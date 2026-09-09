@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:buildtrack_mobile/services/billing_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
 enum SubscriptionPlan { free, starter, growth, pro, business, enterprise }
+
 extension SubscriptionPlanX on SubscriptionPlan {
   String get label {
     switch (this) {
@@ -19,6 +21,7 @@ extension SubscriptionPlanX on SubscriptionPlan {
         return 'Enterprise';
     }
   }
+
   String get badge {
     switch (this) {
       case SubscriptionPlan.free:
@@ -35,6 +38,7 @@ extension SubscriptionPlanX on SubscriptionPlan {
         return 'ENTERPRISE';
     }
   }
+
   int get maxUsers {
     switch (this) {
       case SubscriptionPlan.free:
@@ -51,6 +55,7 @@ extension SubscriptionPlanX on SubscriptionPlan {
         return 999999;
     }
   }
+
   int get maxProjects {
     switch (this) {
       case SubscriptionPlan.free:
@@ -67,6 +72,7 @@ extension SubscriptionPlanX on SubscriptionPlan {
         return -1;
     }
   }
+
   static SubscriptionPlan fromString(String? value) {
     switch (value?.toLowerCase().trim()) {
       case 'starter':
@@ -84,7 +90,9 @@ extension SubscriptionPlanX on SubscriptionPlan {
     }
   }
 }
+
 enum SubscriptionStatus { active, expired, unknown }
+
 class SubscriptionProvider extends ChangeNotifier {
   SubscriptionPlan _currentPlan = SubscriptionPlan.free;
   SubscriptionStatus _status = SubscriptionStatus.unknown;
@@ -116,6 +124,7 @@ class SubscriptionProvider extends ChangeNotifier {
     notifyListeners();
     await _fetchStatusFromNetwork();
   }
+
   Future<void> _fetchStatusFromNetwork() async {
     try {
       final data = await BillingService.fetchStatus();
@@ -148,6 +157,7 @@ class SubscriptionProvider extends ChangeNotifier {
       notifyListeners();
     }
   }
+
   Future<Map<String, dynamic>?> purchase(String productId) async {
     if (_isPurchasing) return null;
     _isPurchasing = true;
@@ -169,6 +179,7 @@ class SubscriptionProvider extends ChangeNotifier {
       notifyListeners();
     }
   }
+
   Future<void> restore() async {
     _isLoading = true;
     _error = '';
@@ -185,6 +196,24 @@ class SubscriptionProvider extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  Future<bool> cancelPlan() async {
+    _isLoading = true;
+    _error = '';
+    notifyListeners();
+    try {
+      final success = await BillingService.cancelSubscription();
+      await fetchStatus();
+      return success;
+    } catch (e) {
+      _error = 'Cancellation failed: ${e.toString()}';
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
   Future<void> handlePaymentResult(bool success) async {
     _pendingPaymentParams = null;
     if (success) {
@@ -194,10 +223,12 @@ class SubscriptionProvider extends ChangeNotifier {
       notifyListeners();
     }
   }
+
   void clearError() {
     _error = '';
     notifyListeners();
   }
+
   void clear() {
     _currentPlan = SubscriptionPlan.free;
     _status = SubscriptionStatus.unknown;
@@ -206,6 +237,7 @@ class SubscriptionProvider extends ChangeNotifier {
     _pendingPaymentParams = null;
     notifyListeners();
   }
+
   Future<void> _persistSubscription() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -223,6 +255,7 @@ class SubscriptionProvider extends ChangeNotifier {
       debugPrint('Persist subscription error: $e');
     }
   }
+
   Future<void> _loadPersistedSubscription() async {
     try {
       final prefs = await SharedPreferences.getInstance();

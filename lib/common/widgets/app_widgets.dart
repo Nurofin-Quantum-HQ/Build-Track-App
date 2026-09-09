@@ -16,7 +16,7 @@ class AppCard extends StatelessWidget {
   final EdgeInsetsGeometry padding;
   final EdgeInsetsGeometry margin;
   final Color color;
-  final double borderRadius;
+  final double borderRadius;  
   final VoidCallback? onTap;
   @override
   Widget build(BuildContext context) {

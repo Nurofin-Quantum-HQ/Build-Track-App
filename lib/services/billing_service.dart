@@ -50,4 +50,16 @@ class BillingService {
       return null;
     }
   }
+
+  static Future<bool> cancelSubscription() async {
+    try {
+      final response = await ApiService.post('/subscriptions/cancel', {});
+      if (response.statusCode == 200) {
+        return true;
+      }
+      return false;
+    } catch (e) {
+      return false;
+    }
+  }
 }
