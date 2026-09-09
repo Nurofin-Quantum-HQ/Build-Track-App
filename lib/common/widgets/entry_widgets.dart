@@ -1612,7 +1612,7 @@ Future<Map<String, dynamic>?> showPaymentSheet(
       'amount': double.tryParse(amountCtrl.text) ?? 0.0,
       'paymentMethod': selectedMethod,
       'notes': noteCtrl.text.trim(),
-      'date': selectedPaymentDate.toIso8601String(),
+      'date': selectedPaymentDate.toUtc().toIso8601String(),
     };
     final res = await ApiService.requestEsignature(emailCtrl.text.trim(), meta);
     if (res == null || res['requestId'] == null) {
