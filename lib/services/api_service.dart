@@ -1089,16 +1089,60 @@ class ApiService {
     }
     return null;
   }
-  static Future<List<dynamic>> getNotifications() async {
+  static Future<Map<String, dynamic>> fetchNotificationPage({int page = 1, int limit = 50}) async {
     try {
-      final response = await get('/notifications');
+      final response = await get('/notifications?page=$page&limit=$limit');
       if (response.statusCode == 200) {
-        return json.decode(response.body);
+        final decoded = json.decode(response.body);
+        if (decoded is Map<String, dynamic>) return decoded;
       }
     } catch (e) {
-      if (kDebugMode) debugPrint('getNotifications error: $e');
+      if (kDebugMode) debugPrint('fetchNotificationPage error: $e');
     }
-    return [];
+    return {'items': <dynamic>[], 'total': 0, 'unreadCount': 0, 'page': 1, 'pages': 1};
+  }
+
+  static Future<List<dynamic>> getNotifications() async {
+    final data = await fetchNotificationPage();
+    return (data['items'] as List?) ?? [];
+  }
+
+  static Future<int> getUnreadNotificationCount() async {
+    try {
+      final response = await get('/notifications/unread-count');
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data is Map<String, dynamic>) return (data['unreadCount'] as int?) ?? 0;
+      }
+    } catch (e) {
+      if (kDebugMode) debugPrint('getUnreadNotificationCount error: $e');
+    }
+    return 0;
+  }
+
+  static Future<Map<String, dynamic>> getNotificationPreferences() async {
+    try {
+      final response = await get('/notifications/preferences');
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data is Map<String, dynamic>) {
+          return Map<String, dynamic>.from((data['preferences'] as Map?) ?? {});
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) debugPrint('getNotificationPreferences error: $e');
+    }
+    return {};
+  }
+
+  static Future<bool> saveNotificationPreferences(Map<String, dynamic> preferences) async {
+    try {
+      final response = await put('/notifications/preferences', {'preferences': preferences});
+      return response.statusCode == 200;
+    } catch (e) {
+      if (kDebugMode) debugPrint('saveNotificationPreferences error: $e');
+      return false;
+    }
   }
 
   static Future<bool> markNotificationAsRead(String id) async {

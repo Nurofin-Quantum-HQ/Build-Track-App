@@ -6,7 +6,7 @@ const String kProMonthlyId = 'buildtrack_pro_monthly';
 const String kBusinessMonthlyId = 'buildtrack_business_monthly';
 const String kEnterpriseMonthlyId = 'buildtrack_enterprise_monthly';
 const Map<String, double> kPlanAmounts = {
-  kStarterMonthlyId: 498,
+  kStarterMonthlyId: 1,
   kGrowthMonthlyId: 999,
   kProMonthlyId: 1499,
   kBusinessMonthlyId: 2499,

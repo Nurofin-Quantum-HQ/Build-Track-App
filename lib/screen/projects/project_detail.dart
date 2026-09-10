@@ -2902,97 +2902,11 @@ class _EntryTile extends StatelessWidget {
 class _ActionButtons extends StatelessWidget {
   const _ActionButtons({required this.project});
   final ProjectModel project;
-  void _showDeleteConfirmation(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            const Icon(
-              Icons.warning_amber_rounded,
-              color: Colors.redAccent,
-              size: 28,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              'Delete Project',
-              style: AppTheme.heading2.copyWith(color: AppColors.textDark),
-            ),
-          ],
-        ),
-        content: Text(
-          'Are you sure you want to delete "${project.name}"? This action '
-          'cannot be undone and all associated entries will be permanently removed.',
-          style: AppTheme.bodyLarge.copyWith(color: AppColors.textLight),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text(
-              'Cancel',
-              style: TextStyle(
-                color: AppColors.textLight,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.redAccent,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            onPressed: () async {
-              Navigator.pop(ctx);
-              showDialog(
-                context: context,
-                barrierDismissible: false,
-                builder: (lCtx) => const Center(
-                  child: CircularProgressIndicator(color: AppColors.primary),
-                ),
-              );
-              final success = await ApiService.deleteProject(project.id);
-              if (context.mounted) {
-                Navigator.pop(context);
-                if (success) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Project deleted successfully'),
-                      backgroundColor: Colors.green,
-                    ),
-                  );
-                  await context.read<ProjectProvider>().load();
-                  if (context.mounted) Navigator.pop(context);
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Failed to delete project'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                }
-              }
-            },
-            child: const Text(
-              'Delete',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
   @override
   Widget build(BuildContext context) {
     final canAddEntry = RoleManager.canManageExpenses;
     final canEdit = RoleManager.canEditProject;
-    final canDelete = RoleManager.canDeleteProject;
-    if (!canAddEntry && !canEdit && !canDelete) {
+    if (!canAddEntry && !canEdit) {
       return AppCard(
         child: Row(
           children: [
@@ -3036,13 +2950,6 @@ class _ActionButtons extends StatelessWidget {
           ),
           const SizedBox(height: 10),
         ],
-        if (canDelete)
-          AppButton(
-            label: 'Delete Project',
-            icon: Icons.delete_outline_outlined,
-            variant: AppButtonVariant.danger,
-            onPressed: () => _showDeleteConfirmation(context),
-          ),
       ],
     );
   }

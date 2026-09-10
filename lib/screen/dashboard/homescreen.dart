@@ -22,6 +22,7 @@ import 'package:flutter/foundation.dart';
 import 'package:showcaseview/showcaseview.dart';
 import 'package:buildtrack_mobile/controller/showcase_keys.dart';
 import 'package:buildtrack_mobile/controller/nav_controller.dart';
+import 'package:buildtrack_mobile/screen/dashboard/notifications_bell.dart';
 
 String relativeTimeLabel(DateTime date) {
   final now = DateTime.now();
@@ -403,22 +404,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                         ),
                       ),
                     const SizedBox(width: 8),
-                    GestureDetector(
-                      onTap: () =>
-                          Navigator.pushNamed(context, '/notifications'),
-                      child: Container(
-                        padding: const EdgeInsets.all(7),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.1),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.notifications_none_outlined,
-                          color: AppColors.primary,
-                          size: 19,
-                        ),
-                      ),
-                    ),
+                    const NotificationsBell(),
                     const SizedBox(width: 8),
                     Showcase(
                       key: ShowcaseKeys.profileIcon,
