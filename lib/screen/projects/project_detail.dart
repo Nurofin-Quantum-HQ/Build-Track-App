@@ -1378,11 +1378,20 @@ class _SummaryCard extends StatelessWidget {
         : allPhases.where((p) => selectedNames.contains(p.name)).toList();
     final completed = project.completedActivityKeys ?? [];
     String? activePhase;
-    for (final p in phases) {
-      final keys = p.allActivities.map((a) => a.key).toList();
-      if (keys.any((k) => !completed.contains(k))) {
-        activePhase = p.name;
-        break;
+    if (project.selectedPhases != null && project.selectedPhases!.isNotEmpty) {
+      for (final p in project.selectedPhases!) {
+        if (p.activities.any((a) => !a.completed)) {
+          activePhase = p.phaseName;
+          break;
+        }
+      }
+    } else {
+      for (final p in phases) {
+        final keys = p.allActivities.map((a) => a.key).toList();
+        if (keys.any((k) => !completed.contains(k))) {
+          activePhase = p.name;
+          break;
+        }
       }
     }
     return AppCard(
