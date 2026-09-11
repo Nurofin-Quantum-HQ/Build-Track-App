@@ -45,6 +45,7 @@ import 'package:buildtrack_mobile/screen/approvals/approvals_screen.dart';
 import 'package:buildtrack_mobile/screen/inventory/fulfillment_payment_screen.dart';
 import 'package:buildtrack_mobile/screen/admin/admin_overview_screen.dart';
 import 'package:showcaseview/showcaseview.dart';
+import 'package:buildtrack_mobile/services/push_notification_service.dart';
 
 void main() {
   runZonedGuarded(
@@ -57,6 +58,8 @@ void main() {
       final token = prefs.getString('token');
       final isLoggedIn = token != null && token.isNotEmpty;
       final projectProvider = ProjectProvider();
+      
+      // Initialize Push Notifications
       if (isLoggedIn) {
         debugPrint('API Initialized: Endpoint is ${ApiService.baseUrl}');
         await projectProvider.load().timeout(
@@ -65,6 +68,11 @@ void main() {
             debugPrint('[main] projectProvider.load timed out after 30s');
           },
         );
+        try {
+          await PushNotificationService.init();
+        } catch (e) {
+          debugPrint('Failed to initialize push notifications: $e');
+        }
       } else {
         debugPrint(
           'API Initialized: Endpoint is ${ApiService.baseUrl} (not logged in)',
