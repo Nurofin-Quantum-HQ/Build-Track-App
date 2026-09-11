@@ -986,10 +986,17 @@ class ProjectProvider extends ChangeNotifier {
     final project = _projects[projectIndex];
     final phases = List<ProjectPhase>.from(project.selectedPhases ?? []);
     bool found = false;
+    final actIdLower = activityId.trim().toLowerCase();
     for (var p = 0; p < phases.length; p++) {
       final phase = phases[p];
       final activities = List<ProjectActivity>.from(phase.activities);
-      final aIndex = activities.indexWhere((a) => a.id == activityId);
+      final aIndex = activities.indexWhere(
+        (a) =>
+            a.id == activityId ||
+            a.name == activityId ||
+            a.id.trim().toLowerCase() == actIdLower ||
+            a.name.trim().toLowerCase() == actIdLower,
+      );
       if (aIndex != -1) {
         final current = activities[aIndex];
         activities[aIndex] = current.copyWith(
@@ -1018,7 +1025,9 @@ class ProjectProvider extends ChangeNotifier {
       );
       final response = await ApiService.put(
         '/projects/$projectId',
-        updated.toJson(),
+        {
+          'selectedPhases': phases.map((ph) => ph.toJson()).toList(),
+        },
       );
       dev.log(
         '[DEBUG] updateActivityBudget: PUT response status: ${response.statusCode}',
@@ -1027,10 +1036,9 @@ class ProjectProvider extends ChangeNotifier {
         if (response.statusCode == 200 && response.body.isNotEmpty) {
           try {
             final data = jsonDecode(response.body);
-            if (data['project'] != null) {
-              final newProject = ProjectModel.fromJson(
-                data['project'] as Map<String, dynamic>,
-              );
+            final projData = data['project'] ?? data['data'];
+            if (projData != null && projData is Map<String, dynamic>) {
+              final newProject = ProjectModel.fromJson(projData);
               _projects[projectIndex] = newProject;
               if (_selectedProject?.id == projectId) {
                 _selectedProject = newProject;

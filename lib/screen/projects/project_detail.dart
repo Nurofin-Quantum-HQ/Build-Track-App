@@ -504,14 +504,29 @@ class _TrackerActivityRowState extends State<_TrackerActivityRow> {
     });
   }
   void _openUpdateBudgetDialog(BuildContext context) {
+    final provider = context.read<ProjectProvider>();
+    final currentProject = provider.projects.firstWhere(
+      (p) => p.id == widget.project.id,
+      orElse: () => widget.project,
+    );
+    ProjectActivity currentActivity = widget.activity;
+    for (final phase in currentProject.selectedPhases ?? <ProjectPhase>[]) {
+      for (final a in phase.activities) {
+        if (a.id == widget.activity.id || a.name == widget.activity.name) {
+          currentActivity = a;
+          break;
+        }
+      }
+    }
+
     final materialController = TextEditingController(
-      text: (widget.activity.budgetMaterial ?? 0.0).toStringAsFixed(0),
+      text: (currentActivity.budgetMaterial ?? 0.0).toStringAsFixed(0),
     );
     final labourController = TextEditingController(
-      text: (widget.activity.budgetLabour ?? 0.0).toStringAsFixed(0),
+      text: (currentActivity.budgetLabour ?? 0.0).toStringAsFixed(0),
     );
     final equipmentController = TextEditingController(
-      text: (widget.activity.budgetEquipment ?? 0.0).toStringAsFixed(0),
+      text: (currentActivity.budgetEquipment ?? 0.0).toStringAsFixed(0),
     );
     showModalBottomSheet(
       context: context,
@@ -544,7 +559,7 @@ class _TrackerActivityRowState extends State<_TrackerActivityRow> {
               ),
               const SizedBox(height: 20),
               Text(
-                'Budget Allocation: ${widget.activity.name}',
+                'Budget Allocation: ${currentActivity.name}',
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w800,
@@ -586,7 +601,9 @@ class _TrackerActivityRowState extends State<_TrackerActivityRow> {
                         .read<ProjectProvider>()
                         .updateActivityBudget(
                           widget.project.id,
-                          widget.activity.id,
+                          currentActivity.id.isNotEmpty
+                              ? currentActivity.id
+                              : currentActivity.name,
                           budgetMaterial: mat,
                           budgetLabour: lab,
                           budgetEquipment: equ,
@@ -677,12 +694,89 @@ class _TrackerActivityRowState extends State<_TrackerActivityRow> {
     );
   }
   Widget _buildBudgetSection(BuildContext context) {
-    final allocMat = widget.activity.budgetMaterial ?? 0.0;
-    final allocLab = widget.activity.budgetLabour ?? 0.0;
-    final allocEqu = widget.activity.budgetEquipment ?? 0.0;
-    final budget =
-        widget.activity.budget ??
-        ActivityBudget.zero(allocMat, allocLab, allocEqu);
+    final provider = context.watch<ProjectProvider>();
+    final entries = provider.entriesForProject(widget.project.id);
+    final currentProject = provider.projects.firstWhere(
+      (p) => p.id == widget.project.id,
+      orElse: () => widget.project,
+    );
+    ProjectActivity currentActivity = widget.activity;
+    for (final phase in currentProject.selectedPhases ?? <ProjectPhase>[]) {
+      for (final a in phase.activities) {
+        if (a.id == widget.activity.id || a.name == widget.activity.name) {
+          currentActivity = a;
+          break;
+        }
+      }
+    }
+
+    final allocMat = currentActivity.budgetMaterial ?? 0.0;
+    final allocLab = currentActivity.budgetLabour ?? 0.0;
+    final allocEqu = currentActivity.budgetEquipment ?? 0.0;
+    final allocTotal = allocMat + allocLab + allocEqu;
+
+    bool matchesActivity(EntryModel e) {
+      if (currentActivity.id.isNotEmpty && e.activityId == currentActivity.id) {
+        return true;
+      }
+      final actNameLower = currentActivity.name.trim().toLowerCase();
+      if (e.activity != null && e.activity!.trim().toLowerCase() == actNameLower) {
+        return true;
+      }
+      if (e.activityId != null && e.activityId!.trim().toLowerCase() == actNameLower) {
+        return true;
+      }
+      return false;
+    }
+
+    final actEntries = entries.where(matchesActivity).toList();
+
+    final spentMat = actEntries
+        .where((e) => e.type == EntryType.material)
+        .fold(0.0, (sum, e) => sum + e.amount);
+
+    final spentLab = actEntries
+        .where((e) => e.type == EntryType.labour)
+        .fold(0.0, (sum, e) => sum + e.amount);
+
+    final spentEqu = actEntries
+        .where((e) => e.type == EntryType.equipment)
+        .fold(0.0, (sum, e) => sum + e.amount);
+
+    final spentTotal = spentMat + spentLab + spentEqu;
+
+    final matCat = ActivityBudgetCategory(
+      allocated: allocMat,
+      spent: spentMat,
+      remaining: allocMat - spentMat,
+      utilization: allocMat > 0 ? (spentMat / allocMat) : 0.0,
+      progress: allocMat > 0 ? (spentMat / allocMat).clamp(0.0, 1.0) : 0.0,
+    );
+
+    final labCat = ActivityBudgetCategory(
+      allocated: allocLab,
+      spent: spentLab,
+      remaining: allocLab - spentLab,
+      utilization: allocLab > 0 ? (spentLab / allocLab) : 0.0,
+      progress: allocLab > 0 ? (spentLab / allocLab).clamp(0.0, 1.0) : 0.0,
+    );
+
+    final equCat = ActivityBudgetCategory(
+      allocated: allocEqu,
+      spent: spentEqu,
+      remaining: allocEqu - spentEqu,
+      utilization: allocEqu > 0 ? (spentEqu / allocEqu) : 0.0,
+      progress: allocEqu > 0 ? (spentEqu / allocEqu).clamp(0.0, 1.0) : 0.0,
+    );
+
+    final totalCat = ActivityBudgetCategory(
+      allocated: allocTotal,
+      spent: spentTotal,
+      remaining: allocTotal - spentTotal,
+      utilization: allocTotal > 0 ? (spentTotal / allocTotal) : 0.0,
+      progress: allocTotal > 0 ? (spentTotal / allocTotal).clamp(0.0, 1.0) : 0.0,
+    );
+
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 4, 16, 12),
       padding: const EdgeInsets.all(14),
@@ -742,25 +836,25 @@ class _TrackerActivityRowState extends State<_TrackerActivityRow> {
           const SizedBox(height: 12),
           _buildBudgetItem(
             label: 'Materials',
-            category: budget.material,
+            category: matCat,
             color: AppColors.primary,
           ),
           const SizedBox(height: 8),
           _buildBudgetItem(
             label: 'Labour',
-            category: budget.labour,
+            category: labCat,
             color: const Color(0xFF10B981),
           ),
           const SizedBox(height: 8),
           _buildBudgetItem(
             label: 'Equipment',
-            category: budget.equipment,
+            category: equCat,
             color: const Color(0xFFF59E0B),
           ),
           const Divider(height: 16, color: Color(0xFFE5E7EB)),
           _buildBudgetItem(
             label: 'Total Budget',
-            category: budget.total,
+            category: totalCat,
             color: const Color(0xFF7C3AED),
             isBold: true,
           ),
