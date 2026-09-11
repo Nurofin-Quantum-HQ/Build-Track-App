@@ -62,7 +62,6 @@ class _ReportsView extends StatefulWidget {
 
 class _ReportsViewState extends State<_ReportsView> {
   final GlobalKey _chartsKey = GlobalKey();
-  final GlobalKey _exportBtnKey = GlobalKey();
   bool _linked = false;
   String _selectedProjectId = 'all';
   String? _selectedFloor;
