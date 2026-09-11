@@ -2719,12 +2719,16 @@ class _RecentEntriesSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isAdmin = UserSession.isAdmin;
+    final isSupervisor = UserSession.isSupervisor || RoleManager.isSupervisor;
+    final hasProjectAccess = UserSession.hasProjectAccess(project.id);
     final allEntries = provider.entriesForProject(project.id).toList();
     final filtered = allEntries.where((e) {
-      if (currentUserId == null || currentUserId!.isEmpty) return false;
-      if (e.createdBy != currentUserId) return false;
       if (e.approvalStatus.toLowerCase().trim() != 'approved') return false;
-      return true;
+      if (isAdmin || isSupervisor || hasProjectAccess) return true;
+      if (currentUserId != null && currentUserId!.isNotEmpty && e.createdBy == currentUserId) {
+        return true;
+      }
+      return false;
     }).toList();
     filtered.sort((a, b) => b.date.compareTo(a.date));
     final entries = filtered.take(3).toList();
@@ -2732,7 +2736,7 @@ class _RecentEntriesSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         AppSectionHeader(
-          title: 'My Recent Entries',
+          title: 'Recent Activity',
           actionLabel: entries.isEmpty ? null : 'View All',
           onAction: () {
             Navigator.push(
@@ -3070,12 +3074,16 @@ class _AllProjectEntriesScreen extends StatelessWidget {
   final bool isAdmin;
   @override
   Widget build(BuildContext context) {
+    final isSupervisor = UserSession.isSupervisor || RoleManager.isSupervisor;
+    final hasProjectAccess = UserSession.hasProjectAccess(project.id);
     final allEntries = provider.entriesForProject(project.id).toList();
     final entries = allEntries.where((e) {
-      if (currentUserId == null || currentUserId!.isEmpty) return false;
-      if (e.createdBy != currentUserId) return false;
       if (e.approvalStatus.toLowerCase().trim() != 'approved') return false;
-      return true;
+      if (isAdmin || isSupervisor || hasProjectAccess) return true;
+      if (currentUserId != null && currentUserId!.isNotEmpty && e.createdBy == currentUserId) {
+        return true;
+      }
+      return false;
     }).toList();
     entries.sort((a, b) => b.date.compareTo(a.date));
     final canEdit = RoleManager.canEditProject;
