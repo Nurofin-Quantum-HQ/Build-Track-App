@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:buildtrack_mobile/services/api_service.dart';
 enum UserRole { admin, supervisor, mason }
@@ -11,6 +13,9 @@ class UserSession extends ChangeNotifier {
   static String _userId = '';
   static UserRole _role = UserRole.mason;
   static String? _profilePhoto;
+  static String _companyName = '';
+  static String _companyFontStyle = 'Inter';
+  static String? _companyLogo;
   static String _rawRoleName = '';
   static List<String> _overseesRoles = [];
   static List<String> _visitedModules = [];
@@ -36,6 +41,9 @@ class UserSession extends ChangeNotifier {
   static bool _initialized = false;
   static String get userId => _userId;
   static UserRole get role => _role;
+  static String get companyName => _companyName;
+  static String get companyFontStyle => _companyFontStyle;
+  static String? get companyLogo => _companyLogo;
   static List<String> get projectIds => List.unmodifiable(_projectIds);
   static List<String> get overseesRoles => List.unmodifiable(_overseesRoles);
   static List<String> get permissions => List.unmodifiable(_permissions);
@@ -44,6 +52,39 @@ class UserSession extends ChangeNotifier {
   static bool get isAdmin => _role == UserRole.admin;
   static bool get isSupervisor => _role == UserRole.supervisor;
   static bool get isMason => _role == UserRole.mason;
+  static TextStyle getCompanyTextStyle({
+    double fontSize = 18,
+    FontWeight fontWeight = FontWeight.w800,
+    Color? color,
+    double? letterSpacing,
+  }) {
+    final baseStyle = TextStyle(
+      fontSize: fontSize,
+      fontWeight: fontWeight,
+      color: color,
+      letterSpacing: letterSpacing,
+    );
+    switch (_companyFontStyle.toLowerCase().trim()) {
+      case 'outfit':
+        return GoogleFonts.outfit(textStyle: baseStyle);
+      case 'poppins':
+        return GoogleFonts.poppins(textStyle: baseStyle);
+      case 'montserrat':
+        return GoogleFonts.montserrat(textStyle: baseStyle);
+      case 'roboto':
+        return GoogleFonts.roboto(textStyle: baseStyle);
+      case 'playfair display':
+        return GoogleFonts.playfairDisplay(textStyle: baseStyle);
+      case 'cinzel':
+        return GoogleFonts.cinzel(textStyle: baseStyle);
+      case 'caveat':
+        return GoogleFonts.caveat(textStyle: baseStyle);
+      case 'inter':
+      default:
+        return GoogleFonts.inter(textStyle: baseStyle);
+    }
+  }
+
   static bool get hasSkippedTour => _hasSkippedTour;
   static bool get hasCreatedProject => _hasCreatedProject;
   static bool get hasAddedEntry => _hasAddedEntry;
@@ -215,12 +256,15 @@ class UserSession extends ChangeNotifier {
 
     
     _profilePhoto = user['profilePhoto']?.toString();
+    _companyName = user['companyName']?.toString() ?? '';
+    _companyFontStyle = user['companyFontStyle']?.toString() ?? 'Inter';
+    _companyLogo = user['companyLogo']?.toString();
     _initialized = true;
     await _persist();
     _instance.notifyListeners();
     debugPrint(
       '[UserSession] fromLoginResponse → '
-      'role=$roleLabel (_raw=$_rawRoleName) projectIds=$_projectIds permissions=$_permissions',
+      'role=$roleLabel (_raw=$_rawRoleName) company=$_companyName font=$_companyFontStyle projectIds=$_projectIds permissions=$_permissions',
     );
   }
   static Future<void> loadFromPrefs() async {
@@ -235,6 +279,9 @@ class UserSession extends ChangeNotifier {
       final data = json.decode(raw) as Map<String, dynamic>;
       _userId = data['id']?.toString() ?? '';
       _profilePhoto = data['profilePhoto']?.toString();
+      _companyName = data['companyName']?.toString() ?? '';
+      _companyFontStyle = data['companyFontStyle']?.toString() ?? 'Inter';
+      _companyLogo = data['companyLogo']?.toString();
       _role = _parseRole(data['role']?.toString());
       _rawRoleName = data['rawRoleName']?.toString() ?? _enumToDisplay(_role);
       final rawProj = data['projectIds'];
@@ -269,7 +316,7 @@ class UserSession extends ChangeNotifier {
       _instance.notifyListeners();
       debugPrint(
         '[UserSession] loadFromPrefs → '
-        'role=$roleLabel (_raw=$_rawRoleName) projectIds=$_projectIds',
+        'role=$roleLabel (_raw=$_rawRoleName) company=$_companyName font=$_companyFontStyle projectIds=$_projectIds',
       );
     } catch (e) {
       debugPrint('[UserSession] loadFromPrefs error: $e');
@@ -281,6 +328,9 @@ class UserSession extends ChangeNotifier {
     _userId = '';
     _role = UserRole.mason;
     _rawRoleName = '';
+    _companyName = '';
+    _companyFontStyle = 'Inter';
+    _companyLogo = null;
     _projectIds = [];
     _overseesRoles = [];
     _permissions = [];
@@ -311,11 +361,17 @@ class UserSession extends ChangeNotifier {
     List<String> permissions = const [],
     String rawRoleName = '',
     String? profilePhoto,
+    String companyName = '',
+    String companyFontStyle = 'Inter',
+    String? companyLogo,
   }) {
     _userId = userId;
     _role = role;
     _rawRoleName = rawRoleName.isNotEmpty ? rawRoleName : _enumToDisplay(role);
     _profilePhoto = profilePhoto;
+    _companyName = companyName;
+    _companyFontStyle = companyFontStyle;
+    _companyLogo = companyLogo;
     final merged = List<String>.from(projectIds);
     if (projectId.isNotEmpty && !merged.contains(projectId)) {
       merged.insert(0, projectId);
@@ -383,6 +439,9 @@ class UserSession extends ChangeNotifier {
           'id': _userId,
           'role': roleLabel,
           'rawRoleName': _rawRoleName,
+          'companyName': _companyName,
+          'companyFontStyle': _companyFontStyle,
+          'companyLogo': _companyLogo,
           'projectIds': _projectIds,
           'projectId': projectId,
           'permissions': _permissions,

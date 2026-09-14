@@ -1,11 +1,14 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:buildtrack_mobile/common/themes/app_colors.dart';
 import 'package:buildtrack_mobile/common/themes/app_theme.dart';
+import 'package:buildtrack_mobile/common/utils/image_pick_helper.dart';
 import 'package:buildtrack_mobile/common/widgets/app_layout.dart';
 import 'package:buildtrack_mobile/common/widgets/app_widgets.dart';
 import 'package:buildtrack_mobile/services/api_service.dart';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 class CreateWorkspaceScreen extends StatefulWidget {
   const CreateWorkspaceScreen({super.key});
   @override
@@ -18,10 +21,23 @@ class _CreateWorkspaceScreenState extends State<CreateWorkspaceScreen> {
   final _emailCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
   final _confirmCtrl = TextEditingController();
+  String _selectedFontStyle = 'Inter';
+  Uint8List? _logoBytes;
+  String? _logoDataUri;
   bool _obscurePass = true;
   bool _obscureConfirm = true;
   bool _isLoading = false;
-  
+  static const List<String> _fontOptions = [
+    'Inter',
+    'Outfit',
+    'Poppins',
+    'Montserrat',
+    'Roboto',
+    'Playfair Display',
+    'Cinzel',
+    'Caveat',
+  ];
+
   bool _isEmailVerified = false;
   bool _otpSent = false;
   bool _isSendingOtp = false;
@@ -65,34 +81,57 @@ class _CreateWorkspaceScreenState extends State<CreateWorkspaceScreen> {
   Widget _buildHeader() {
     return Column(
       children: [
-        ShaderMask(
-          shaderCallback: (bounds) => const LinearGradient(
-            colors: [Color(0xFF4A3FDE), Color(0xFF7B52FF)],
-          ).createShader(bounds),
-          child: RichText(
-            text: TextSpan(
-              children: [
-                const TextSpan(
-                  text: 'Build',
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.white,
-                    letterSpacing: -0.5,
-                  ),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(9),
+              child: Image.asset(
+                'assets/images/buildtrack-logo.png',
+                width: 36,
+                height: 36,
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) => Image.network(
+                  'assets/images/buildtrack-logo.png',
+                  width: 36,
+                  height: 36,
+                  fit: BoxFit.contain,
                 ),
-                TextSpan(
-                  text: 'Track',
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w900,
-                    color: const Color(0xFF7BCFFF),
-                    letterSpacing: -0.5,
-                  ),
-                ),
-              ],
+              ),
             ),
-          ),
+            const SizedBox(width: 10),
+            ShaderMask(
+              shaderCallback: (bounds) => const LinearGradient(
+                colors: [Color(0xFF4A3FDE), Color(0xFF7B52FF)],
+              ).createShader(bounds),
+              child: RichText(
+                text: TextSpan(
+                  children: [
+                    const TextSpan(
+                      text: 'Build',
+                      style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                    TextSpan(
+                      text: 'Track',
+                      style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.w900,
+                        color: const Color(0xFF7BCFFF),
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 18),
         Text(
@@ -125,10 +164,162 @@ class _CreateWorkspaceScreenState extends State<CreateWorkspaceScreen> {
           keyboardType: TextInputType.phone,
         ),
         AppTextField(
-          label: 'Company Name',
+          label: 'Company Name *',
           controller: _companyCtrl,
           hint: 'e.g. Apex Construction',
           prefixIcon: Icons.business_outlined,
+        ),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Company Name Font Style',
+              style: AppTheme.body.copyWith(
+                fontWeight: FontWeight.w600,
+                color: AppColors.textDark,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              decoration: BoxDecoration(
+                color: AppColors.cardBg,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppColors.inputBorder),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  isExpanded: true,
+                  value: _selectedFontStyle,
+                  icon: const Icon(Icons.keyboard_arrow_down, color: AppColors.primary),
+                  items: _fontOptions.map((font) {
+                    return DropdownMenuItem<String>(
+                      value: font,
+                      child: Text(
+                        font,
+                        style: _getFontPreviewStyle(font),
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (val) {
+                    if (val != null) setState(() => _selectedFontStyle = val);
+                  },
+                ),
+              ),
+            ),
+            const SizedBox(height: AppTheme.spacingMd),
+          ],
+        ),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text(
+                  'Company Logo',
+                  style: AppTheme.body.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textDark,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  '(Optional)',
+                  style: AppTheme.body.copyWith(
+                    color: AppColors.textLight,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            _logoBytes != null
+                ? Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.cardBg,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+                    ),
+                    child: Row(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: Image.memory(
+                            _logoBytes!,
+                            width: 44,
+                            height: 44,
+                            fit: BoxFit.contain,
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Logo selected',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 13,
+                                  color: AppColors.textDark,
+                                ),
+                              ),
+                              GestureDetector(
+                                onTap: _pickLogo,
+                                child: const Text(
+                                  'Change logo',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: AppColors.primary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close, color: Colors.red, size: 20),
+                          onPressed: () => setState(() {
+                            _logoBytes = null;
+                            _logoDataUri = null;
+                          }),
+                        ),
+                      ],
+                    ),
+                  )
+                : InkWell(
+                    onTap: _pickLogo,
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: AppColors.primarySurface.withValues(alpha: 0.5),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: AppColors.primary.withValues(alpha: 0.25),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.add_photo_alternate_outlined, color: AppColors.primary, size: 20),
+                          const SizedBox(width: 10),
+                          Text(
+                            'Upload Company Logo (Optional)',
+                            style: AppTheme.body.copyWith(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+            const SizedBox(height: AppTheme.spacingMd),
+          ],
         ),
         AppTextField(
           label: 'Email Address',
@@ -260,6 +451,34 @@ class _CreateWorkspaceScreenState extends State<CreateWorkspaceScreen> {
       ],
     );
   }
+
+  TextStyle _getFontPreviewStyle(String font) {
+    const base = TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textDark);
+    switch (font.toLowerCase()) {
+      case 'outfit': return GoogleFonts.outfit(textStyle: base);
+      case 'poppins': return GoogleFonts.poppins(textStyle: base);
+      case 'montserrat': return GoogleFonts.montserrat(textStyle: base);
+      case 'roboto': return GoogleFonts.roboto(textStyle: base);
+      case 'playfair display': return GoogleFonts.playfairDisplay(textStyle: base);
+      case 'cinzel': return GoogleFonts.cinzel(textStyle: base);
+      case 'caveat': return GoogleFonts.caveat(textStyle: base);
+      case 'inter':
+      default: return GoogleFonts.inter(textStyle: base);
+    }
+  }
+
+  Future<void> _pickLogo() async {
+    final picked = await pickImageFromGallery(context);
+    if (picked == null || !mounted) return;
+    final bytes = await picked.readAsBytes();
+    final ext = picked.path.split('.').last.toLowerCase();
+    final mime = ext == 'png' ? 'image/png' : 'image/jpeg';
+    setState(() {
+      _logoBytes = bytes;
+      _logoDataUri = 'data:$mime;base64,${base64Encode(bytes)}';
+    });
+  }
+
   Widget _buildActions() {
     return Column(
       children: [
@@ -291,9 +510,55 @@ class _CreateWorkspaceScreenState extends State<CreateWorkspaceScreen> {
             ),
           ],
         ),
+        const SizedBox(height: 22),
+        _buildPoweredByNurofin(),
       ],
     );
   }
+  Widget _buildPoweredByNurofin() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Text(
+            'Powered by',
+            style: AppTheme.caption.copyWith(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textLight,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Image.asset(
+            'assets/images/nurofin-logo.png',
+            height: 18,
+            fit: BoxFit.contain,
+            errorBuilder: (context, error, stackTrace) => Image.network(
+              'assets/images/nurofin-logo.png',
+              height: 18,
+              fit: BoxFit.contain,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _sendOtp() async {
     final email = _emailCtrl.text.trim();
     if (!email.contains('@')) {
@@ -361,7 +626,6 @@ class _CreateWorkspaceScreenState extends State<CreateWorkspaceScreen> {
       );
     }
   }
-
   void _onCreatePressed() async {
     if (!_isEmailVerified) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -375,9 +639,9 @@ class _CreateWorkspaceScreenState extends State<CreateWorkspaceScreen> {
     final email = _emailCtrl.text.trim();
     final pass = _passCtrl.text;
     final confirm = _confirmCtrl.text;
-    if (name.isEmpty || email.isEmpty || pass.isEmpty || phone.isEmpty) {
+    if (name.isEmpty || company.isEmpty || email.isEmpty || pass.isEmpty || phone.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill in all required fields (including phone)')),
+        const SnackBar(content: Text('Please fill in all required fields (including Company Name and phone)')),
       );
       return;
     }
@@ -405,10 +669,13 @@ class _CreateWorkspaceScreenState extends State<CreateWorkspaceScreen> {
     final payload = {
       'name': name,
       'companyName': company,
+      'companyFontStyle': _selectedFontStyle,
+      'companyLogo': _logoDataUri,
       'phone': phone,
       'email': email,
       'password': pass,
       'role': 'Admin',
+      'client': 'mobile',
     };
     try {
       final response = await ApiService.post('/auth/register', payload);
