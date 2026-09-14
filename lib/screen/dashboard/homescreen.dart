@@ -83,14 +83,47 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'BuildTrack Menu',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                  UserSession.companyLogo != null && UserSession.companyLogo!.isNotEmpty
+                      ? Row(
+                          children: [
+                            Container(
+                              width: 42,
+                              height: 42,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: Colors.white24),
+                                image: DecorationImage(
+                                  image: getProfileImageProvider(UserSession.companyLogo)!,
+                                  fit: BoxFit.contain,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                UserSession.companyName.isNotEmpty ? UserSession.companyName : 'BuildTrack',
+                                style: UserSession.getCompanyTextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        )
+                      : Text(
+                          UserSession.companyName.isNotEmpty ? UserSession.companyName : 'BuildTrack',
+                          style: UserSession.getCompanyTextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                   const SizedBox(height: 8),
                   Text(
                     'Role: ${UserSession.roleLabel}',
@@ -212,7 +245,40 @@ class _HomeScreenState extends State<HomeScreen> {
           builder: (ctx) => Column(
             children: [
               AppTopBar(
-                title: 'BuildTrack',
+                title: UserSession.companyName.isNotEmpty ? UserSession.companyName : 'BuildTrack',
+                titleWidget: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (UserSession.companyLogo != null && UserSession.companyLogo!.isNotEmpty) ...[
+                      Container(
+                        width: 26,
+                        height: 26,
+                        margin: const EdgeInsets.only(right: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(6),
+                          image: DecorationImage(
+                            image: getProfileImageProvider(UserSession.companyLogo)!,
+                            fit: BoxFit.contain,
+                          ),
+                        ),
+                      ),
+                    ],
+                    Flexible(
+                      child: Text(
+                        UserSession.companyName.isNotEmpty ? UserSession.companyName : 'BuildTrack',
+                        textAlign: TextAlign.center,
+                        overflow: TextOverflow.ellipsis,
+                        style: UserSession.getCompanyTextStyle(
+                          fontSize: 19,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
                 leftIcon: Icons.menu,
                 onLeftTap: () => Scaffold.of(ctx).openDrawer(),
                 rightWidget: Row(

@@ -22,23 +22,35 @@ class ProfileUserData {
     required this.email,
     required this.role,
     this.profilePhoto,
+    this.companyName = '',
+    this.companyFontStyle = 'Inter',
+    this.companyLogo,
   });
   final String name;
   final String email;
   final String role;
   final String? profilePhoto;
+  final String companyName;
+  final String companyFontStyle;
+  final String? companyLogo;
   factory ProfileUserData.fromJson(Map<String, dynamic> json) {
     return ProfileUserData(
       name: json['name']?.toString() ?? 'Unknown',
       email: json['email']?.toString() ?? '',
       role: json['role']?.toString() ?? 'Mason',
       profilePhoto: json['profilePhoto']?.toString(),
+      companyName: json['companyName']?.toString() ?? '',
+      companyFontStyle: json['companyFontStyle']?.toString() ?? 'Inter',
+      companyLogo: json['companyLogo']?.toString(),
     );
   }
   static ProfileUserData get sessionFallback => ProfileUserData(
     name: UserSession.userId.isNotEmpty ? UserSession.userId : 'Guest User',
     email: '${UserSession.userId}@buildtrack.app',
     role: UserSession.roleLabel,
+    companyName: UserSession.companyName,
+    companyFontStyle: UserSession.companyFontStyle,
+    companyLogo: UserSession.companyLogo,
   );
 }
 class ProfileScreen extends StatefulWidget {

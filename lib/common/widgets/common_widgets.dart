@@ -7,6 +7,7 @@ import 'package:buildtrack_mobile/controller/user_session.dart';
 import 'package:buildtrack_mobile/common/utils/image_pick_helper.dart';
 class AppTopBar extends StatelessWidget {
   final String title;
+  final Widget? titleWidget;
   final IconData? leftIcon;
   final VoidCallback? onLeftTap;
   final Widget? rightWidget;
@@ -14,6 +15,7 @@ class AppTopBar extends StatelessWidget {
   const AppTopBar({
     super.key,
     required this.title,
+    this.titleWidget,
     this.leftIcon,
     this.onLeftTap,
     this.rightWidget,
@@ -43,17 +45,18 @@ class AppTopBar extends StatelessWidget {
                   )
                 : const SizedBox(width: 44),
             Expanded(
-              child: Text(
-                title,
-                textAlign: TextAlign.center,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: isSubScreen ? _textDark : _primaryBlue,
-                  fontSize: isSubScreen ? 17 : 20,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.3,
-                ),
-              ),
+              child: titleWidget ??
+                  Text(
+                    title,
+                    textAlign: TextAlign.center,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: isSubScreen ? _textDark : _primaryBlue,
+                      fontSize: isSubScreen ? 17 : 20,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.3,
+                    ),
+                  ),
             ),
             IntrinsicWidth(child: rightWidget ?? const SizedBox(width: 32)),
           ],

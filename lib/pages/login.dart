@@ -67,7 +67,30 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget _buildHeader() {
     return Column(
       children: [
-        Text('BuildTrack', style: AppTheme.heading1.copyWith(fontSize: 30)),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: Image.asset(
+                'assets/images/buildtrack-logo.png',
+                width: 38,
+                height: 38,
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) => Image.network(
+                  'assets/images/buildtrack-logo.png',
+                  width: 38,
+                  height: 38,
+                  fit: BoxFit.contain,
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Text('BuildTrack', style: AppTheme.heading1.copyWith(fontSize: 30)),
+          ],
+        ),
         const SizedBox(height: 6),
         Text(
           'Manage your construction smarter',
@@ -144,7 +167,52 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ],
         ),
+        const SizedBox(height: 22),
+        _buildPoweredByNurofin(),
       ],
+    );
+  }
+  Widget _buildPoweredByNurofin() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Text(
+            'Powered by',
+            style: AppTheme.caption.copyWith(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textLight,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Image.asset(
+            'assets/images/nurofin-logo.png',
+            height: 18,
+            fit: BoxFit.contain,
+            errorBuilder: (context, error, stackTrace) => Image.network(
+              'assets/images/nurofin-logo.png',
+              height: 18,
+              fit: BoxFit.contain,
+            ),
+          ),
+        ],
+      ),
     );
   }
   Future<void> _login() async {
