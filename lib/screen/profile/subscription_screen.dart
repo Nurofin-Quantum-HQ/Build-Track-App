@@ -7,6 +7,9 @@ import 'package:buildtrack_mobile/screen/profile/payment_webview_screen.dart';
 import 'package:buildtrack_mobile/services/billing_service.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:showcaseview/showcaseview.dart';
+import 'package:buildtrack_mobile/controller/user_session.dart';
+
 class _PlanInfo {
   const _PlanInfo({
     required this.plan,
@@ -33,6 +36,7 @@ class _PlanInfo {
   final String maxProjectsLabel;
   final bool isHighlighted;
 }
+
 const _plans = [
   _PlanInfo(
     plan: SubscriptionPlan.free,
@@ -55,7 +59,7 @@ const _plans = [
   _PlanInfo(
     plan: SubscriptionPlan.starter,
     title: 'Starter',
-    price: '₹498',
+    price: '₹1',
     period: '/month',
     tagline: 'For small teams just getting started.',
     features: [
@@ -144,8 +148,59 @@ const _plans = [
     maxProjectsLabel: 'Unlimited',
   ),
 ];
+
 class SubscriptionScreen extends StatelessWidget {
   const SubscriptionScreen({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return ShowCaseWidget(
+      globalTooltipActions: const [
+        TooltipActionButton(
+          type: TooltipDefaultActionType.skip,
+          backgroundColor: Colors.transparent,
+          textStyle: TextStyle(
+            color: Colors.white70,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        TooltipActionButton(
+          type: TooltipDefaultActionType.next,
+          backgroundColor: AppColors.primary,
+          textStyle: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
+      enableAutoScroll: true,
+      onFinish: () => UserSession.markModuleVisited('subscription'),
+      builder: (context) => const _SubscriptionScreenContent(),
+    );
+  }
+}
+
+class _SubscriptionScreenContent extends StatefulWidget {
+  const _SubscriptionScreenContent();
+  @override
+  State<_SubscriptionScreenContent> createState() =>
+      _SubscriptionScreenContentState();
+}
+
+class _SubscriptionScreenContentState
+    extends State<_SubscriptionScreenContent> {
+  final GlobalKey _plansKey = GlobalKey();
+  final GlobalKey _ctaKey = GlobalKey();
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!UserSession.hasSkippedTour &&
+          !UserSession.visitedModules.contains('subscription')) {
+        ShowCaseWidget.of(context).startShowCase([_plansKey, _ctaKey]);
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final sub = context.watch<SubscriptionProvider>();
@@ -166,39 +221,78 @@ class SubscriptionScreen extends StatelessWidget {
                       _ErrorBanner(message: sub.error),
                       const SizedBox(height: 20),
                     ],
-                    ...List.generate(_plans.length, (i) {
-                      final plan = _plans[i];
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 24),
-                        child: _PlanCard(
-                          info: plan,
-                          isCurrentPlan: sub.currentPlan == plan.plan,
-                          isPurchasing: sub.isPurchasing,
-                          onUpgrade: () => _onUpgrade(context, sub, plan),
-                        ),
-                      );
-                    }),
-                    const SizedBox(height: 16),
-                    GestureDetector(
-                      onTap: () => _onRestore(context, sub),
-                      behavior: HitTestBehavior.opaque,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        child: Text(
-                          'Restore Purchases',
-                          style: TextStyle(
-                            color: AppColors.primary.withValues(alpha: 0.8),
-                            fontWeight: FontWeight.w600,
-                            fontSize: 14,
-                            decoration: TextDecoration.underline,
-                            decorationColor: AppColors.primary.withValues(
-                              alpha: 0.4,
+                    Showcase(
+                      key: _plansKey,
+                      description:
+                          'Choose the plan that fits your business needs.',
+                      child: Column(
+                        children: List.generate(_plans.length, (i) {
+                          final plan = _plans[i];
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 24),
+                            child: _PlanCard(
+                              info: plan,
+                              isCurrentPlan: sub.currentPlan == plan.plan,
+                              isPurchasing: sub.isPurchasing,
+                              onUpgrade: () => _onUpgrade(context, sub, plan),
                             ),
-                          ),
-                        ),
+                          );
+                        }),
                       ),
                     ),
                     const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        GestureDetector(
+                          onTap: () => _onRestore(context, sub),
+                          behavior: HitTestBehavior.opaque,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 8,
+                              horizontal: 8,
+                            ),
+                            child: Text(
+                              'Restore Purchases',
+                              style: TextStyle(
+                                color: AppColors.primary.withValues(alpha: 0.8),
+                                fontWeight: FontWeight.w600,
+                                fontSize: 13.5,
+                                decoration: TextDecoration.underline,
+                                decorationColor: AppColors.primary.withValues(
+                                  alpha: 0.4,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const Text(
+                          ' • ',
+                          style: TextStyle(color: Color(0xFFD0D5DD)),
+                        ),
+                        GestureDetector(
+                          onTap: () => _showCancelDialog(context, sub),
+                          behavior: HitTestBehavior.opaque,
+                          child: const Padding(
+                            padding: EdgeInsets.symmetric(
+                              vertical: 8,
+                              horizontal: 8,
+                            ),
+                            child: Text(
+                              'Cancel Plan',
+                              style: TextStyle(
+                                color: Color(0xFFD92D20),
+                                fontWeight: FontWeight.w600,
+                                fontSize: 13.5,
+                                decoration: TextDecoration.underline,
+                                decorationColor: Color(0xFFFECDCA),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
                     const Text(
                       'Subscriptions auto-renew monthly.\nCancel anytime from your account settings.',
                       textAlign: TextAlign.center,
@@ -218,19 +312,32 @@ class SubscriptionScreen extends StatelessWidget {
       ),
     );
   }
+
   Widget _buildTopBar(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(8, 8, 16, 8),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           IconButton(
             icon: const Icon(Icons.close_rounded, color: AppColors.textDark),
             onPressed: () => Navigator.maybePop(context),
           ),
+          Showcase(
+            key: _ctaKey,
+            description: 'Get help and understand how this screen works.',
+            child: IconButton(
+              icon: const Icon(Icons.help_outline, color: AppColors.textDark),
+              onPressed: () {
+                ShowCaseWidget.of(context).startShowCase([_plansKey, _ctaKey]);
+              },
+            ),
+          ),
         ],
       ),
     );
   }
+
   Widget _buildHero() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -285,6 +392,7 @@ class SubscriptionScreen extends StatelessWidget {
       ],
     );
   }
+
   Future<void> _onUpgrade(
     BuildContext context,
     SubscriptionProvider sub,
@@ -306,6 +414,7 @@ class SubscriptionScreen extends StatelessWidget {
       _showSuccessDialog(context, plan);
     } else {}
   }
+
   Future<void> _onRestore(
     BuildContext context,
     SubscriptionProvider sub,
@@ -330,6 +439,89 @@ class SubscriptionScreen extends StatelessWidget {
       ),
     );
   }
+
+  void _showCancelDialog(BuildContext context, SubscriptionProvider sub) {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        bool isCancelling = false;
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            title: const Row(
+              children: [
+                Icon(Icons.info_outline_rounded, color: AppColors.warning),
+                SizedBox(width: 8),
+                Text(
+                  'Cancel Plan',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            content: Text(
+              sub.isPaid
+                  ? 'Your ${sub.currentPlan.label} subscription will remain active until the end of the current billing cycle${sub.renewalDate != null ? ' (${sub.renewalDate!.day}/${sub.renewalDate!.month}/${sub.renewalDate!.year})' : ''}.\n\nAfter that, your account will revert to the Free plan with 1 project limit.'
+                  : 'You are currently on the Free Plan.\n\nYour account has no active recurring charges.',
+              style: const TextStyle(
+                fontSize: 14,
+                color: Color(0xFF344054),
+                height: 1.4,
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: isCancelling ? null : () => Navigator.pop(ctx),
+                child: const Text('Keep My Plan'),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.error,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                onPressed: isCancelling
+                    ? null
+                    : () async {
+                        setDialogState(() => isCancelling = true);
+                        final success = await sub.cancelPlan();
+                        if (ctx.mounted) {
+                          Navigator.pop(ctx);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                success
+                                    ? 'Subscription has been cancelled successfully.'
+                                    : sub.error.isNotEmpty
+                                    ? sub.error
+                                    : 'Cancellation request submitted.',
+                              ),
+                              backgroundColor: const Color(0xFF101828),
+                            ),
+                          );
+                        }
+                      },
+                child: isCancelling
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text('Confirm Cancel'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   void _showSuccessDialog(BuildContext context, _PlanInfo plan) {
     showDialog(
       context: context,
@@ -393,6 +585,7 @@ class SubscriptionScreen extends StatelessWidget {
     );
   }
 }
+
 class _PlanCard extends StatelessWidget {
   const _PlanCard({
     required this.info,
@@ -575,6 +768,7 @@ class _PlanCard extends StatelessWidget {
       ],
     );
   }
+
   Widget _buildCta() {
     if (isCurrentPlan) {
       return Container(
@@ -647,6 +841,7 @@ class _PlanCard extends StatelessWidget {
     );
   }
 }
+
 class _LimitPill extends StatelessWidget {
   const _LimitPill({required this.icon, required this.label});
   final IconData icon;
@@ -677,6 +872,7 @@ class _LimitPill extends StatelessWidget {
     );
   }
 }
+
 class _FeatureItem extends StatelessWidget {
   const _FeatureItem({required this.text, required this.isHighlighted});
   final String text;
@@ -722,6 +918,7 @@ class _FeatureItem extends StatelessWidget {
     );
   }
 }
+
 class _ErrorBanner extends StatelessWidget {
   const _ErrorBanner({required this.message});
   final String message;

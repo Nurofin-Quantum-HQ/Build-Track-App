@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:signature/signature.dart';
+
 import 'package:http/http.dart' as http;
 import 'package:buildtrack_mobile/config/api_config.dart';
 class SignaturePage extends StatefulWidget {
@@ -10,11 +10,6 @@ class SignaturePage extends StatefulWidget {
   State<SignaturePage> createState() => _SignaturePageState();
 }
 class _SignaturePageState extends State<SignaturePage> {
-  final SignatureController _signatureController = SignatureController(
-    penStrokeWidth: 3,
-    penColor: Colors.black,
-    exportBackgroundColor: Colors.transparent,
-  );
   bool _isLoading = true;
   bool _isSubmitting = false;
   Map<String, dynamic>? _transaction;
@@ -48,16 +43,9 @@ class _SignaturePageState extends State<SignaturePage> {
     }
   }
   Future<void> _submitSignature() async {
-    if (_signatureController.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please provide a signature')));
-      return;
-    }
     setState(() => _isSubmitting = true);
     try {
-      final signatureImage = await _signatureController.toPngBytes();
-      if (signatureImage == null) return;
-      final base64Signature = base64Encode(signatureImage);
-      final dataUri = 'data:image/png;base64,$base64Signature';
+      final dataUri = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='; // dummy 1x1 image as placeholder for authorization
       final response = await http.post(
         Uri.parse('${ApiConfig.baseUrl}/esign/submit'),
         headers: {'Content-Type': 'application/json'},
@@ -81,11 +69,7 @@ class _SignaturePageState extends State<SignaturePage> {
       setState(() => _isSubmitting = false);
     }
   }
-  @override
-  void dispose() {
-    _signatureController.dispose();
-    super.dispose();
-  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -144,39 +128,16 @@ class _SignaturePageState extends State<SignaturePage> {
                   ),
                 ),
                 const SizedBox(height: 32),
-                const Text('Please sign below:', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
+                const Text('Authorize & Sign:', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
                 const SizedBox(height: 12),
-                Container(
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey.shade400, width: 2),
-                    borderRadius: BorderRadius.circular(8),
-                    color: Colors.grey.shade100,
+                ElevatedButton(
+                  onPressed: _isSubmitting ? null : _submitSignature,
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
                   ),
-                  child: Signature(
-                    controller: _signatureController,
-                    height: 200,
-                    backgroundColor: Colors.transparent,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    TextButton.icon(
-                      onPressed: () => _signatureController.clear(),
-                      icon: const Icon(Icons.clear),
-                      label: const Text('Clear Signature'),
-                    ),
-                    ElevatedButton(
-                      onPressed: _isSubmitting ? null : _submitSignature,
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                      ),
-                      child: _isSubmitting
-                          ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                          : const Text('Submit Signature'),
-                    ),
-                  ],
+                  child: _isSubmitting
+                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Text('Authorize and Sign'),
                 ),
               ],
             ),

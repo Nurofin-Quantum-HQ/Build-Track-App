@@ -3,6 +3,8 @@ import 'package:buildtrack_mobile/controller/subscription_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
+
 class PaymentWebViewScreen extends StatefulWidget {
   final Map<String, dynamic> paymentParams;
   const PaymentWebViewScreen({super.key, required this.paymentParams});
@@ -36,8 +38,20 @@ class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
               _handlePaymentReturn(isSuccess);
               return NavigationDecision.prevent;
             }
+            if (url.startsWith('https://buildtrack.nurofin.com/subscription')) {
+              final uri = Uri.parse(url);
+              final status = uri.queryParameters['status'];
+              final isSuccess = status == 'success';
+              _handlePaymentReturn(isSuccess);
+              return NavigationDecision.prevent;
+            }
             if (url.contains('/api/subscriptions/callback')) {
               return NavigationDecision.navigate;
+            }
+            // Intercept UPI and intent deep links to open external apps
+            if (!url.startsWith('http://') && !url.startsWith('https://') && !url.startsWith('buildtrack://') && !url.startsWith('about:')) {
+              _launchExternalUrl(url);
+              return NavigationDecision.prevent;
             }
             return NavigationDecision.navigate;
           },
@@ -45,7 +59,7 @@ class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
       )
       ..loadHtmlString(
         _buildPaymentHtml(),
-        baseUrl: 'https://build-track.onrender.com/',
+        baseUrl: 'https://buildtrack.nurofin.com/',
       );
   }
   String _buildPaymentHtml() {
@@ -118,6 +132,20 @@ class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
     context.read<SubscriptionProvider>().handlePaymentResult(isSuccess);
     if (mounted) Navigator.of(context).pop(isSuccess);
   }
+
+  Future<void> _launchExternalUrl(String url) async {
+    final uri = Uri.parse(url);
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        debugPrint("Could not launch $url");
+      }
+    } catch (e) {
+      debugPrint("Error launching $url: $e");
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(

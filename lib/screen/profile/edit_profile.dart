@@ -18,6 +18,7 @@ class EditProfileScreen extends StatefulWidget {
 class _EditProfileScreenState extends State<EditProfileScreen> {
   late final TextEditingController _nameCtrl;
   late final TextEditingController _emailCtrl;
+  late final TextEditingController _phoneCtrl;
   late final TextEditingController _companyCtrl;
   String _selectedFontStyle = 'Inter';
   Uint8List? _selectedImageBytes;
@@ -49,6 +50,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     super.initState();
     _nameCtrl = TextEditingController();
     _emailCtrl = TextEditingController();
+    _phoneCtrl = TextEditingController();
     _companyCtrl = TextEditingController();
     WidgetsBinding.instance.addPostFrameCallback((_) => _initFields());
   }
@@ -59,6 +61,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       _emailCtrl.text = args.email;
       _companyCtrl.text = args.companyName;
       _selectedFontStyle = args.companyFontStyle.isNotEmpty ? args.companyFontStyle : 'Inter';
+      _phoneCtrl.text = '';
       _initialPhotoUrl = args.profilePhoto;
       _initialLogoUrl = args.companyLogo;
     } else {
@@ -66,11 +69,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       _emailCtrl.text = '';
       _companyCtrl.text = UserSession.companyName;
       _selectedFontStyle = UserSession.companyFontStyle.isNotEmpty ? UserSession.companyFontStyle : 'Inter';
+      _phoneCtrl.text = '';
       _initialPhotoUrl = UserSession.profilePhoto;
       _initialLogoUrl = UserSession.companyLogo;
       _fetchProfile();
       return;
     }
+    _fetchProfile();
     setState(() => _isLoadingInitial = false);
   }
   Future<void> _fetchProfile() async {
@@ -82,6 +87,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         final userJson = decoded['user'] ?? decoded;
         _nameCtrl.text = userJson['name']?.toString() ?? '';
         _emailCtrl.text = userJson['email']?.toString() ?? '';
+        _phoneCtrl.text = userJson['phone']?.toString() ?? '';
         _companyCtrl.text = userJson['companyName']?.toString() ?? '';
         _selectedFontStyle = userJson['companyFontStyle']?.toString() ?? 'Inter';
         _initialPhotoUrl = userJson['profilePhoto']?.toString();
@@ -233,6 +239,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     final name = _nameCtrl.text.trim();
     final email = _emailCtrl.text.trim();
     final company = _companyCtrl.text.trim();
+    final phone = _phoneCtrl.text.trim();
     if (name.isEmpty) {
       ScaffoldMessenger.of(
         context,
@@ -290,6 +297,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         'companyName': company,
         'companyFontStyle': _selectedFontStyle,
         if (email.isNotEmpty) 'email': email,
+        if (phone.isNotEmpty) 'phone': phone,
         if (companyLogoValue != null) 'companyLogo': companyLogoValue,
       };
       final response = await ApiService.put('/users/profile', payload);
@@ -422,6 +430,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   hint: 'name@company.com',
                   prefixIcon: Icons.mail_outline,
                   keyboardType: TextInputType.emailAddress,
+                ),
+                AppTextField(
+                  label: 'Phone Number',
+                  controller: _phoneCtrl,
+                  hint: 'Enter your phone number',
+                  prefixIcon: Icons.phone_outlined,
+                  keyboardType: TextInputType.phone,
                 ),
                 const SizedBox(height: AppTheme.spacingMd),
                 const Divider(),
@@ -679,7 +694,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       ),
                     ],
                   ),
-                ),
                 const SizedBox(height: AppTheme.spacingXl),
                 _isSaving
                     ? const Center(

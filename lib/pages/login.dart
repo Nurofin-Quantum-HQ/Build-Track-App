@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:buildtrack_mobile/common/themes/app_colors.dart';
 import 'package:buildtrack_mobile/common/themes/app_theme.dart';
 import 'package:buildtrack_mobile/common/widgets/app_widgets.dart';
 import 'package:buildtrack_mobile/controller/project_provider.dart';
 import 'package:buildtrack_mobile/services/auth_service.dart';
+import 'package:buildtrack_mobile/services/push_notification_service.dart';
 import 'package:buildtrack_mobile/controller/subscription_provider.dart';
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -18,6 +20,25 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passCtrl = TextEditingController();
   bool _obscurePass = true;
   bool _loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCachedEmail();
+  }
+
+  Future<void> _loadCachedEmail() async {
+    final prefs = await SharedPreferences.getInstance();
+    final cachedEmail = prefs.getString('cached_email');
+    if (cachedEmail != null && cachedEmail.isNotEmpty) {
+      if (mounted) {
+        setState(() {
+          _emailCtrl.text = cachedEmail;
+        });
+      }
+    }
+  }
+
   @override
   void dispose() {
     _emailCtrl.dispose();
@@ -231,6 +252,7 @@ class _LoginScreenState extends State<LoginScreen> {
         if (mounted) {
           context.read<SubscriptionProvider>().fetchStatus();
           context.read<ProjectProvider>().load();
+          await PushNotificationService.init();
           Navigator.pushReplacementNamed(context, '/home');
         }
       } else {

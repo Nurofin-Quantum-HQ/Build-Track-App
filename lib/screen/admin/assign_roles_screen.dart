@@ -9,6 +9,9 @@ import 'package:buildtrack_mobile/services/api_service.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:buildtrack_mobile/controller/subscription_provider.dart';
+import 'package:showcaseview/showcaseview.dart';
+import 'package:buildtrack_mobile/controller/showcase_keys.dart';
+import 'package:buildtrack_mobile/controller/user_session.dart';
 class AssignRolesScreen extends StatefulWidget {
   const AssignRolesScreen({super.key});
   @override
@@ -127,6 +130,17 @@ class _AssignRolesScreenState extends State<AssignRolesScreen> {
   void initState() {
     super.initState();
     _fetchProjects();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!UserSession.hasSkippedTour && !UserSession.visitedModules.contains('AssignRolesScreen')) {
+        ShowCaseWidget.of(context).startShowCase([
+          ShowcaseKeys.assignRoleUserDetails,
+          ShowcaseKeys.assignRoleRoleDropdown,
+          ShowcaseKeys.assignRolePermissions,
+          ShowcaseKeys.assignRoleProjectDropdown,
+        ]);
+        UserSession.markModuleVisited('AssignRolesScreen');
+      }
+    });
   }
   @override
   void didChangeDependencies() {
@@ -405,17 +419,40 @@ class _AssignRolesScreenState extends State<AssignRolesScreen> {
     final isAdmin = RoleManager.canAssignRole;
     final subProvider = context.watch<SubscriptionProvider>();
     final plan = subProvider.currentPlan;
-    return Scaffold(
-      backgroundColor: AppColors.gradientStart,
-      body: SafeArea(
-        bottom: false,
-        child: Column(
+    return ShowCaseWidget(
+      globalTooltipActions: const [TooltipActionButton(type: TooltipDefaultActionType.skip, backgroundColor: Colors.transparent, textStyle: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold)), TooltipActionButton(type: TooltipDefaultActionType.next, backgroundColor: AppColors.primary, textStyle: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))], 
+      enableAutoScroll: true,
+      builder: (context) => Scaffold(
+          backgroundColor: AppColors.gradientStart,
+          body: SafeArea(
+            bottom: false,
+            child: Column(
           children: [
             AppTopBar(
               title: _isEditMode ? 'Edit User' : 'Assign Role',
               isSubScreen: true,
               leftIcon: Icons.arrow_back,
               onLeftTap: () => Navigator.maybePop(context),
+              rightWidget: GestureDetector(
+                onTap: () => ShowCaseWidget.of(context).startShowCase([
+                  ShowcaseKeys.assignRoleUserDetails,
+                  ShowcaseKeys.assignRoleRoleDropdown,
+                  ShowcaseKeys.assignRolePermissions,
+                  ShowcaseKeys.assignRoleProjectDropdown,
+                ]),
+                child: Container(
+                  padding: const EdgeInsets.all(7),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.help_outline,
+                    color: AppColors.primary,
+                    size: 22,
+                  ),
+                ),
+              ),
             ),
             Expanded(
               child: SingleChildScrollView(
@@ -443,7 +480,7 @@ class _AssignRolesScreenState extends State<AssignRolesScreen> {
           ],
         ),
       ),
-    );
+    ));
   }
   Widget _adminBadge() {
     return Container(
@@ -524,20 +561,32 @@ class _AssignRolesScreenState extends State<AssignRolesScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          AppTextField(
-            label: 'Full Name',
-            controller: _nameCtrl,
-            hint: 'Enter full name',
-            prefixIcon: Icons.person_outline,
-            enabled: true,
-          ),
-          AppTextField(
-            label: 'Email Address',
-            controller: _emailCtrl,
-            hint: 'Enter email address',
-            prefixIcon: Icons.email_outlined,
-            keyboardType: TextInputType.emailAddress,
-            enabled: true,
+          Showcase(
+            key: ShowcaseKeys.assignRoleUserDetails,
+            description: 'Enter the user\'s full name and email address here.',
+            tooltipBackgroundColor: const Color(0xFF1E1E2C),
+            textColor: Colors.white,
+            tooltipBorderRadius: BorderRadius.circular(16),
+            tooltipPadding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                AppTextField(
+                  label: 'Full Name',
+                  controller: _nameCtrl,
+                  hint: 'Enter full name',
+                  prefixIcon: Icons.person_outline,
+                  enabled: true,
+                ),
+                AppTextField(
+                  label: 'Email Address',
+                  controller: _emailCtrl,
+                  hint: 'Enter email address',
+                  prefixIcon: Icons.email_outlined,
+                  keyboardType: TextInputType.emailAddress,
+                  enabled: true,
+                ),
+              ],
+            ),
           ),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -577,21 +626,29 @@ class _AssignRolesScreenState extends State<AssignRolesScreen> {
               const SizedBox(height: AppTheme.spacingMd),
             ],
           ),
-          AppDropdownField<String>(
-            label: 'Role',
-            value: _selectedRole,
-            hint: 'Select role',
-            items: _roles
-                .map(
-                  (r) => DropdownMenuItem<String>(
-                    value: r,
-                    child: Text(r == _customRoleValue ? 'Custom Role' : r),
-                  ),
-                )
-                .toList(),
-            onChanged: isAdmin
-                ? (v) => _applyDefaultPermissionsForRole(v)
-                : (_) {},
+          Showcase(
+            key: ShowcaseKeys.assignRoleRoleDropdown,
+            description: 'Select a standard role like Supervisor or Mason, or create a Custom Role.',
+            tooltipBackgroundColor: const Color(0xFF1E1E2C),
+            textColor: Colors.white,
+            tooltipBorderRadius: BorderRadius.circular(16),
+            tooltipPadding: const EdgeInsets.all(16),
+            child: AppDropdownField<String>(
+              label: 'Role',
+              value: _selectedRole,
+              hint: 'Select role',
+              items: _roles
+                  .map(
+                    (r) => DropdownMenuItem<String>(
+                      value: r,
+                      child: Text(r == _customRoleValue ? 'Custom Role' : r),
+                    ),
+                  )
+                  .toList(),
+              onChanged: isAdmin
+                  ? (v) => _applyDefaultPermissionsForRole(v)
+                  : (_) {},
+            ),
           ),
           if (_isCustomRoleSelected) ...[
             const SizedBox(height: AppTheme.spacingMd),
@@ -622,9 +679,25 @@ class _AssignRolesScreenState extends State<AssignRolesScreen> {
             style: AppTheme.caption.copyWith(color: AppColors.textLight),
           ),
           const SizedBox(height: 14),
-          _buildPermissionsTable(isAdmin),
+          Showcase(
+            key: ShowcaseKeys.assignRolePermissions,
+            description: 'Configure exact permissions for what this user can see or modify in the app.',
+            tooltipBackgroundColor: const Color(0xFF1E1E2C),
+            textColor: Colors.white,
+            tooltipBorderRadius: BorderRadius.circular(16),
+            tooltipPadding: const EdgeInsets.all(16),
+            child: _buildPermissionsTable(isAdmin),
+          ),
           const SizedBox(height: AppTheme.spacingMd),
-          _buildProjectMultiSelect(isAdmin),
+          Showcase(
+            key: ShowcaseKeys.assignRoleProjectDropdown,
+            description: 'Select one or more projects this role can access. Leave empty for all.',
+            tooltipBackgroundColor: const Color(0xFF1E1E2C),
+            textColor: Colors.white,
+            tooltipBorderRadius: BorderRadius.circular(16),
+            tooltipPadding: const EdgeInsets.all(16),
+            child: _buildProjectMultiSelect(isAdmin),
+          ),
         ],
       ),
     );

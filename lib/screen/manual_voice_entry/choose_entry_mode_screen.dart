@@ -3,6 +3,9 @@ import 'package:buildtrack_mobile/common/widgets/common_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:buildtrack_mobile/controller/project_provider.dart';
+import 'package:buildtrack_mobile/controller/user_session.dart';
+import 'package:buildtrack_mobile/controller/showcase_keys.dart';
+import 'package:showcaseview/showcaseview.dart';
 class ChooseEntryModeScreen extends StatefulWidget {
   const ChooseEntryModeScreen({super.key});
   @override
@@ -109,9 +112,23 @@ class _ChooseEntryModeScreenState extends State<ChooseEntryModeScreen>
       Provider.of<ProjectProvider>(context).selectedActivity ??
       _contextArgs['activity']?.toString() ??
       '—';
+  void _startTour(BuildContext context) {
+    if (!UserSession.hasSkippedTour && !UserSession.visitedModules.contains('AddEntryMode')) {
+      ShowCaseWidget.of(context).startShowCase([ShowcaseKeys.addEntryVoiceTab, ShowcaseKeys.addEntryManualTab]);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return ShowCaseWidget(
+      globalTooltipActions: const [TooltipActionButton(type: TooltipDefaultActionType.skip, backgroundColor: Colors.transparent, textStyle: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold)), TooltipActionButton(type: TooltipDefaultActionType.next, backgroundColor: AppColors.primary, textStyle: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))], 
+      enableAutoScroll: true,
+      onFinish: () => UserSession.markModuleVisited('AddEntryMode'),
+      builder: (context) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _startTour(context);
+        });
+        return Scaffold(
       backgroundColor: AppColors.gradientStart,
       body: SafeArea(
         bottom: false,
@@ -157,23 +174,39 @@ class _ChooseEntryModeScreenState extends State<ChooseEntryModeScreen>
                         const SizedBox(height: 24),
                         _buildContextBanner(),
                         const SizedBox(height: 28),
-                        _InteractiveModeCard(
-                          icon: Icons.mic_rounded,
-                          iconColor: AppColors.primary,
-                          iconBg: AppColors.primary.withValues(alpha: 0.1),
-                          title: 'Use Voice',
-                          subtitle:
-                              'Speak naturally and let AI capture the details.',
-                          onTap: _goVoice,
+                        Showcase(
+                          key: ShowcaseKeys.addEntryVoiceTab,
+                          description: 'Use voice to automatically log entries.',
+                          tooltipBackgroundColor: const Color(0xFF1E1E2C),
+                          textColor: Colors.white,
+                          tooltipBorderRadius: BorderRadius.circular(16),
+                          tooltipPadding: const EdgeInsets.all(16),
+                          child: _InteractiveModeCard(
+                            icon: Icons.mic_rounded,
+                            iconColor: AppColors.primary,
+                            iconBg: AppColors.primary.withValues(alpha: 0.1),
+                            title: 'Use Voice',
+                            subtitle:
+                                'Speak naturally and let AI capture the details.',
+                            onTap: _goVoice,
+                          ),
                         ),
                         const SizedBox(height: 16),
-                        _InteractiveModeCard(
-                          icon: Icons.edit_outlined,
-                          iconColor: const Color(0xFF7C3AED),
-                          iconBg: const Color(0xFFF3EEFF),
-                          title: 'Enter Manually',
-                          subtitle: 'Fill the form manually.',
-                          onTap: _goManual,
+                        Showcase(
+                          key: ShowcaseKeys.addEntryManualTab,
+                          description: 'Manually input entry details.',
+                          tooltipBackgroundColor: const Color(0xFF1E1E2C),
+                          textColor: Colors.white,
+                          tooltipBorderRadius: BorderRadius.circular(16),
+                          tooltipPadding: const EdgeInsets.all(16),
+                          child: _InteractiveModeCard(
+                            icon: Icons.edit_outlined,
+                            iconColor: const Color(0xFF7C3AED),
+                            iconBg: const Color(0xFFF3EEFF),
+                            title: 'Enter Manually',
+                            subtitle: 'Fill the form manually.',
+                            onTap: _goManual,
+                          ),
                         ),
                       ],
                     ),
@@ -184,6 +217,8 @@ class _ChooseEntryModeScreenState extends State<ChooseEntryModeScreen>
           ],
         ),
       ),
+    );
+    },
     );
   }
   Widget _buildStepIndicator() {

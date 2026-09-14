@@ -7,13 +7,33 @@ import 'package:buildtrack_mobile/services/task_service.dart';
 import 'package:buildtrack_mobile/models/project_model.dart';
 import 'package:buildtrack_mobile/controller/project_provider.dart';
 import 'package:provider/provider.dart';
-class AssignTaskScreen extends StatefulWidget {
+import 'package:showcaseview/showcaseview.dart';
+import 'package:buildtrack_mobile/controller/user_session.dart';
+
+class AssignTaskScreen extends StatelessWidget {
   final ProjectModel? initialProject;
   const AssignTaskScreen({super.key, this.initialProject});
+
   @override
-  State<AssignTaskScreen> createState() => _AssignTaskScreenState();
+  Widget build(BuildContext context) {
+    return ShowCaseWidget(
+      globalTooltipActions: const [TooltipActionButton(type: TooltipDefaultActionType.skip, backgroundColor: Colors.transparent, textStyle: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold)), TooltipActionButton(type: TooltipDefaultActionType.next, backgroundColor: AppColors.primary, textStyle: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))], 
+      enableAutoScroll: true,
+      onFinish: () => UserSession.markModuleVisited('AssignTaskScreen'),
+      builder: (context) => _AssignTaskScreenContent(initialProject: initialProject),
+    );
+  }
 }
-class _AssignTaskScreenState extends State<AssignTaskScreen> {
+
+class _AssignTaskScreenContent extends StatefulWidget {
+  final ProjectModel? initialProject;
+  const _AssignTaskScreenContent({this.initialProject});
+  @override
+  State<_AssignTaskScreenContent> createState() => _AssignTaskScreenContentState();
+}
+
+class _AssignTaskScreenContentState extends State<_AssignTaskScreenContent> {
+  final GlobalKey _helpKey = GlobalKey();
   final _formKey = GlobalKey<FormState>();
   String _title = '';
   String _description = '';
@@ -46,6 +66,9 @@ class _AssignTaskScreenState extends State<AssignTaskScreen> {
         if (project != null) {
           provider.selectProject(project);
         }
+      }
+      if (!UserSession.hasSkippedTour && !UserSession.visitedModules.contains('AssignTaskScreen')) {
+        ShowCaseWidget.of(context).startShowCase([_helpKey]);
       }
     });
   }
@@ -167,6 +190,16 @@ class _AssignTaskScreenState extends State<AssignTaskScreen> {
               isSubScreen: true,
               leftIcon: Icons.arrow_back,
               onLeftTap: () => Navigator.maybePop(context),
+              rightWidget: Showcase(
+                key: _helpKey,
+                description: 'Get help and understand how this screen works.',
+                child: IconButton(
+                  icon: const Icon(Icons.help_outline, color: AppColors.primary),
+                  onPressed: () {
+                    ShowCaseWidget.of(context).startShowCase([_helpKey]);
+                  },
+                ),
+              ),
             ),
             Expanded(
               child: _isLoading

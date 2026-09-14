@@ -216,28 +216,36 @@ class ReportExportHelper {
               col == 'Material' ||
               col == 'Worker Type' ||
               col == 'Equipment') {
-            rowValues.add(entry.description.isEmpty ? '—' : entry.description);
+            rowValues.add(entry.description.isEmpty ? 'null' : entry.description);
           } else if (col == 'Brand') {
-            rowValues.add(entry.brand ?? '—');
+            rowValues.add(entry.brand ?? 'null');
           } else if (col == 'Floor') {
-            rowValues.add(entry.floor ?? '—');
+            rowValues.add(entry.floor ?? 'null');
           } else if (col == 'Phase') {
-            rowValues.add(entry.phase ?? '—');
+            rowValues.add(entry.phase ?? 'null');
           } else if (col == 'Activity') {
-            rowValues.add(entry.activity ?? '—');
+            rowValues.add(entry.activity ?? 'null');
           } else if (col == 'Unit') {
-            rowValues.add(entry.unit ?? '—');
+            rowValues.add(entry.unit ?? 'null');
           } else if (col == 'Status') {
             rowValues.add(status);
           } else if (col == 'Amount') {
             rowValues.add(amount.toStringAsFixed(2));
+          } else if (col == 'Paid') {
+            rowValues.add(entry.paidAmount.toStringAsFixed(2));
+          } else if (col == 'Remaining') {
+            rowValues.add(entry.remainingAmount.toStringAsFixed(2));
           } else if (col == 'Rate' || col == 'Rate/Day' || col == 'Rent Rate') {
             final rate = entry.ratePerUnit ?? 0.0;
             rowValues.add(rate.toStringAsFixed(2));
           } else if (col == 'Qty' || col == 'Days' || col == 'Duration') {
-            final rate = entry.ratePerUnit;
-            final val = (rate == null || rate == 0) ? null : entry.amount / rate;
-            rowValues.add(val != null ? val.toStringAsFixed(1) : '—');
+            if (entry.quantity != null && entry.quantity! > 0) {
+              rowValues.add(entry.quantity!.toStringAsFixed(1));
+            } else {
+              final rate = entry.ratePerUnit;
+              final val = (rate == null || rate == 0) ? null : entry.amount / rate;
+              rowValues.add(val != null ? val.toStringAsFixed(1) : 'null');
+            }
           }
         }
       } else if (quickCategoryTab == 'Materials') {
@@ -414,6 +422,10 @@ class ReportExportHelper {
             );
           } else if (col == 'Amount') {
             rowValues.add(_formatIndianCurrency(e.amount));
+          } else if (col == 'Paid') {
+            rowValues.add(_formatIndianCurrency(e.paidAmount));
+          } else if (col == 'Remaining') {
+            rowValues.add(_formatIndianCurrency(e.remainingAmount));
           } else if (col == 'Rate' || col == 'Rate/Day' || col == 'Rent Rate') {
             final rate = e.ratePerUnit ?? 0.0;
             rowValues.add(_formatIndianCurrency(rate));

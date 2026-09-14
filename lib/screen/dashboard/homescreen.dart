@@ -19,6 +19,11 @@ import 'package:buildtrack_mobile/services/api_service.dart';
 import 'package:buildtrack_mobile/models/project_model.dart';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:showcaseview/showcaseview.dart';
+import 'package:buildtrack_mobile/controller/showcase_keys.dart';
+import 'package:buildtrack_mobile/controller/nav_controller.dart';
+import 'package:buildtrack_mobile/screen/dashboard/notifications_bell.dart';
+
 String relativeTimeLabel(DateTime date) {
   final now = DateTime.now();
   final diff = now.difference(date);
@@ -53,12 +58,142 @@ String relativeTimeLabel(DateTime date) {
     return '${date.day} ${months[date.month - 1]}';
   }
 }
-class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+
+class HomeScreen extends StatelessWidget {
+  HomeScreen({super.key});
+  final GlobalKey<ShowCaseWidgetState> _showcaseKey = GlobalKey<ShowCaseWidgetState>();
+  
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  Widget build(BuildContext context) {
+    return ShowCaseWidget(
+      key: _showcaseKey,
+      globalTooltipActions: [
+        TooltipActionButton(
+          type: TooltipDefaultActionType.skip, 
+          backgroundColor: Colors.transparent, 
+          textStyle: const TextStyle(color: Colors.white70, fontWeight: FontWeight.bold),
+          onTap: () {
+            UserSession.skipTour();
+            _showcaseKey.currentState?.dismiss();
+          }
+        ), 
+        const TooltipActionButton(
+          type: TooltipDefaultActionType.next, 
+          backgroundColor: AppColors.primary, 
+          textStyle: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)
+        )
+      ], 
+      enableAutoScroll: true,
+      onFinish: () {
+        UserSession.markModuleVisited('HomeScreen');
+        if (UserSession.globalTourActive) {
+          Future.delayed(const Duration(milliseconds: 300), () {
+            if (context.mounted) {
+              final nav = Provider.of<NavController>(context, listen: false);
+              nav.setRoute('/projects', context);
+            }
+          });
+        }
+      },
+      builder: (context) => const _HomeScreenContent(),
+    );
+  }
 }
-class _HomeScreenState extends State<HomeScreen> {
+
+class _HomeScreenContent extends StatefulWidget {
+  const _HomeScreenContent();
+  @override
+  State<_HomeScreenContent> createState() => _HomeScreenContentState();
+}
+class _HomeScreenContentState extends State<_HomeScreenContent> {
+  List<GlobalKey> _getShowcaseKeys({bool isReplay = false}) {
+    final keys = <GlobalKey>[];
+    keys.add(ShowcaseKeys.sidebarMenu);
+    if (isReplay || !UserSession.hasCreatedProject) {
+      keys.add(ShowcaseKeys.projects);
+    }
+    keys.add(ShowcaseKeys.inventoryTab);
+    keys.add(ShowcaseKeys.profileIcon);
+    keys.add(ShowcaseKeys.progress);
+    keys.add(ShowcaseKeys.dashboardTotalCost);
+    keys.add(ShowcaseKeys.dashboardTotalBudget);
+    keys.add(ShowcaseKeys.dashboardTotalRevenue);
+    keys.add(ShowcaseKeys.dashboardNetCashFlow);
+    if (isReplay || !UserSession.hasAddedEntry) {
+      keys.add(ShowcaseKeys.addEntry);
+    }
+    keys.add(ShowcaseKeys.recentEntries);
+    if (isReplay || !UserSession.hasViewedReports) {
+      keys.add(ShowcaseKeys.reports);
+    }
+    keys.add(ShowcaseKeys.quickAddEntry);
+    keys.add(ShowcaseKeys.helpButton);
+    return keys;
+  }
+
+  bool _tourChecked = false;
+
+  @override
+  void initState() {
+    super.initState();
+  }
+
+  void _checkTour(ProjectProvider provider) {
+    if (_tourChecked) return;
+    if (!provider.projectsLoaded) return;
+    _tourChecked = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (provider.projects.isNotEmpty || UserSession.hasAddedEntry) {
+        UserSession.markAllModulesVisited();
+      } else {
+        if (!UserSession.appTourPrompted) {
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => AlertDialog(
+              title: const Text('Welcome to BuildTrack!'),
+              content: const Text('Do you want an app tour to help you get started?'),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    UserSession.markAppTourPrompted();
+                    Navigator.pop(context);
+                  },
+                  child: const Text('No'),
+                ),
+                TextButton(
+                  onPressed: () {
+                    UserSession.markAppTourPrompted();
+                    UserSession.resetTour();
+                    UserSession.setGlobalTourActive(true);
+                    Navigator.pop(context);
+                    _startHomeScreenTour();
+                  },
+                  child: const Text('Yes', style: TextStyle(fontWeight: FontWeight.bold)),
+                )
+              ],
+            ),
+          );
+        } else if (UserSession.globalTourActive && !UserSession.visitedModules.contains('HomeScreen')) {
+          _startHomeScreenTour();
+        }
+      }
+    });
+  }
+
+  void _startHomeScreenTour() {
+    if (!UserSession.hasSkippedTour && !UserSession.visitedModules.contains('HomeScreen')) {
+      Future.delayed(const Duration(seconds: 1), () {
+        if (mounted) {
+          final keysToShow = _getShowcaseKeys();
+          if (keysToShow.isNotEmpty) {
+            ShowCaseWidget.of(context).startShowCase(keysToShow);
+          }
+        }
+      });
+    }
+  }
+
   void _showEntryOptions(BuildContext context, String type) {
     Navigator.pushNamed(context, '/add-entry');
   }
@@ -152,6 +287,20 @@ class _HomeScreenState extends State<HomeScreen> {
               onTap: () => Navigator.pushNamed(context, '/profile'),
             ),
             ListTile(
+              leading: const Icon(Icons.help_outline, color: AppColors.textDark),
+              title: const Text(
+                'App Guidelines',
+                style: TextStyle(color: AppColors.textDark),
+              ),
+              onTap: () {
+                Navigator.pop(context); // Close drawer
+                final keysToShow = _getShowcaseKeys(isReplay: true);
+                if (keysToShow.isNotEmpty) {
+                  ShowcaseView.get().startShowCase(keysToShow);
+                }
+              },
+            ),
+            ListTile(
               leading: Container(
                 padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
@@ -237,6 +386,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
   @override
   Widget build(BuildContext context) {
+    _checkTour(context.watch<ProjectProvider>());
     return NurofinScaffold(
       drawer: _buildDrawer(context),
       body: SafeArea(
@@ -244,78 +394,108 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Builder(
           builder: (ctx) => Column(
             children: [
-              AppTopBar(
-                title: UserSession.companyName.isNotEmpty ? UserSession.companyName : 'BuildTrack',
-                titleWidget: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (UserSession.companyLogo != null && UserSession.companyLogo!.isNotEmpty) ...[
-                      Container(
-                        width: 26,
-                        height: 26,
-                        margin: const EdgeInsets.only(right: 8),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(6),
-                          image: DecorationImage(
-                            image: getProfileImageProvider(UserSession.companyLogo)!,
-                            fit: BoxFit.contain,
+              Showcase(
+                key: ShowcaseKeys.sidebarMenu,
+                description: 'Tap the menu icon to access Logs, Inventory, Subscriptions, and Roles.',
+                tooltipBackgroundColor: const Color(0xFF1E1E2C),
+                textColor: Colors.white,
+                tooltipBorderRadius: BorderRadius.circular(16),
+                tooltipPadding: const EdgeInsets.all(16),
+                child: AppTopBar(
+                  title: UserSession.companyName.isNotEmpty ? UserSession.companyName : 'BuildTrack',
+                  titleWidget: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (UserSession.companyLogo != null && UserSession.companyLogo!.isNotEmpty) ...[
+                        Container(
+                          width: 26,
+                          height: 26,
+                          margin: const EdgeInsets.only(right: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(6),
+                            image: DecorationImage(
+                              image: getProfileImageProvider(UserSession.companyLogo)!,
+                              fit: BoxFit.contain,
+                            ),
+                          ),
+                        ),
+                      ],
+                      Flexible(
+                        child: Text(
+                          UserSession.companyName.isNotEmpty ? UserSession.companyName : 'BuildTrack',
+                          textAlign: TextAlign.center,
+                          overflow: TextOverflow.ellipsis,
+                          style: UserSession.getCompanyTextStyle(
+                            fontSize: 19,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.primary,
                           ),
                         ),
                       ),
                     ],
-                    Flexible(
-                      child: Text(
-                        UserSession.companyName.isNotEmpty ? UserSession.companyName : 'BuildTrack',
-                        textAlign: TextAlign.center,
-                        overflow: TextOverflow.ellipsis,
-                        style: UserSession.getCompanyTextStyle(
-                          fontSize: 19,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.primary,
+                  ),
+                  leftIcon: Icons.menu,
+                  onLeftTap: () => Scaffold.of(ctx).openDrawer(),
+                  rightWidget: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Showcase(
+                        key: ShowcaseKeys.helpButton,
+                        description: 'Tap here anytime to replay this tour and get help.',
+                        tooltipBackgroundColor: const Color(0xFF1E1E2C),
+                        textColor: Colors.white,
+                        tooltipBorderRadius: BorderRadius.circular(16),
+                        tooltipPadding: const EdgeInsets.all(16),
+                        child: GestureDetector(
+                          onTap: () {
+                            final keysToShow = _getShowcaseKeys(isReplay: true);
+                            if (keysToShow.isNotEmpty) {
+                              ShowcaseView.get().startShowCase(keysToShow);
+                            }
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.all(7),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withValues(alpha: 0.1),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.help_outline,
+                              color: AppColors.primary,
+                              size: 19,
+                            ),
+                          ),
                         ),
                       ),
-                    ),
-                  ],
-                ),
-                leftIcon: Icons.menu,
-                onLeftTap: () => Scaffold.of(ctx).openDrawer(),
-                rightWidget: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    GestureDetector(
-                      onTap: () =>
-                          Navigator.pushNamed(context, '/notifications'),
-                      child: Container(
-                        padding: const EdgeInsets.all(7),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.1),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.notifications_none_outlined,
-                          color: AppColors.primary,
-                          size: 19,
-                        ),
+                      const SizedBox(width: 8),
+                      const NotificationsBell(),
+                      const SizedBox(width: 8),
+                      Showcase(
+                      key: ShowcaseKeys.profileIcon,
+                      description: 'Tap your profile icon to view your account details and settings.',
+                      tooltipBackgroundColor: const Color(0xFF1E1E2C),
+                      textColor: Colors.white,
+                      tooltipBorderRadius: BorderRadius.circular(16),
+                      tooltipPadding: const EdgeInsets.all(16),
+                      child: GestureDetector(
+                        onTap: () => Navigator.pushNamed(context, '/profile'),
+                        child: const ProfileAvatar(radius: 17),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    GestureDetector(
-                      onTap: () => Navigator.pushNamed(context, '/profile'),
-                      child: const ProfileAvatar(radius: 17),
                     ),
                   ],
                 ),
               ),
-              Expanded(
+            ),
+            Expanded(
                 child: SingleChildScrollView(
                   physics: const ClampingScrollPhysics(),
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      if (UserSession.isAdmin)
+                      if (UserSession.isAdmin || RoleManager.canViewReports || RoleManager.canManageExpenses)
                         _AdminDashboard(onEntryTap: _showEntryOptions),
                       if (UserSession.isSupervisor)
                         const _SupervisorDashboard(),
@@ -352,16 +532,9 @@ class _TaskCard extends StatelessWidget {
         final phases = proj.selectedPhases ?? [];
         for (var phase in phases) {
           for (var act in phase.activities) {
-            if (act.name == task.activityName) {
-              if (act.completed) {
-                displayStatus = 'Completed';
-              } else if (proj.progress > 0) {
-                displayStatus = 'Work in Progress';
-              } else {
-                displayStatus = 'Not Started';
+              if (act.name == task.activityName) {
+                break;
               }
-              break;
-            }
           }
         }
       }
@@ -375,92 +548,92 @@ class _TaskCard extends StatelessWidget {
       statusColor = Colors.orange;
       statusBg = Colors.orange.withValues(alpha: 0.1);
     }
-    return AppCard(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Text(
-                  task.title,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15,
-                    color: AppColors.textDark,
+    return GestureDetector(
+      onTap: displayStatus != 'Completed' ? onEdit : null,
+      child: AppCard(
+        margin: const EdgeInsets.only(bottom: 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    task.title,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                      color: AppColors.textDark,
+                    ),
                   ),
                 ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: statusBg,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  displayStatus,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: statusColor,
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: statusBg,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    displayStatus,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: statusColor,
+                    ),
                   ),
                 ),
-              ),
-              if (displayStatus != 'Completed' && onEdit != null) ...[
-                const SizedBox(width: 8),
-                GestureDetector(
-                  onTap: onEdit,
-                  child: const Icon(
+                if (displayStatus != 'Completed' && onEdit != null) ...[
+                  const SizedBox(width: 8),
+                  const Icon(
                     Icons.edit,
                     size: 18,
                     color: AppColors.primary,
                   ),
-                ),
+                ],
               ],
-            ],
-          ),
-          const SizedBox(height: 6),
-          if (task.description.isNotEmpty) ...[
-            Text(
-              task.description,
-              style: const TextStyle(fontSize: 13, color: AppColors.textLight),
             ),
             const SizedBox(height: 6),
-          ],
-          Row(
-            children: [
-              const Icon(
-                Icons.person_outline,
-                size: 14,
-                color: AppColors.textLight,
-              ),
-              const SizedBox(width: 4),
+            if (task.description.isNotEmpty) ...[
               Text(
-                'Assigned to: ${task.assignee ?? "Unassigned"}',
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: AppColors.textLight,
-                ),
+                task.description,
+                style: const TextStyle(fontSize: 13, color: AppColors.textLight),
               ),
-              const SizedBox(width: 12),
-              const Icon(
-                Icons.location_on_outlined,
-                size: 14,
-                color: AppColors.textLight,
-              ),
-              const SizedBox(width: 4),
-              Text(
-                task.floorName ?? 'On Site',
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: AppColors.textLight,
-                ),
-              ),
+              const SizedBox(height: 6),
             ],
-          ),
-        ],
+            Row(
+              children: [
+                const Icon(
+                  Icons.person_outline,
+                  size: 14,
+                  color: AppColors.textLight,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  'Assigned to: ${task.assignee ?? "Unassigned"}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textLight,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Icon(
+                  Icons.location_on_outlined,
+                  size: 14,
+                  color: AppColors.textLight,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  task.floorName ?? 'On Site',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textLight,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1738,6 +1911,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
     final List<dynamic> attachments = tx['attachments'] is List
         ? tx['attachments'] as List
         : [];
+
     DateTime date = DateTime.now();
     if (tx['date'] != null) {
       try {
@@ -2410,6 +2584,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
         : [];
     final hasImage =
         attachments.isNotEmpty && attachments.first.toString().isNotEmpty;
+
     DateTime date = DateTime.now();
     if (tx['date'] != null) {
       try {
@@ -2593,9 +2768,16 @@ class _AdminDashboardState extends State<_AdminDashboard> {
         const SizedBox(height: 16),
         const ApprovalsAlertWidget(),
         const SizedBox(height: 16),
-        Container(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
+        Showcase(
+          key: ShowcaseKeys.progress,
+          description: 'Track your overall project completion here',
+          tooltipBackgroundColor: const Color(0xFF1E1E2C),
+          textColor: Colors.white,
+          tooltipBorderRadius: BorderRadius.circular(16),
+          tooltipPadding: const EdgeInsets.all(16),
+          child: Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
             color: Colors.white.withValues(alpha: 0.95),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
@@ -2776,47 +2958,68 @@ class _AdminDashboardState extends State<_AdminDashboard> {
               ),
             ],
           ),
+          ),
         ),
         const SizedBox(height: 16),
         Row(
           children: [
             Expanded(
-              child: _costCard(
-                'TOTAL COST',
-                project != null
-                    ? formatCurrency(
-                        context.read<ProjectProvider>().totalSpentForProject(
-                          project.id,
-                        ),
-                      )
-                    : '₹—',
-                project != null
-                    ? () {
-                        final paid = context
-                            .read<ProjectProvider>()
-                            .totalSpentForProject(project.id);
-                        final budget = project.totalBudget;
-                        final pct = budget > 0
-                            ? (paid / budget * 100).toStringAsFixed(0)
-                            : '0';
-                        return '$pct% Used';
-                      }()
-                    : '—',
-                project != null &&
-                    context.read<ProjectProvider>().totalSpentForProject(
-                          project.id,
-                        ) >
-                        project.totalBudget * 0.9,
+              child: Showcase(
+                key: ShowcaseKeys.dashboardTotalCost,
+                description: 'Track your total funds spent across all categories for this project.',
+                tooltipBackgroundColor: const Color(0xFF1E1E2C),
+                textColor: Colors.white,
+                tooltipBorderRadius: BorderRadius.circular(16),
+                tooltipPadding: const EdgeInsets.all(16),
+                child: _costCard(
+                  'TOTAL COST',
+                  project != null
+                      ? formatCurrency(
+                          context.read<ProjectProvider>().totalSpentForProject(
+                            project.id,
+                          ),
+                        )
+                      : '₹—',
+                  project != null
+                      ? () {
+                          final paid = context
+                              .read<ProjectProvider>()
+                              .totalSpentForProject(project.id);
+                          final budget = project.totalBudget;
+                          final pct = budget > 0
+                              ? (paid / budget * 100).toStringAsFixed(0)
+                              : '0';
+                          return '$pct% Used';
+                        }()
+                      : '—',
+                  project != null &&
+                      context.read<ProjectProvider>().totalSpentForProject(
+                            project.id,
+                          ) >
+                          project.totalBudget * 0.9,
+                  indicatorIcon: Icons.trending_up,
+                ),
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: _costCard(
-                'BUDGET',
-                project?.formattedBudget ?? '₹—',
-                'Remaining: ${project?.formattedRemaining ?? '—'}',
-                false,
-                isInvoice: true,
+              child: Showcase(
+                key: ShowcaseKeys.dashboardTotalBudget,
+                description: 'Track the total allocated budget and remaining balance for this project.',
+                tooltipBackgroundColor: const Color(0xFF1E1E2C),
+                textColor: Colors.white,
+                tooltipBorderRadius: BorderRadius.circular(16),
+                tooltipPadding: const EdgeInsets.all(16),
+                child: _costCard(
+                  'BUDGET',
+                  project?.formattedBudget ?? '₹—',
+                  'Remaining: ${project?.formattedRemaining ?? '—'}',
+                  project != null && project.remainingBudget < 0,
+                  isInvoice: true,
+                  indicatorIcon: (project != null && project.remainingBudget < 0)
+                      ? Icons.trending_down
+                      : Icons.trending_flat,
+                ),
               ),
             ),
           ],
@@ -2825,41 +3028,50 @@ class _AdminDashboardState extends State<_AdminDashboard> {
         Row(
           children: [
             Expanded(
-              child: _costCard(
-                'TOTAL REVENUE',
-                project != null ? formatCurrency(_totalRevenueSum) : '₹—',
-                'Cash Inflow',
-                false,
+              child: Showcase(
+                key: ShowcaseKeys.dashboardTotalRevenue,
+                description: 'View the total revenue inflow recorded for this project.',
+                tooltipBackgroundColor: const Color(0xFF1E1E2C),
+                textColor: Colors.white,
+                tooltipBorderRadius: BorderRadius.circular(16),
+                tooltipPadding: const EdgeInsets.all(16),
+                child: _costCard(
+                  'TOTAL REVENUE',
+                  project != null ? formatCurrency(_totalRevenueSum) : '₹—',
+                  'Cash Inflow',
+                  false,
+                  indicatorIcon: Icons.trending_up,
+                ),
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: _costCard(
-                'NET CASH FLOW',
-                project != null
-                    ? formatCurrency(
-                        _totalRevenueSum -
-                            context
-                                .read<ProjectProvider>()
-                                .totalSpentForProject(project.id),
-                      )
-                    : '₹—',
-                project != null
-                    ? (_totalRevenueSum -
-                                  context
-                                      .read<ProjectProvider>()
-                                      .totalSpentForProject(project.id) >=
-                              0
-                          ? 'Net Profit'
-                          : 'Net Loss')
-                    : '—',
-                project != null &&
-                    (_totalRevenueSum -
-                            context
-                                .read<ProjectProvider>()
-                                .totalSpentForProject(project.id) <
-                        0),
-                isInvoice: true,
+              child: Builder(
+                builder: (_) {
+                  final netCash = project != null
+                      ? (_totalRevenueSum -
+                          context
+                              .read<ProjectProvider>()
+                              .totalSpentForProject(project.id))
+                      : 0.0;
+                  final isLoss = netCash < 0;
+                  return Showcase(
+                    key: ShowcaseKeys.dashboardNetCashFlow,
+                    description: 'See your net profit or loss calculated instantly.',
+                    tooltipBackgroundColor: const Color(0xFF1E1E2C),
+                    textColor: Colors.white,
+                    tooltipBorderRadius: BorderRadius.circular(16),
+                    tooltipPadding: const EdgeInsets.all(16),
+                    child: _costCard(
+                      'NET CASH FLOW',
+                      project != null ? formatCurrency(netCash) : '₹—',
+                      project != null ? (isLoss ? 'Net Loss' : 'Net Profit') : '—',
+                      isLoss,
+                      isInvoice: !isLoss,
+                      indicatorIcon: isLoss ? Icons.trending_down : Icons.trending_up,
+                    ),
+                  );
+                },
               ),
             ),
           ],
@@ -2871,7 +3083,15 @@ class _AdminDashboardState extends State<_AdminDashboard> {
         ],
         _buildSpeakUpdate(context),
         const SizedBox(height: 16),
-        _buildRecentActivity(context),
+        Showcase(
+          key: ShowcaseKeys.recentEntries,
+          description: 'Quickly view or edit your most recently added entries',
+          tooltipBackgroundColor: const Color(0xFF1E1E2C),
+          textColor: Colors.white,
+          tooltipBorderRadius: BorderRadius.circular(16),
+          tooltipPadding: const EdgeInsets.all(16),
+          child: _buildRecentActivity(context),
+        ),
       ],
     );
   }
@@ -3072,14 +3292,22 @@ class _AdminDashboardState extends State<_AdminDashboard> {
     String sub,
     bool isOver, {
     bool isInvoice = false,
+    IconData? icon,
+    IconData? indicatorIcon,
   }) {
     final cardColor = Colors.white.withValues(alpha: 0.95);
     final accentColor = isOver
         ? Colors.redAccent
         : (isInvoice ? AppColors.primaryPurple : AppColors.primaryBlue);
-    final iconData = isInvoice
-        ? Icons.account_balance_wallet_outlined
-        : Icons.monetization_on_outlined;
+    final iconData = icon ??
+        (isInvoice
+            ? Icons.account_balance_wallet_outlined
+            : Icons.currency_rupee_rounded);
+    final pillIcon = indicatorIcon ??
+        (isInvoice
+            ? Icons.trending_flat
+            : (isOver ? Icons.trending_up : Icons.trending_down));
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -3113,7 +3341,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                 ),
               ),
               Container(
-                padding: const EdgeInsets.all(6),
+                padding: const EdgeInsets.all(7),
                 decoration: BoxDecoration(
                   color: accentColor.withValues(alpha: 0.08),
                   shape: BoxShape.circle,
@@ -3139,18 +3367,16 @@ class _AdminDashboardState extends State<_AdminDashboard> {
           ),
           const SizedBox(height: 10),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
             decoration: BoxDecoration(
               color: accentColor.withValues(alpha: 0.06),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(
-                  isInvoice
-                      ? Icons.trending_flat
-                      : (isOver ? Icons.trending_up : Icons.trending_down),
+                  pillIcon,
                   size: 12,
                   color: accentColor,
                 ),
@@ -3178,10 +3404,17 @@ class _AdminDashboardState extends State<_AdminDashboard> {
     );
   }
   Widget _buildSpeakUpdate(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        gradient: AppGradients.primaryButton,
+    return Showcase(
+      key: ShowcaseKeys.quickAddEntry,
+      description: 'Quickly add a new entry from here.',
+      tooltipBackgroundColor: const Color(0xFF1E1E2C),
+      textColor: Colors.white,
+      tooltipBorderRadius: BorderRadius.circular(16),
+      tooltipPadding: const EdgeInsets.all(16),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(24),
+          gradient: AppGradients.primaryButton,
         boxShadow: [
           BoxShadow(
             color: AppColors.primaryBlue.withValues(alpha: 0.35),
@@ -3276,6 +3509,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                 ],
               ),
             ),
+          ),
           ),
         ),
       ),
@@ -3699,7 +3933,7 @@ class _SupervisorDashboardState extends State<_SupervisorDashboard> {
           ..._tasks.map(
             (task) => _TaskCard(
               task: task,
-              onEdit: () => _showEditTaskDialog(context, task, () {
+              onEdit: () => Navigator.pushNamed(context, '/update-progress', arguments: {'task': task}).then((_) {
                 if (context.mounted) _loadAll();
               }),
             ),
@@ -4523,7 +4757,7 @@ class _MasonDashboardState extends State<_MasonDashboard> {
             (task) => _TaskCard(
               task: task,
               onEdit: task.status != 'Completed'
-                  ? () => _showEditTaskDialog(context, task, () {
+                  ? () => Navigator.pushNamed(context, '/update-progress', arguments: {'task': task}).then((_) {
                       if (context.mounted) _loadTasks();
                     })
                   : null,

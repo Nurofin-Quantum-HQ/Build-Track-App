@@ -405,7 +405,7 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
         completedActivityKeys: [],
         selectedPhases: _phases
             .where(
-              (p) => p.isSelected && p.allActivities.any((a) => a.isSelected),
+              (p) => p.isSelected && (p.isCustom || p.allActivities.any((a) => a.isSelected)),
             )
             .map(
               (p) => ProjectPhase(
@@ -2299,8 +2299,12 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
               FocusManager.instance.primaryFocus?.unfocus();
               Navigator.pop(ctx);
               setState(
-                () =>
-                    _phases.add(ConstructionPhase(name: name, isCustom: true)),
+                () {
+                  final newPhase = ConstructionPhase(name: name, isCustom: true);
+                  newPhase.isSelected = true;
+                  newPhase.isExpanded = true;
+                  _phases.add(newPhase);
+                },
               );
             },
             style: ElevatedButton.styleFrom(

@@ -16,6 +16,8 @@ import 'package:buildtrack_mobile/services/auth_service.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/material.dart';
 import 'package:buildtrack_mobile/common/utils/image_pick_helper.dart';
+import 'package:showcaseview/showcaseview.dart';
+import 'package:buildtrack_mobile/controller/showcase_keys.dart';
 class ProfileUserData {
   const ProfileUserData({
     required this.name,
@@ -64,10 +66,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
   ProfileUserData? _user;
   bool _isLoadingProfile = true;
   String? _profileError;
+  final GlobalKey _settingsCardKey = GlobalKey();
+  final GlobalKey _teamAccessKey = GlobalKey();
+  final GlobalKey _logoutKey = GlobalKey();
   @override
   void initState() {
     super.initState();
     _fetchProfile();
+    _loadNotificationPrefs();
+  }
+  Future<void> _loadNotificationPrefs() async {
+    final prefs = await ApiService.getNotificationPreferences();
+    if (mounted && prefs.containsKey('push')) {
+      setState(() => _notificationsEnabled = prefs['push'] == true);
+    }
+  }
+  Future<void> _setNotificationsEnabled(bool val) async {
+    setState(() => _notificationsEnabled = val);
+    final ok = await ApiService.saveNotificationPreferences({'push': val});
+    if (!ok && mounted) setState(() => _notificationsEnabled = !val);
   }
   Future<void> _fetchProfile() async {
     setState(() {
@@ -242,40 +259,102 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
   @override
   Widget build(BuildContext context) {
-    return AppSubScreenLayout(
-      title: 'Profile',
-      scrollable: true,
-      child: _isLoadingProfile
-          ? const Padding(
-              padding: EdgeInsets.symmetric(vertical: 60),
-              child: Center(
-                child: CircularProgressIndicator(color: AppColors.primary),
+    return ShowCaseWidget(
+      globalTooltipActions: const [TooltipActionButton(type: TooltipDefaultActionType.skip, backgroundColor: Colors.transparent, textStyle: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold)), TooltipActionButton(type: TooltipDefaultActionType.next, backgroundColor: AppColors.primary, textStyle: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))], enableAutoScroll: true, 
+      builder: (context) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          final _projProvider = Provider.of<ProjectProvider>(context, listen: false);
+          if (_projProvider.projectsLoaded && _projProvider.projects.isEmpty && !UserSession.hasSkippedTour && !UserSession.visitedModules.contains('profile')) {
+            UserSession.markModuleVisited('profile');
+            final keys = <GlobalKey>[
+              ShowcaseKeys.profileFields,
+              _settingsCardKey,
+              ShowcaseKeys.profileSubscription,
+              if (RoleManager.canViewTeamAccess) _teamAccessKey,
+              _logoutKey,
+            ];
+            ShowCaseWidget.of(context).startShowCase(keys);
+          }
+        });
+        return AppSubScreenLayout(
+            title: 'Profile',
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.help_outline, color: Colors.black87),
+                onPressed: () {
+                  final keys = <GlobalKey>[
+                    ShowcaseKeys.profileFields,
+                    _settingsCardKey,
+                    ShowcaseKeys.profileSubscription,
+                    if (RoleManager.canViewTeamAccess) _teamAccessKey,
+                    _logoutKey,
+                  ];
+                  ShowCaseWidget.of(context).startShowCase(keys);
+                },
               ),
-            )
-          : Column(
-              children: [
-                if (_profileError != null) ...[
-                  _ErrorBanner(message: _profileError!),
-                  const SizedBox(height: 12),
-                ],
-                _buildProfileCard(_user!),
-                const SizedBox(height: AppTheme.spacingLg),
-                SubscriptionCard(showUpgradeButton: RoleManager.isAdmin),
-                const SizedBox(height: AppTheme.spacingLg),
-                _buildSettingsCard(),
-                const SizedBox(height: AppTheme.spacingLg),
-                if (RoleManager.canViewTeamAccess) ...[
-                  _buildTeamAccessSection(),
-                  const SizedBox(height: AppTheme.spacingLg),
-                ],
-                _buildActions(),
-                const SizedBox(height: AppTheme.spacingLg),
-                Text(
-                  'BuildTrack Version 2.4.0 (2024)',
-                  style: AppTheme.caption.copyWith(color: Colors.grey.shade600),
-                ),
-              ],
-            ),
+            ],
+            scrollable: true,
+            child: _isLoadingProfile
+                ? const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 60),
+                    child: Center(
+                      child: CircularProgressIndicator(color: AppColors.primary),
+                    ),
+                  )
+                : Column(
+                    children: [
+                      if (_profileError != null) ...[
+                        _ErrorBanner(message: _profileError!),
+                        const SizedBox(height: 12),
+                      ],
+                      Showcase(
+                        key: ShowcaseKeys.profileFields,
+                        description: 'This is your profile summary and role.',
+                        tooltipBackgroundColor: const Color(0xFF1E1E2C),
+                        textColor: Colors.white,
+                        tooltipBorderRadius: BorderRadius.circular(16),
+                        tooltipPadding: const EdgeInsets.all(16),
+                        child: _buildProfileCard(_user!),
+                      ),
+                      const SizedBox(height: AppTheme.spacingLg),
+                      Showcase(
+                        key: ShowcaseKeys.profileSubscription,
+                        description: 'View your current subscription plan and limits.',
+                        tooltipBackgroundColor: const Color(0xFF1E1E2C),
+                        textColor: Colors.white,
+                        tooltipBorderRadius: BorderRadius.circular(16),
+                        tooltipPadding: const EdgeInsets.all(16),
+                        child: SubscriptionCard(showUpgradeButton: RoleManager.isAdmin),
+                      ),
+                      const SizedBox(height: AppTheme.spacingLg),
+                      Showcase(
+                        key: _settingsCardKey,
+                        description: 'Manage your profile and notification settings here.',
+                        child: _buildSettingsCard(),
+                      ),
+                      const SizedBox(height: AppTheme.spacingLg),
+                      if (RoleManager.canViewTeamAccess) ...[
+                        Showcase(
+                          key: _teamAccessKey,
+                          description: 'Assign roles and manage team access from here.',
+                          child: _buildTeamAccessSection(),
+                        ),
+                        const SizedBox(height: AppTheme.spacingLg),
+                      ],
+                      Showcase(
+                        key: _logoutKey,
+                        description: 'Click here to log out securely.',
+                        child: _buildActions(),
+                      ),
+                      const SizedBox(height: AppTheme.spacingLg),
+                      Text(
+                        'BuildTrack Version 2.4.0 (2024)',
+                        style: AppTheme.caption.copyWith(color: Colors.grey.shade600),
+                      ),
+                    ],
+                  ),
+          );
+      },
     );
   }
   Widget _buildProfileCard(ProfileUserData user) {
@@ -423,10 +502,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
               value: _notificationsEnabled,
               activeThumbColor: AppColors.primary,
               activeTrackColor: AppColors.primary.withValues(alpha: 0.25),
-              onChanged: (val) => setState(() => _notificationsEnabled = val),
+              onChanged: _setNotificationsEnabled,
             ),
-            onTap: () =>
-                setState(() => _notificationsEnabled = !_notificationsEnabled),
+            onTap: () => _setNotificationsEnabled(!_notificationsEnabled),
             showDivider: false,
             showChevron: false,
           ),
@@ -491,12 +569,78 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
   Widget _buildActions() {
-    return AppButton(
-      label: 'Logout',
-      variant: AppButtonVariant.danger,
-      icon: Icons.logout_outlined,
-      onPressed: _onLogoutPressed,
+    return Column(
+      children: [
+        AppButton(
+          label: 'Logout',
+          variant: AppButtonVariant.danger,
+          icon: Icons.logout_outlined,
+          onPressed: _onLogoutPressed,
+        ),
+        if (RoleManager.isAdmin) ...[
+          const SizedBox(height: AppTheme.spacingMd),
+          AppButton(
+            label: 'Delete Account',
+            variant: AppButtonVariant.danger,
+            icon: Icons.delete_outline,
+            onPressed: _onDeleteAccountPressed,
+          ),
+        ],
+      ],
     );
+  }
+  Future<void> _onDeleteAccountPressed() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Delete Account?'),
+        content: const Text(
+          'This will permanently delete your admin account and ALL data associated with it — projects, team members, transactions, and more. This cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text(
+              'Delete My Account',
+              style: TextStyle(color: Colors.red, fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      final response = await ApiService.delete('/auth/account');
+      if (!mounted) return;
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        await AuthService.logout();
+        if (!mounted) return;
+        context.read<ProjectProvider>().clear();
+        context.read<InventoryProvider>().clear();
+        context.read<SubscriptionProvider>().clear();
+        Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to delete account (${response.statusCode})'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error deleting account: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
   void _onLogoutPressed() async {
     await AuthService.logout();
@@ -756,3 +900,4 @@ class _ErrorBanner extends StatelessWidget {
     );
   }
 }
+

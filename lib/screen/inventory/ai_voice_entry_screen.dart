@@ -930,44 +930,33 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
       }
     }
     if (data.phase == null || data.phase!.trim().isEmpty) {
-      const phaseKeywords = [
-        'foundation',
-        'structural',
-        'plumbing',
-        'electrical',
-        'finishing',
-        'roofing',
-        'excavation',
-        'superstructure',
-      ];
-      for (final p in phaseKeywords) {
-        if (t.contains(p)) {
-          data.phase = '${p[0].toUpperCase()}${p.substring(1)} Work';
-          break;
+      final projProv = Provider.of<ProjectProvider>(context, listen: false);
+      final phases = projProv.selectedProject?.selectedPhases;
+      if (phases != null) {
+        for (final p in phases) {
+          if (t.contains(p.phaseName.toLowerCase())) {
+            data.phase = p.phaseName;
+            break;
+          }
         }
       }
     }
     if (data.activity == null || data.activity!.trim().isEmpty) {
-      const activityKeywords = {
-        'column casting': 'Column Casting',
-        'beam casting': 'Beam Casting',
-        'slab': 'Slab Work',
-        'pcc': 'PCC',
-        'footing': 'Footing Work',
-        'block work': 'Block Work',
-        'brick laying': 'Brick Laying',
-        'plastering': 'Plastering',
-        'tile': 'Tiling',
-        'plumbing': 'Plumbing',
-        'wiring': 'Wiring',
-        'painting': 'Painting',
-        'excavation': 'Excavation',
-        'backfilling': 'Backfilling',
-      };
-      for (final entry in activityKeywords.entries) {
-        if (t.contains(entry.key)) {
-          data.activity = entry.value;
-          break;
+      final projProv = Provider.of<ProjectProvider>(context, listen: false);
+      final phases = projProv.selectedProject?.selectedPhases;
+      if (phases != null) {
+        for (final p in phases) {
+          if (data.phase != null && data.phase != p.phaseName) continue;
+          for (final a in p.activities) {
+            if (t.contains(a.name.toLowerCase())) {
+              data.activity = a.name;
+              if (data.phase == null) {
+                data.phase = p.phaseName;
+              }
+              break;
+            }
+          }
+          if (data.activity != null) break;
         }
       }
     }

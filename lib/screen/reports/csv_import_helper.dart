@@ -74,13 +74,25 @@ class CsvImportHelper {
     final List<List<dynamic>> parsedCsv = const CsvToListConverter().convert(
       csvString,
     );
-    if (parsedCsv.isEmpty || parsedCsv.length <= 1) {
+    String parseString(dynamic v) {
+      if (v == null) return '';
+      final str = v.toString().trim();
+      if (str.toLowerCase() == 'null' || str == '-' || str == '—' || str.contains('?')) return '';
+      return str;
+    }
+    int materialCount = 0;
+    int labourCount = 0;
+    int equipmentCount = 0;
+    int successCount = 0;
+    int failedCount = 0;
+    final List<String> errors = [];
+    final totalRows = parsedCsv.length - 1;
+    if (totalRows <= 0) {
       throw Exception('CSV file is empty or has no data rows');
     }
     final headers = parsedCsv.first.map((h) => h.toString().trim()).toList();
     final headerLower = headers.map((h) => h.toLowerCase()).toList();
-    // Map each export header to the import field it represents.
-    // Display-only columns (Amount, Paid, Remaining, Payment Date) are skipped.
+    
     final dateIdx = headerLower.indexWhere(
       (h) => h == 'purchased date' || h == 'date',
     );
@@ -107,8 +119,12 @@ class CsvImportHelper {
       (h) => h == 'qty' || h == 'days' || h == 'duration' || h == 'quantity',
     );
     final statusIdx = headerLower.indexOf('status');
+    final amountIdx = headerLower.indexWhere(
+      (h) => h.contains('amount') && !h.contains('paid') && !h.contains('remaining') && !h.contains('overtime') || h == 'total',
+    );
+    final payDateIdx = headerLower.indexWhere((h) => h.contains('payment date') || h.contains('pay date'));
     final paidAmountIdx = headerLower.indexWhere(
-      (h) => h == 'paid' || h == 'paid amount' || h == 'amount paid',
+      (h) => h.contains('paid') && !h.contains('unpaid'),
     );
     final notesIdx = headerLower.indexOf('notes');
     // Validate required columns exist
@@ -132,17 +148,12 @@ class CsvImportHelper {
       final clean = v.toString().trim().replaceAll(RegExp(r'[^\d.\-]'), '');
       return double.tryParse(clean) ?? 0.0;
     }
-    String parseString(dynamic v) {
-      if (v == null) return '';
-      return v.toString().trim();
+
+    if (totalRows > 100) {
+      throw Exception(
+        'CSV file exceeds the maximum limit of 100 rows (Found $totalRows rows). Please reduce the number of entries and try again.',
+      );
     }
-    int materialCount = 0;
-    int labourCount = 0;
-    int equipmentCount = 0;
-    int successCount = 0;
-    int failedCount = 0;
-    final List<String> errors = [];
-    final totalRows = parsedCsv.length - 1;
     for (int i = 1; i < parsedCsv.length; i++) {
       final row = parsedCsv[i];
       if (row.isEmpty ||
@@ -155,9 +166,26 @@ class CsvImportHelper {
         final dateStr = dateIdx != -1 && dateIdx < row.length
             ? parseString(row[dateIdx])
             : '';
-        final date = dateStr.isNotEmpty
-            ? (DateTime.tryParse(dateStr) ?? DateTime.now())
-            : DateTime.now();
+        DateTime date = DateTime.now();
+        if (dateStr.isNotEmpty) {
+          final parsed = DateTime.tryParse(dateStr);
+          if (parsed != null) {
+            date = parsed;
+          } else {
+            try {
+              final parts = dateStr.split(RegExp(r'[/|-]'));
+              if (parts.length == 3) {
+                final d = int.tryParse(parts[0]);
+                final m = int.tryParse(parts[1]);
+                final y = int.tryParse(parts[2]);
+                if (d != null && m != null && y != null) {
+                  if (y > 31) date = DateTime(y, m, d);
+                  else date = DateTime(d, m, y);
+                }
+              }
+            } catch(e) {}
+          }
+        }
         // ── Project resolution ──
         final csvProjName = projectIdx != -1 && projectIdx < row.length
             ? parseString(row[projectIdx])
@@ -265,7 +293,7 @@ class CsvImportHelper {
         // ── Numeric fields ──
         final qty = qtyIdx != -1 && qtyIdx < row.length
             ? parseDouble(row[qtyIdx])
-            : 1.0;
+            : 0.0;
         final rate = rateIdx != -1 && rateIdx < row.length
             ? parseDouble(row[rateIdx])
             : 0.0;
@@ -290,16 +318,58 @@ class CsvImportHelper {
             resolvedStatus = 'Partial';
           }
         }
-        final double finalAmount = qty * rate;
+        double finalAmount = qty * rate;
+        if (finalAmount == 0 && amountIdx != -1 && amountIdx < row.length) {
+          finalAmount = parseDouble(row[amountIdx]);
+        }
+
         double paidAmt;
-        if (resolvedStatus == 'Paid') {
-          paidAmt = finalAmount;
-        } else if (paidAmountIdx != -1 && paidAmountIdx < row.length) {
-          paidAmt = parseDouble(row[paidAmountIdx]);
-        } else if (resolvedStatus == 'Partial') {
-          paidAmt = finalAmount / 2;
+        if (paidAmountIdx != -1 && paidAmountIdx < row.length) {
+          final parsedPaid = parseDouble(row[paidAmountIdx]);
+          if (parsedPaid > 0) {
+            paidAmt = parsedPaid;
+          } else if (resolvedStatus == 'Paid' || resolvedStatus == 'Fully Paid') {
+            paidAmt = finalAmount;
+          } else if (resolvedStatus == 'Partial') {
+            paidAmt = finalAmount / 2;
+          } else {
+            paidAmt = 0.0;
+          }
         } else {
-          paidAmt = 0.0;
+          if (resolvedStatus == 'Paid' || resolvedStatus == 'Fully Paid') {
+            paidAmt = finalAmount;
+          } else if (resolvedStatus == 'Partial') {
+            paidAmt = finalAmount / 2;
+          } else {
+            paidAmt = 0.0;
+          }
+        }
+
+        final payDateStr = payDateIdx != -1 && payDateIdx < row.length
+            ? parseString(row[payDateIdx])
+            : '';
+        
+        DateTime? pDate;
+        if (payDateStr.isNotEmpty) {
+          try {
+            // handle DD-MM-YYYY or ISO formats here if necessary, or just rely on the backend accepting ISO or trying simple parse.
+            // Actually, backend might accept DD/MM/YYYY or YYYY-MM-DD. Since flutter formats it using _formatYmd which is dd/MM/yyyy typically, we'll let backend parse or we pass ISO.
+            final parts = payDateStr.split(RegExp(r'[/|-]'));
+            if (parts.length == 3) {
+              final d = int.tryParse(parts[0]);
+              final m = int.tryParse(parts[1]);
+              final y = int.tryParse(parts[2]);
+              if (d != null && m != null && y != null) {
+                if (y > 31) {
+                  pDate = DateTime(y, m, d);
+                } else {
+                  pDate = DateTime(d, m, y); // yy-mm-dd
+                }
+              }
+            }
+          } catch(e) {
+            // Ignore parse errors, leave pDate null
+          }
         }
         // ── Build payload ──
         final Map<String, dynamic> payload = {};
@@ -331,6 +401,7 @@ class CsvImportHelper {
             'paymentStatus': resolvedStatus,
             'paidAmount': paidAmt,
             'paymentMode': 'Cash',
+            if (pDate != null) 'paymentDate': pDate.toIso8601String(),
             'worker': name,
           });
           labourCount++;
@@ -366,6 +437,7 @@ class CsvImportHelper {
             'paymentStatus': resolvedStatus,
             'paidAmount': paidAmt,
             'paymentMode': 'Cash',
+            if (pDate != null) 'paymentDate': pDate.toIso8601String(),
           });
           equipmentCount++;
         } else {
@@ -400,6 +472,7 @@ class CsvImportHelper {
             'paymentStatus': resolvedStatus,
             'paidAmount': paidAmt,
             'paymentMode': 'Cash',
+            if (pDate != null) 'paymentDate': pDate.toIso8601String(),
             if (resolvedFloor != null ||
                 phaseName != null ||
                 activityName != null)

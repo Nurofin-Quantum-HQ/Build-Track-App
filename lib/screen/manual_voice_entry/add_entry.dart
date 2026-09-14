@@ -3,6 +3,7 @@ import 'package:csv/csv.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:buildtrack_mobile/common/themes/app_colors.dart';
+import 'package:buildtrack_mobile/controller/nav_controller.dart';
 import 'package:buildtrack_mobile/common/themes/app_theme.dart';
 import 'package:buildtrack_mobile/common/widgets/app_widgets.dart';
 import 'package:buildtrack_mobile/common/widgets/common_widgets.dart';
@@ -15,12 +16,57 @@ import 'package:buildtrack_mobile/screen/reports/save_helper_stub.dart'
     if (dart.library.html) 'package:buildtrack_mobile/screen/reports/save_helper_web.dart'
     if (dart.library.io) 'package:buildtrack_mobile/screen/reports/save_helper_mobile.dart';
 import 'package:flutter/material.dart';
-class AddEntryScreen extends StatefulWidget {
-  const AddEntryScreen({super.key});
+import 'package:showcaseview/showcaseview.dart';
+import 'package:buildtrack_mobile/controller/user_session.dart';
+import 'package:buildtrack_mobile/controller/showcase_keys.dart';
+
+class AddEntryScreen extends StatelessWidget {
+  AddEntryScreen({super.key});
+  final GlobalKey<ShowCaseWidgetState> _showcaseKey = GlobalKey<ShowCaseWidgetState>();
+
   @override
-  State<AddEntryScreen> createState() => _AddEntryScreenState();
+  Widget build(BuildContext context) {
+    return ShowCaseWidget(
+      key: _showcaseKey,
+      globalTooltipActions: [
+        TooltipActionButton(
+          type: TooltipDefaultActionType.skip, 
+          backgroundColor: Colors.transparent, 
+          textStyle: const TextStyle(color: Colors.white70, fontWeight: FontWeight.bold),
+          onTap: () {
+            UserSession.skipTour();
+            _showcaseKey.currentState?.dismiss();
+          }
+        ), 
+        const TooltipActionButton(
+          type: TooltipDefaultActionType.next, 
+          backgroundColor: AppColors.primary, 
+          textStyle: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)
+        )
+      ], 
+      enableAutoScroll: true,
+      onFinish: () {
+        UserSession.markModuleVisited('AddEntryScreen');
+        if (UserSession.globalTourActive) {
+          Future.delayed(const Duration(milliseconds: 300), () {
+            if (context.mounted) {
+              final nav = Provider.of<NavController>(context, listen: false);
+              nav.setRoute('/inventory', context);
+            }
+          });
+        }
+      },
+      builder: (context) => const _AddEntryScreenContent(),
+    );
+  }
 }
-class _AddEntryScreenState extends State<AddEntryScreen> {
+
+class _AddEntryScreenContent extends StatefulWidget {
+  const _AddEntryScreenContent();
+  @override
+  State<_AddEntryScreenContent> createState() => _AddEntryScreenContentState();
+}
+class _AddEntryScreenContentState extends State<_AddEntryScreenContent> {
   static const primaryBlue = AppColors.primary;
   static const bgColor = AppColors.gradientStart;
   static const textDark = AppColors.textDark;
@@ -48,10 +94,25 @@ class _AddEntryScreenState extends State<AddEntryScreen> {
     'Notes',
   ];
   late Map<String, bool> _columnVisibility;
+  final GlobalKey _csvKey = GlobalKey();
+
   @override
   void initState() {
     super.initState();
     _columnVisibility = {for (var c in _customColumns) c: true};
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final _projProvider = Provider.of<ProjectProvider>(context, listen: false);
+      if (!UserSession.hasSkippedTour && !UserSession.visitedModules.contains('AddEntryScreen')) {
+        final keys = <GlobalKey>[];
+        if (RoleManager.canManageExpenses) keys.add(ShowcaseKeys.addEntryMaterial);
+        if (RoleManager.canAddEntries) keys.add(ShowcaseKeys.addEntryLabour);
+        if (RoleManager.canManageEquipmentMaster) keys.add(ShowcaseKeys.addEntryEquipment);
+        keys.add(ShowcaseKeys.addEntryCSV);
+        keys.add(_csvKey);
+        ShowCaseWidget.of(context).startShowCase(keys);
+        UserSession.markModuleVisited('AddEntryScreen');
+      }
+    });
   }
   List<Map<String, dynamic>> get _entries {
     final items = <Map<String, dynamic>>[];
@@ -635,7 +696,7 @@ class _AddEntryScreenState extends State<AddEntryScreen> {
                 "unit": normalizedUnit,
                 "project": projectId,
                 "notes": notes,
-                "date": date.toIso8601String(),
+                "date": date.toUtc().toIso8601String(),
                 "floor": resolvedFloor,
                 "phase": ?phaseName,
                 "phaseId": ?phaseId,
@@ -682,7 +743,7 @@ class _AddEntryScreenState extends State<AddEntryScreen> {
                 "rate": rate,
                 "unit": normalizedUnit,
                 "project": projectId,
-                "date": date.toIso8601String(),
+                "date": date.toUtc().toIso8601String(),
                 "floor": resolvedFloor,
                 "phase": ?phaseName,
                 "phaseId": ?phaseId,
@@ -727,7 +788,7 @@ class _AddEntryScreenState extends State<AddEntryScreen> {
                 "rate": rate,
                 "unit": normalizedUnit,
                 "project": projectId,
-                "date": date.toIso8601String(),
+                "date": date.toUtc().toIso8601String(),
                 "floor": resolvedFloor,
                 "phase": ?phaseName,
                 "phaseId": ?phaseId,
@@ -810,7 +871,7 @@ class _AddEntryScreenState extends State<AddEntryScreen> {
               "unit": normalizedUnit,
               "project": projectId,
               "notes": notes,
-              "date": date.toIso8601String(),
+              "date": date.toUtc().toIso8601String(),
               "floor": resolvedFloor,
               "phase": ?phaseName,
               "phaseId": ?phaseId,
@@ -875,7 +936,7 @@ class _AddEntryScreenState extends State<AddEntryScreen> {
               "rate": rate,
               "unit": normalizedUnit,
               "project": projectId,
-              "date": date.toIso8601String(),
+              "date": date.toUtc().toIso8601String(),
               "floor": resolvedFloor,
               "phase": ?phaseName,
               "phaseId": ?phaseId,
@@ -942,7 +1003,7 @@ class _AddEntryScreenState extends State<AddEntryScreen> {
               "rate": rate,
               "unit": normalizedUnit,
               "project": projectId,
-              "date": date.toIso8601String(),
+              "date": date.toUtc().toIso8601String(),
               "floor": resolvedFloor,
               "phase": ?phaseName,
               "phaseId": ?phaseId,
@@ -1117,16 +1178,23 @@ class _AddEntryScreenState extends State<AddEntryScreen> {
     }
   }
   Widget _buildCsvImportCard(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
+    return Showcase(
+      key: ShowcaseKeys.addEntryCSV,
+      description: 'Upload bulk entries via CSV. Download templates and upload completed files here.',
+      tooltipBackgroundColor: const Color(0xFF1E1E2C),
+      textColor: Colors.white,
+      tooltipBorderRadius: BorderRadius.circular(16),
+      tooltipPadding: const EdgeInsets.all(16),
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
           ),
         ],
         border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
@@ -1218,15 +1286,20 @@ class _AddEntryScreenState extends State<AddEntryScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              TextButton.icon(
-                onPressed: _isUploadingCsv ? null : _openCustomizeColumnsSheet,
-                icon: const Icon(Icons.settings_outlined, size: 16),
-                label: const Text('Customize Template Columns'),
-                style: TextButton.styleFrom(
-                  foregroundColor: AppColors.primary,
-                  textStyle: const TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w700,
+              Showcase(
+                key: _csvKey,
+                title: 'Customize Template',
+                description: 'You can adjust which columns appear in the CSV.',
+                child: TextButton.icon(
+                  onPressed: _isUploadingCsv ? null : _openCustomizeColumnsSheet,
+                  icon: const Icon(Icons.settings_outlined, size: 16),
+                  label: const Text('Customize Template Columns'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    textStyle: const TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ),
@@ -1272,7 +1345,7 @@ class _AddEntryScreenState extends State<AddEntryScreen> {
           ),
         ],
       ),
-    );
+    ));
   }
   @override
   Widget build(BuildContext context) {
@@ -1288,9 +1361,30 @@ class _AddEntryScreenState extends State<AddEntryScreen> {
               onLeftTap: Navigator.canPop(context)
                   ? () => Navigator.pop(context)
                   : null,
-              rightWidget: GestureDetector(
-                onTap: () => Navigator.pushNamed(context, '/profile'),
-                child: const ProfileAvatar(radius: 18),
+              rightWidget: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  GestureDetector(
+                    onTap: () => ShowcaseView.get().startShowCase([_csvKey]),
+                    child: Container(
+                      padding: const EdgeInsets.all(7),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.help_outline,
+                        color: AppColors.primary,
+                        size: 19,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: () => Navigator.pushNamed(context, '/profile'),
+                    child: const ProfileAvatar(radius: 18),
+                  ),
+                ],
               ),
             ),
             Expanded(
@@ -1347,7 +1441,20 @@ class _AddEntryScreenState extends State<AddEntryScreen> {
     };
     final Color iconColor = iconColors[type] ?? primaryBlue;
     final Color iconBg = iconBgColors[type] ?? const Color(0xFFF0F2F8);
-    return AppCard(
+    GlobalKey? showcaseKey;
+    String description = '';
+    if (type == 'material') {
+      showcaseKey = ShowcaseKeys.addEntryMaterial;
+      description = 'Log concrete, steel, lumber, or site-specific procurement items.';
+    } else if (type == 'labour') {
+      showcaseKey = ShowcaseKeys.addEntryLabour;
+      description = 'Track crew hours, specialized trade performance, and site presence.';
+    } else if (type == 'equipment') {
+      showcaseKey = ShowcaseKeys.addEntryEquipment;
+      description = 'Record heavy machinery runtime, fuel logs, and maintenance events.';
+    }
+
+    Widget cardContent = AppCard(
       onTap: () => _navigateToContext(context, type),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
@@ -1391,6 +1498,19 @@ class _AddEntryScreenState extends State<AddEntryScreen> {
         ],
       ),
     );
+
+    if (showcaseKey != null) {
+      return Showcase(
+        key: showcaseKey,
+        description: description,
+        tooltipBackgroundColor: const Color(0xFF1E1E2C),
+        textColor: Colors.white,
+        tooltipBorderRadius: BorderRadius.circular(16),
+        tooltipPadding: const EdgeInsets.all(16),
+        child: cardContent,
+      );
+    }
+    return cardContent;
   }
   Future<void> _openCustomizeColumnsSheet() async {
     final result = await showModalBottomSheet<Map<String, dynamic>>(
@@ -1595,3 +1715,4 @@ class _CustomizeTemplateSheetState extends State<CustomizeTemplateSheet> {
     );
   }
 }
+

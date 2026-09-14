@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:buildtrack_mobile/common/themes/app_colors.dart';
+import 'package:buildtrack_mobile/controller/nav_controller.dart';
 import 'package:buildtrack_mobile/common/themes/app_gradients.dart';
 import 'package:buildtrack_mobile/common/utils/currency_formatter.dart';
 import 'package:buildtrack_mobile/common/widgets/common_widgets.dart';
@@ -9,13 +10,60 @@ import 'package:buildtrack_mobile/models/project_model.dart';
 import 'package:buildtrack_mobile/controller/inventory_provider.dart';
 import 'package:buildtrack_mobile/models/inventory_model.dart';
 import 'package:flutter/material.dart';
+import 'package:showcaseview/showcaseview.dart';
+import 'package:buildtrack_mobile/controller/user_session.dart';
+import 'package:buildtrack_mobile/controller/showcase_keys.dart';
 import 'package:provider/provider.dart';
-class InventoryScreen extends StatefulWidget {
-  const InventoryScreen({super.key});
+
+class InventoryScreen extends StatelessWidget {
+  InventoryScreen({super.key});
+  final GlobalKey<ShowCaseWidgetState> _showcaseKey = GlobalKey<ShowCaseWidgetState>();
+
   @override
-  State<InventoryScreen> createState() => _InventoryScreenState();
+  Widget build(BuildContext context) {
+    return ShowCaseWidget(
+      key: _showcaseKey,
+      globalTooltipActions: [
+        TooltipActionButton(
+          type: TooltipDefaultActionType.skip, 
+          backgroundColor: Colors.transparent, 
+          textStyle: const TextStyle(color: Colors.white70, fontWeight: FontWeight.bold),
+          onTap: () {
+            UserSession.skipTour();
+            _showcaseKey.currentState?.dismiss();
+          }
+        ), 
+        const TooltipActionButton(
+          type: TooltipDefaultActionType.next, 
+          backgroundColor: AppColors.primary, 
+          textStyle: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)
+        )
+      ], 
+      enableAutoScroll: true,
+      onFinish: () {
+        UserSession.markModuleVisited('InventoryScreen');
+        if (UserSession.globalTourActive) {
+          Future.delayed(const Duration(milliseconds: 300), () {
+            if (context.mounted) {
+              final nav = Provider.of<NavController>(context, listen: false);
+              nav.setRoute('/reports', context);
+            }
+          });
+        }
+      },
+      builder: (context) => const _InventoryScreenContent(),
+    );
+  }
 }
-class _InventoryScreenState extends State<InventoryScreen> {
+
+class _InventoryScreenContent extends StatefulWidget {
+  const _InventoryScreenContent();
+  @override
+  State<_InventoryScreenContent> createState() => _InventoryScreenContentState();
+}
+
+class _InventoryScreenContentState extends State<_InventoryScreenContent> {
+  final GlobalKey _helpKey = GlobalKey();
   static const Color _blue = AppColors.primary;
   static const Color _bg = AppColors.gradientStart;
   static const Color _dark = AppColors.textDark;
@@ -39,6 +87,21 @@ class _InventoryScreenState extends State<InventoryScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<InventoryProvider>().loadInventory(_selectedProjectId ?? '');
+      if (!UserSession.hasSkippedTour && !UserSession.visitedModules.contains('InventoryScreen')) {
+        Future.delayed(const Duration(seconds: 1), () {
+          if (mounted) {
+            ShowCaseWidget.of(context).startShowCase([
+              ShowcaseKeys.inventoryProjectContext,
+              ShowcaseKeys.inventoryFilters,
+              ShowcaseKeys.inventoryAdd,
+              ShowcaseKeys.inventoryMaterials,
+              ShowcaseKeys.inventoryTools,
+              ShowcaseKeys.inventoryStats,
+              _helpKey,
+            ]);
+          }
+        });
+      }
     });
   }
   @override
@@ -433,9 +496,34 @@ class _InventoryScreenState extends State<InventoryScreen> {
           children: [
             AppTopBar(
               title: 'Inventory',
-              rightWidget: GestureDetector(
-                onTap: () => Navigator.pushNamed(context, '/profile'),
-                child: const ProfileAvatar(radius: 18),
+              rightWidget: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Showcase(
+                    key: _helpKey,
+                    description: 'Tap here anytime to replay this tour and get help.',
+                    tooltipBackgroundColor: const Color(0xFF1E1E2C),
+                    textColor: Colors.white,
+                    tooltipBorderRadius: BorderRadius.circular(16),
+                    tooltipPadding: const EdgeInsets.all(16),
+                    child: IconButton(
+                      icon: const Icon(Icons.help_outline, color: AppColors.primary),
+                      onPressed: () {
+                        ShowCaseWidget.of(context).startShowCase([
+                          ShowcaseKeys.inventoryProjectContext,
+                          ShowcaseKeys.inventoryFilters,
+                          ShowcaseKeys.inventoryAdd,
+                          _helpKey,
+                        ]);
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: () => Navigator.pushNamed(context, '/profile'),
+                    child: const ProfileAvatar(radius: 18),
+                  ),
+                ],
               ),
             ),
             Expanded(
@@ -446,7 +534,15 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
                     child: Column(
                       children: [
-                        _buildProjectSelector(),
+                        Showcase(
+                          key: ShowcaseKeys.inventoryProjectContext,
+                          description: 'Select a project to view its specific materials, equipment, and updates.',
+                          tooltipBackgroundColor: const Color(0xFF1E1E2C),
+                          textColor: Colors.white,
+                          tooltipBorderRadius: BorderRadius.circular(16),
+                          tooltipPadding: const EdgeInsets.all(16),
+                          child: _buildProjectSelector(),
+                        ),
                         const SizedBox(height: 10),
                         _buildSearchBar(),
                         const SizedBox(height: 10),
@@ -629,42 +725,62 @@ class _InventoryScreenState extends State<InventoryScreen> {
           final active = i == _tabIndex;
           final textColor = active ? Colors.white : const Color(0xFF4B4966);
           final iconColor = active ? Colors.white : const Color(0xFF757299);
-          return Expanded(
-            child: InkWell(
-              onTap: () {
-                setState(() => _tabIndex = i);
-                _pageController.animateToPage(
-                  i,
-                  duration: const Duration(milliseconds: 250),
-                  curve: Curves.easeInOut,
-                );
-              },
-              borderRadius: BorderRadius.circular(10),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(vertical: 11),
-                decoration: BoxDecoration(
-                  gradient: active ? AppGradients.primaryButton : null,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(icons[i], color: iconColor, size: 16),
-                    const SizedBox(width: 6),
-                    Text(
-                      labels[i],
-                      style: TextStyle(
-                        color: textColor,
-                        fontWeight: active ? FontWeight.w800 : FontWeight.w600,
-                        fontSize: 12.5,
-                      ),
+          Widget tabChild = InkWell(
+            onTap: () {
+              setState(() => _tabIndex = i);
+              _pageController.animateToPage(
+                i,
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeInOut,
+              );
+            },
+            borderRadius: BorderRadius.circular(10),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.symmetric(vertical: 11),
+              decoration: BoxDecoration(
+                gradient: active ? AppGradients.primaryButton : null,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(icons[i], color: iconColor, size: 16),
+                  const SizedBox(width: 6),
+                  Text(
+                    labels[i],
+                    style: TextStyle(
+                      color: textColor,
+                      fontWeight: active ? FontWeight.w800 : FontWeight.w600,
+                      fontSize: 12.5,
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           );
+          if (i == 0) {
+            tabChild = Showcase(
+              key: ShowcaseKeys.inventoryMaterials,
+              description: 'View your materials inventory here',
+              tooltipBackgroundColor: const Color(0xFF1E1E2C),
+              textColor: Colors.white,
+              tooltipBorderRadius: BorderRadius.circular(16),
+              tooltipPadding: const EdgeInsets.all(16),
+              child: tabChild,
+            );
+          } else if (i == 2) {
+            tabChild = Showcase(
+              key: ShowcaseKeys.inventoryTools,
+              description: 'View your equipment and tools inventory here',
+              tooltipBackgroundColor: const Color(0xFF1E1E2C),
+              textColor: Colors.white,
+              tooltipBorderRadius: BorderRadius.circular(16),
+              tooltipPadding: const EdgeInsets.all(16),
+              child: tabChild,
+            );
+          }
+          return Expanded(child: tabChild);
         }),
       ),
     );
@@ -877,18 +993,36 @@ class _TimelineTabContentState extends State<_TimelineTabContent> {
       SliverToBoxAdapter(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
-          child: _KpiStrip(kpis: widget.kpis),
+          child: widget.type == 'material'
+              ? Showcase(
+                  key: ShowcaseKeys.inventoryStats,
+                  description: 'Track total loads, equipment count, and overall inventory metrics for this project.',
+                  tooltipBackgroundColor: const Color(0xFF1E1E2C),
+                  textColor: Colors.white,
+                  tooltipBorderRadius: BorderRadius.circular(16),
+                  tooltipPadding: const EdgeInsets.all(16),
+                  child: _KpiStrip(kpis: widget.kpis),
+                )
+              : _KpiStrip(kpis: widget.kpis),
         ),
       ),
       SliverToBoxAdapter(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-          child: _FiltersRow(
-            chips: widget.chips,
-            activeChip: widget.activeChip,
-            dateFilter: widget.dateFilter,
-            onChip: widget.onChipChange,
-            onDate: widget.onDateFilter,
+          child: Showcase(
+            key: ShowcaseKeys.inventoryFilters,
+            description: 'Filter your inventory by categories or dates to quickly find what you need.',
+            tooltipBackgroundColor: const Color(0xFF1E1E2C),
+            textColor: Colors.white,
+            tooltipBorderRadius: BorderRadius.circular(16),
+            tooltipPadding: const EdgeInsets.all(16),
+            child: _FiltersRow(
+              chips: widget.chips,
+              activeChip: widget.activeChip,
+              dateFilter: widget.dateFilter,
+              onChip: widget.onChipChange,
+              onDate: widget.onDateFilter,
+            ),
           ),
         ),
       ),
@@ -2097,38 +2231,46 @@ class _EmptyState extends StatelessWidget {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
-            GestureDetector(
-              onTap: onAdd,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 13,
-                ),
-                decoration: BoxDecoration(
-                  gradient: AppGradients.primaryButton,
-                  borderRadius: BorderRadius.circular(14),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.primaryBlue.withValues(alpha: 0.3),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.add, color: Colors.white, size: 17),
-                    SizedBox(width: 8),
-                    Text(
-                      'Add First Entry',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14,
+            Showcase(
+              key: ShowcaseKeys.inventoryAdd,
+              description: 'Tap here to add your first inventory entry.',
+              tooltipBackgroundColor: const Color(0xFF1E1E2C),
+              textColor: Colors.white,
+              tooltipBorderRadius: BorderRadius.circular(16),
+              tooltipPadding: const EdgeInsets.all(16),
+              child: GestureDetector(
+                onTap: onAdd,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 13,
+                  ),
+                  decoration: BoxDecoration(
+                    gradient: AppGradients.primaryButton,
+                    borderRadius: BorderRadius.circular(14),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primaryBlue.withValues(alpha: 0.3),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.add, color: Colors.white, size: 17),
+                      SizedBox(width: 8),
+                      Text(
+                        'Add First Entry',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -2255,3 +2397,4 @@ class _ProjectSelectorSheet extends StatelessWidget {
     );
   }
 }
+

@@ -454,7 +454,9 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
         child: Column(
           children: [
             AppTopBar(
-              title: _itemName,
+              title: _itemName.isNotEmpty
+                  ? '${_itemName[0].toUpperCase()}${_itemName.substring(1)}'
+                  : 'Project Logs',
               isSubScreen: true,
               leftIcon: Icons.arrow_back,
               onLeftTap: () => Navigator.maybePop(context),
@@ -640,7 +642,7 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
               Expanded(
                 child: _summaryBadge(
                   Icons.remove_circle_outline,
-                  '-$_totalUsed Used',
+                  _totalUsed > 0 ? '-$_totalUsed Used' : '0 Used',
                   const Color(0xFFE040FB),
                 ),
               ),
@@ -1189,20 +1191,22 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   PaymentStatusChip(status: payStatus),
-                  const SizedBox(width: 6),
-                  if (billAmt > 0)
-                    Flexible(
-                      child: Text(
-                        '${formatCurrency(paidAmt)} paid / ${formatCurrency(billAmt)}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppTheme.caption.copyWith(
-                          color: textGray,
-                          fontWeight: FontWeight.w600,
-                        ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      billAmt > 0
+                          ? '${formatCurrency(paidAmt)} / ${formatCurrency(billAmt)}'
+                          : formatCurrency(paidAmt),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTheme.caption.copyWith(
+                        color: textGray,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 11,
                       ),
                     ),
-                  const Spacer(),
+                  ),
+                  const SizedBox(width: 8),
                   GestureDetector(
                     onTap: canSettle
                         ? () {

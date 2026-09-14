@@ -5,6 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:buildtrack_mobile/controller/user_session.dart';
 import 'package:buildtrack_mobile/common/utils/image_pick_helper.dart';
+import 'package:showcaseview/showcaseview.dart';
+import 'package:buildtrack_mobile/controller/showcase_keys.dart';
+
 class AppTopBar extends StatelessWidget {
   final String title;
   final Widget? titleWidget;
@@ -93,29 +96,50 @@ class AppBottomNav extends StatelessWidget {
             children: [
               _navItem(context, nav, '/home', Icons.home_rounded, 'HOME'),
               if (nav.isRouteEnabled('/projects'))
-                _navItem(
-                  context,
-                  nav,
-                  '/projects',
-                  Icons.architecture_outlined,
-                  'PROJECTS',
+                Showcase(
+                  key: ShowcaseKeys.projects,
+                  description: 'Click here to view your projects and create new ones.',
+                  child: _navItem(
+                    context,
+                    nav,
+                    '/projects',
+                    Icons.architecture_outlined,
+                    'PROJECTS',
+                  ),
                 ),
-              if (nav.isRouteEnabled('/add-entry')) _entryButton(context, nav),
+              if (nav.isRouteEnabled('/add-entry'))
+                Showcase(
+                  key: ShowcaseKeys.addEntry,
+                  description: 'Click here to add daily entries.',
+                  child: _entryButton(context, nav),
+                ),
               if (nav.isRouteEnabled('/inventory'))
-                _navItem(
-                  context,
-                  nav,
-                  '/inventory',
-                  Icons.inventory_2_outlined,
-                  'INVENTORY',
+                Showcase(
+                  key: ShowcaseKeys.inventoryTab,
+                  description: 'Manage your materials, tools, and inventory here.',
+                  tooltipBackgroundColor: const Color(0xFF1E1E2C),
+                  textColor: Colors.white,
+                  tooltipBorderRadius: BorderRadius.circular(16),
+                  tooltipPadding: const EdgeInsets.all(16),
+                  child: _navItem(
+                    context,
+                    nav,
+                    '/inventory',
+                    Icons.inventory_2_outlined,
+                    'INVENTORY',
+                  ),
                 ),
               if (nav.isRouteEnabled('/reports'))
-                _navItem(
-                  context,
-                  nav,
-                  '/reports',
-                  Icons.bar_chart_outlined,
-                  'REPORTS',
+                Showcase(
+                  key: ShowcaseKeys.reports,
+                  description: 'View detailed project reports and bulk CSV imports here.',
+                  child: _navItem(
+                    context,
+                    nav,
+                    '/reports',
+                    Icons.bar_chart_outlined,
+                    'REPORTS',
+                  ),
                 ),
             ],
           ),

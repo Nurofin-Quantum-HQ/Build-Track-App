@@ -884,13 +884,15 @@ class _TrackerActivityRowState extends State<_TrackerActivityRow> {
                         : null,
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         widget.activity.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 13.5,
                           fontWeight: done ? FontWeight.w600 : FontWeight.w500,
@@ -913,12 +915,16 @@ class _TrackerActivityRowState extends State<_TrackerActivityRow> {
                               color: AppColors.success,
                             ),
                             const SizedBox(width: 3),
-                            Text(
-                              'Completed $dateLabel',
-                              style: const TextStyle(
-                                fontSize: 10,
-                                color: AppColors.success,
-                                fontWeight: FontWeight.w600,
+                            Flexible(
+                              child: Text(
+                                'Completed $dateLabel',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  color: AppColors.success,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ),
                           ],
@@ -927,9 +933,10 @@ class _TrackerActivityRowState extends State<_TrackerActivityRow> {
                     ],
                   ),
                 ),
+                const SizedBox(width: 4),
                 Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
+                    horizontal: 6,
                     vertical: 3,
                   ),
                   decoration: BoxDecoration(
@@ -941,20 +948,20 @@ class _TrackerActivityRowState extends State<_TrackerActivityRow> {
                   child: Text(
                     done ? 'Done' : 'Pending',
                     style: TextStyle(
-                      fontSize: 10,
+                      fontSize: 9.5,
                       fontWeight: FontWeight.w800,
                       color: done ? AppColors.success : const Color(0xFFF59E0B),
                     ),
                   ),
                 ),
-                const SizedBox(width: 6),
+                const SizedBox(width: 4),
                 GestureDetector(
                   onTap: () => _openUpdateProgress(context),
                   behavior: HitTestBehavior.opaque,
                   child: Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 6,
+                      horizontal: 8,
+                      vertical: 5,
                     ),
                     decoration: BoxDecoration(
                       color: AppColors.primary.withValues(alpha: 0.08),
@@ -967,7 +974,7 @@ class _TrackerActivityRowState extends State<_TrackerActivityRow> {
                     child: const Text(
                       'ADD',
                       style: TextStyle(
-                        fontSize: 10,
+                        fontSize: 9.5,
                         fontWeight: FontWeight.w800,
                         color: AppColors.primary,
                         letterSpacing: 0.3,
@@ -976,14 +983,14 @@ class _TrackerActivityRowState extends State<_TrackerActivityRow> {
                   ),
                 ),
                 if (done) ...[
-                  const SizedBox(width: 6),
+                  const SizedBox(width: 4),
                   GestureDetector(
                     onTap: () => _showActivityDetails(context),
                     behavior: HitTestBehavior.opaque,
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 6,
+                        horizontal: 8,
+                        vertical: 5,
                       ),
                       decoration: BoxDecoration(
                         color: AppColors.success.withValues(alpha: 0.08),
@@ -996,7 +1003,7 @@ class _TrackerActivityRowState extends State<_TrackerActivityRow> {
                       child: const Text(
                         'VIEW',
                         style: TextStyle(
-                          fontSize: 10,
+                          fontSize: 9.5,
                           fontWeight: FontWeight.w800,
                           color: AppColors.success,
                           letterSpacing: 0.3,
@@ -1005,7 +1012,7 @@ class _TrackerActivityRowState extends State<_TrackerActivityRow> {
                     ),
                   ),
                 ],
-                const SizedBox(width: 4),
+                const SizedBox(width: 2),
                 AnimatedRotation(
                   turns: _isBudgetExpanded ? 0.5 : 0,
                   duration: const Duration(milliseconds: 180),
@@ -1371,11 +1378,20 @@ class _SummaryCard extends StatelessWidget {
         : allPhases.where((p) => selectedNames.contains(p.name)).toList();
     final completed = project.completedActivityKeys ?? [];
     String? activePhase;
-    for (final p in phases) {
-      final keys = p.allActivities.map((a) => a.key).toList();
-      if (keys.any((k) => !completed.contains(k))) {
-        activePhase = p.name;
-        break;
+    if (project.selectedPhases != null && project.selectedPhases!.isNotEmpty) {
+      for (final p in project.selectedPhases!) {
+        if (p.activities.any((a) => !a.completed)) {
+          activePhase = p.phaseName;
+          break;
+        }
+      }
+    } else {
+      for (final p in phases) {
+        final keys = p.allActivities.map((a) => a.key).toList();
+        if (keys.any((k) => !completed.contains(k))) {
+          activePhase = p.name;
+          break;
+        }
       }
     }
     return AppCard(
@@ -2895,97 +2911,11 @@ class _EntryTile extends StatelessWidget {
 class _ActionButtons extends StatelessWidget {
   const _ActionButtons({required this.project});
   final ProjectModel project;
-  void _showDeleteConfirmation(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            const Icon(
-              Icons.warning_amber_rounded,
-              color: Colors.redAccent,
-              size: 28,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              'Delete Project',
-              style: AppTheme.heading2.copyWith(color: AppColors.textDark),
-            ),
-          ],
-        ),
-        content: Text(
-          'Are you sure you want to delete "${project.name}"? This action '
-          'cannot be undone and all associated entries will be permanently removed.',
-          style: AppTheme.bodyLarge.copyWith(color: AppColors.textLight),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text(
-              'Cancel',
-              style: TextStyle(
-                color: AppColors.textLight,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.redAccent,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            onPressed: () async {
-              Navigator.pop(ctx);
-              showDialog(
-                context: context,
-                barrierDismissible: false,
-                builder: (lCtx) => const Center(
-                  child: CircularProgressIndicator(color: AppColors.primary),
-                ),
-              );
-              final success = await ApiService.deleteProject(project.id);
-              if (context.mounted) {
-                Navigator.pop(context);
-                if (success) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Project deleted successfully'),
-                      backgroundColor: Colors.green,
-                    ),
-                  );
-                  await context.read<ProjectProvider>().load();
-                  if (context.mounted) Navigator.pop(context);
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Failed to delete project'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                }
-              }
-            },
-            child: const Text(
-              'Delete',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
   @override
   Widget build(BuildContext context) {
     final canAddEntry = RoleManager.canManageExpenses;
     final canEdit = RoleManager.canEditProject;
-    final canDelete = RoleManager.canDeleteProject;
-    if (!canAddEntry && !canEdit && !canDelete) {
+    if (!canAddEntry && !canEdit) {
       return AppCard(
         child: Row(
           children: [
@@ -3029,13 +2959,6 @@ class _ActionButtons extends StatelessWidget {
           ),
           const SizedBox(height: 10),
         ],
-        if (canDelete)
-          AppButton(
-            label: 'Delete Project',
-            icon: Icons.delete_outline_outlined,
-            variant: AppButtonVariant.danger,
-            onPressed: () => _showDeleteConfirmation(context),
-          ),
       ],
     );
   }

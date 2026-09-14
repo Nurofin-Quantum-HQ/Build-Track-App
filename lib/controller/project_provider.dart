@@ -21,6 +21,7 @@ class ProjectProvider extends ChangeNotifier {
   String? _selectedActivity;
   String? _selectedActivityId;
   bool _isLoading = false;
+  bool _projectsLoaded = false;
   String _error = '';
   bool _entriesLoading = false;
   bool get entriesLoading => _entriesLoading;
@@ -34,6 +35,7 @@ class ProjectProvider extends ChangeNotifier {
   String? get selectedActivity => _selectedActivity;
   String? get selectedActivityId => _selectedActivityId;
   bool get isLoading => _isLoading;
+  bool get projectsLoaded => _projectsLoaded;
   String get error => _error;
   bool get hasProjects => _projects.isNotEmpty;
   int get projectCount => _projects.length;
@@ -509,8 +511,16 @@ class ProjectProvider extends ChangeNotifier {
         final computedProgress = totalActs > 0
             ? doneActs / totalActs
             : p.progress;
+        final completedKeys = effectivePhases
+            .expand((ph) => ph.activities)
+            .where((a) => a.completed)
+            .map((a) => a.id)
+            .toList();
         return p.copyWith(
           selectedPhases: effectivePhases,
+          completedActivityKeys: completedKeys.isNotEmpty
+              ? completedKeys
+              : p.completedActivityKeys,
           floors: floors,
           progress: computedProgress,
         );
@@ -590,6 +600,7 @@ class ProjectProvider extends ChangeNotifier {
       }
       await _backfillCompletedActivities();
       await _persistEntries();
+      _projectsLoaded = true;
       _error = '';
       notifyListeners();
     } catch (e, st) {
@@ -643,6 +654,7 @@ class ProjectProvider extends ChangeNotifier {
       if (_selectedProject != null) {
         UserSession.projectId = _selectedProject!.id;
       }
+      _projectsLoaded = true;
       _error = '';
     } catch (e) {
       _error = 'Failed to fetch projects: $e';
@@ -688,11 +700,17 @@ class ProjectProvider extends ChangeNotifier {
         updated.toJson(),
       );
       if (response.statusCode == 200) {
-        final idx = _projects.indexWhere((p) => p.id == updated.id);
-        if (idx != -1) _projects[idx] = updated;
-        if (_selectedProject?.id == updated.id) {
-          _selectedProject = updated;
-          UserSession.projectId = updated.id;
+        final decoded = json.decode(response.body);
+        final Map<String, dynamic> projectJson = 
+            (decoded is Map && decoded.containsKey('project'))
+                ? decoded['project'] as Map<String, dynamic>
+                : decoded as Map<String, dynamic>;
+        final serverProject = ProjectModel.fromJson(projectJson);
+        final idx = _projects.indexWhere((p) => p.id == serverProject.id);
+        if (idx != -1) _projects[idx] = serverProject;
+        if (_selectedProject?.id == serverProject.id) {
+          _selectedProject = serverProject;
+          UserSession.projectId = serverProject.id;
         }
         _error = '';
       } else {
@@ -880,8 +898,14 @@ class ProjectProvider extends ChangeNotifier {
     }
     final total = phases.fold<int>(0, (sum, p) => sum + p.totalCount);
     final done = phases.fold<int>(0, (sum, p) => sum + p.completedCount);
+    final completedKeys = phases
+        .expand((p) => p.activities)
+        .where((a) => a.completed)
+        .map((a) => a.id)
+        .toList();
     final updated = project.copyWith(
       selectedPhases: phases,
+      completedActivityKeys: completedKeys,
       progress:
           manualProgress ?? (total == 0 ? project.progress : done / total),
     );
@@ -932,6 +956,7 @@ class ProjectProvider extends ChangeNotifier {
             dev.log('[DEBUG] toggleActivityCompletion parse error: $e');
           }
         }
+        await _persistProjects();
         return true;
       } else {
         _projects[projectIndex] = project;
@@ -1149,6 +1174,7 @@ class ProjectProvider extends ChangeNotifier {
     _phases = [];
     _selectedProject = null;
     _isLoading = false;
+    _projectsLoaded = false;
     _error = '';
     notifyListeners();
   }

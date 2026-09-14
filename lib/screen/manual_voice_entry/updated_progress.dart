@@ -180,8 +180,10 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
                             await TaskService.updateTask(task.id, {
                               'title': titleCtrl.text,
                               'description': descCtrl.text,
-                              'status': updatedStatus,
                             });
+                            if (updatedStatus != null && updatedStatus != task.status) {
+                              await TaskService.updateTaskStatus(task.id, updatedStatus!);
+                            }
                             if (ctx.mounted) Navigator.pop(ctx);
                             onSave();
                           } catch (e) {
@@ -253,6 +255,36 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
     _argsLoaded = true;
     final args = ModalRoute.of(context)?.settings.arguments;
     if (args is Map) {
+      final task = args['task'];
+      if (task != null) {
+        _launchedFromTracker = true;
+        _selectedProjectId = task.project;
+        if (task.floorName != null && task.floorName!.isNotEmpty) {
+          _selectedFloor = task.floorName;
+        }
+        if (task.phaseName != null && task.phaseName!.isNotEmpty) {
+          _selectedPhaseName = task.phaseName;
+        }
+        if (task.activityName != null && task.activityName!.isNotEmpty) {
+          _selectedActivityName = task.activityName;
+        }
+        _completedTaskIds.add(task.id);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          final provider = context.read<ProjectProvider>();
+          final project = provider.projects.cast<ProjectModel?>().firstWhere(
+            (p) => p?.id == task.project,
+            orElse: () => null,
+          );
+          if (project != null) {
+            setState(() {
+              _completionProgress = project.progress;
+              _loadActivityDetails();
+            });
+          }
+        });
+        return; // Early return to skip other args if task is provided
+      }
       final projectId = args['projectId'] as String?;
       final phaseName = args['phaseName'] as String?;
       final activityName = args['activityName'] as String?;
@@ -910,6 +942,16 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
                       if (task.activityName != null &&
                           task.activityName!.isNotEmpty) {
                         _selectedActivityName = task.activityName;
+                      }
+                      
+                      final provider = context.read<ProjectProvider>();
+                      final project = provider.projects.cast<ProjectModel?>().firstWhere(
+                        (p) => p?.id == _selectedProjectId,
+                        orElse: () => null,
+                      );
+                      if (project != null) {
+                        _completionProgress = project.progress;
+                        _loadActivityDetails();
                       }
                     } else {
                       _completedTaskIds.remove(task.id);

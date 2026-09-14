@@ -5,6 +5,7 @@ class ApiConfig {
     defaultValue: 'development',
   );
   static String get baseUrl {
-    return 'https://build-track.onrender.com/api';
+    return 'http://localhost:5001/api';
+    //return 'https://buildtrack-api.nurofin.com/api';
   }
 }
