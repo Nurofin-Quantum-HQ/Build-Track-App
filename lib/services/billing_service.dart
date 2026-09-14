@@ -6,7 +6,7 @@ const String kProMonthlyId = 'buildtrack_pro_monthly';
 const String kBusinessMonthlyId = 'buildtrack_business_monthly';
 const String kEnterpriseMonthlyId = 'buildtrack_enterprise_monthly';
 const Map<String, double> kPlanAmounts = {
-  kStarterMonthlyId: 498,
+  kStarterMonthlyId: 1,
   kGrowthMonthlyId: 999,
   kProMonthlyId: 1499,
   kBusinessMonthlyId: 2499,
@@ -33,9 +33,16 @@ class BillingService {
           return data['paymentParams'] as Map<String, dynamic>;
         }
         return null;
+      } else if (response.statusCode == 422) {
+        final data = json.decode(response.body) as Map<String, dynamic>;
+        if (data['requiresPhone'] == true) {
+          throw Exception(data['message'] ?? 'Please update your profile with a valid phone number to continue.');
+        }
+        throw Exception(data['message'] ?? 'Could not initiate payment.');
       }
       return null;
     } catch (e) {
+      if (e is Exception) rethrow;
       return null;
     }
   }

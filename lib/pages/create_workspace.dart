@@ -14,6 +14,7 @@ class CreateWorkspaceScreen extends StatefulWidget {
 class _CreateWorkspaceScreenState extends State<CreateWorkspaceScreen> {
   final _nameCtrl = TextEditingController();
   final _companyCtrl = TextEditingController();
+  final _phoneCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
   final _confirmCtrl = TextEditingController();
@@ -30,6 +31,7 @@ class _CreateWorkspaceScreenState extends State<CreateWorkspaceScreen> {
   void dispose() {
     _nameCtrl.dispose();
     _companyCtrl.dispose();
+    _phoneCtrl.dispose();
     _emailCtrl.dispose();
     _passCtrl.dispose();
     _confirmCtrl.dispose();
@@ -114,6 +116,13 @@ class _CreateWorkspaceScreenState extends State<CreateWorkspaceScreen> {
           controller: _nameCtrl,
           hint: 'e.g. Jane Doe',
           prefixIcon: Icons.person_outline,
+        ),
+        AppTextField(
+          label: 'Phone Number',
+          controller: _phoneCtrl,
+          hint: 'e.g. +1 234 567 8900',
+          prefixIcon: Icons.phone_outlined,
+          keyboardType: TextInputType.phone,
         ),
         AppTextField(
           label: 'Company Name',
@@ -362,12 +371,13 @@ class _CreateWorkspaceScreenState extends State<CreateWorkspaceScreen> {
     }
     final name = _nameCtrl.text.trim();
     final company = _companyCtrl.text.trim();
+    final phone = _phoneCtrl.text.trim();
     final email = _emailCtrl.text.trim();
     final pass = _passCtrl.text;
     final confirm = _confirmCtrl.text;
-    if (name.isEmpty || email.isEmpty || pass.isEmpty) {
+    if (name.isEmpty || email.isEmpty || pass.isEmpty || phone.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill in all required fields')),
+        const SnackBar(content: Text('Please fill in all required fields (including phone)')),
       );
       return;
     }
@@ -395,6 +405,7 @@ class _CreateWorkspaceScreenState extends State<CreateWorkspaceScreen> {
     final payload = {
       'name': name,
       'companyName': company,
+      'phone': phone,
       'email': email,
       'password': pass,
       'role': 'Admin',

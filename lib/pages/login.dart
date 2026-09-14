@@ -6,6 +6,7 @@ import 'package:buildtrack_mobile/common/themes/app_theme.dart';
 import 'package:buildtrack_mobile/common/widgets/app_widgets.dart';
 import 'package:buildtrack_mobile/controller/project_provider.dart';
 import 'package:buildtrack_mobile/services/auth_service.dart';
+import 'package:buildtrack_mobile/services/push_notification_service.dart';
 import 'package:buildtrack_mobile/controller/subscription_provider.dart';
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -183,6 +184,7 @@ class _LoginScreenState extends State<LoginScreen> {
         if (mounted) {
           context.read<SubscriptionProvider>().fetchStatus();
           context.read<ProjectProvider>().load();
+          await PushNotificationService.init();
           Navigator.pushReplacementNamed(context, '/home');
         }
       } else {

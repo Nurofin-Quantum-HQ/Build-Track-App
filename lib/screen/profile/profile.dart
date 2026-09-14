@@ -61,6 +61,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void initState() {
     super.initState();
     _fetchProfile();
+    _loadNotificationPrefs();
+  }
+  Future<void> _loadNotificationPrefs() async {
+    final prefs = await ApiService.getNotificationPreferences();
+    if (mounted && prefs.containsKey('push')) {
+      setState(() => _notificationsEnabled = prefs['push'] == true);
+    }
+  }
+  Future<void> _setNotificationsEnabled(bool val) async {
+    setState(() => _notificationsEnabled = val);
+    final ok = await ApiService.saveNotificationPreferences({'push': val});
+    if (!ok && mounted) setState(() => _notificationsEnabled = !val);
   }
   Future<void> _fetchProfile() async {
     setState(() {
@@ -478,10 +490,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
               value: _notificationsEnabled,
               activeThumbColor: AppColors.primary,
               activeTrackColor: AppColors.primary.withValues(alpha: 0.25),
-              onChanged: (val) => setState(() => _notificationsEnabled = val),
+              onChanged: _setNotificationsEnabled,
             ),
-            onTap: () =>
-                setState(() => _notificationsEnabled = !_notificationsEnabled),
+            onTap: () => _setNotificationsEnabled(!_notificationsEnabled),
             showDivider: false,
             showChevron: false,
           ),
@@ -546,12 +557,78 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
   Widget _buildActions() {
-    return AppButton(
-      label: 'Logout',
-      variant: AppButtonVariant.danger,
-      icon: Icons.logout_outlined,
-      onPressed: _onLogoutPressed,
+    return Column(
+      children: [
+        AppButton(
+          label: 'Logout',
+          variant: AppButtonVariant.danger,
+          icon: Icons.logout_outlined,
+          onPressed: _onLogoutPressed,
+        ),
+        if (RoleManager.isAdmin) ...[
+          const SizedBox(height: AppTheme.spacingMd),
+          AppButton(
+            label: 'Delete Account',
+            variant: AppButtonVariant.danger,
+            icon: Icons.delete_outline,
+            onPressed: _onDeleteAccountPressed,
+          ),
+        ],
+      ],
     );
+  }
+  Future<void> _onDeleteAccountPressed() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Delete Account?'),
+        content: const Text(
+          'This will permanently delete your admin account and ALL data associated with it — projects, team members, transactions, and more. This cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text(
+              'Delete My Account',
+              style: TextStyle(color: Colors.red, fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      final response = await ApiService.delete('/auth/account');
+      if (!mounted) return;
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        await AuthService.logout();
+        if (!mounted) return;
+        context.read<ProjectProvider>().clear();
+        context.read<InventoryProvider>().clear();
+        context.read<SubscriptionProvider>().clear();
+        Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to delete account (${response.statusCode})'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error deleting account: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
   void _onLogoutPressed() async {
     await AuthService.logout();

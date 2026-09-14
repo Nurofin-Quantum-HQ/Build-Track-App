@@ -1,8 +1,10 @@
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:buildtrack_mobile/controller/user_session.dart';
 import 'package:buildtrack_mobile/services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:buildtrack_mobile/config/navigator_key.dart';
+
 class AuthService {
   static Future<Map<String, dynamic>?> login(
     String email,
@@ -46,22 +48,67 @@ class AuthService {
       rethrow;
     }
   }
-  static Future<void> logout() async {
+  static Future<void> logout({bool sessionExpired = false}) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('token');
     await prefs.remove('jwt_token');
     await prefs.remove('user_role');
     await UserSession.clear();
     debugPrint('[AuthService] Logged out — session cleared');
+
+    if (globalNavigatorKey.currentContext != null) {
+      if (sessionExpired) {
+        ScaffoldMessenger.of(globalNavigatorKey.currentContext!).showSnackBar(
+          SnackBar(
+            content: const Text('Session expired. Please log in again.'),
+            backgroundColor: Colors.red.shade600,
+          ),
+        );
+      }
+      Navigator.of(globalNavigatorKey.currentContext!).pushNamedAndRemoveUntil('/login', (route) => false);
+    }
   }
+
+  static Future<bool> validateSession() async {
+    try {
+      final token = await getToken();
+      if (token == null || token.isEmpty) return false;
+
+      // We call the API directly here to avoid interceptor loops if needed, 
+      // but using ApiService.get is fine since the interceptor will just call logout() on 401 anyway.
+      // Wait, let's use the underlying http package to avoid circular dependency if ApiService calls AuthService.logout().
+      // Actually, we can just use ApiService.get, but let's make sure ApiService is ready.
+      // Alternatively, just make an http request directly.
+      final response = await ApiService.get('/auth/me');
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data != null && data['user'] != null) {
+          final Map<String, dynamic> user = Map<String, dynamic>.from(data['user']);
+          await UserSession.fromLoginResponse(user);
+          return true;
+        }
+      }
+      // If 401, the interceptor will trigger logout. So we just return false here.
+      return false;
+    } catch (e) {
+      debugPrint('[AuthService] Session validation error: $e');
+      // On network error, we don't necessarily want to log out. We might be offline.
+      // We assume valid if we have a token but are offline, until the first 401 happens.
+      // Returning true here allows the app to proceed if it's an offline scenario.
+      return true; 
+    }
+  }
+
   static Future<String?> getToken() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('token');
+    return prefs.getString('token') ?? prefs.getString('jwt_token');
   }
+
   static Future<String?> getUserRole() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString('user_role');
   }
+
   static Future<bool> isLoggedIn() async {
     final token = await getToken();
     return token != null && token.isNotEmpty;

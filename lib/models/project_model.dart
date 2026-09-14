@@ -314,6 +314,8 @@ class ProjectActivity {
     'name': name,
     'isCustom': isCustom,
     'completed': completed,
+    'isCompleted': completed,
+    'status': completed ? 'Completed' : 'Pending',
     if (completedAt != null) 'completedAt': completedAt!.toIso8601String(),
     if (notes != null) 'notes': notes,
     'photo': photo,
@@ -335,11 +337,27 @@ class ProjectActivity {
     final double mat = (j['budgetMaterial'] as num?)?.toDouble() ?? 0.0;
     final double lab = (j['budgetLabour'] as num?)?.toDouble() ?? 0.0;
     final double equ = (j['budgetEquipment'] as num?)?.toDouble() ?? 0.0;
+    
+    bool isDone = false;
+    final rawComp = j['completed'] ?? j['isCompleted'] ?? j['is_completed'] ?? j['complete'];
+    if (rawComp is bool) {
+      isDone = rawComp;
+    } else if (rawComp is num) {
+      isDone = rawComp != 0;
+    } else if (rawComp is String) {
+      final s = rawComp.toLowerCase().trim();
+      isDone = s == 'true' || s == '1' || s == 'completed' || s == 'done' || s == 'yes';
+    }
+    final rawStatus = (j['status'] ?? '').toString().toLowerCase().trim();
+    if (rawStatus == 'completed' || rawStatus == 'done') {
+      isDone = true;
+    }
+
     return ProjectActivity(
       id: (j['id'] ?? j['_id'])?.toString() ?? '',
       name: (j['name'] ?? '').toString(),
       isCustom: (j['isCustom'] as bool?) ?? false,
-      completed: (j['completed'] as bool?) ?? false,
+      completed: isDone,
       completedAt: j['completedAt'] != null
           ? DateTime.tryParse(j['completedAt'].toString())
           : null,
@@ -836,6 +854,58 @@ class ProjectModel {
         projectTypeStr = projectTypeStr.replaceFirst(' / ', ' → ');
       }
     }
+    final List<String>? parsedCompletedKeys = (j['completedActivityKeys'] ??
+            j['completedActivities'] ??
+            j['completed_activity_keys']) !=
+        null
+        ? List<String>.from(
+            (j['completedActivityKeys'] ??
+                    j['completedActivities'] ??
+                    j['completed_activity_keys']) as List,
+          )
+        : null;
+
+    final Set<String> completedSet = Set<String>.from(parsedCompletedKeys ?? []);
+
+    List<ProjectPhase>? parsedSelectedPhases = j['selectedPhases'] != null
+        ? (j['selectedPhases'] as List<dynamic>)
+            .map((e) => ProjectPhase.fromJson(e as Map<String, dynamic>))
+            .toList()
+        : null;
+
+    if (parsedSelectedPhases != null && parsedSelectedPhases.isNotEmpty) {
+      final updatedPhases = parsedSelectedPhases.map((phase) {
+        final updatedActivities = phase.activities.map((act) {
+          final isKeyCompleted = completedSet.contains(act.id) ||
+              completedSet.contains(act.name) ||
+              completedSet.contains('${phase.phaseName}_${act.name}') ||
+              completedSet.contains('${phase.id}_${act.id}');
+          if (act.completed) {
+            completedSet.add(act.id);
+            completedSet.add(act.name);
+            return act;
+          } else if (isKeyCompleted) {
+            return act.copyWith(completed: true);
+          }
+          return act;
+        }).toList();
+        return phase.copyWith(activities: updatedActivities);
+      }).toList();
+      parsedSelectedPhases = updatedPhases;
+    }
+
+    final int totalCount = parsedSelectedPhases?.fold<int>(
+            0, (sum, p) => sum + p.totalCount) ??
+        0;
+    final int doneCount = parsedSelectedPhases?.fold<int>(
+            0, (sum, p) => sum + p.completedCount) ??
+        completedSet.length;
+
+    double parsedProgress = (j['progress'] as num?)?.toDouble() ?? 0.0;
+    if (totalCount > 0 && (parsedProgress == 0.0 || doneCount > 0)) {
+      parsedProgress = (doneCount / totalCount).clamp(0.0, 1.0);
+    }
+
     return ProjectModel(
       id: j['_id']?.toString() ?? j['id']?.toString() ?? '',
       name: finalName,
@@ -847,7 +917,7 @@ class ProjectModel {
         (e) => e.name == j['stage'],
         orElse: () => ProjectStage.preConstruction,
       ),
-      progress: (j['progress'] as num?)?.toDouble() ?? 0.0,
+      progress: parsedProgress,
       spentAmount: (j['spentAmount'] as num?)?.toDouble() ?? 0.0,
       totalIncome: (j['totalIncome'] as num?)?.toDouble() ?? 0.0,
       totalBudget:
@@ -866,14 +936,10 @@ class ProjectModel {
       trackedActivityKeys: j['trackedActivityKeys'] != null
           ? List<String>.from(j['trackedActivityKeys'] as List)
           : null,
-      completedActivityKeys: j['completedActivityKeys'] != null
-          ? List<String>.from(j['completedActivityKeys'] as List)
-          : null,
-      selectedPhases: j['selectedPhases'] != null
-          ? (j['selectedPhases'] as List<dynamic>)
-                .map((e) => ProjectPhase.fromJson(e as Map<String, dynamic>))
-                .toList()
-          : null,
+      completedActivityKeys: completedSet.isNotEmpty
+          ? completedSet.toList()
+          : parsedCompletedKeys,
+      selectedPhases: parsedSelectedPhases,
       contractorName: j['contractorName']?.toString(),
       siteEngineer:
           j['siteEngineer']?.toString() ?? j['siteEngineerName']?.toString(),

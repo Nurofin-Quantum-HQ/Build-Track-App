@@ -7,17 +7,35 @@ import 'package:buildtrack_mobile/models/project_model.dart';
 import 'package:buildtrack_mobile/config/api_config.dart';
 import 'package:flutter/foundation.dart';
 
+import 'dart:math';
+import 'package:buildtrack_mobile/services/auth_service.dart';
+
 class ApiService {
   static List<ProjectModel>? mockProjects;
   static String get baseUrl => ApiConfig.baseUrl;
+
+  static String _generateRequestId() {
+    final random = Random();
+    String hex(int max) => random.nextInt(max).toRadixString(16).padLeft(2, '0');
+    return 'BT-${DateTime.now().toIso8601String().replaceAll(RegExp(r'[-:T.]'), '').substring(0, 14)}-'
+           '${hex(256)}${hex(256)}${hex(256)}';
+  }
 
   static Future<Map<String, String>> _getHeaders() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token') ?? prefs.getString('jwt_token');
     return {
       'Content-Type': 'application/json',
+      'X-Request-ID': _generateRequestId(),
       if (token != null) 'Authorization': 'Bearer $token',
     };
+  }
+
+  static void _checkUnauthorized(http.Response response) {
+    if (response.statusCode == 401) {
+      AuthService.logout(sessionExpired: true);
+      throw Exception('Unauthorized');
+    }
   }
 
   // --- OFFLINE SYNC LOGIC ---
@@ -91,6 +109,8 @@ class ApiService {
         .get(Uri.parse(url), headers: headers)
         .timeout(const Duration(seconds: 90));
     
+    _checkUnauthorized(response);
+
     // Opportunistically sync
     syncOfflineEntries();
     
@@ -111,11 +131,14 @@ class ApiService {
           .timeout(const Duration(seconds: 90));
       debugPrint('Status: ${response.statusCode}');
       
+      _checkUnauthorized(response);
+
       // Opportunistically sync
       syncOfflineEntries();
       
       return response;
       } catch (e) {
+        if (e.toString() == 'Exception: Unauthorized') rethrow;
         debugPrint('Network/API error caught: $e. Queuing request for offline sync.');
         await _queueOfflineRequest(endpoint, body, method: 'POST');
         return http.Response(jsonEncode({'message': 'Queued for offline sync', 'offline': true}), 201);
@@ -136,11 +159,14 @@ class ApiService {
       debugPrint('Status: ${response.statusCode}');
       debugPrint('Body: ${response.body}');
       
+      _checkUnauthorized(response);
+
       // Opportunistically sync
       syncOfflineEntries();
       
       return response;
     } catch (e) {
+      if (e.toString() == 'Exception: Unauthorized') rethrow;
       debugPrint('Network/API error caught: $e. Queuing request for offline sync.');
       await _queueOfflineRequest(endpoint, body, method: 'PUT');
       return http.Response(jsonEncode({'message': 'Queued for offline sync', 'offline': true}), 200);
@@ -155,6 +181,9 @@ class ApiService {
         .timeout(const Duration(seconds: 90));
     debugPrint('Status: ${response.statusCode}');
     debugPrint('Body: ${response.body}');
+
+    _checkUnauthorized(response);
+
     return response;
   }
   static Future<List<ProjectModel>> fetchProjects() async {
@@ -348,25 +377,12 @@ class ApiService {
       return null;
     }
   }
-  static Future<bool> updateTransactionPayment(
+  static Future<http.Response> updateTransactionPayment(
     String id,
     Map<String, dynamic> payload,
   ) async {
-    try {
-      final response = await put('/transactions/$id', payload);
-      if (kDebugMode) {
-        debugPrint('=== UPDATE TRANSACTION RESPONSE DEBUG ===');
-        debugPrint('Status Code: ${response.statusCode}');
-        debugPrint('Response Body: ${response.body}');
-        debugPrint('=============================');
-      }
-      return response.statusCode == 200 || response.statusCode == 201;
-    } catch (e) {
-      if (kDebugMode) {
-        debugPrint('PUT /transactions/$id Error: $e');
-      }
-      return false;
-    }
+    // Return response directly so caller can distinguish status codes
+    return await put('/transactions/$id', payload);
   }
   static Future<bool> updateTransaction(
     String id,
@@ -1089,16 +1105,60 @@ class ApiService {
     }
     return null;
   }
-  static Future<List<dynamic>> getNotifications() async {
+  static Future<Map<String, dynamic>> fetchNotificationPage({int page = 1, int limit = 50}) async {
     try {
-      final response = await get('/notifications');
+      final response = await get('/notifications?page=$page&limit=$limit');
       if (response.statusCode == 200) {
-        return json.decode(response.body);
+        final decoded = json.decode(response.body);
+        if (decoded is Map<String, dynamic>) return decoded;
       }
     } catch (e) {
-      if (kDebugMode) debugPrint('getNotifications error: $e');
+      if (kDebugMode) debugPrint('fetchNotificationPage error: $e');
     }
-    return [];
+    return {'items': <dynamic>[], 'total': 0, 'unreadCount': 0, 'page': 1, 'pages': 1};
+  }
+
+  static Future<List<dynamic>> getNotifications() async {
+    final data = await fetchNotificationPage();
+    return (data['items'] as List?) ?? [];
+  }
+
+  static Future<int> getUnreadNotificationCount() async {
+    try {
+      final response = await get('/notifications/unread-count');
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data is Map<String, dynamic>) return (data['unreadCount'] as int?) ?? 0;
+      }
+    } catch (e) {
+      if (kDebugMode) debugPrint('getUnreadNotificationCount error: $e');
+    }
+    return 0;
+  }
+
+  static Future<Map<String, dynamic>> getNotificationPreferences() async {
+    try {
+      final response = await get('/notifications/preferences');
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data is Map<String, dynamic>) {
+          return Map<String, dynamic>.from((data['preferences'] as Map?) ?? {});
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) debugPrint('getNotificationPreferences error: $e');
+    }
+    return {};
+  }
+
+  static Future<bool> saveNotificationPreferences(Map<String, dynamic> preferences) async {
+    try {
+      final response = await put('/notifications/preferences', {'preferences': preferences});
+      return response.statusCode == 200;
+    } catch (e) {
+      if (kDebugMode) debugPrint('saveNotificationPreferences error: $e');
+      return false;
+    }
   }
 
   static Future<bool> markNotificationAsRead(String id) async {

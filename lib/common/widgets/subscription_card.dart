@@ -319,6 +319,39 @@ class _SubscriptionCardState extends State<SubscriptionCard> {
                     variant: CtaVariant.secondary,
                     isFullWidth: true,
                   ),
+                ] else ...[
+                  const SizedBox(height: 18),
+                  const Divider(color: Colors.white24, height: 1),
+                  const SizedBox(height: 14),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.shield_outlined,
+                          color: Colors.white70,
+                          size: 14,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Plan managed by your admin',
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.85),
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
               ],
             ),

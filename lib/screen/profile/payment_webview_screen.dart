@@ -38,6 +38,13 @@ class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
               _handlePaymentReturn(isSuccess);
               return NavigationDecision.prevent;
             }
+            if (url.startsWith('https://buildtrack.nurofin.com/subscription')) {
+              final uri = Uri.parse(url);
+              final status = uri.queryParameters['status'];
+              final isSuccess = status == 'success';
+              _handlePaymentReturn(isSuccess);
+              return NavigationDecision.prevent;
+            }
             if (url.contains('/api/subscriptions/callback')) {
               return NavigationDecision.navigate;
             }
@@ -52,7 +59,7 @@ class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
       )
       ..loadHtmlString(
         _buildPaymentHtml(),
-        baseUrl: 'https://buildtrack-api.nurofin.com/',
+        baseUrl: 'https://buildtrack.nurofin.com/',
       );
   }
   String _buildPaymentHtml() {

@@ -511,8 +511,16 @@ class ProjectProvider extends ChangeNotifier {
         final computedProgress = totalActs > 0
             ? doneActs / totalActs
             : p.progress;
+        final completedKeys = effectivePhases
+            .expand((ph) => ph.activities)
+            .where((a) => a.completed)
+            .map((a) => a.id)
+            .toList();
         return p.copyWith(
           selectedPhases: effectivePhases,
+          completedActivityKeys: completedKeys.isNotEmpty
+              ? completedKeys
+              : p.completedActivityKeys,
           floors: floors,
           progress: computedProgress,
         );
@@ -890,8 +898,14 @@ class ProjectProvider extends ChangeNotifier {
     }
     final total = phases.fold<int>(0, (sum, p) => sum + p.totalCount);
     final done = phases.fold<int>(0, (sum, p) => sum + p.completedCount);
+    final completedKeys = phases
+        .expand((p) => p.activities)
+        .where((a) => a.completed)
+        .map((a) => a.id)
+        .toList();
     final updated = project.copyWith(
       selectedPhases: phases,
+      completedActivityKeys: completedKeys,
       progress:
           manualProgress ?? (total == 0 ? project.progress : done / total),
     );
@@ -942,6 +956,7 @@ class ProjectProvider extends ChangeNotifier {
             dev.log('[DEBUG] toggleActivityCompletion parse error: $e');
           }
         }
+        await _persistProjects();
         return true;
       } else {
         _projects[projectIndex] = project;
