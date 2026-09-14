@@ -17,6 +17,7 @@ class EditProfileScreen extends StatefulWidget {
 class _EditProfileScreenState extends State<EditProfileScreen> {
   late final TextEditingController _nameCtrl;
   late final TextEditingController _emailCtrl;
+  late final TextEditingController _phoneCtrl;
   Uint8List? _selectedImageBytes;
   String? _selectedImagePath;
   String? _initialPhotoUrl;
@@ -28,6 +29,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     super.initState();
     _nameCtrl = TextEditingController();
     _emailCtrl = TextEditingController();
+    _phoneCtrl = TextEditingController();
     WidgetsBinding.instance.addPostFrameCallback((_) => _initFields());
   }
   void _initFields() {
@@ -35,14 +37,17 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     if (args is ProfileUserData) {
       _nameCtrl.text = args.name;
       _emailCtrl.text = args.email;
+      // We don't have phone in args directly, it will be fetched or left empty
       _initialPhotoUrl = args.profilePhoto;
     } else {
       _nameCtrl.text = UserSession.userId.isNotEmpty ? UserSession.userId : '';
       _emailCtrl.text = '';
+      _phoneCtrl.text = '';
       _initialPhotoUrl = UserSession.profilePhoto;
       _fetchProfile();
       return;
     }
+    _fetchProfile();
     setState(() => _isLoadingInitial = false);
   }
   Future<void> _fetchProfile() async {
@@ -54,6 +59,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         final userJson = decoded['user'] ?? decoded;
         _nameCtrl.text = userJson['name']?.toString() ?? '';
         _emailCtrl.text = userJson['email']?.toString() ?? '';
+        _phoneCtrl.text = userJson['phone']?.toString() ?? '';
         _initialPhotoUrl = userJson['profilePhoto']?.toString();
       }
     } catch (_) {
@@ -124,6 +130,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   Future<void> _onSave() async {
     final name = _nameCtrl.text.trim();
     final email = _emailCtrl.text.trim();
+    final phone = _phoneCtrl.text.trim();
     if (name.isEmpty) {
       ScaffoldMessenger.of(
         context,
@@ -161,6 +168,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       final payload = <String, dynamic>{
         'name': name,
         if (email.isNotEmpty) 'email': email,
+        if (phone.isNotEmpty) 'phone': phone,
       };
       final response = await ApiService.put('/users/profile', payload);
       if (!mounted) return;
@@ -291,6 +299,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   hint: 'name@company.com',
                   prefixIcon: Icons.mail_outline,
                   keyboardType: TextInputType.emailAddress,
+                ),
+                AppTextField(
+                  label: 'Phone Number',
+                  controller: _phoneCtrl,
+                  hint: 'Enter your phone number',
+                  prefixIcon: Icons.phone_outlined,
+                  keyboardType: TextInputType.phone,
                 ),
                 const SizedBox(height: AppTheme.spacingXl),
                 _isSaving
