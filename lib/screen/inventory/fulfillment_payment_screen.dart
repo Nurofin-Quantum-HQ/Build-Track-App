@@ -67,7 +67,7 @@ class _FulfillmentPaymentScreenState extends State<FulfillmentPaymentScreen> {
       'amount': _parseAmount(_amountCtrl.text) ?? 0.0,
       'paymentMethod': _selectedMethod,
       'notes': _noteCtrl.text.trim(),
-      'date': _selectedPaymentDate.toIso8601String(),
+      'date': _selectedPaymentDate.toUtc().toIso8601String(),
     };
     final res = await ApiService.requestEsignature(_clientEmailCtrl.text.trim(), meta);
     if (res == null || res['requestId'] == null) {
@@ -224,14 +224,14 @@ class _FulfillmentPaymentScreenState extends State<FulfillmentPaymentScreen> {
         'paidAmount': totalPaid,
         'paymentMode': apiPaymentMode,
         'notes': _noteCtrl.text.trim(),
-        'paymentDate': _selectedPaymentDate.toIso8601String(),
+        'paymentDate': _selectedPaymentDate.toUtc().toIso8601String(),
         if (apiPaymentMode == 'Cash' && _requestEsign) 'requestEsign': true,
         if (apiPaymentMode == 'Cash' && _requestEsign) 'clientEmail': _clientEmailCtrl.text.trim(),
         if (amount > 0)
           'paymentEntry': {
             'amount': amount,
             'method': apiPaymentMode,
-            'date': _selectedPaymentDate.toIso8601String(),
+            'date': _selectedPaymentDate.toUtc().toIso8601String(),
             'notes': _noteCtrl.text.trim(),
             if (apiPaymentMode == 'Cash' && _requestEsign) 'requestEsign': true,
             if (apiPaymentMode == 'Cash' && _requestEsign) 'clientEmail': _clientEmailCtrl.text.trim(),
