@@ -1364,7 +1364,7 @@ class _AddEntryScreenContentState extends State<_AddEntryScreenContent> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   GestureDetector(
-                    onTap: () => ShowcaseView.get().startShowCase([_csvKey]),
+                    onTap: () => ShowCaseWidget.of(context).startShowCase([_csvKey]),
                     child: Container(
                       padding: const EdgeInsets.all(7),
                       decoration: BoxDecoration(
