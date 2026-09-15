@@ -33,9 +33,16 @@ class BillingService {
           return data['paymentParams'] as Map<String, dynamic>;
         }
         return null;
+      } else if (response.statusCode == 422) {
+        final data = json.decode(response.body) as Map<String, dynamic>;
+        if (data['requiresPhone'] == true) {
+          throw Exception(data['message'] ?? 'Please update your profile with a valid phone number to continue.');
+        }
+        throw Exception(data['message'] ?? 'Could not initiate payment.');
       }
       return null;
     } catch (e) {
+      if (e is Exception) rethrow;
       return null;
     }
   }

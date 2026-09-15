@@ -162,7 +162,7 @@ class SubscriptionProvider extends ChangeNotifier {
       _pendingPaymentParams = params;
       return params;
     } catch (e) {
-      _error = 'Payment initiation failed: ${e.toString()}';
+      _error = e.toString().replaceAll('Exception: ', '');
       return null;
     } finally {
       _isPurchasing = false;

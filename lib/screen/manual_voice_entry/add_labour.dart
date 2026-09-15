@@ -1061,7 +1061,7 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
       "project": _selectedProjectId,
       "date": _selectedDate.toUtc().toIso8601String(),
       "floor": _selectedFloor,
-      "floorId": ?_selectedFloorId,
+      "floorId": _selectedFloorId,
       "phase": _selectedPhase,
       "phaseId":
           _selectedPhaseId ??

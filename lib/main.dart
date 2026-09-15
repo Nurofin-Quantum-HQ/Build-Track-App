@@ -1,3 +1,5 @@
+import 'package:firebase_core/firebase_core.dart';
+import 'package:buildtrack_mobile/firebase_options.dart';
 import 'package:buildtrack_mobile/common/themes/app_theme.dart';
 import 'package:buildtrack_mobile/controller/nav_controller.dart';
 import 'package:buildtrack_mobile/controller/project_provider.dart';
@@ -46,16 +48,36 @@ import 'package:buildtrack_mobile/screen/approvals/approvals_screen.dart';
 import 'package:buildtrack_mobile/screen/inventory/fulfillment_payment_screen.dart';
 import 'package:buildtrack_mobile/services/push_notification_service.dart';
 
+import 'package:buildtrack_mobile/services/auth_service.dart';
+import 'package:buildtrack_mobile/config/navigator_key.dart';
+
 void main() {
   runZonedGuarded(
     () async {
       debugPrint('App Started');
       WidgetsFlutterBinding.ensureInitialized();
       debugPrint('Flutter Initialized');
+      
+      try {
+        await Firebase.initializeApp(
+          options: DefaultFirebaseOptions.currentPlatform,
+        );
+        debugPrint('Firebase Initialized');
+      } catch (e) {
+        debugPrint('Failed to initialize Firebase: $e');
+      }
+
       await UserSession.loadFromPrefs();
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('token');
-      final isLoggedIn = token != null && token.isNotEmpty;
+      // Validate session using AuthService instead of just checking if token exists
+      bool isLoggedIn = await AuthService.validateSession();
+      if (!isLoggedIn) {
+        // Just to be safe, clear any stale data if validation failed
+        final prefs = await SharedPreferences.getInstance();
+        final token = prefs.getString('token');
+        if (token != null && token.isNotEmpty) {
+           await AuthService.logout(sessionExpired: false); // Clear without showing snackbar at startup
+        }
+      }
       final projectProvider = ProjectProvider();
       
       // Initialize Push Notifications
@@ -102,6 +124,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: globalNavigatorKey,
       title: 'BuildTrack',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,

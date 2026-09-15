@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:buildtrack_mobile/common/widgets/entry_widgets.dart';
@@ -66,7 +67,7 @@ class _FulfillmentPaymentScreenState extends State<FulfillmentPaymentScreen> {
       'amount': _parseAmount(_amountCtrl.text) ?? 0.0,
       'paymentMethod': _selectedMethod,
       'notes': _noteCtrl.text.trim(),
-      'date': _selectedPaymentDate.toIso8601String(),
+      'date': _selectedPaymentDate.toUtc().toIso8601String(),
     };
     final res = await ApiService.requestEsignature(_clientEmailCtrl.text.trim(), meta);
     if (res == null || res['requestId'] == null) {
@@ -223,49 +224,82 @@ class _FulfillmentPaymentScreenState extends State<FulfillmentPaymentScreen> {
         'paidAmount': totalPaid,
         'paymentMode': apiPaymentMode,
         'notes': _noteCtrl.text.trim(),
-        'paymentDate': _selectedPaymentDate.toIso8601String(),
+        'paymentDate': _selectedPaymentDate.toUtc().toIso8601String(),
         if (apiPaymentMode == 'Cash' && _requestEsign) 'requestEsign': true,
         if (apiPaymentMode == 'Cash' && _requestEsign) 'clientEmail': _clientEmailCtrl.text.trim(),
         if (amount > 0)
           'paymentEntry': {
             'amount': amount,
             'method': apiPaymentMode,
-            'date': _selectedPaymentDate.toIso8601String(),
+            'date': _selectedPaymentDate.toUtc().toIso8601String(),
             'notes': _noteCtrl.text.trim(),
             if (apiPaymentMode == 'Cash' && _requestEsign) 'requestEsign': true,
             if (apiPaymentMode == 'Cash' && _requestEsign) 'clientEmail': _clientEmailCtrl.text.trim(),
           },
         if (_newReceiptDataUri != null) 'paymentReceipt': _newReceiptDataUri,
       };
-      final success = await ApiService.updateTransactionPayment(
+      final response = await ApiService.updateTransactionPayment(
         _entryId,
         payload,
       );
-      if (success) {
+      
+      if (response.statusCode == 200 || response.statusCode == 201) {
         if (mounted) {
-          context.read<ProjectProvider>().load();
-          context.read<InventoryProvider>().loadInventory(_projectId);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                amount > 0
-                    ? '${formatCurrency(amount)} recorded via $_selectedMethod'
-                    : 'Payment details updated successfully',
+          try {
+            // Test parsing to differentiate flutter-side crashes
+            jsonDecode(response.body);
+            
+            context.read<ProjectProvider>().load();
+            context.read<InventoryProvider>().loadInventory(_projectId);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  amount > 0
+                      ? '${formatCurrency(amount)} recorded via $_selectedMethod'
+                      : 'Payment details updated successfully',
+                ),
+                backgroundColor: const Color(0xFF15803D),
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
-              backgroundColor: const Color(0xFF15803D),
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+            );
+            Navigator.pop(context, true);
+          } catch (e) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Server updated payment, but client failed to parse response: $e'),
+                backgroundColor: Colors.orange.shade600,
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
-            ),
-          );
-          Navigator.pop(context, true);
+            );
+          }
         }
       } else {
         if (mounted) {
+          String errMsg = 'Failed to update payment on server';
+          if (response.statusCode == 400) {
+            errMsg = 'Invalid payment data (400 Bad Request)';
+          } else if (response.statusCode == 403) {
+            errMsg = 'Permission denied to update payment (403)';
+          } else if (response.statusCode >= 500) {
+            errMsg = 'Server error (${response.statusCode}). Please try again later.';
+          } else if (response.statusCode == 401) {
+            errMsg = 'Session expired. Please log in again.';
+          }
+          
+          try {
+            final errorData = jsonDecode(response.body);
+            if (errorData['message'] != null) {
+               errMsg = errorData['message'];
+            }
+          } catch (_) {}
+
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: const Text('Failed to update payment on server'),
+              content: Text(errMsg),
               backgroundColor: Colors.red.shade600,
               behavior: SnackBarBehavior.floating,
               shape: RoundedRectangleBorder(
@@ -277,9 +311,13 @@ class _FulfillmentPaymentScreenState extends State<FulfillmentPaymentScreen> {
       }
     } catch (e) {
       if (mounted) {
+        if (e.toString() == 'Exception: Unauthorized') {
+          // Handled by global interceptor, do not show another snackbar
+          return;
+        }
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error: $e'),
+            content: Text('Network or processing error: $e'),
             backgroundColor: Colors.red.shade600,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
