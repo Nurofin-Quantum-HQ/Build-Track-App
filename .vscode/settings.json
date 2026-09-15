@@ -1,5 +1,5 @@
 {
-    "cmake.sourceDirectory": "C:/buildtrack_app/linux/flutter",
+    "dart.flutterSdkPath": "/Users/aryantls/flutter",
     "java.import.gradle.enabled": false,
     "java.import.exclusions": [
         "**/node_modules/**",
