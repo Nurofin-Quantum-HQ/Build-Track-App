@@ -694,6 +694,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       ),
                     ],
                   ),
+                ),
                 const SizedBox(height: AppTheme.spacingXl),
                 _isSaving
                     ? const Center(
