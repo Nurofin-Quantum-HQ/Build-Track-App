@@ -1847,7 +1847,7 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
           _buildEditField(
             label: 'Quantity',
             controller: _editControllers['quantity']!,
-            keyboardType: TextInputType.number,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
           ),
           _buildEditField(label: 'Unit', controller: _editControllers['unit']!),
         ] else if (_entryType == 'labour') ...[
@@ -1858,12 +1858,12 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
           _buildEditField(
             label: 'Workers Count',
             controller: _editControllers['workers']!,
-            keyboardType: TextInputType.number,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
           ),
           _buildEditField(
             label: 'Hours Worked',
             controller: _editControllers['hours']!,
-            keyboardType: TextInputType.number,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
           ),
         ] else ...[
           _buildEditField(
@@ -1873,13 +1873,13 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
           _buildEditField(
             label: 'Hours Used',
             controller: _editControllers['hours']!,
-            keyboardType: TextInputType.number,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
           ),
         ],
         _buildEditField(
           label: 'Rate (₹)',
           controller: _editControllers['rate']!,
-          keyboardType: TextInputType.number,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
         ),
         _buildEditField(label: 'Floor', controller: _editControllers['floor']!),
         if (_entryType == 'material')
