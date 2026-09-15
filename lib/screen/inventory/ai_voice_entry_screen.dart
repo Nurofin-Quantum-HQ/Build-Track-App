@@ -378,12 +378,25 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
     if (state == VoiceEngineState.error) {
       debugPrint('[VOICE ERROR] Engine error: ${_voiceCtrl.errorMessage}');
       if (mounted) {
+        final err = _voiceCtrl.errorMessage;
+        final isPermission = err.toLowerCase().contains('permission') || err.toLowerCase().contains('denied');
         setState(() {
-          _saveError = _voiceCtrl.errorMessage;
+          _saveError = isPermission
+              ? 'Microphone permission is required. Please enable microphone access in your device Settings.'
+              : err;
           _status = VoiceStatus.idle;
           _isListeningForAnswer = false;
           _rebuildResponse();
         });
+        if (isPermission) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Microphone permission denied. Please allow microphone access in device Settings to use voice input.'),
+              behavior: SnackBarBehavior.floating,
+              backgroundColor: Colors.redAccent,
+            ),
+          );
+        }
       }
       return;
     }
@@ -482,9 +495,17 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
     if (mounted && _rawTranscript.isNotEmpty) {
       _beginAiProcessing();
     } else if (mounted) {
-      debugPrint('[VOICE] No transcript captured — restarting');
-      setState(() => _status = VoiceStatus.listening);
-      _startInitialRecording();
+      debugPrint('[VOICE] No transcript captured — setting idle');
+      setState(() {
+        _status = VoiceStatus.idle;
+        _saveError = "Couldn't hear or understand any speech. Please tap the mic and speak clearly.";
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Couldn't hear or understand any speech. Please tap the mic and try again."),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
   void _resetCurrentEntryData() {
