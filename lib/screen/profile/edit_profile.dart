@@ -298,7 +298,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         'companyFontStyle': _selectedFontStyle,
         if (email.isNotEmpty) 'email': email,
         if (phone.isNotEmpty) 'phone': phone,
-        if (companyLogoValue != null) 'companyLogo': companyLogoValue,
+        'companyLogo': ?companyLogoValue,
       };
       final response = await ApiService.put('/users/profile', payload);
       if (!mounted) return;
@@ -694,6 +694,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       ),
                     ],
                   ),
+                ),
                 const SizedBox(height: AppTheme.spacingXl),
                 _isSaving
                     ? const Center(
