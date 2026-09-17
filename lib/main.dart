@@ -50,6 +50,13 @@ import 'package:buildtrack_mobile/services/push_notification_service.dart';
 
 import 'package:buildtrack_mobile/services/auth_service.dart';
 import 'package:buildtrack_mobile/config/navigator_key.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  debugPrint("Handling a background message: ${message.messageId}");
+}
 
 void main() {
   runZonedGuarded(
@@ -62,6 +69,7 @@ void main() {
         await Firebase.initializeApp(
           options: DefaultFirebaseOptions.currentPlatform,
         );
+        FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
         debugPrint('Firebase Initialized');
       } catch (e) {
         debugPrint('Failed to initialize Firebase: $e');

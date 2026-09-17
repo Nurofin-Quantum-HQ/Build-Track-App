@@ -547,6 +547,9 @@ class ProjectModel {
   final double? budgetEquipment;
   final double? budgetMisc;
   final String? projectStatus;
+  final String? photo;
+  final String? scope;
+  final List<String>? documents;
   ProjectModel({
     required this.id,
     required this.name,
@@ -589,6 +592,9 @@ class ProjectModel {
     this.budgetEquipment,
     this.budgetMisc,
     this.projectStatus,
+    this.photo,
+    this.scope,
+    this.documents,
   });
   ProjectModel copyWith({
     String? id,
@@ -632,6 +638,11 @@ class ProjectModel {
     double? budgetEquipment,
     double? budgetMisc,
     String? projectStatus,
+    String? photo,
+    String? scope,
+    List<String>? documents,
+    bool clearPhoto = false,
+    bool clearDocuments = false,
   }) {
     return ProjectModel(
       id: id ?? this.id,
@@ -676,6 +687,9 @@ class ProjectModel {
       budgetEquipment: budgetEquipment ?? this.budgetEquipment,
       budgetMisc: budgetMisc ?? this.budgetMisc,
       projectStatus: projectStatus ?? this.projectStatus,
+      photo: clearPhoto ? null : (photo ?? this.photo),
+      scope: scope ?? this.scope,
+      documents: clearDocuments ? null : (documents ?? this.documents),
     );
   }
   double get remainingBudget => totalBudget - spentAmount;
@@ -766,6 +780,9 @@ class ProjectModel {
       'bathCommon': bathCommon,
       'bathAttached': bathAttached,
       'selectedFeatures': selectedFeatures,
+      'photo': photo,
+      'scope': scope,
+      'documents': documents,
       'projectType': projectType,
     };
   }
@@ -969,6 +986,9 @@ class ProjectModel {
       budgetEquipment: bEq > 0 ? bEq : null,
       budgetMisc: bMisc > 0 ? bMisc : null,
       projectStatus: resolvedProjectStatus,
+      photo: j['photo']?.toString(),
+      scope: j['scope']?.toString(),
+      documents: (j['documents'] as List?)?.map((e) => e.toString()).toList(),
     );
   }
   static String encodeList(List<ProjectModel> list) =>

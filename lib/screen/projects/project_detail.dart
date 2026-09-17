@@ -31,7 +31,11 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        context.read<ProjectProvider>().load();
+        final provider = context.read<ProjectProvider>();
+        provider.load();
+        if (provider.selectedProject != null) {
+          provider.refreshProject(provider.selectedProject!.id);
+        }
       }
     });
   }
@@ -145,12 +149,29 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                     if (project.selectedFeatures != null &&
                         project.selectedFeatures!.isNotEmpty)
                       ..._buildConfigSections(project.selectedFeatures!),
+                    if (project.photo != null && project.photo!.isNotEmpty) ...[
+                      const AppSectionHeader(title: 'Site Photo'),
+                      _SitePhotoCard(photoUrl: project.photo!),
+                      const SizedBox(height: 14),
+                    ],
+                    if (project.scope != null && project.scope!.isNotEmpty) ...[
+                      const AppSectionHeader(title: 'Project Scope'),
+                      _ProjectScopeCard(scope: project.scope!),
+                      const SizedBox(height: 14),
+                    ],
+                    if (project.documents != null && project.documents!.isNotEmpty) ...[
+                      const AppSectionHeader(title: 'Documents & Blueprints'),
+                      _DocumentsCard(documents: project.documents!),
+                      const SizedBox(height: 14),
+                    ],
                     const AppSectionHeader(title: 'Timeline & Status'),
                     _ProjectTimelineCard(project: project),
                     const SizedBox(height: 14),
-                    const AppSectionHeader(title: 'Financial Overview'),
-                    _FinancialCard(project: project),
-                    const SizedBox(height: 14),
+                    if (UserSession.isAdmin) ...[
+                      const AppSectionHeader(title: 'Financial Overview'),
+                      _FinancialCard(project: project),
+                      const SizedBox(height: 14),
+                    ],
                     _CsvImportExportCard(project: project),
                     const SizedBox(height: 14),
                     AppSectionHeader(
@@ -852,7 +873,7 @@ class _TrackerActivityRowState extends State<_TrackerActivityRow> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         InkWell(
-          onTap: () => setState(() => _isBudgetExpanded = !_isBudgetExpanded),
+          onTap: UserSession.isAdmin ? () => setState(() => _isBudgetExpanded = !_isBudgetExpanded) : null,
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 10, 8, 10),
             child: Row(
@@ -1012,21 +1033,23 @@ class _TrackerActivityRowState extends State<_TrackerActivityRow> {
                     ),
                   ),
                 ],
-                const SizedBox(width: 2),
-                AnimatedRotation(
-                  turns: _isBudgetExpanded ? 0.5 : 0,
-                  duration: const Duration(milliseconds: 180),
-                  child: const Icon(
-                    Icons.keyboard_arrow_down_rounded,
-                    color: AppColors.textLight,
-                    size: 18,
+                if (UserSession.isAdmin) ...[
+                  const SizedBox(width: 2),
+                  AnimatedRotation(
+                    turns: _isBudgetExpanded ? 0.5 : 0,
+                    duration: const Duration(milliseconds: 180),
+                    child: const Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      color: AppColors.textLight,
+                      size: 18,
+                    ),
                   ),
-                ),
+                ],
               ],
             ),
           ),
         ),
-        if (_isBudgetExpanded) _buildBudgetSection(context),
+        if (_isBudgetExpanded && UserSession.isAdmin) _buildBudgetSection(context),
       ],
     );
   }
@@ -3583,6 +3606,73 @@ class _CsvImportExportCardState extends State<_CsvImportExportCard> {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+class _SitePhotoCard extends StatelessWidget {
+  final String photoUrl;
+  const _SitePhotoCard({required this.photoUrl});
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      height: 200,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        image: DecorationImage(
+          image: NetworkImage(
+            photoUrl.startsWith('http') 
+              ? photoUrl 
+              : '${ApiService.baseUrl.replaceAll('/api', '')}$photoUrl'
+          ),
+          fit: BoxFit.cover,
+        ),
+      ),
+    );
+  }
+}
+
+class _ProjectScopeCard extends StatelessWidget {
+  final String scope;
+  const _ProjectScopeCard({required this.scope});
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      child: Text(
+        scope,
+        style: const TextStyle(fontSize: 14, color: AppColors.textDark),
+      ),
+    );
+  }
+}
+
+class _DocumentsCard extends StatelessWidget {
+  final List<String> documents;
+  const _DocumentsCard({required this.documents});
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: documents
+            .map((doc) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8.0),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.insert_drive_file, color: AppColors.primary, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          doc.split("/").last,
+                          style: const TextStyle(fontSize: 14, color: AppColors.primary, decoration: TextDecoration.underline),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ))
+            .toList(),
       ),
     );
   }

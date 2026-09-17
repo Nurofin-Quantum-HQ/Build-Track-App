@@ -495,11 +495,11 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      if (UserSession.isAdmin || RoleManager.canViewReports || RoleManager.canManageExpenses)
-                        _AdminDashboard(onEntryTap: _showEntryOptions),
-                      if (UserSession.isSupervisor)
-                        const _SupervisorDashboard(),
-                      if (UserSession.isMason)
+                      if (UserSession.isAdmin)
+                        _AdminDashboard(onEntryTap: _showEntryOptions)
+                      else if (UserSession.isSupervisor)
+                        const _SupervisorDashboard()
+                      else
                         _MasonDashboard(onEntryTap: _showEntryOptions),
                     ],
                   ),

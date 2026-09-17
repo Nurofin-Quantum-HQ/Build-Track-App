@@ -459,15 +459,17 @@ class _ProjectsScreenContentState extends State<_ProjectsScreenContent> {
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              const SizedBox(height: 4),
-              Text(
-                '${p.formattedSpent} of ${p.formattedBudget}',
-                style: const TextStyle(
-                  color: primaryBlue,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
+              if (UserSession.isAdmin) ...[
+                const SizedBox(height: 4),
+                Text(
+                  '${p.formattedSpent} of ${p.formattedBudget}',
+                  style: const TextStyle(
+                    color: primaryBlue,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-              ),
+              ],
               const SizedBox(height: 14),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,

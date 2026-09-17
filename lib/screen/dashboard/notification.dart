@@ -4,6 +4,7 @@ import 'package:buildtrack_mobile/common/widgets/common_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:buildtrack_mobile/services/api_service.dart';
 import 'package:intl/intl.dart';
+import 'package:buildtrack_mobile/controller/user_session.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -77,12 +78,25 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 
   String? _targetRoute(dynamic n) {
+    final isWorker = UserSession.isMason;
+
     switch (n['relatedModel']) {
       case 'Transaction':
         return '/logs';
       case 'Inventory':
+        if (isWorker) {
+          return '/add-material';
+        }
         return '/inventory';
       case 'Task':
+        if (isWorker) {
+          // Navigating to update-progress requires arguments for task, but since we are pushing named route, we can just push to update progress.
+          // Wait, the mobile app uses arguments: {'task': taskModel}. Here we only have n['relatedEntity'] (taskId).
+          // We can just return null or navigate without args (which goes to the project list).
+          // Actually, let's just return '/update-progress' and let the screen handle it, or navigate to dashboard where they can see their tasks.
+          // Since we can't easily construct a TaskModel here, we'll route to the dashboard.
+          return '/';
+        }
         return '/assign-task';
       case 'Project':
         return '/projects';

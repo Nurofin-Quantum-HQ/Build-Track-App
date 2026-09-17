@@ -809,7 +809,7 @@ class _InventoryScreenContentState extends State<_InventoryScreenContent> {
       type: 'material',
       emptyTitle: 'No Material Purchases',
       emptySubtitle: 'Add your first material purchase to get started.',
-      emptyRoute: '/add-material',
+      emptyRoute: '/add-entry',
       selectedProjectId: _selectedProjectId,
       onChipChange: (c) => setState(() => _matCategory = c),
       onDateFilter: (f, cr) => setState(() {
@@ -844,7 +844,7 @@ class _InventoryScreenContentState extends State<_InventoryScreenContent> {
       type: 'labour',
       emptyTitle: 'No Labour Entries',
       emptySubtitle: 'Add your first labour entry to track workforce costs.',
-      emptyRoute: '/add-labour',
+      emptyRoute: '/add-entry',
       selectedProjectId: _selectedProjectId,
       onChipChange: (c) => setState(() => _labCategory = c),
       onDateFilter: (f, cr) => setState(() {
@@ -879,7 +879,7 @@ class _InventoryScreenContentState extends State<_InventoryScreenContent> {
       type: 'equipment',
       emptyTitle: 'No Equipment Entries',
       emptySubtitle: 'Add your first equipment entry to track asset usage.',
-      emptyRoute: '/add-equipment',
+      emptyRoute: '/add-entry',
       selectedProjectId: _selectedProjectId,
       onChipChange: (c) => setState(() => _eqpCategory = c),
       onDateFilter: (f, cr) => setState(() {

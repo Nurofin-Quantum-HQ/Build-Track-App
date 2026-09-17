@@ -12,15 +12,32 @@
           "package_name": "com.example.buildtrack_mobile"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "715728014325-olt9thj00o98pp6pi7g0rl4lsgc17snv.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
-          "current_key": "AIzaSyDjdD2SfU5efpadq8oSB5PyplQrOVkNCpw"
+          "current_key": "AIzaSyAnzGhNPljpmGz3XKTYK2F8rzhB68o5ynI"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "715728014325-olt9thj00o98pp6pi7g0rl4lsgc17snv.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "715728014325-c6ooj2k9i6b7aqrja5vh5v911bt85mab.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.buildtrackMobile"
+              }
+            }
+          ]
         }
       }
     }
