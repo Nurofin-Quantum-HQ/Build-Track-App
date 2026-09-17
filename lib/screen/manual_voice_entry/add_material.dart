@@ -1140,7 +1140,7 @@ class _AddMaterialScreenState extends State<AddMaterialScreen> {
         return;
       }
       String apiMode = _paymentMethod;
-      if (apiMode == 'Bank Transfer' || apiMode == 'Card') apiMode = 'Bank';
+      if (apiMode == 'Bank Transfer') apiMode = 'Bank Transfer';
       payload["paidAmount"] = totalPaid;
       payload["paymentMode"] = apiMode;
       if (apiMode == 'Cash' && _requestEsign) {
@@ -1176,7 +1176,7 @@ class _AddMaterialScreenState extends State<AddMaterialScreen> {
       final payDate =
           (_paymentResult!['paymentDate'] as DateTime?) ?? DateTime.now();
       String apiMode = method;
-      if (apiMode == 'Bank Transfer' || apiMode == 'Card') apiMode = 'Bank';
+      if (apiMode == 'Bank Transfer') apiMode = 'Bank Transfer';
       payload["paidAmount"] = totalPaid;
       payload["paymentMode"] = apiMode;
       final bool esignReq = (_paymentResult!['requestEsign'] as bool?) ?? false;
@@ -2328,7 +2328,7 @@ class _AddMaterialScreenState extends State<AddMaterialScreen> {
                             controller: _qtyCtrl,
                             hint: '0',
                             suffix: _selectedUnit ?? 'units',
-                            keyboardType: TextInputType.number,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
                             onChanged: (_) => setState(() => _qtyError = null),
                             error: _qtyError,
                           ),
@@ -2339,7 +2339,7 @@ class _AddMaterialScreenState extends State<AddMaterialScreen> {
                             controller: _rateCtrl,
                             hint: '0',
                             prefix: '₹',
-                            keyboardType: TextInputType.number,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
                             onChanged: (_) => setState(() => _rateError = null),
                             error: _rateError,
                           ),
