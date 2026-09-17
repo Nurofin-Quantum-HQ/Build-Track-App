@@ -81,7 +81,10 @@ class _FulfillmentPaymentScreenState extends State<FulfillmentPaymentScreen> {
       _esignStatusText = 'Waiting for client to sign...';
     });
     final reqId = res['requestId'];
-    while (_isEsignPolling) {
+    int attempts = 0;
+    const maxAttempts = 60; // 3 minutes timeout (60 * 3s)
+    while (_isEsignPolling && attempts < maxAttempts) {
+      attempts++;
       await Future.delayed(const Duration(seconds: 3));
       if (!mounted || !_isEsignPolling) break;
       final statusRes = await ApiService.checkEsignatureStatus(reqId);
@@ -97,6 +100,12 @@ class _FulfillmentPaymentScreenState extends State<FulfillmentPaymentScreen> {
         }
         break;
       }
+    }
+    if (mounted && _isEsignPolling) {
+      setState(() {
+        _isEsignPolling = false;
+        _esignStatusText = 'Signing timed out. You can retry or proceed.';
+      });
     }
   }
   static const _pMethods = [
@@ -165,6 +174,7 @@ class _FulfillmentPaymentScreenState extends State<FulfillmentPaymentScreen> {
   }
   @override
   void dispose() {
+    _clientEmailCtrl.dispose();
     _amountCtrl.dispose();
     _noteCtrl.dispose();
     super.dispose();
@@ -216,8 +226,8 @@ class _FulfillmentPaymentScreenState extends State<FulfillmentPaymentScreen> {
           ? 'Partial'
           : 'Pending';
       String apiPaymentMode = _selectedMethod;
-      if (apiPaymentMode == 'Bank Transfer' || apiPaymentMode == 'Card') {
-        apiPaymentMode = 'Bank';
+      if (apiPaymentMode == 'Bank Transfer') {
+        apiPaymentMode = 'Bank Transfer';
       }
       final payload = {
         'paymentStatus': newStatusStr,

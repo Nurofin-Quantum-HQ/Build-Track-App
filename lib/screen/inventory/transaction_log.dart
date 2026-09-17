@@ -62,31 +62,37 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
         return List.from(visible);
     }
   }
-  int get _totalAdded {
-    return _allLogs.where((l) => l['isPositive'] == true).fold(0, (sum, l) {
+  String _formatQty(double val) {
+    if (val % 1 == 0) {
+      return val.toInt().toString();
+    }
+    return val.toStringAsFixed(2).replaceAll(RegExp(r'\.?0+$'), '');
+  }
+  double get _totalAdded {
+    return _allLogs.where((l) => l['isPositive'] == true).fold(0.0, (sum, l) {
       final v =
-          int.tryParse(
+          double.tryParse(
             l['amount']
                 .toString()
                 .replaceAll('+', '')
                 .replaceAll('-', '')
                 .trim(),
           ) ??
-          0;
+          0.0;
       return sum + v;
     });
   }
-  int get _totalUsed {
-    return _allLogs.where((l) => l['isPositive'] == false).fold(0, (sum, l) {
+  double get _totalUsed {
+    return _allLogs.where((l) => l['isPositive'] == false).fold(0.0, (sum, l) {
       final v =
-          int.tryParse(
+          double.tryParse(
             l['amount']
                 .toString()
                 .replaceAll('+', '')
                 .replaceAll('-', '')
                 .trim(),
           ) ??
-          0;
+          0.0;
       return sum + v;
     });
   }
@@ -311,11 +317,8 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
             }
           }
           pId = pId.trim();
-          if (pId.isEmpty) {
-            pId = 'p1';
-          }
           if (selectedProjId != null && selectedProjId.isNotEmpty) {
-            if (pId != selectedProjId) continue;
+            if (pId.isNotEmpty && pId != selectedProjId) continue;
           }
           if (!_isGeneral) {
             if (category != _itemType) continue;
@@ -612,7 +615,7 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
             text: TextSpan(
               children: [
                 TextSpan(
-                  text: '$net',
+                  text: _formatQty(net),
                   style: const TextStyle(
                     fontSize: 50,
                     fontWeight: FontWeight.w900,
@@ -634,7 +637,7 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
               Expanded(
                 child: _summaryBadge(
                   Icons.add_circle_outline,
-                  '+$_totalAdded Added',
+                  '+${_formatQty(_totalAdded)} Added',
                   color,
                 ),
               ),
@@ -642,7 +645,7 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
               Expanded(
                 child: _summaryBadge(
                   Icons.remove_circle_outline,
-                  _totalUsed > 0 ? '-$_totalUsed Used' : '0 Used',
+                  _totalUsed > 0 ? '-${_formatQty(_totalUsed)} Used' : '0 Used',
                   const Color(0xFFE040FB),
                 ),
               ),
@@ -650,7 +653,7 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
               Expanded(
                 child: _summaryBadge(
                   Icons.balance_outlined,
-                  'Net $net',
+                  'Net ${_formatQty(net)}',
                   purple,
                 ),
               ),
