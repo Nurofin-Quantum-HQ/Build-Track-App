@@ -79,25 +79,6 @@ class ProjectProvider extends ChangeNotifier {
     final remain = project.totalBudget - project.spentAmount;
     return remain < 0 ? 0 : remain;
   }
-  Future<Map<String, DateTime>> _loadPersistedCompletedAt() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final raw = prefs.getString(_kCompletedAtKey);
-      if (raw == null || raw.isEmpty) return {};
-      final decoded = json.decode(raw) as Map<String, dynamic>;
-      final result = <String, DateTime>{};
-      decoded.forEach((key, value) {
-        if (value != null) {
-          final dt = DateTime.tryParse(value.toString());
-          if (dt != null) result[key] = dt;
-        }
-      });
-      return result;
-    } catch (e) {
-      dev.log('_loadPersistedCompletedAt error: $e');
-      return {};
-    }
-  }
   Future<void> _saveCompletedAt(
     String projectId,
     String activityId,
@@ -113,6 +94,23 @@ class ProjectProvider extends ChangeNotifier {
       await prefs.setString(_kCompletedAtKey, json.encode(existing));
     } catch (e) {
       dev.log('_saveCompletedAt error: $e');
+    }
+  }
+  Future<void> _removeCompletedAt(
+    String projectId,
+    String activityId,
+  ) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_kCompletedAtKey);
+      if (raw != null && raw.isNotEmpty) {
+        final Map<String, dynamic> existing = json.decode(raw);
+        if (existing.remove('$projectId|$activityId') != null) {
+          await prefs.setString(_kCompletedAtKey, json.encode(existing));
+        }
+      }
+    } catch (e) {
+      dev.log('_removeCompletedAt error: $e');
     }
   }
   Future<void> _saveActivityDetails(
@@ -427,31 +425,6 @@ class ProjectProvider extends ChangeNotifier {
           initialProjId ??
           prefs.getString('buildtrack_selected_project_id') ??
           (UserSession.projectId.isNotEmpty ? UserSession.projectId : null);
-      final Map<String, DateTime> persistedDates =
-          await _loadPersistedCompletedAt();
-      final Map<String, Map<String, dynamic>> persistedDetails =
-          await _loadPersistedActivityDetails();
-      final Map<String, Map<String, DateTime>> prevCompletedAt = {};
-      persistedDates.forEach((key, date) {
-        final parts = key.split('|');
-        if (parts.length == 2) {
-          prevCompletedAt.putIfAbsent(parts[0], () => {})[parts[1]] = date;
-        }
-      });
-      for (final p in _projects) {
-        for (final phase in p.selectedPhases ?? <ProjectPhase>[]) {
-          for (final act in phase.activities) {
-            if (act.completed && act.completedAt != null) {
-              prevCompletedAt.putIfAbsent(p.id, () => {})[act.id] =
-                  act.completedAt!;
-            } else if (act.completed && act.completedAt == null) {
-              prevCompletedAt
-                  .putIfAbsent(p.id, () => {})
-                  .putIfAbsent(act.id, () => DateTime(2000));
-            }
-          }
-        }
-      }
       final results = await Future.wait([
         ApiService.fetchProjects(),
         if (targetProjId != null)
@@ -461,45 +434,36 @@ class ProjectProvider extends ChangeNotifier {
       ]);
       final fetched = results[0] as List<ProjectModel>;
       final List<EntryModel> freshEntries = results[1] as List<EntryModel>;
+      final Map<String, Map<String, dynamic>> persistedDetails =
+          await _loadPersistedActivityDetails();
       _projects = _filterForCurrentUser(fetched);
       _projects = _projects.map((p) {
-        final actDates = prevCompletedAt[p.id];
-        final List<ProjectPhase>
-        mergedPhases = (p.selectedPhases ?? <ProjectPhase>[]).map((phase) {
-          final mergedActivities = phase.activities.map((act) {
-            var updatedAct = act;
-            if (actDates != null) {
-              final savedDate = actDates[act.id];
-              if (savedDate != null) {
-                if (updatedAct.completedAt == null || !updatedAct.completed) {
+        final List<ProjectPhase> effectivePhases =
+            (p.selectedPhases ?? <ProjectPhase>[]).map((phase) {
+              final mergedActivities = phase.activities.map((act) {
+                var updatedAct = act;
+                final detailsKey = '${p.id}|${act.id}';
+                final savedDetails = persistedDetails[detailsKey];
+                if (savedDetails != null) {
                   updatedAct = updatedAct.copyWith(
-                    completed: true,
-                    completedAt: savedDate == DateTime(2000) ? null : savedDate,
+                    notes:
+                        updatedAct.notes ?? savedDetails['notes']?.toString(),
+                    photo:
+                        updatedAct.photo ?? savedDetails['photo']?.toString(),
+                    photos:
+                        updatedAct.photos ??
+                        (savedDetails['photos'] as List?)
+                            ?.map((x) => x.toString())
+                            .toList(),
                   );
                 }
-              }
-            }
-            final detailsKey = '${p.id}|${act.id}';
-            final savedDetails = persistedDetails[detailsKey];
-            if (savedDetails != null) {
-              updatedAct = updatedAct.copyWith(
-                notes: updatedAct.notes ?? savedDetails['notes']?.toString(),
-                photo: updatedAct.photo ?? savedDetails['photo']?.toString(),
-                photos:
-                    updatedAct.photos ??
-                    (savedDetails['photos'] as List?)
-                        ?.map((x) => x.toString())
-                        .toList(),
-              );
-            }
-            return updatedAct;
-          }).toList();
-          return phase.copyWith(activities: mergedActivities);
-        }).toList();
+                return updatedAct;
+              }).toList();
+              return phase.copyWith(activities: mergedActivities);
+            }).toList();
         final floors = (p.floors == null || p.floors!.isEmpty)
             ? ['Ground']
             : p.floors!;
-        final effectivePhases = mergedPhases;
         final totalActs = effectivePhases.fold<int>(
           0,
           (s, ph) => s + ph.totalCount,
@@ -844,6 +808,7 @@ class ProjectProvider extends ChangeNotifier {
   Future<bool> toggleActivityCompletion(
     String projectId,
     String activityId, {
+    bool? isCompleted,
     DateTime? completedAt,
     String? notes,
     String? photo,
@@ -851,7 +816,7 @@ class ProjectProvider extends ChangeNotifier {
     double? manualProgress,
   }) async {
     debugPrint(
-      '[DEBUG] toggleActivityCompletion: projectId=$projectId, activityId=$activityId, notes=${notes != null}, photo=${photo != null}, photos=${photos != null}',
+      '[DEBUG] toggleActivityCompletion: projectId=$projectId, activityId=$activityId, isCompleted=$isCompleted, notes=${notes != null}, photo=${photo != null}, photos=${photos != null}',
     );
     final projectIndex = _projects.indexWhere((p) => p.id == projectId);
     if (projectIndex == -1) {
@@ -864,26 +829,43 @@ class ProjectProvider extends ChangeNotifier {
     final phases = List<ProjectPhase>.from(project.selectedPhases ?? []);
     bool found = false;
     DateTime? stampedDate;
+    bool newCompletedStatus = true;
+
     for (var p = 0; p < phases.length; p++) {
       final phase = phases[p];
       final activities = List<ProjectActivity>.from(phase.activities);
       final aIndex = activities.indexWhere((a) => a.id == activityId);
       if (aIndex != -1) {
         final current = activities[aIndex];
-        stampedDate = completedAt ?? current.completedAt ?? DateTime.now();
+        newCompletedStatus =
+            isCompleted ??
+            (notes != null ||
+                    photo != null ||
+                    (photos != null && photos.isNotEmpty) ||
+                    completedAt != null
+                ? true
+                : !current.completed);
+        if (newCompletedStatus) {
+          stampedDate = completedAt ?? current.completedAt ?? DateTime.now();
+        } else {
+          stampedDate = null;
+        }
         final shouldClear = (photos != null && photos.isEmpty);
         activities[aIndex] = current.copyWith(
-          completed: true,
-          completedAt: stampedDate,
-          notes: notes ?? current.notes,
+          completed: newCompletedStatus,
+          completedAt: newCompletedStatus ? stampedDate : null,
+          clearCompletedAt: !newCompletedStatus,
+          notes: notes ?? (newCompletedStatus ? current.notes : null),
           photo: shouldClear
               ? null
               : ((photos != null && photos.isNotEmpty)
                     ? photos.first
-                    : (photo ?? current.photo)),
-          photos: shouldClear ? [] : (photos ?? current.photos),
-          clearPhoto: shouldClear,
-          clearPhotos: shouldClear,
+                    : (photo ?? (newCompletedStatus ? current.photo : null))),
+          photos: shouldClear
+              ? []
+              : (photos ?? (newCompletedStatus ? current.photos : null)),
+          clearPhoto: shouldClear || !newCompletedStatus,
+          clearPhotos: shouldClear || !newCompletedStatus,
         );
         phases[p] = phase.copyWith(activities: activities);
         found = true;
@@ -912,21 +894,7 @@ class ProjectProvider extends ChangeNotifier {
     _projects[projectIndex] = updated;
     if (_selectedProject?.id == projectId) _selectedProject = updated;
     notifyListeners();
-    if (stampedDate != null) {
-      await _saveCompletedAt(projectId, activityId, stampedDate);
-    }
-    if (notes != null || photo != null || photos != null) {
-      final firstPhoto = (photos != null && photos.isNotEmpty)
-          ? photos.first
-          : photo;
-      await _saveActivityDetails(
-        projectId,
-        activityId,
-        notes: notes,
-        photo: firstPhoto,
-        photos: photos,
-      );
-    }
+
     try {
       debugPrint(
         '[DEBUG] toggleActivityCompletion: sending PUT to /projects/$projectId...',
@@ -939,6 +907,23 @@ class ProjectProvider extends ChangeNotifier {
         '[DEBUG] toggleActivityCompletion: PUT response status: ${response.statusCode}',
       );
       if (response.statusCode == 200 || response.statusCode == 204) {
+        if (newCompletedStatus && stampedDate != null) {
+          await _saveCompletedAt(projectId, activityId, stampedDate);
+        } else if (!newCompletedStatus) {
+          await _removeCompletedAt(projectId, activityId);
+        }
+        if (notes != null || photo != null || photos != null) {
+          final firstPhoto = (photos != null && photos.isNotEmpty)
+              ? photos.first
+              : photo;
+          await _saveActivityDetails(
+            projectId,
+            activityId,
+            notes: notes,
+            photo: firstPhoto,
+            photos: photos,
+          );
+        }
         if (response.statusCode == 200 && response.body.isNotEmpty) {
           try {
             final data = jsonDecode(response.body);
@@ -1001,10 +986,17 @@ class ProjectProvider extends ChangeNotifier {
     final project = _projects[projectIndex];
     final phases = List<ProjectPhase>.from(project.selectedPhases ?? []);
     bool found = false;
+    final actIdLower = activityId.trim().toLowerCase();
     for (var p = 0; p < phases.length; p++) {
       final phase = phases[p];
       final activities = List<ProjectActivity>.from(phase.activities);
-      final aIndex = activities.indexWhere((a) => a.id == activityId);
+      final aIndex = activities.indexWhere(
+        (a) =>
+            a.id == activityId ||
+            a.name == activityId ||
+            a.id.trim().toLowerCase() == actIdLower ||
+            a.name.trim().toLowerCase() == actIdLower,
+      );
       if (aIndex != -1) {
         final current = activities[aIndex];
         activities[aIndex] = current.copyWith(
@@ -1033,7 +1025,9 @@ class ProjectProvider extends ChangeNotifier {
       );
       final response = await ApiService.put(
         '/projects/$projectId',
-        updated.toJson(),
+        {
+          'selectedPhases': phases.map((ph) => ph.toJson()).toList(),
+        },
       );
       dev.log(
         '[DEBUG] updateActivityBudget: PUT response status: ${response.statusCode}',
@@ -1042,10 +1036,9 @@ class ProjectProvider extends ChangeNotifier {
         if (response.statusCode == 200 && response.body.isNotEmpty) {
           try {
             final data = jsonDecode(response.body);
-            if (data['project'] != null) {
-              final newProject = ProjectModel.fromJson(
-                data['project'] as Map<String, dynamic>,
-              );
+            final projData = data['project'] ?? data['data'];
+            if (projData != null && projData is Map<String, dynamic>) {
+              final newProject = ProjectModel.fromJson(projData);
               _projects[projectIndex] = newProject;
               if (_selectedProject?.id == projectId) {
                 _selectedProject = newProject;

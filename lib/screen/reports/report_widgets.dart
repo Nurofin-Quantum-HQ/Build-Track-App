@@ -302,89 +302,95 @@ class ChartSection extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 14),
-            SizedBox(
-              height: 200,
-              child: LineChart(
-                LineChartData(
-                  minY: 0,
-                  maxY: roundedMaxY,
-                  gridData: const FlGridData(
-                    show: true,
-                    drawVerticalLine: false,
-                  ),
-                  borderData: FlBorderData(show: false),
-                  titlesData: FlTitlesData(
-                    bottomTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        interval: 1,
-                        getTitlesWidget: (value, meta) {
-                          final i = value.toInt();
-                          if (i < 0 || i >= categories.length) {
-                            return const SizedBox();
-                          }
-                          return Padding(
-                            padding: const EdgeInsets.only(top: 6),
-                            child: Text(
-                              categories[i]['name'].toString(),
-                              style: const TextStyle(fontSize: 10),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    leftTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        reservedSize: dynamicReservedSize,
-                        interval: leftInterval,
-                        getTitlesWidget: (value, meta) {
-                          return SideTitleWidget(
-                            axisSide: meta.axisSide,
-                            space: 6,
-                            child: Text(
-                              formatY(value),
-                              style: const TextStyle(
-                                fontSize: 10,
-                                color: Colors.grey,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.visible,
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    topTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
-                    ),
-                    rightTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
-                    ),
-                  ),
-                  lineBarsData: [
-                    LineChartBarData(
-                      spots: actualSpots,
-                      isCurved: true,
-                      barWidth: 3,
-                      color: AppColors.primary,
-                      dotData: const FlDotData(show: true),
-                      belowBarData: BarAreaData(
+            OrientationBuilder(
+              builder: (context, orientation) {
+                final isLandscape = orientation == Orientation.landscape;
+                final chartHeight = isLandscape ? 150.0 : 200.0;
+                return SizedBox(
+                  height: chartHeight,
+                  child: LineChart(
+                    LineChartData(
+                      minY: 0,
+                      maxY: roundedMaxY,
+                      gridData: const FlGridData(
                         show: true,
-                        color: AppColors.primary.withValues(alpha: 0.08),
+                        drawVerticalLine: false,
                       ),
+                      borderData: FlBorderData(show: false),
+                      titlesData: FlTitlesData(
+                        bottomTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            interval: 1,
+                            getTitlesWidget: (value, meta) {
+                              final i = value.toInt();
+                              if (i < 0 || i >= categories.length) {
+                                return const SizedBox();
+                              }
+                              return Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Text(
+                                  categories[i]['name'].toString(),
+                                  style: TextStyle(fontSize: isLandscape ? 9 : 10),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        leftTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: dynamicReservedSize,
+                            interval: leftInterval,
+                            getTitlesWidget: (value, meta) {
+                              return SideTitleWidget(
+                                axisSide: meta.axisSide,
+                                space: 4,
+                                child: Text(
+                                  formatY(value),
+                                  style: TextStyle(
+                                    fontSize: isLandscape ? 9 : 10,
+                                    color: Colors.grey,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.visible,
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        topTitles: const AxisTitles(
+                          sideTitles: SideTitles(showTitles: false),
+                        ),
+                        rightTitles: const AxisTitles(
+                          sideTitles: SideTitles(showTitles: false),
+                        ),
+                      ),
+                      lineBarsData: [
+                        LineChartBarData(
+                          spots: actualSpots,
+                          isCurved: true,
+                          barWidth: 3,
+                          color: AppColors.primary,
+                          dotData: const FlDotData(show: true),
+                          belowBarData: BarAreaData(
+                            show: true,
+                            color: AppColors.primary.withValues(alpha: 0.08),
+                          ),
+                        ),
+                        LineChartBarData(
+                          spots: targetSpots,
+                          isCurved: false,
+                          barWidth: 2,
+                          color: Colors.red,
+                          dashArray: [6, 4],
+                          dotData: const FlDotData(show: false),
+                        ),
+                      ],
                     ),
-                    LineChartBarData(
-                      spots: targetSpots,
-                      isCurved: false,
-                      barWidth: 2,
-                      color: Colors.red,
-                      dashArray: [6, 4],
-                      dotData: const FlDotData(show: false),
-                    ),
-                  ],
-                ),
-              ),
+                  ),
+                );
+              },
             ),
             const SizedBox(height: 10),
             Row(

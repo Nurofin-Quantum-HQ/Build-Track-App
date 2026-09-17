@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -133,7 +134,7 @@ class AiChatReportProvider extends ChangeNotifier {
       final stopWatch = Stopwatch()..start();
       final response = await http
           .post(uri, headers: headers, body: payloadStr)
-          .timeout(const Duration(seconds: 45));
+          .timeout(const Duration(seconds: 15));
       stopWatch.stop();
       debugPrint('\n==============================');
       debugPrint('[FLUTTER] RESPONSE RECEIVED');
@@ -163,7 +164,14 @@ class AiChatReportProvider extends ChangeNotifier {
       debugPrint('Request URL: $baseUrl/api/reports/dashboard/query');
       debugPrint('Request Payload: {"query": "$trimmed"}');
       debugPrint('Stack Trace:\n$stackTrace');
-      _errorMessage = e.toString().replaceAll('Exception: ', '');
+      if (e is TimeoutException ||
+          (e is ApiException && (e.statusCode == 504 || e.responseBody.contains('AI taking too long')))) {
+        _errorMessage = 'AI taking too long';
+      } else if (e is ApiException) {
+        _errorMessage = e.message;
+      } else {
+        _errorMessage = e.toString().replaceAll('Exception: ', '');
+      }
       _state = AiReportState.error;
     }
     notifyListeners();

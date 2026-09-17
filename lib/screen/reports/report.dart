@@ -5,6 +5,7 @@ import 'package:buildtrack_mobile/controller/report_provider.dart';
 import 'package:buildtrack_mobile/models/project_model.dart';
 import 'package:buildtrack_mobile/screen/reports/report_export_helper.dart';
 import 'package:buildtrack_mobile/screen/reports/csv_import_helper.dart';
+import 'package:buildtrack_mobile/screen/reports/report_widgets.dart' show EfficiencyBanner;
 import 'package:buildtrack_mobile/services/api_service.dart';
 import 'package:flutter/material.dart';
 import 'package:showcaseview/showcaseview.dart';
@@ -62,7 +63,6 @@ class _ReportsView extends StatefulWidget {
 
 class _ReportsViewState extends State<_ReportsView> {
   final GlobalKey _chartsKey = GlobalKey();
-  final GlobalKey _exportBtnKey = GlobalKey();
   bool _linked = false;
   String _selectedProjectId = 'all';
   String? _selectedFloor;
@@ -1361,6 +1361,11 @@ class _ReportsViewState extends State<_ReportsView> {
                         tooltipBorderRadius: BorderRadius.circular(16),
                         tooltipPadding: const EdgeInsets.all(16),
                         child: _AskAiBanner(projectName: provider.selectedProjectName),
+                      ),
+                      const SizedBox(height: 14),
+                      EfficiencyBanner(
+                        note: 'Tap to view category breakdowns, monthly spending trends, and budget health charts.',
+                        isExceeded: grandRemaining > 0,
                       ),
                       const SizedBox(height: 18),
                       Showcase(

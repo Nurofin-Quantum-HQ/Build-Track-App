@@ -33,8 +33,10 @@ class EntryPermissions {
     if (UserSession.isSupervisor) {
       return UserSession.hasProjectAccess(projectId);
     }
-    if (UserSession.isMason) return createdBy == UserSession.userId;
-    return false;
+    if (UserSession.isMason) {
+      return createdBy == UserSession.userId || UserSession.hasProjectAccess(projectId);
+    }
+    return UserSession.hasProjectAccess(projectId);
   }
   static List<Entry> filterEntries(List<Entry> entries) {
     if (UserSession.isAdmin) return entries;
