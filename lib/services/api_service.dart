@@ -21,8 +21,7 @@ class ApiService {
   }
 
   static Future<Map<String, String>> _getHeaders() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('token') ?? prefs.getString('jwt_token');
+    final token = await AuthService.getToken(); // [BT-SEC-05] single source of truth
     return {
       'Content-Type': 'application/json',
       'X-Request-ID': _generateRequestId(),

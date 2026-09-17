@@ -3,9 +3,17 @@ import 'package:flutter/material.dart';
 import 'package:buildtrack_mobile/controller/user_session.dart';
 import 'package:buildtrack_mobile/services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:buildtrack_mobile/config/navigator_key.dart';
 
 class AuthService {
+  // [BT-SEC-05] The JWT lives in OS-backed secure storage (Keystore/Keychain),
+  // not SharedPreferences (which is plaintext on Android). All token reads go
+  // through getToken() so there is a single source of truth.
+  static const _secure = FlutterSecureStorage(
+    aOptions: AndroidOptions(encryptedSharedPreferences: true),
+  );
+  static const _kTokenKey = 'token';
   static Future<Map<String, dynamic>?> login(
     String email,
     String password,
@@ -24,9 +32,8 @@ class AuthService {
         if (token == null) {
           throw Exception('Token not found in login response');
         }
+        await _secure.write(key: _kTokenKey, value: token); // [BT-SEC-05]
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('token', token);
-        await prefs.setString('jwt_token', token);
         final roleStr = user['role']?.toString() ?? 'Mason';
         await prefs.setString('user_role', roleStr);
         await prefs.setString('cached_email', email); // Cache the email for auto-fill
@@ -49,8 +56,9 @@ class AuthService {
     }
   }
   static Future<void> logout({bool sessionExpired = false}) async {
+    await _secure.delete(key: _kTokenKey); // [BT-SEC-05]
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('token');
+    await prefs.remove('token');       // clear any pre-migration plaintext token
     await prefs.remove('jwt_token');
     await prefs.remove('user_role');
     await UserSession.clear();
@@ -100,8 +108,21 @@ class AuthService {
   }
 
   static Future<String?> getToken() async {
+    // [BT-SEC-05] Prefer secure storage. One-time migration: if a token from a
+    // previous app version is still in SharedPreferences, move it into secure
+    // storage and clear the plaintext copy, so existing sessions survive the update.
+    final secureToken = await _secure.read(key: _kTokenKey);
+    if (secureToken != null && secureToken.isNotEmpty) return secureToken;
+
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('token') ?? prefs.getString('jwt_token');
+    final legacy = prefs.getString('token') ?? prefs.getString('jwt_token');
+    if (legacy != null && legacy.isNotEmpty) {
+      await _secure.write(key: _kTokenKey, value: legacy);
+      await prefs.remove('token');
+      await prefs.remove('jwt_token');
+      return legacy;
+    }
+    return null;
   }
 
   static Future<String?> getUserRole() async {

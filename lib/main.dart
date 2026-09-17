@@ -42,7 +42,6 @@ import 'package:buildtrack_mobile/screen/esign/signature_page.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:buildtrack_mobile/controller/user_session.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:buildtrack_mobile/screen/profile/payment_webview_screen.dart';
 import 'package:buildtrack_mobile/screen/approvals/approvals_screen.dart';
 import 'package:buildtrack_mobile/screen/inventory/fulfillment_payment_screen.dart';
@@ -80,8 +79,7 @@ void main() {
       bool isLoggedIn = await AuthService.validateSession();
       if (!isLoggedIn) {
         // Just to be safe, clear any stale data if validation failed
-        final prefs = await SharedPreferences.getInstance();
-        final token = prefs.getString('token');
+        final token = await AuthService.getToken(); // [BT-SEC-05]
         if (token != null && token.isNotEmpty) {
            await AuthService.logout(sessionExpired: false); // Clear without showing snackbar at startup
         }
