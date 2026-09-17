@@ -24,6 +24,7 @@ dependencies:
   path_provider: ^2.1.0
   csv: ^6.0.0
   shared_preferences: ^2.3.2
+  flutter_secure_storage: ^9.2.2   # [BT-SEC-05] Keystore/Keychain-backed JWT storage
   http: ^1.6.0
   open_filex: ^4.3.2
   in_app_purchase: ^3.2.0

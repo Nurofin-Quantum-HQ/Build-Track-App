@@ -3,9 +3,9 @@ import 'dart:convert';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/api_service.dart'; // Adjusting to the actual config
+import '../services/auth_service.dart'; // [BT-SEC-05] token via secure storage
 
 class PushNotificationService {
   static final FirebaseMessaging _firebaseMessaging =
@@ -58,8 +58,7 @@ class PushNotificationService {
   }
 
   static Future<void> _registerTokenWithBackend(String fcmToken) async {
-    final prefs = await SharedPreferences.getInstance();
-    final jwtToken = prefs.getString('token');
+    final jwtToken = await AuthService.getToken(); // [BT-SEC-05]
 
     if (jwtToken == null || jwtToken.isEmpty) {
       return;
