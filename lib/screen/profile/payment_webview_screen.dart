@@ -11,9 +11,11 @@ class PaymentWebViewScreen extends StatefulWidget {
   @override
   State<PaymentWebViewScreen> createState() => _PaymentWebViewScreenState();
 }
+
 class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
   late final WebViewController _controller;
   bool _isLoading = true;
+
   @override
   void initState() {
     super.initState();
@@ -33,6 +35,7 @@ class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
           },
           onNavigationRequest: (NavigationRequest request) {
             final url = request.url;
+            
             if (url.startsWith('buildtrack://payment/')) {
               final isSuccess = url.contains('/success');
               _handlePaymentReturn(isSuccess);
@@ -48,11 +51,28 @@ class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
             if (url.contains('/api/subscriptions/callback')) {
               return NavigationDecision.navigate;
             }
-            // Intercept UPI and intent deep links to open external apps
-            if (!url.startsWith('http://') && !url.startsWith('https://') && !url.startsWith('buildtrack://') && !url.startsWith('about:')) {
+            
+            // Fix for Google Pay and other UPI Apps!
+            // Airpay formats Google Pay as an Android Intent (intent://pay?...)
+            if (url.startsWith('intent://')) {
+              // Convert intent:// to upi:// and strip Android specific Intent parameters
+              final upiUrl = url.replaceFirst('intent://', 'upi://').split('#Intent')[0];
+              _launchExternalUrl(upiUrl);
+              return NavigationDecision.prevent;
+            }
+            
+            // Intercept standard UPI deep links
+            if (url.startsWith('upi://') || url.startsWith('gpay://') || url.startsWith('phonepe://') || url.startsWith('paytm://')) {
               _launchExternalUrl(url);
               return NavigationDecision.prevent;
             }
+
+            // Intercept other unknown schemes
+            if (!url.startsWith('http://') && !url.startsWith('https://') && !url.startsWith('about:')) {
+              _launchExternalUrl(url);
+              return NavigationDecision.prevent;
+            }
+            
             return NavigationDecision.navigate;
           },
         ),
@@ -62,10 +82,12 @@ class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
         baseUrl: 'https://buildtrack.nurofin.com/',
       );
   }
+
   String _buildPaymentHtml() {
     final p = widget.paymentParams;
     final airpayUrl = p['airpayUrl']?.toString() ?? '';
     final StringBuffer inputFields = StringBuffer();
+    
     p.forEach((key, value) {
       if (key != 'airpayUrl') {
         final safeValue = value
@@ -80,6 +102,7 @@ class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
         );
       }
     });
+    
     return '''
 <!DOCTYPE html>
 <html>
@@ -88,34 +111,18 @@ class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <style>
       body {
-        margin: 0;
-        padding: 0;
-        background: #ffffff;
+        margin: 0; padding: 0; background: #ffffff;
         font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        min-height: 100vh;
-        color: #344054;
+        display: flex; flex-direction: column; align-items: center;
+        justify-content: center; min-height: 100vh; color: #344054;
       }
       .loader {
-        width: 40px;
-        height: 40px;
-        border: 3px solid #E0E5FF;
-        border-top: 3px solid #173EEA;
-        border-radius: 50%;
-        animation: spin 0.8s linear infinite;
-        margin-bottom: 16px;
+        width: 40px; height: 40px; border: 3px solid #E0E5FF;
+        border-top: 3px solid #173EEA; border-radius: 50%;
+        animation: spin 0.8s linear infinite; margin-bottom: 16px;
       }
-      @keyframes spin {
-        to { transform: rotate(360deg); }
-      }
-      p {
-        font-size: 15px;
-        font-weight: 600;
-        color: #667085;
-      }
+      @keyframes spin { to { transform: rotate(360deg); } }
+      p { font-size: 15px; font-weight: 600; color: #667085; }
     </style>
   </head>
   <body onload="document.getElementById('payForm').submit()">
@@ -128,6 +135,7 @@ class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
 </html>
 ''';
   }
+
   void _handlePaymentReturn(bool isSuccess) {
     context.read<SubscriptionProvider>().handlePaymentResult(isSuccess);
     if (mounted) Navigator.of(context).pop(isSuccess);
@@ -139,10 +147,10 @@ class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
       } else {
-        debugPrint("Could not launch $url");
+        debugPrint("Could not launch external URL: $url");
       }
     } catch (e) {
-      debugPrint("Error launching $url: $e");
+      debugPrint("Error launching external URL $url: $e");
     }
   }
 
@@ -159,21 +167,12 @@ class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
           children: [
             Icon(Icons.lock_rounded, color: Color(0xFF12B76A), size: 16),
             SizedBox(width: 6),
-            Text(
-              'Secure Payment',
-              style: TextStyle(
-                color: Color(0xFF101828),
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
+            Text('Secure Payment', style: TextStyle(color: Color(0xFF101828), fontSize: 16, fontWeight: FontWeight.w700)),
           ],
         ),
         leading: IconButton(
           icon: const Icon(Icons.close_rounded, color: Color(0xFF344054)),
-          onPressed: () {
-            _handlePaymentReturn(false);
-          },
+          onPressed: () => _handlePaymentReturn(false),
         ),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
@@ -190,19 +189,9 @@ class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    CircularProgressIndicator(
-                      color: AppColors.primary,
-                      strokeWidth: 2.5,
-                    ),
+                    CircularProgressIndicator(color: AppColors.primary, strokeWidth: 2.5),
                     SizedBox(height: 16),
-                    Text(
-                      'Loading secure payment...',
-                      style: TextStyle(
-                        color: Color(0xFF667085),
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
+                    Text('Loading secure payment...', style: TextStyle(color: Color(0xFF667085), fontSize: 14, fontWeight: FontWeight.w500)),
                   ],
                 ),
               ),
