@@ -3505,7 +3505,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
         badgeLabel = 'Material';
         break;
     }
-    final timeLabel = relativeTimeLabel(entry.date.toLocal());
+    final timeLabel = relativeTimeLabel(entry.createdAt.toLocal());
     final title = entry.description.isNotEmpty ? entry.description : badgeLabel;
     final subtitle = '₹${entry.amount.toStringAsFixed(0)} • $timeLabel';
     return Container(

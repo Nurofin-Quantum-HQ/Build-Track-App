@@ -13,6 +13,7 @@ import 'package:buildtrack_mobile/controller/showcase_keys.dart';
 import 'package:buildtrack_mobile/controller/user_session.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ReportsScreen extends StatelessWidget {
   ReportsScreen({super.key});
@@ -144,6 +145,7 @@ class _ReportsViewState extends State<_ReportsView> {
   @override
   void initState() {
     super.initState();
+    _loadActiveColumns();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!UserSession.hasSkippedTour && !UserSession.visitedModules.contains('ReportsScreen')) {
         ShowCaseWidget.of(context).startShowCase([
@@ -156,6 +158,24 @@ class _ReportsViewState extends State<_ReportsView> {
         UserSession.markModuleVisited('ReportsScreen');
       }
     });
+  }
+
+  Future<void> _loadActiveColumns() async {
+    final prefs = await SharedPreferences.getInstance();
+    final userId = UserSession.userId;
+    final all = prefs.getStringList('activeColumnsAll_$userId');
+    final materials = prefs.getStringList('activeColumnsMaterials_$userId');
+    final labour = prefs.getStringList('activeColumnsLabour_$userId');
+    final equipment = prefs.getStringList('activeColumnsEquipment_$userId');
+    
+    if (mounted) {
+      setState(() {
+        if (all != null) _activeColumnsAll = all;
+        if (materials != null) _activeColumnsMaterials = materials;
+        if (labour != null) _activeColumnsLabour = labour;
+        if (equipment != null) _activeColumnsEquipment = equipment;
+      });
+    }
   }
 
   @override
@@ -270,16 +290,33 @@ class _ReportsViewState extends State<_ReportsView> {
     }
   }
 
-  void _setActiveColumnsForTab(String tabName, List<String> cols) {
+  Future<void> _syncPreferences(String key, List<String> cols) async {
+    try {
+      await ApiService.put('/users/profile', {
+        'preferences': {
+          key: cols,
+        }
+      });
+    } catch(e) {}
+  }
+
+  Future<void> _setActiveColumnsForTab(String tabName, List<String> cols) async {
+    final prefs = await SharedPreferences.getInstance();
+    final userId = UserSession.userId;
+    
     setState(() {
       if (tabName == 'Materials') {
         _activeColumnsMaterials = cols;
+        prefs.setStringList('activeColumnsMaterials_$userId', cols); _syncPreferences('activeColumnsMaterials', cols);
       } else if (tabName == 'Labour') {
         _activeColumnsLabour = cols;
+        prefs.setStringList('activeColumnsLabour_$userId', cols); _syncPreferences('activeColumnsLabour', cols);
       } else if (tabName == 'Equipment') {
         _activeColumnsEquipment = cols;
+        prefs.setStringList('activeColumnsEquipment_$userId', cols); _syncPreferences('activeColumnsEquipment', cols);
       } else {
         _activeColumnsAll = cols;
+        prefs.setStringList('activeColumnsAll_$userId', cols); _syncPreferences('activeColumnsAll', cols);
       }
     });
   }
@@ -716,6 +753,40 @@ class _ReportsViewState extends State<_ReportsView> {
     }
   }
 
+  Future<void> _handleRevertCsv() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Revert Last Upload'),
+        content: const Text('Are you sure you want to undo the last CSV import? This will restore the transactions to their previous state.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+            child: const Text('Revert', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+    
+    setState(() => _isImportingCsv = true);
+    final success = await ApiService.revertCsv();
+    setState(() => _isImportingCsv = false);
+    
+    if (success) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Successfully reverted last CSV import')));
+        context.read<ReportProvider>().refresh();
+      }
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to revert CSV import')));
+      }
+    }
+  }
+
   Future<void> _handleUploadCsv() async {
     final projectProvider = context.read<ProjectProvider>();
     if (projectProvider.projects.isEmpty) {
@@ -955,37 +1026,52 @@ class _ReportsViewState extends State<_ReportsView> {
             ],
           ),
           const SizedBox(height: 8),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: _isImportingCsv ? null : _handleUploadCsv,
-              icon: _isImportingCsv
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : const Icon(Icons.upload_file_rounded, size: 16),
-              label: Text(
-                _isImportingCsv ? 'Importing...' : 'Upload CSV File',
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: _isImportingCsv ? null : _handleUploadCsv,
+                  icon: _isImportingCsv
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.upload_file_rounded, size: 16),
+                  label: Text(
+                    _isImportingCsv ? 'Importing...' : 'Upload CSV File',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
                 ),
               ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                elevation: 0,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(
+              const SizedBox(width: 8),
+              Container(
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
+                child: IconButton(
+                  onPressed: _isImportingCsv ? null : _handleRevertCsv,
+                  icon: const Icon(Icons.undo, color: AppColors.primary),
+                  tooltip: 'Revert Last CSV Import',
+                ),
               ),
-            ),
+            ],
           ),
         ],
       ),
@@ -4241,6 +4327,7 @@ class _ReportActions {
   static void addMore(BuildContext context, EntryModel entry) {
     final dupArgs = entry.toJson();
     dupArgs['isDuplicate'] = true;
+    dupArgs['fromReport'] = true;
     dupArgs['sourceTransactionId'] = entry.id;
     dupArgs['projectId'] = entry.projectId;
     String route;

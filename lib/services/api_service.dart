@@ -10,6 +10,29 @@ import 'dart:math';
 import 'package:buildtrack_mobile/services/auth_service.dart';
 
 class ApiService {
+  static Future<bool> backupCsv() async {
+    try {
+      final response = await post('/transactions/backup-csv', {});
+      return response.statusCode == 200 || response.statusCode == 201;
+    } catch (e) {
+      debugPrint('Backup CSV Error: $e');
+      return false;
+    }
+  }
+
+  static Future<bool> revertCsv() async {
+    try {
+      final response = await post('/transactions/revert-csv', {});
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return true;
+      }
+      return false;
+    } catch (e) {
+      debugPrint('Revert CSV Error: $e');
+      return false;
+    }
+  }
+
   static List<ProjectModel>? mockProjects;
   static String get baseUrl => ApiConfig.baseUrl;
 
@@ -1189,3 +1212,4 @@ class ApiService {
     }
   }
 }
+

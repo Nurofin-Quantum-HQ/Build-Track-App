@@ -45,6 +45,7 @@ class _AddMaterialScreenState extends State<AddMaterialScreen> {
   bool _isSaving = false;
   bool _isEditing = false;
   bool _isDuplicate = false;
+  bool _fromReport = false;
   String? _editingTransactionId;
   String? _sourceTransactionId;
   bool _argsLoaded = false;
@@ -199,6 +200,7 @@ class _AddMaterialScreenState extends State<AddMaterialScreen> {
           }
         }
         _isDuplicate = args['isDuplicate'] as bool? ?? false;
+        _fromReport = args['fromReport'] as bool? ?? false;
         _sourceTransactionId = args['sourceTransactionId']?.toString();
         final prefill = args['prefill'] as String?;
         if (prefill != null) _nameCtrl.text = prefill;
@@ -1229,7 +1231,13 @@ class _AddMaterialScreenState extends State<AddMaterialScreen> {
             ? 'Material entry updated successfully!'
             : 'Material entry saved successfully!',
       );
-      if (UserSession.hasPermission('view_inventory')) {
+      if (_fromReport) {
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          '/reports',
+          (route) => route.settings.name == '/' || route.isFirst,
+        );
+      } else if (UserSession.hasPermission('view_inventory')) {
         Navigator.pushNamedAndRemoveUntil(
           context,
           '/inventory',
@@ -2027,6 +2035,7 @@ class _AddMaterialScreenState extends State<AddMaterialScreen> {
             ),
             Expanded(
               child: SingleChildScrollView(
+                key: const PageStorageKey('add_material_scroll'),
                 controller: _scrollCtrl,
                 physics: const ClampingScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),

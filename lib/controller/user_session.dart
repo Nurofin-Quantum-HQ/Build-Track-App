@@ -345,9 +345,26 @@ class UserSession extends ChangeNotifier {
     _initialized = false;
     final prefs = await SharedPreferences.getInstance();
     final cachedEmail = prefs.getString('cached_email');
+    
+    // Backup activeColumns preferences so they persist across logouts
+    final allKeys = prefs.getKeys();
+    final columnPrefs = <String, List<String>>{};
+    for (final key in allKeys) {
+      if (key.startsWith('activeColumns')) {
+        final val = prefs.getStringList(key);
+        if (val != null) columnPrefs[key] = val;
+      }
+    }
+    
     await prefs.clear();
+    
     if (cachedEmail != null) {
       await prefs.setString('cached_email', cachedEmail);
+    }
+    
+    // Restore column preferences
+    for (final entry in columnPrefs.entries) {
+      await prefs.setStringList(entry.key, entry.value);
     }
     _instance.notifyListeners();
     debugPrint('[UserSession] cleared');

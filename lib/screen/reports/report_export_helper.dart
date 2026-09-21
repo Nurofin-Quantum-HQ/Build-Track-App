@@ -1,4 +1,4 @@
-import 'package:buildtrack_mobile/models/project_model.dart';
+﻿import 'package:buildtrack_mobile/models/project_model.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -60,134 +60,100 @@ class ReportExportHelper {
   static List<String> getExportHeaders({
     required String quickCategoryTab,
     List<String>? activeColumns,
+    List<EntryModel>? entries,
   }) {
-    if (activeColumns != null) {
-      return activeColumns
-          .map((col) => col == 'Amount' ? 'Amount (INR)' : col)
-          .toList();
+    int maxPayments = 0;
+    if (entries != null) {
+      for (var entry in entries) {
+        if (entry.paymentHistory.length > maxPayments) {
+          maxPayments = entry.paymentHistory.length;
+        }
+      }
     }
+
+    List<String> getPaymentColumns() {
+      if (maxPayments == 0) return ['Payment Date', 'Payment Mode'];
+      List<String> cols = [];
+      for (int i = 1; i <= maxPayments; i++) {
+        cols.addAll(['Payment $i Amount', 'Payment $i Date', 'Payment $i Mode']);
+      }
+      return cols;
+    }
+
+    List<String> headers = [];
+    if (activeColumns != null) {
+      headers = activeColumns.map((col) => col == 'Amount' ? 'Amount (INR)' : col).toList();
+      if (!headers.contains('Transaction ID')) {
+        headers.insert(0, 'Transaction ID');
+      }
+      int payIdx = headers.indexOf('Payment Date');
+      if (payIdx != -1) {
+        headers.removeAt(payIdx);
+        headers.insertAll(payIdx, getPaymentColumns());
+      }
+      return headers;
+    }
+    
     switch (quickCategoryTab) {
       case 'Materials':
-        return [
-          'Purchased Date',
-          'Project',
-          'Material',
-          'Brand',
-          'Rate',
-          'Qty',
-          'Unit',
-          'Status',
-          'Amount (INR)',
-          'Payment Date',
+        headers = [
+          'Transaction ID', 'Purchased Date', 'Project', 'Material', 'Brand', 'Rate', 'Qty', 'Unit', 'Status', 'Amount (INR)', 'Payment Date',
         ];
+        break;
       case 'Labour':
-        return [
-          'Purchased Date',
-          'Project',
-          'Worker Type',
-          'Rate/Day',
-          'Days',
-          'Status',
-          'Amount (INR)',
-          'Payment Date',
+        headers = [
+          'Transaction ID', 'Purchased Date', 'Project', 'Worker Type', 'Rate/Day', 'Days', 'Status', 'Amount (INR)', 'Payment Date',
         ];
+        break;
       case 'Equipment':
-        return [
-          'Purchased Date',
-          'Project',
-          'Equipment',
-          'Rent Rate',
-          'Duration',
-          'Status',
-          'Amount (INR)',
-          'Payment Date',
+        headers = [
+          'Transaction ID', 'Purchased Date', 'Project', 'Equipment', 'Rent Rate', 'Duration', 'Status', 'Amount (INR)', 'Payment Date',
         ];
+        break;
       default:
-        return [
-          'Purchased Date',
-          'Project',
-          'Type',
-          'Description',
-          'Brand',
-          'Floor',
-          'Phase',
-          'Activity',
-          'Unit',
-          'Status',
-          'Amount (INR)',
-          'Payment Date',
+        headers = [
+          'Transaction ID', 'Purchased Date', 'Project', 'Type', 'Description', 'Brand', 'Floor', 'Phase', 'Activity', 'Unit', 'Status', 'Amount (INR)', 'Payment Date',
         ];
+        break;
     }
+    
+    int payIdx = headers.indexOf('Payment Date');
+    if (payIdx != -1) {
+      headers.removeAt(payIdx);
+      headers.insertAll(payIdx, getPaymentColumns());
+    }
+    
+    return headers;
   }
   static Future<void> exportToCsv({
     required List<EntryModel> entries,
     required String Function(String) getProjectName,
     required String quickCategoryTab,
     List<String>? activeColumns,
+    bool includePaymentHistory = true,
   }) async {
     if (entries.isEmpty) return;
     final csvBuffer = StringBuffer();
-    final List<String> headers;
-    if (activeColumns != null) {
-      headers = activeColumns
-          .map((col) => col == 'Amount' ? 'Amount (INR)' : col)
-          .toList();
-    } else {
-      if (quickCategoryTab == 'Materials') {
-        headers = [
-          'Purchased Date',
-          'Project',
-          'Material',
-          'Brand',
-          'Rate',
-          'Qty',
-          'Unit',
-          'Status',
-          'Amount (INR)',
-          'Payment Date',
-        ];
-      } else if (quickCategoryTab == 'Labour') {
-        headers = [
-          'Purchased Date',
-          'Project',
-          'Worker Type',
-          'Rate/Day',
-          'Days',
-          'Status',
-          'Amount (INR)',
-          'Payment Date',
-        ];
-      } else if (quickCategoryTab == 'Equipment') {
-        headers = [
-          'Purchased Date',
-          'Project',
-          'Equipment',
-          'Rent Rate',
-          'Duration',
-          'Status',
-          'Amount (INR)',
-          'Payment Date',
-        ];
-      } else {
-        headers = [
-          'Purchased Date',
-          'Project',
-          'Type',
-          'Description',
-          'Brand',
-          'Floor',
-          'Phase',
-          'Activity',
-          'Unit',
-          'Status',
-          'Amount (INR)',
-          'Payment Date',
-        ];
+
+    int maxPayments = 0;
+    if (includePaymentHistory) {
+      for (var entry in entries) {
+        if (entry.paymentHistory.length > maxPayments) {
+          maxPayments = entry.paymentHistory.length;
+        }
       }
     }
+
+    final List<String> headers = getExportHeaders(
+      quickCategoryTab: quickCategoryTab,
+      activeColumns: activeColumns,
+      entries: includePaymentHistory ? entries : null,
+    );
+    
     csvBuffer.writeln(
       headers.map((h) => '"${h.replaceAll('"', '""')}"').join(','),
     );
+    
     for (final entry in entries) {
       final dateStr = _formatYmd(entry.date);
       final projectName = getProjectName(entry.projectId);
@@ -199,15 +165,33 @@ class ReportExportHelper {
       );
       final payDateStr = entry.paymentDate != null
           ? _formatYmd(entry.paymentDate!)
-          : '—';
-      final List<String> rowValues;
+          : '';
+          
+      final List<String> rowValues = [];
+      
       if (activeColumns != null) {
-        rowValues = [];
+        if (!activeColumns.contains('Transaction ID')) {
+          rowValues.add(entry.id);
+        }
         for (final col in activeColumns) {
           if (col == 'Purchased Date') {
             rowValues.add(dateStr);
           } else if (col == 'Payment Date') {
-            rowValues.add(payDateStr);
+            if (includePaymentHistory && maxPayments > 0) {
+              for (int i = 0; i < maxPayments; i++) {
+                if (i < entry.paymentHistory.length) {
+                  final p = entry.paymentHistory[i];
+                  rowValues.add((p['amount'] ?? 0.0).toString());
+                  rowValues.add(p['date']?.toString() ?? '');
+                  rowValues.add(p['mode']?.toString() ?? '');
+                } else {
+                  rowValues.addAll(['', '', '']);
+                }
+              }
+            } else {
+              rowValues.add(payDateStr);
+              rowValues.add(entry.paymentMode ?? '');
+            }
           } else if (col == 'Project') {
             rowValues.add(projectName);
           } else if (col == 'Type') {
@@ -216,17 +200,17 @@ class ReportExportHelper {
               col == 'Material' ||
               col == 'Worker Type' ||
               col == 'Equipment') {
-            rowValues.add(entry.description.isEmpty ? 'null' : entry.description);
+            rowValues.add(entry.description.isEmpty ? '' : entry.description);
           } else if (col == 'Brand') {
-            rowValues.add(entry.brand ?? 'null');
+            rowValues.add(entry.brand ?? '');
           } else if (col == 'Floor') {
-            rowValues.add(entry.floor ?? 'null');
+            rowValues.add(entry.floor ?? '');
           } else if (col == 'Phase') {
-            rowValues.add(entry.phase ?? 'null');
+            rowValues.add(entry.phase ?? '');
           } else if (col == 'Activity') {
-            rowValues.add(entry.activity ?? 'null');
+            rowValues.add(entry.activity ?? '');
           } else if (col == 'Unit') {
-            rowValues.add(entry.unit ?? 'null');
+            rowValues.add(entry.unit ?? '');
           } else if (col == 'Status') {
             rowValues.add(status);
           } else if (col == 'Amount') {
@@ -244,67 +228,94 @@ class ReportExportHelper {
             } else {
               final rate = entry.ratePerUnit;
               final val = (rate == null || rate == 0) ? null : entry.amount / rate;
-              rowValues.add(val != null ? val.toStringAsFixed(1) : 'null');
+              rowValues.add(val != null ? val.toStringAsFixed(1) : '');
             }
+          } else if (col == 'Transaction ID') {
+            rowValues.add(entry.id);
           }
         }
-      } else if (quickCategoryTab == 'Materials') {
-        final rate = entry.ratePerUnit;
-        final qty = (rate == null || rate == 0) ? null : entry.amount / rate;
-        rowValues = [
-          dateStr,
-          projectName,
-          entry.description,
-          entry.brand ?? '—',
-          (entry.ratePerUnit ?? 0.0).toStringAsFixed(2),
-          qty != null ? qty.toStringAsFixed(1) : '—',
-          entry.unit ?? 'unit',
-          status,
-          amount.toStringAsFixed(2),
-          payDateStr,
-        ];
-      } else if (quickCategoryTab == 'Labour') {
-        final rate = entry.ratePerUnit;
-        final days = (rate == null || rate == 0) ? null : entry.amount / rate;
-        rowValues = [
-          dateStr,
-          projectName,
-          entry.description,
-          (entry.ratePerUnit ?? 0.0).toStringAsFixed(2),
-          days != null ? days.toStringAsFixed(1) : '—',
-          status,
-          amount.toStringAsFixed(2),
-          payDateStr,
-        ];
-      } else if (quickCategoryTab == 'Equipment') {
-        final rate = entry.ratePerUnit;
-        final duration = (rate == null || rate == 0) ? null : entry.amount / rate;
-        rowValues = [
-          dateStr,
-          projectName,
-          entry.description,
-          (entry.ratePerUnit ?? 0.0).toStringAsFixed(2),
-          duration != null ? duration.toStringAsFixed(1) : '—',
-          status,
-          amount.toStringAsFixed(2),
-          payDateStr,
-        ];
       } else {
-        rowValues = [
-          dateStr,
-          projectName,
-          entry.type.name.toUpperCase(),
-          entry.description.isEmpty ? '—' : entry.description,
-          entry.brand ?? '—',
-          entry.floor ?? '—',
-          entry.phase ?? '—',
-          entry.activity ?? '—',
-          entry.unit ?? '—',
-          status,
-          amount.toStringAsFixed(2),
-          payDateStr,
-        ];
+        if (quickCategoryTab != 'All') {
+          rowValues.add(entry.id); // Default headers add Transaction ID first
+        } else {
+          rowValues.add(entry.id);
+        }
+        
+        List<String> baseVals = [];
+        
+        if (quickCategoryTab == 'Materials') {
+          final rate = entry.ratePerUnit;
+          final qty = (rate == null || rate == 0) ? null : entry.amount / rate;
+          baseVals = [
+            dateStr,
+            projectName,
+            entry.description.isEmpty ? '' : entry.description,
+            entry.brand ?? '',
+            (entry.ratePerUnit ?? 0.0).toStringAsFixed(2),
+            qty != null ? qty.toStringAsFixed(1) : '',
+            entry.unit ?? 'unit',
+            status,
+            amount.toStringAsFixed(2),
+          ];
+        } else if (quickCategoryTab == 'Labour') {
+          final rate = entry.ratePerUnit;
+          final days = (rate == null || rate == 0) ? null : entry.amount / rate;
+          baseVals = [
+            dateStr,
+            projectName,
+            entry.description.isEmpty ? '' : entry.description,
+            (entry.ratePerUnit ?? 0.0).toStringAsFixed(2),
+            days != null ? days.toStringAsFixed(1) : '',
+            status,
+            amount.toStringAsFixed(2),
+          ];
+        } else if (quickCategoryTab == 'Equipment') {
+          final rate = entry.ratePerUnit;
+          final duration = (rate == null || rate == 0) ? null : entry.amount / rate;
+          baseVals = [
+            dateStr,
+            projectName,
+            entry.description.isEmpty ? '' : entry.description,
+            (entry.ratePerUnit ?? 0.0).toStringAsFixed(2),
+            duration != null ? duration.toStringAsFixed(1) : '',
+            status,
+            amount.toStringAsFixed(2),
+          ];
+        } else {
+          baseVals = [
+            dateStr,
+            projectName,
+            entry.type.name.toUpperCase(),
+            entry.description.isEmpty ? '' : entry.description,
+            entry.brand ?? '',
+            entry.floor ?? '',
+            entry.phase ?? '',
+            entry.activity ?? '',
+            entry.unit ?? '',
+            status,
+            amount.toStringAsFixed(2),
+          ];
+        }
+        
+        rowValues.addAll(baseVals);
+        
+        if (includePaymentHistory && maxPayments > 0) {
+          for (int i = 0; i < maxPayments; i++) {
+            if (i < entry.paymentHistory.length) {
+              final p = entry.paymentHistory[i];
+              rowValues.add((p['amount'] ?? 0.0).toString());
+              rowValues.add(p['date']?.toString() ?? '');
+              rowValues.add(p['mode']?.toString() ?? '');
+            } else {
+              rowValues.addAll(['', '', '']);
+            }
+          }
+        } else {
+          rowValues.add(payDateStr);
+          rowValues.add(entry.paymentMode ?? '');
+        }
       }
+      
       final escapedRow = rowValues
           .map((val) => '"${val.replaceAll('"', '""')}"')
           .join(',');
@@ -391,7 +402,7 @@ class ReportExportHelper {
             rowValues.add(_formatYmd(e.date));
           } else if (col == 'Payment Date') {
             rowValues.add(
-              e.paymentDate != null ? _formatYmd(e.paymentDate!) : '—',
+              e.paymentDate != null ? _formatYmd(e.paymentDate!) : '',
             );
           } else if (col == 'Project') {
             rowValues.add(getProjectName(e.projectId));
@@ -401,17 +412,17 @@ class ReportExportHelper {
               col == 'Material' ||
               col == 'Worker Type' ||
               col == 'Equipment') {
-            rowValues.add(e.description.isEmpty ? '—' : e.description);
+            rowValues.add(e.description.isEmpty ? '' : e.description);
           } else if (col == 'Brand') {
-            rowValues.add(e.brand ?? '—');
+            rowValues.add(e.brand ?? '');
           } else if (col == 'Floor') {
-            rowValues.add(e.floor ?? '—');
+            rowValues.add(e.floor ?? '');
           } else if (col == 'Phase') {
-            rowValues.add(e.phase ?? '—');
+            rowValues.add(e.phase ?? '');
           } else if (col == 'Activity') {
-            rowValues.add(e.activity ?? '—');
+            rowValues.add(e.activity ?? '');
           } else if (col == 'Unit') {
-            rowValues.add(e.unit ?? '—');
+            rowValues.add(e.unit ?? '');
           } else if (col == 'Status') {
             rowValues.add(
               _getPaymentStatusLabel(
@@ -432,7 +443,7 @@ class ReportExportHelper {
           } else if (col == 'Qty' || col == 'Days' || col == 'Duration') {
             final rate = e.ratePerUnit;
             final val = (rate == null || rate == 0) ? null : e.amount / rate;
-            rowValues.add(val != null ? val.toStringAsFixed(1) : '—');
+            rowValues.add(val != null ? val.toStringAsFixed(1) : '');
           }
         }
         return rowValues;
@@ -470,10 +481,10 @@ class ReportExportHelper {
         return [
           _formatYmd(e.date),
           getProjectName(e.projectId),
-          e.description.isEmpty ? '—' : e.description,
-          e.brand ?? '—',
+          e.description.isEmpty ? '' : e.description,
+          e.brand ?? '',
           _formatIndianCurrency(rate ?? 0.0),
-          qty != null ? qty.toStringAsFixed(1) : '—',
+          qty != null ? qty.toStringAsFixed(1) : '',
           e.unit ?? 'unit',
           _getPaymentStatusLabel(
             e.paymentStatus,
@@ -481,7 +492,7 @@ class ReportExportHelper {
             paidAmount: e.paidAmount,
           ),
           _formatIndianCurrency(e.amount),
-          e.paymentDate != null ? _formatYmd(e.paymentDate!) : '—',
+          e.paymentDate != null ? _formatYmd(e.paymentDate!) : '',
         ];
       }).toList();
     } else if (quickCategoryTab == 'Labour') {
@@ -513,16 +524,16 @@ class ReportExportHelper {
         return [
           _formatYmd(e.date),
           getProjectName(e.projectId),
-          e.description.isEmpty ? '—' : e.description,
+          e.description.isEmpty ? '' : e.description,
           _formatIndianCurrency(rate ?? 0.0),
-          days != null ? days.toStringAsFixed(1) : '—',
+          days != null ? days.toStringAsFixed(1) : '',
           _getPaymentStatusLabel(
             e.paymentStatus,
             amount: e.amount,
             paidAmount: e.paidAmount,
           ),
           _formatIndianCurrency(e.amount),
-          e.paymentDate != null ? _formatYmd(e.paymentDate!) : '—',
+          e.paymentDate != null ? _formatYmd(e.paymentDate!) : '',
         ];
       }).toList();
     } else if (quickCategoryTab == 'Equipment') {
@@ -554,16 +565,16 @@ class ReportExportHelper {
         return [
           _formatYmd(e.date),
           getProjectName(e.projectId),
-          e.description.isEmpty ? '—' : e.description,
+          e.description.isEmpty ? '' : e.description,
           _formatIndianCurrency(rate ?? 0.0),
-          duration != null ? duration.toStringAsFixed(1) : '—',
+          duration != null ? duration.toStringAsFixed(1) : '',
           _getPaymentStatusLabel(
             e.paymentStatus,
             amount: e.amount,
             paidAmount: e.paidAmount,
           ),
           _formatIndianCurrency(e.amount),
-          e.paymentDate != null ? _formatYmd(e.paymentDate!) : '—',
+          e.paymentDate != null ? _formatYmd(e.paymentDate!) : '',
         ];
       }).toList();
     } else {
@@ -602,19 +613,19 @@ class ReportExportHelper {
           _formatYmd(e.date),
           getProjectName(e.projectId),
           e.type.name.toUpperCase(),
-          e.description.isEmpty ? '—' : e.description,
-          e.brand ?? '—',
-          e.floor ?? '—',
-          e.phase ?? '—',
-          e.activity ?? '—',
-          e.unit ?? '—',
+          e.description.isEmpty ? '' : e.description,
+          e.brand ?? '',
+          e.floor ?? '',
+          e.phase ?? '',
+          e.activity ?? '',
+          e.unit ?? '',
           _getPaymentStatusLabel(
             e.paymentStatus,
             amount: e.amount,
             paidAmount: e.paidAmount,
           ),
           _formatIndianCurrency(e.amount),
-          e.paymentDate != null ? _formatYmd(e.paymentDate!) : '—',
+          e.paymentDate != null ? _formatYmd(e.paymentDate!) : '',
         ];
       }).toList();
     }

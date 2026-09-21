@@ -32,6 +32,7 @@ class _AddEquipmentScreenState extends State<AddEquipmentScreen> {
   String? _selectedActivityId;
   Map<String, dynamic>? _duplicateContext;
   bool _isDuplicate = false;
+  bool _fromReport = false;
   String? _sourceTransactionId;
   List<String> _floors = [];
   List<String> _phases = [];
@@ -198,6 +199,7 @@ class _AddEquipmentScreenState extends State<AddEquipmentScreen> {
           }
         }
         _isDuplicate = args['isDuplicate'] as bool? ?? false;
+        _fromReport = args['fromReport'] as bool? ?? false;
         _sourceTransactionId = args['sourceTransactionId']?.toString();
         final prefill = args['prefill'] as String?;
         if (prefill != null) _nameCtrl.text = prefill;
@@ -1280,7 +1282,13 @@ class _AddEquipmentScreenState extends State<AddEquipmentScreen> {
             ? 'Equipment entry updated successfully!'
             : 'Equipment entry saved successfully!',
       );
-      if (UserSession.hasPermission('view_inventory')) {
+      if (_fromReport) {
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          '/reports',
+          (route) => route.settings.name == '/' || route.isFirst,
+        );
+      } else if (UserSession.hasPermission('view_inventory')) {
         Navigator.pushNamedAndRemoveUntil(
           context,
           '/inventory',
@@ -2066,6 +2074,7 @@ class _AddEquipmentScreenState extends State<AddEquipmentScreen> {
             ),
             Expanded(
               child: SingleChildScrollView(
+                key: const PageStorageKey('add_equipment_scroll'),
                 controller: _scrollCtrl,
                 physics: const ClampingScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
