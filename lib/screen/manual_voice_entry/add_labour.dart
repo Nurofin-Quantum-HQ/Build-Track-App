@@ -998,7 +998,20 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
         _scrollCtrl.animateTo(
           0,
           duration: const Duration(milliseconds: 300),
-          curve: Curves.easeInOut,
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (_scrollCtrl.hasClients) {
+        _scrollCtrl.animateTo(
+          _scrollCtrl.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
         );
       }
     });
@@ -1297,6 +1310,7 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
                         if (result != null) {
                           _recordPaymentNow = true;
                           _paymentResult = result;
+                          _scrollToBottom();
                         }
                       });
                     }
@@ -1373,6 +1387,7 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
                   if (result != null && mounted) {
                     setState(() {
                       _paymentHistory.add(result);
+                      _scrollToBottom();
                     });
                   }
                 },
