@@ -48,6 +48,12 @@ extension EntryTypeX on EntryType {
     }
   }
 }
+
+DateTime? _parseLocal(String? s) {
+  if (s == null || s.isEmpty) return null;
+  return DateTime.tryParse(s)?.toLocal();
+}
+
 class EntryModel {
   EntryModel({
     required this.id,
@@ -55,6 +61,7 @@ class EntryModel {
     required this.type,
     required this.amount,
     required this.date,
+    required this.createdAt,
     this.description = '',
     this.brand,
     this.quantity,
@@ -71,6 +78,7 @@ class EntryModel {
     this.approvedBy,
     this.approvedAt,
     this.paymentDate,
+    this.paymentMode,
     this.rejectionReason,
     this.paidAmount = 0.0,
     this.paymentHistory = const [],
@@ -80,6 +88,7 @@ class EntryModel {
   final EntryType type;
   double amount;
   final DateTime date;
+  final DateTime createdAt;
   final String description;
   final String? brand;
   final double? quantity;
@@ -96,6 +105,7 @@ class EntryModel {
   final String? approvedBy;
   final DateTime? approvedAt;
   final DateTime? paymentDate;
+  final String? paymentMode;
   final String? rejectionReason;
   final double paidAmount;
   final List<Map<String, dynamic>> paymentHistory;
@@ -122,6 +132,7 @@ class EntryModel {
     'approvedBy': approvedBy,
     'approvedAt': approvedAt?.toIso8601String(),
     'paymentDate': paymentDate?.toIso8601String(),
+    'paymentMode': paymentMode,
     'rejectionReason': rejectionReason,
     'paidAmount': paidAmount,
     'paymentHistory': paymentHistory,
@@ -149,6 +160,27 @@ class EntryModel {
       }
     }
 
+    final paymentHistory = j['paymentHistory'] != null
+        ? List<Map<String, dynamic>>.from(
+            (j['paymentHistory'] as List).map(
+              (e) {
+                final m = Map<String, dynamic>.from(e as Map);
+                if (m['date'] != null) {
+                   m['date'] = _parseLocal(m['date'].toString())?.toIso8601String() ?? m['date'];
+                }
+                return m;
+              }
+            ),
+          )
+        : const <Map<String, dynamic>>[];
+        
+    String? pMode = (j['paymentMode'] ?? j['paymentMethod'] ?? j['mode'])?.toString();
+    if (pMode == null || pMode.isEmpty) {
+      if (paymentHistory.isNotEmpty) {
+        pMode = paymentHistory.first['mode']?.toString() ?? paymentHistory.first['paymentMode']?.toString();
+      }
+    }
+
     return EntryModel(
       id: j['_id']?.toString() ?? j['id']?.toString() ?? '',
       projectId: j['project']?.toString() ?? j['projectId']?.toString() ?? '',
@@ -157,7 +189,8 @@ class EntryModel {
         orElse: () => EntryType.material,
       ),
       amount: (j['amount'] as num?)?.toDouble() ?? 0.0,
-      date: DateTime.tryParse(j['date']?.toString() ?? j['createdAt']?.toString() ?? '') ?? DateTime.now(),
+      date: _parseLocal(j['date']?.toString() ?? j['createdAt']?.toString()) ?? DateTime.now(),
+      createdAt: _parseLocal(j['createdAt']?.toString()) ?? DateTime.now(),
       description: desc,
       brand: j['brand']?.toString(),
       quantity: (j['quantity'] as num?)?.toDouble(),
@@ -187,21 +220,12 @@ class EntryModel {
                       j['approvedBy']['_id']?.toString()
                 : j['approvedBy'].toString())
           : null,
-      approvedAt: j['approvedAt'] != null
-          ? DateTime.tryParse(j['approvedAt'].toString())
-          : null,
-      paymentDate: j['paymentDate'] != null
-          ? DateTime.tryParse(j['paymentDate'].toString())
-          : null,
+      approvedAt: _parseLocal(j['approvedAt']?.toString()),
+      paymentDate: _parseLocal(j['paymentDate']?.toString()),
+      paymentMode: pMode,
       rejectionReason: j['rejectionReason']?.toString(),
       paidAmount: (j['paidAmount'] as num?)?.toDouble() ?? 0.0,
-      paymentHistory: j['paymentHistory'] != null
-          ? List<Map<String, dynamic>>.from(
-              (j['paymentHistory'] as List).map(
-                (e) => Map<String, dynamic>.from(e as Map),
-              ),
-            )
-          : const [],
+      paymentHistory: paymentHistory,
     );
   }
   static String encodeList(List<EntryModel> list) =>
@@ -358,9 +382,7 @@ class ProjectActivity {
       name: (j['name'] ?? '').toString(),
       isCustom: (j['isCustom'] as bool?) ?? false,
       completed: isDone,
-      completedAt: j['completedAt'] != null
-          ? DateTime.tryParse(j['completedAt'].toString())
-          : null,
+      completedAt: _parseLocal(j['completedAt']?.toString()),
       notes: j['notes']?.toString(),
       photo: j['photo']?.toString(),
       photos: j['photos'] != null
@@ -411,9 +433,7 @@ class ActivityBudget {
       total: ActivityBudgetCategory.fromJson(
         j['total'] as Map<String, dynamic>? ?? {},
       ),
-      budgetLastCalculatedAt: j['budgetLastCalculatedAt'] != null
-          ? DateTime.tryParse(j['budgetLastCalculatedAt'].toString())
-          : null,
+      budgetLastCalculatedAt: _parseLocal(j['budgetLastCalculatedAt']?.toString()),
     );
   }
   static ActivityBudget zero(
@@ -797,7 +817,7 @@ class ProjectModel {
     final rawStartDate =
         j['startDate']?.toString() ?? dates?['startDate']?.toString();
     if (rawStartDate != null && rawStartDate.isNotEmpty) {
-      final parsed = DateTime.tryParse(rawStartDate);
+      final parsed = _parseLocal(rawStartDate);
       if (parsed != null) parsedStartDate = parsed;
     }
     DateTime? parsedExpectedEnd;
@@ -805,7 +825,7 @@ class ProjectModel {
         j['expectedEndDate']?.toString() ??
         dates?['expectedEndDate']?.toString();
     if (rawExpected != null && rawExpected.isNotEmpty) {
-      parsedExpectedEnd = DateTime.tryParse(rawExpected);
+      parsedExpectedEnd = _parseLocal(rawExpected);
     }
     List<String>? parsedFloors;
     final rawFloors = j['floors'] as List?;
@@ -963,9 +983,9 @@ class ProjectModel {
       contactNumber: j['contactNumber']?.toString(),
       mapAddress: j['mapAddress']?.toString(),
       actualEndDate: dates?['actualEndDate'] != null
-          ? DateTime.tryParse(dates!['actualEndDate'].toString())
+          ? _parseLocal(dates!['actualEndDate'].toString())
           : (j['actualEndDate'] != null
-                ? DateTime.tryParse(j['actualEndDate'].toString())
+                ? _parseLocal(j['actualEndDate'].toString())
                 : null),
       landArea: j['landArea']?.toString(),
       landUnit: j['landUnit']?.toString(),

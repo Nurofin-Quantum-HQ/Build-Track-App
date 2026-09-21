@@ -66,6 +66,7 @@ class ProjectReportScreen extends StatelessWidget {
             ),
             Expanded(
               child: SingleChildScrollView(
+                key: const PageStorageKey('project_report_scroll_key'),
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
                 child: Column(

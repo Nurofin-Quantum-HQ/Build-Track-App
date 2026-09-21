@@ -312,6 +312,20 @@ class ChartSection extends StatelessWidget {
                     LineChartData(
                       minY: 0,
                       maxY: roundedMaxY,
+                      lineTouchData: LineTouchData(
+                        touchTooltipData: LineTouchTooltipData(
+                          getTooltipItems: (touchedSpots) {
+                            return touchedSpots.map((spot) {
+                              final isTarget = spot.barIndex == 1;
+                              final name = isTarget ? 'Budget' : 'Actual';
+                              return LineTooltipItem(
+                                '$name\n₹${spot.y.toStringAsFixed(0)}',
+                                const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                              );
+                            }).toList();
+                          },
+                        ),
+                      ),
                       gridData: const FlGridData(
                         show: true,
                         drawVerticalLine: false,

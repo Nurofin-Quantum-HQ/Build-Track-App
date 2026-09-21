@@ -582,18 +582,8 @@ class _FulfillmentPaymentScreenState extends State<FulfillmentPaymentScreen> {
                           ? 0.4
                           : 1.0,
                       duration: const Duration(milliseconds: 180),
-                      child: Container(
+                      child: SizedBox(
                         height: 60,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: _amountError != null
-                                ? const Color(0xFFDC2626)
-                                : const Color(0xFFE2E4F6),
-                            width: _amountError != null ? 1.5 : 1.0,
-                          ),
-                        ),
                         child: TextField(
                           controller: _amountCtrl,
                           enabled: _selectedStatus != PaymentStatus.pending,
@@ -629,19 +619,47 @@ class _FulfillmentPaymentScreenState extends State<FulfillmentPaymentScreen> {
                             });
                           },
                           textAlignVertical: TextAlignVertical.center,
-                          decoration: const InputDecoration(
+                          decoration: InputDecoration(
                             prefixText: '₹ ',
-                            prefixStyle: TextStyle(
+                            prefixStyle: const TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.w600,
                               color: _kGray,
                             ),
                             hintText: '0.00',
-                            hintStyle: TextStyle(color: _kGray),
-                            border: InputBorder.none,
-                            contentPadding: EdgeInsets.symmetric(
+                            hintStyle: const TextStyle(color: _kGray),
+                            filled: true,
+                            fillColor: Colors.white,
+                            contentPadding: const EdgeInsets.symmetric(
                               horizontal: 16,
                               vertical: 14,
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(
+                                color: _amountError != null
+                                    ? const Color(0xFFDC2626)
+                                    : const Color(0xFFE2E4F6),
+                                width: _amountError != null ? 1.5 : 1.0,
+                              ),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(
+                                color: _amountError != null
+                                    ? const Color(0xFFDC2626)
+                                    : const Color(0xFF4F46E5),
+                                width: 1.5,
+                              ),
+                            ),
+                            disabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(
+                                color: _amountError != null
+                                    ? const Color(0xFFDC2626)
+                                    : const Color(0xFFE2E4F6),
+                                width: 1.0,
+                              ),
                             ),
                           ),
                           style: const TextStyle(

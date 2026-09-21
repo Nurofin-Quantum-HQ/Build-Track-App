@@ -270,12 +270,13 @@ class ProjectProvider extends ChangeNotifier {
           ? DateTime.tryParse(json['paymentDate'].toString())
           : null;
       return EntryModel(
-        id:
-            json['_id']?.toString() ??
-            DateTime.now().millisecondsSinceEpoch.toString(),
+        id: json['_id']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString(),
         projectId: entryProjectId,
         type: parsedType,
         amount: amount,
+        createdAt: json['createdAt'] != null
+            ? DateTime.tryParse(json['createdAt'].toString()) ?? DateTime.now()
+            : DateTime.now(),
         date: json['date'] != null
             ? DateTime.tryParse(json['date'].toString()) ?? DateTime.now()
             : DateTime.now(),
@@ -1097,6 +1098,7 @@ class ProjectProvider extends ChangeNotifier {
       projectId: entry.projectId,
       type: entry.type,
       amount: 0,
+      createdAt: entry.createdAt,
       date: entry.date,
       description: entry.description,
       brand: brand ?? entry.brand,
