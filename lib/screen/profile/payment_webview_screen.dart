@@ -55,9 +55,8 @@ class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
             // Fix for Google Pay and other UPI Apps!
             // Airpay formats Google Pay as an Android Intent (intent://pay?...)
             if (url.startsWith('intent://')) {
-              // Convert intent:// to upi:// and strip Android specific Intent parameters
-              final upiUrl = url.replaceFirst('intent://', 'upi://').split('#Intent')[0];
-              _launchExternalUrl(upiUrl);
+              // Pass the raw intent string directly to the OS launcher
+              _launchExternalUrl(url);
               return NavigationDecision.prevent;
             }
             
@@ -142,12 +141,24 @@ class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
   }
 
   Future<void> _launchExternalUrl(String url) async {
+    // For complex Android Intents (like Google Pay), canLaunchUrl will falsely return false.
+    // We must bypass the check and force the OS to handle it.
+    if (url.startsWith('intent://') || url.startsWith('upi://') || url.startsWith('gpay://')) {
+      try {
+        await launchUrl(Uri.parse(url), mode: LaunchMode.externalNonBrowserApplication);
+        return;
+      } catch (e) {
+        debugPrint("Forced launch failed for $url: $e");
+      }
+    }
+
     final uri = Uri.parse(url);
     try {
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
       } else {
-        debugPrint("Could not launch external URL: $url");
+        // Fallback: just try launching it anyway (fixes some Android 11+ visibility issues)
+        await launchUrl(uri, mode: LaunchMode.externalNonBrowserApplication);
       }
     } catch (e) {
       debugPrint("Error launching external URL $url: $e");
