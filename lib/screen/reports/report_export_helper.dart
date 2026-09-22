@@ -1,4 +1,4 @@
-﻿import 'package:buildtrack_mobile/models/project_model.dart';
+import 'package:buildtrack_mobile/models/project_model.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -31,7 +31,7 @@ class ReportExportHelper {
     }
   }
   static String _formatYmd(DateTime dt) {
-    return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
+    return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
   }
   static String _formatDateTime(DateTime dt) {
     return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
@@ -86,6 +86,9 @@ class ReportExportHelper {
       if (!headers.contains('Transaction ID')) {
         headers.insert(0, 'Transaction ID');
       }
+      if (!headers.contains('Action')) {
+        headers.insert(1, 'Action');
+      }
       int payIdx = headers.indexOf('Payment Date');
       if (payIdx != -1) {
         headers.removeAt(payIdx);
@@ -97,22 +100,22 @@ class ReportExportHelper {
     switch (quickCategoryTab) {
       case 'Materials':
         headers = [
-          'Transaction ID', 'Purchased Date', 'Project', 'Material', 'Brand', 'Rate', 'Qty', 'Unit', 'Status', 'Amount (INR)', 'Payment Date',
+          'Transaction ID', 'Action', 'Purchased Date', 'Project', 'Material', 'Brand', 'Rate', 'Qty', 'Unit', 'Status', 'Amount (INR)', 'Payment Date',
         ];
         break;
       case 'Labour':
         headers = [
-          'Transaction ID', 'Purchased Date', 'Project', 'Worker Type', 'Rate/Day', 'Days', 'Status', 'Amount (INR)', 'Payment Date',
+          'Transaction ID', 'Action', 'Purchased Date', 'Project', 'Worker Type', 'Rate/Day', 'Days', 'Status', 'Amount (INR)', 'Payment Date',
         ];
         break;
       case 'Equipment':
         headers = [
-          'Transaction ID', 'Purchased Date', 'Project', 'Equipment', 'Rent Rate', 'Duration', 'Status', 'Amount (INR)', 'Payment Date',
+          'Transaction ID', 'Action', 'Purchased Date', 'Project', 'Equipment', 'Rent Rate', 'Duration', 'Status', 'Amount (INR)', 'Payment Date',
         ];
         break;
       default:
         headers = [
-          'Transaction ID', 'Purchased Date', 'Project', 'Type', 'Description', 'Brand', 'Floor', 'Phase', 'Activity', 'Unit', 'Status', 'Amount (INR)', 'Payment Date',
+          'Transaction ID', 'Action', 'Purchased Date', 'Project', 'Type', 'Description', 'Brand', 'Floor', 'Phase', 'Activity', 'Unit', 'Status', 'Amount (INR)', 'Payment Date',
         ];
         break;
     }
@@ -173,17 +176,22 @@ class ReportExportHelper {
         if (!activeColumns.contains('Transaction ID')) {
           rowValues.add(entry.id);
         }
+        if (!activeColumns.contains('Action')) {
+          rowValues.add('');
+        }
         for (final col in activeColumns) {
-          if (col == 'Purchased Date') {
+          if (col == 'Action') {
+            rowValues.add('');
+          } else if (col == 'Purchased Date') {
             rowValues.add(dateStr);
           } else if (col == 'Payment Date') {
             if (includePaymentHistory && maxPayments > 0) {
               for (int i = 0; i < maxPayments; i++) {
                 if (i < entry.paymentHistory.length) {
                   final p = entry.paymentHistory[i];
-                  rowValues.add((p['amount'] ?? 0.0).toString());
                   rowValues.add(p['date']?.toString() ?? '');
-                  rowValues.add(p['mode']?.toString() ?? '');
+                  rowValues.add((p['amount'] ?? 0.0).toString());
+                  rowValues.add(p['method']?.toString() ?? p['mode']?.toString() ?? '');
                 } else {
                   rowValues.addAll(['', '', '']);
                 }
@@ -240,6 +248,8 @@ class ReportExportHelper {
         } else {
           rowValues.add(entry.id);
         }
+        
+        rowValues.add(''); // Action column
         
         List<String> baseVals = [];
         

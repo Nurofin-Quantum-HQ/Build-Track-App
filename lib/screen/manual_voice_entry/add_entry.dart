@@ -71,6 +71,14 @@ class _AddEntryScreenContentState extends State<_AddEntryScreenContent> {
   static const bgColor = AppColors.gradientStart;
   static const textDark = AppColors.textDark;
   static const textGray = AppColors.textLight;
+  final ScrollController _scrollController = ScrollController();
+  
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
   bool _isUploadingCsv = false;
   List<String> _customColumns = [
     'Date',
@@ -1388,6 +1396,7 @@ class _AddEntryScreenContentState extends State<_AddEntryScreenContent> {
             ),
             Expanded(
               child: SingleChildScrollView(
+                controller: _scrollController,
                 physics: const ClampingScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
                 child: Column(

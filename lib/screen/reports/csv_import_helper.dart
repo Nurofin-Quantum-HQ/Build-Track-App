@@ -222,7 +222,6 @@ class CsvImportHelper {
            }
         }
 
-        // ── Date ──
         final dateStr = dateIdx != -1 && dateIdx < row.length
             ? parseString(row[dateIdx])
             : '';
@@ -239,8 +238,11 @@ class CsvImportHelper {
                 final m = int.tryParse(parts[1]);
                 final y = int.tryParse(parts[2]);
                 if (d != null && m != null && y != null) {
-                  if (y > 31) date = DateTime(y, m, d);
-                  else date = DateTime(d, m, y);
+                  if (y > 31) {
+                     date = DateTime(y, m, d);
+                  } else if (d > 31) {
+                     date = DateTime(d, m, y);
+                  }
                 }
               }
             } catch(e) {}
@@ -440,9 +442,19 @@ class CsvImportHelper {
             // Ignore parse errors, leave pDate null
           }
         }
+        // Action column
+        final actionIdx = headerLower.indexWhere((h) => h == 'action' || h == 'row action status' || h == 'changed');
+        String actionVal = '';
+        if (actionIdx != -1 && actionIdx < row.length) {
+            actionVal = parseString(row[actionIdx]).toUpperCase();
+        }
+        
+        final String localDateStr = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+        
         // ── Build payload ──
         final Map<String, dynamic> payload = {};
-        if (tId != null) payload['_id'] = tId;
+        if (tId != null) payload['transactionId'] = tId;
+        if (actionIdx != -1 && actionVal.isNotEmpty) payload['rowStatus'] = actionVal;
         if (payments.isNotEmpty) payload['paymentHistory'] = payments;
         if (entryType == EntryType.labour) {
           final normalizedUnit = (unit == 'day' || unit == 'days')
@@ -460,19 +472,19 @@ class CsvImportHelper {
             'rate': rate,
             'unit': normalizedUnit,
             'project': projectId,
-            'date': date.toIso8601String(),
+            'date': localDateStr,
             'floor': resolvedFloor,
-            'phase': ?phaseName,
-            'phaseId': ?phaseId,
-            'activity': ?activityName,
-            'activityId': ?activityId,
+            'phase': phaseName,
+            'phaseId': phaseId,
+            'activity': activityName,
+            'activityId': activityId,
             'amount': finalAmount,
             'remarks': notes,
             'notes': notes,
             'paymentStatus': resolvedStatus,
             'paidAmount': paidAmt,
             'paymentMode': 'UPI',
-            if (pDate != null) 'paymentDate': pDate.toIso8601String(),
+            if (pDate != null) 'paymentDate': '${pDate.year}-${pDate.month.toString().padLeft(2, '0')}-${pDate.day.toString().padLeft(2, '0')}',
             'worker': name,
           });
           labourCount++;
@@ -495,12 +507,12 @@ class CsvImportHelper {
             'rate': rate,
             'unit': normalizedUnit,
             'project': projectId,
-            'date': date.toIso8601String(),
+            'date': localDateStr,
             'floor': resolvedFloor,
-            'phase': ?phaseName,
-            'phaseId': ?phaseId,
-            'activity': ?activityName,
-            'activityId': ?activityId,
+            'phase': phaseName,
+            'phaseId': phaseId,
+            'activity': activityName,
+            'activityId': activityId,
             'amount': finalAmount,
             'totalAmount': finalAmount,
             'brand': brand,
@@ -508,7 +520,7 @@ class CsvImportHelper {
             'paymentStatus': resolvedStatus,
             'paidAmount': paidAmt,
             'paymentMode': 'UPI',
-            if (pDate != null) 'paymentDate': pDate.toIso8601String(),
+            if (pDate != null) 'paymentDate': '${pDate.year}-${pDate.month.toString().padLeft(2, '0')}-${pDate.day.toString().padLeft(2, '0')}',
           });
           equipmentCount++;
         } else {
@@ -533,27 +545,27 @@ class CsvImportHelper {
             'unit': normalizedUnit,
             'project': projectId,
             'notes': notes,
-            'date': date.toIso8601String(),
+            'date': localDateStr,
             'floor': resolvedFloor,
-            'phase': ?phaseName,
-            'phaseId': ?phaseId,
-            'activity': ?activityName,
-            'activityId': ?activityId,
+            'phase': phaseName,
+            'phaseId': phaseId,
+            'activity': activityName,
+            'activityId': activityId,
             'amount': finalAmount,
             'paymentStatus': resolvedStatus,
             'paidAmount': paidAmt,
             'paymentMode': 'UPI',
-            if (pDate != null) 'paymentDate': pDate.toIso8601String(),
+            if (pDate != null) 'paymentDate': '${pDate.year}-${pDate.month.toString().padLeft(2, '0')}-${pDate.day.toString().padLeft(2, '0')}',
             if (resolvedFloor != null ||
                 phaseName != null ||
                 activityName != null)
               'executionContext': {
                 'project': projectId,
-                'floor': ?resolvedFloor,
-                'phase': ?phaseName,
-                'phaseId': ?phaseId,
-                'activity': ?activityName,
-                'activityId': ?activityId,
+                if (resolvedFloor != null) 'floor': resolvedFloor,
+                if (phaseName != null) 'phase': phaseName,
+                if (phaseId != null) 'phaseId': phaseId,
+                if (activityName != null) 'activity': activityName,
+                if (activityId != null) 'activityId': activityId,
               },
           });
           materialCount++;
@@ -569,59 +581,43 @@ class CsvImportHelper {
         await ApiService.backupCsv();
     } catch(e) {}
     
-    final List<Map<String, dynamic>> createPayloads = [];
-    final List<Map<String, dynamic>> updatePayloads = [];
-    for (var p in allPayloads) {
-       if (p.containsKey('_id') && p['_id'] != null && p['_id'].toString().isNotEmpty) {
-           updatePayloads.add(p);
-       } else {
-           createPayloads.add(p);
-       }
-    }
-    
-    if (createPayloads.isNotEmpty) {
+    if (allPayloads.isNotEmpty) {
         try {
-            final res = await ApiService.addTransactionsBulk(createPayloads);
+            final res = await ApiService.addTransactionsBulk(allPayloads);
             if (res != null) {
-                successCount += createPayloads.length; 
+                successCount += allPayloads.length; 
             } else {
                 throw Exception('Bulk upload failed');
             }
         } catch(e) {
-            for (var p in createPayloads) {
+            // fallback to individual creates/updates
+            for (var p in allPayloads) {
                 try {
-                    final successResult = await ApiService.addTransactionsBulk([p]);
-                    if (successResult != null) {
-                        successCount++;
+                    if (p.containsKey('_id') && p['_id'] != null && p['_id'].toString().isNotEmpty) {
+                        final id = p['_id'].toString();
+                        final payloadWithoutId = Map<String, dynamic>.from(p)..remove('_id');
+                        final success = await ApiService.updateTransaction(id, payloadWithoutId);
+                        if (success) {
+                            successCount++;
+                        } else {
+                            failedCount++;
+                            errors.add('Failed to update transaction: $id');
+                        }
                     } else {
-                        failedCount++;
-                        final title = p['title'] ?? 'Unknown';
-                        errors.add('Failed to create new transaction: $title');
+                        final successResult = await ApiService.addTransactionsBulk([p]);
+                        if (successResult != null) {
+                            successCount++;
+                        } else {
+                            failedCount++;
+                            final title = p['title'] ?? 'Unknown';
+                            errors.add('Failed to create new transaction: $title');
+                        }
                     }
                 } catch(innerE) {
                     failedCount++;
                     final title = p['title'] ?? 'Unknown';
-                    errors.add('Error creating new transaction "$title": $innerE');
+                    errors.add('Error processing transaction "$title": $innerE');
                 }
-            }
-        }
-    }
-    
-    if (updatePayloads.isNotEmpty) {
-        for (var p in updatePayloads) {
-            try {
-                final id = p['_id'].toString();
-                final payloadWithoutId = Map<String, dynamic>.from(p)..remove('_id');
-                final success = await ApiService.updateTransaction(id, payloadWithoutId);
-                if (success) {
-                    successCount++;
-                } else {
-                    failedCount++;
-                    errors.add('Failed to update existing transaction $id');
-                }
-            } catch (e) {
-                failedCount++;
-                errors.add('Error updating existing transaction ${p['_id']}: $e');
             }
         }
     }

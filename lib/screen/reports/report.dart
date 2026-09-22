@@ -64,6 +64,8 @@ class _ReportsView extends StatefulWidget {
 
 class _ReportsViewState extends State<_ReportsView> {
   final GlobalKey _chartsKey = GlobalKey();
+  final ScrollController _scrollController = ScrollController();
+
   bool _linked = false;
   String _selectedProjectId = 'all';
   String? _selectedFloor;
@@ -201,6 +203,7 @@ class _ReportsViewState extends State<_ReportsView> {
 
   @override
   void dispose() {
+    _scrollController.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -1434,6 +1437,7 @@ class _ReportsViewState extends State<_ReportsView> {
                 color: AppColors.primary,
                 onRefresh: provider.refresh,
                 child: SingleChildScrollView(
+                  controller: _scrollController,
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.fromLTRB(16, 14, 16, 100),
                   child: Column(

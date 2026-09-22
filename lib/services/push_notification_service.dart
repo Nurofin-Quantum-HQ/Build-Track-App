@@ -7,6 +7,8 @@ import 'package:http/http.dart' as http;
 import '../services/api_service.dart'; // Adjusting to the actual config
 import '../services/auth_service.dart'; // [BT-SEC-05] token via secure storage
 
+import 'package:flutter/foundation.dart';
+
 class PushNotificationService {
   static final FirebaseMessaging _firebaseMessaging =
       FirebaseMessaging.instance;
@@ -19,6 +21,10 @@ class PushNotificationService {
   static Future<void> init() async {
     // Firebase is initialized once in main.dart.
     // Do not call Firebase.initializeApp() here.
+    if (kIsWeb) {
+      print('Push notifications are not supported on Web. Skipping init.');
+      return;
+    }
 
     if (!_listenersConfigured) {
       const androidInitSettings =
