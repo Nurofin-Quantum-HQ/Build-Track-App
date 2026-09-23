@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:buildtrack_mobile/common/themes/app_colors.dart';
 import 'package:buildtrack_mobile/common/widgets/common_widgets.dart';
 import 'package:buildtrack_mobile/controller/project_provider.dart';
@@ -172,13 +173,16 @@ class _ReportsViewState extends State<_ReportsView> {
     
     try {
       final res = await ApiService.get('/users/profile');
-      if (res != null && res['user'] != null && res['user']['preferences'] != null) {
-        final rc = res['user']['preferences']['reportColumns'];
-        if (rc != null) {
-          if (rc['All'] != null) all = List<String>.from(rc['All']);
-          if (rc['Materials'] != null) materials = List<String>.from(rc['Materials']);
-          if (rc['Labour'] != null) labour = List<String>.from(rc['Labour']);
-          if (rc['Equipment'] != null) equipment = List<String>.from(rc['Equipment']);
+      if (res.statusCode == 200) {
+        final decoded = json.decode(res.body);
+        if (decoded != null && decoded['user'] != null && decoded['user']['preferences'] != null) {
+          final rc = decoded['user']['preferences']['reportColumns'];
+          if (rc != null) {
+            if (rc['All'] != null) all = List<String>.from(rc['All']);
+            if (rc['Materials'] != null) materials = List<String>.from(rc['Materials']);
+            if (rc['Labour'] != null) labour = List<String>.from(rc['Labour']);
+            if (rc['Equipment'] != null) equipment = List<String>.from(rc['Equipment']);
+          }
         }
       }
     } catch(e) {}
