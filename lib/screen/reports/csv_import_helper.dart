@@ -585,7 +585,22 @@ class CsvImportHelper {
         try {
             final res = await ApiService.addTransactionsBulk(allPayloads);
             if (res != null) {
-                successCount += allPayloads.length; 
+                final results = res['results'] as Map<String, dynamic>?;
+                if (results != null) {
+                    successCount += ((results['created'] ?? 0) as num).toInt();
+                    successCount += ((results['updated'] ?? 0) as num).toInt();
+                    failedCount += ((results['failedCount'] ?? 0) as num).toInt();
+                    final skips = ((results['unchangedSkipped'] ?? 0) as num).toInt();
+                    
+                    final failures = results['failures'] as List<dynamic>? ?? [];
+                    for (var f in failures) {
+                        final title = f['title'] ?? 'Unknown';
+                        final reason = f['reason'] ?? f['error'] ?? 'Unknown error';
+                        errors.add('Row error ($title): $reason');
+                    }
+                } else {
+                    successCount += allPayloads.length;
+                }
             } else {
                 throw Exception('Bulk upload failed');
             }
