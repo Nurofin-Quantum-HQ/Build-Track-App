@@ -537,6 +537,9 @@ class _ReportsViewState extends State<_ReportsView> {
   }
 
   String _formatDateLong(DateTime dt) {
+    final utcDt = dt.toUtc();
+    final isMidnightUTC = utcDt.hour == 0 && utcDt.minute == 0 && utcDt.second == 0;
+
     final months = [
       'Jan',
       'Feb',
@@ -551,6 +554,14 @@ class _ReportsViewState extends State<_ReportsView> {
       'Nov',
       'Dec',
     ];
+
+    if (isMidnightUTC) {
+      final day = utcDt.day.toString().padLeft(2, '0');
+      final month = months[utcDt.month - 1];
+      final year = utcDt.year;
+      return '$day $month $year';
+    }
+
     final day = dt.day.toString().padLeft(2, '0');
     final month = months[dt.month - 1];
     final year = dt.year;
@@ -3739,6 +3750,9 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
     String projectName,
   ) {
     String formatDateLong(DateTime dt) {
+      final utcDt = dt.toUtc();
+      final isMidnightUTC = utcDt.hour == 0 && utcDt.minute == 0 && utcDt.second == 0;
+      
       final months = [
         'Jan',
         'Feb',
@@ -3753,6 +3767,14 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
         'Nov',
         'Dec',
       ];
+
+      if (isMidnightUTC) {
+        final day = utcDt.day.toString().padLeft(2, '0');
+        final month = months[utcDt.month - 1];
+        final year = utcDt.year;
+        return '$day $month $year';
+      }
+
       final day = dt.day.toString().padLeft(2, '0');
       final month = months[dt.month - 1];
       final year = dt.year;
