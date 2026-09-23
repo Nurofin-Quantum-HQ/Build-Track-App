@@ -64,9 +64,9 @@ class ReportExportHelper {
   }) {
     int maxPayments = 0;
     if (entries != null) {
-      for (var entry in entries) {
-        if (entry.paymentHistory.length > maxPayments) {
-          maxPayments = entry.paymentHistory.length;
+      for (var e in entries) {
+        if (e.paymentHistory.length > maxPayments) {
+          maxPayments = e.paymentHistory.length;
         }
       }
     }
@@ -75,7 +75,7 @@ class ReportExportHelper {
       if (maxPayments == 0) return ['Payment Date', 'Payment Mode'];
       List<String> cols = [];
       for (int i = 1; i <= maxPayments; i++) {
-        cols.addAll(['Payment $i Amount', 'Payment $i Date', 'Payment $i Mode']);
+        cols.addAll(['Payment $i Date', 'Payment $i Amount', 'Payment $i Mode']);
       }
       return cols;
     }
