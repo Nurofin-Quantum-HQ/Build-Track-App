@@ -177,11 +177,11 @@ class ReportExportHelper {
           rowValues.add(entry.id);
         }
         if (!activeColumns.contains('Action')) {
-          rowValues.add('');
+          rowValues.add('unchanged');
         }
         for (final col in activeColumns) {
           if (col == 'Action') {
-            rowValues.add('');
+            rowValues.add('unchanged');
           } else if (col == 'Purchased Date') {
             rowValues.add(dateStr);
           } else if (col == 'Payment Date') {
@@ -249,7 +249,7 @@ class ReportExportHelper {
           rowValues.add(entry.id);
         }
         
-        rowValues.add(''); // Action column
+        rowValues.add('unchanged'); // Action column
         
         List<String> baseVals = [];
         
