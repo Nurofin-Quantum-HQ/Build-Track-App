@@ -165,10 +165,23 @@ class _ReportsViewState extends State<_ReportsView> {
   Future<void> _loadActiveColumns() async {
     final prefs = await SharedPreferences.getInstance();
     final userId = UserSession.userId;
-    final all = prefs.getStringList('activeColumnsAll_$userId');
-    final materials = prefs.getStringList('activeColumnsMaterials_$userId');
-    final labour = prefs.getStringList('activeColumnsLabour_$userId');
-    final equipment = prefs.getStringList('activeColumnsEquipment_$userId');
+    List<String>? all = prefs.getStringList('activeColumnsAll_$userId');
+    List<String>? materials = prefs.getStringList('activeColumnsMaterials_$userId');
+    List<String>? labour = prefs.getStringList('activeColumnsLabour_$userId');
+    List<String>? equipment = prefs.getStringList('activeColumnsEquipment_$userId');
+    
+    try {
+      final res = await ApiService.get('/users/profile');
+      if (res != null && res['user'] != null && res['user']['preferences'] != null) {
+        final rc = res['user']['preferences']['reportColumns'];
+        if (rc != null) {
+          if (rc['All'] != null) all = List<String>.from(rc['All']);
+          if (rc['Materials'] != null) materials = List<String>.from(rc['Materials']);
+          if (rc['Labour'] != null) labour = List<String>.from(rc['Labour']);
+          if (rc['Equipment'] != null) equipment = List<String>.from(rc['Equipment']);
+        }
+      }
+    } catch(e) {}
     
     if (mounted) {
       setState(() {
@@ -295,9 +308,12 @@ class _ReportsViewState extends State<_ReportsView> {
 
   Future<void> _syncPreferences(String key, List<String> cols) async {
     try {
+      final tabKey = key.replaceAll('activeColumns', '');
       await ApiService.put('/users/profile', {
         'preferences': {
-          key: cols,
+          'reportColumns': {
+            tabKey: cols,
+          }
         }
       });
     } catch(e) {}

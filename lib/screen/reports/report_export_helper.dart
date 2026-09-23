@@ -180,7 +180,9 @@ class ReportExportHelper {
           rowValues.add('unchanged');
         }
         for (final col in activeColumns) {
-          if (col == 'Action') {
+          if (col == 'Created At') {
+            rowValues.add(entry.createdAt != null ? _formatDateTime(entry.createdAt!) : '');
+          } else if (col == 'Action') {
             rowValues.add('unchanged');
           } else if (col == 'Purchased Date') {
             rowValues.add(dateStr);
