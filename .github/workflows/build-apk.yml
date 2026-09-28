@@ -1,4 +1,4 @@
-name: Build Android APK
+﻿name: Build Android APK
 on:
   push:
     branches:
@@ -7,6 +7,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
       
@@ -19,7 +21,6 @@ jobs:
         with:
           channel: 'stable'
           
-      # This line violently spams 'y' to accept all Android NDK licenses
       - run: yes | flutter doctor --android-licenses
       
       - run: flutter pub get
@@ -29,3 +30,11 @@ jobs:
         with:
           name: release-apk
           path: build/app/outputs/flutter-apk/app-release.apk
+
+      - name: Update Latest Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: latest
+          name: Latest Release
+          files: build/app/outputs/flutter-apk/app-release.apk
+          prerelease: false
