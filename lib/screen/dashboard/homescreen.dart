@@ -2953,6 +2953,23 @@ class _AdminDashboardState extends State<_AdminDashboard> {
             ),
           ],
         ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _costCard(
+                'UPCOMING PAY / PLANNED',
+                project != null ? formatCurrency(project.remainingBudget < 0 ? 0 : project.remainingBudget) : '₹—',
+                'Planned to spend',
+                false,
+                isInvoice: true,
+                indicatorIcon: Icons.schedule,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(child: const SizedBox.shrink()),
+          ],
+        ),
         const SizedBox(height: 14),
         if (project != null) ...[
           _buildRevenueHistory(context),
