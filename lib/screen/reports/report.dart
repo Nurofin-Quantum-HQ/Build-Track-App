@@ -1101,7 +1101,7 @@ class _ReportsViewState extends State<_ReportsView> {
                 ),
                 child: IconButton(
                   onPressed: _isImportingCsv ? null : _handleRevertCsv,
-                  icon: const Icon(Icons.undo, color: AppColors.primary),
+                  icon: Icon(Icons.undo, color: AppColors.primary),
                   tooltip: 'Revert Last CSV Import',
                 ),
               ),
@@ -1443,7 +1443,7 @@ class _ReportsViewState extends State<_ReportsView> {
                     tooltipBorderRadius: BorderRadius.circular(16),
                     tooltipPadding: const EdgeInsets.all(16),
                     child: IconButton(
-                      icon: const Icon(Icons.help_outline, color: AppColors.primary),
+                      icon: Icon(Icons.help_outline, color: AppColors.primary),
                       onPressed: () {
                         ShowCaseWidget.of(context).startShowCase([
                           ShowcaseKeys.reportAskAI,
@@ -2786,7 +2786,7 @@ class _ReportsViewState extends State<_ReportsView> {
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: AppColors.primary),
+                borderSide: BorderSide(color: AppColors.primary),
               ),
             ),
           ),
@@ -2902,7 +2902,7 @@ class _ReportsViewState extends State<_ReportsView> {
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppColors.primary),
+                  borderSide: BorderSide(color: AppColors.primary),
                 ),
               ),
             ),
@@ -3981,7 +3981,7 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
             data: Theme.of(context).copyWith(cardColor: Colors.white),
             child: PopupMenuButton<String>(
               tooltip: 'Export Options',
-              icon: const Icon(Icons.download, color: AppColors.primary),
+              icon: Icon(Icons.download, color: AppColors.primary),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),

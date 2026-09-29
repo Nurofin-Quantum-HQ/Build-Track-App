@@ -18,7 +18,7 @@ class EditProjectScreen extends StatefulWidget {
   State<EditProjectScreen> createState() => _EditProjectScreenState();
 }
 class _EditProjectScreenState extends State<EditProjectScreen> {
-  static const primaryBlue = AppColors.primary;
+  static primaryBlue = AppColors.primary;
   static const bgColor = AppColors.gradientStart;
   static const textDark = AppColors.textDark;
   static const textGray = AppColors.textLight;

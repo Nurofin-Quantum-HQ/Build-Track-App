@@ -17,7 +17,7 @@ class EntryDetailScreen extends StatefulWidget {
   State<EntryDetailScreen> createState() => _EntryDetailScreenState();
 }
 class _EntryDetailScreenState extends State<EntryDetailScreen> {
-  static const primaryBlue = AppColors.primary;
+  static primaryBlue = AppColors.primary;
   static const bgColor = AppColors.gradientStart;
   static const textDark = AppColors.textDark;
   static const textGray = AppColors.textLight;

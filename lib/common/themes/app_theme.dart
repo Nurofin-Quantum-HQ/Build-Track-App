@@ -12,9 +12,9 @@ class AppTheme {
   static const double radiusMd = 12;
   static const double radiusLg = 16;
   static const double radiusXl = 24;
-  static const Color primary = AppColors.primaryBlue;
-  static const Color primaryLight = AppColors.primaryLightBlue;
-  static const Color secondary = AppColors.primaryPurple;
+  static Color primary = AppColors.primaryBlue;
+  static Color primaryLight = AppColors.primaryLightBlue;
+  static Color secondary = AppColors.primaryPurple;
   static const Color surface = AppColors.cardBg;
   static const Color background = AppColors.bgBase1;
   static const Color success = AppColors.success;
@@ -58,7 +58,7 @@ class AppTheme {
   static final ButtonStyle outlineButton = OutlinedButton.styleFrom(
     foregroundColor: AppColors.primaryBlue,
     minimumSize: const Size.fromHeight(48),
-    side: const BorderSide(color: AppColors.primaryBlue, width: 1.5),
+    side: BorderSide(color: AppColors.primaryBlue, width: 1.5),
     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
     textStyle: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w600),
   );
@@ -151,7 +151,7 @@ class AppTheme {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(radiusMd),
-        borderSide: const BorderSide(color: AppColors.primaryBlue, width: 1.5),
+        borderSide: BorderSide(color: AppColors.primaryBlue, width: 1.5),
       ),
       hintStyle: GoogleFonts.inter(
         color: AppColors.textSecondary,

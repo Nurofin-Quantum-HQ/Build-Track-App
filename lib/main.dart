@@ -41,6 +41,7 @@ import 'package:buildtrack_mobile/services/api_service.dart';
 import 'package:buildtrack_mobile/screen/esign/signature_page.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:buildtrack_mobile/controller/theme_provider.dart';
 import 'package:buildtrack_mobile/controller/user_session.dart';
 import 'package:buildtrack_mobile/screen/profile/payment_webview_screen.dart';
 import 'package:buildtrack_mobile/screen/approvals/approvals_screen.dart';
@@ -114,6 +115,7 @@ void main() {
             ChangeNotifierProvider.value(value: projectProvider),
             ChangeNotifierProvider(create: (_) => SubscriptionProvider()),
             ChangeNotifierProvider(create: (_) => InventoryProvider()),
+            ChangeNotifierProvider(create: (_) => ThemeProvider()),
           ],
           child: MyApp(isLoggedIn: isLoggedIn),
         ),

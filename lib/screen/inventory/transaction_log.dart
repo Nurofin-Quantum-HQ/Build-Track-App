@@ -16,8 +16,8 @@ class TransactionLogsScreen extends StatefulWidget {
   State<TransactionLogsScreen> createState() => _TransactionLogsScreenState();
 }
 class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
-  static const primaryBlue = AppColors.primary;
-  static const purple = AppColors.primary;
+  static primaryBlue = AppColors.primary;
+  static purple = AppColors.primary;
   static const bgColor = AppColors.gradientStart;
   static const textDark = AppColors.textDark;
   static const textGray = AppColors.textLight;

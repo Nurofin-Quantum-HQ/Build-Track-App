@@ -3762,12 +3762,12 @@ class _DocumentsCard extends StatelessWidget {
                   padding: const EdgeInsets.only(bottom: 8.0),
                   child: Row(
                     children: [
-                      const Icon(Icons.insert_drive_file, color: AppColors.primary, size: 20),
+                      Icon(Icons.insert_drive_file, color: AppColors.primary, size: 20),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           doc.split("/").last,
-                          style: const TextStyle(fontSize: 14, color: AppColors.primary, decoration: TextDecoration.underline),
+                          style: TextStyle(fontSize: 14, color: AppColors.primary, decoration: TextDecoration.underline),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),

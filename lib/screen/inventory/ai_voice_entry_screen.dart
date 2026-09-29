@@ -2428,7 +2428,7 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
               minHeight: 4,
               backgroundColor: const Color(0xFFF0EDFF),
               valueColor: AlwaysStoppedAnimation<Color>(
-                isComplete ? const Color(0xFF22C55E) : AppColors.primary,
+                isComplete ? Color(0xFF22C55E) : AppColors.primary,
               ),
             ),
           ),
@@ -3745,7 +3745,7 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
             shape: BoxShape.circle,
             color: !isEnabled
                 ? const Color(0xFFF1F5F9)
-                : (isListening ? const Color(0xFFEF4444) : AppColors.primary),
+                : (isListening ? Color(0xFFEF4444) : AppColors.primary),
             border: Border.all(
               color: !isEnabled
                   ? const Color(0xFFCBD5E1)
@@ -3781,7 +3781,7 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(10),
               side: BorderSide(
-                color: isEnabled ? AppColors.primary : const Color(0xFFE2E8F0),
+                color: isEnabled ? AppColors.primary : Color(0xFFE2E8F0),
                 width: 1.5,
               ),
             ),
@@ -4032,7 +4032,7 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
           onPressed: () => Navigator.pushNamed(context, '/logs'),
           style: OutlinedButton.styleFrom(
             foregroundColor: AppColors.primary,
-            side: const BorderSide(color: AppColors.primary, width: 1.5),
+            side: BorderSide(color: AppColors.primary, width: 1.5),
             minimumSize: const Size(double.infinity, 48),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),

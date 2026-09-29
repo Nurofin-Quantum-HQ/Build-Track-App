@@ -18,7 +18,7 @@ class _ReceiptViewerScreenState extends State<ReceiptViewerScreen> {
   final TransformationController _transformationController =
       TransformationController();
   TapDownDetails? _doubleTapDetails;
-  static const primaryBlue = AppColors.primary;
+  static primaryBlue = AppColors.primary;
   static const bgColor = AppColors.gradientStart;
   static const textDark = AppColors.textDark;
   static const textGray = AppColors.textLight;

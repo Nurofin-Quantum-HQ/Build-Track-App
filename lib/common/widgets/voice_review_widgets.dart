@@ -191,7 +191,7 @@ class VoiceStatusHeader extends StatelessWidget {
           const Color(0xFFDCFCE7),
         );
       case VoiceEngineState.listening:
-        return ('Listening…', AppColors.primary, const Color(0xFFEEF0FF));
+        return ('Listening…', AppColors.primary, Color(0xFFEEF0FF));
       case VoiceEngineState.processing:
         return (
           'Processing voice entry…',

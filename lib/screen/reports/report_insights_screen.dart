@@ -335,7 +335,7 @@ class _DateRangeRow extends StatelessWidget {
           initialDateRange: DateTimeRange(start: fromDate, end: toDate),
           builder: (ctx, child) => Theme(
             data: Theme.of(ctx).copyWith(
-              colorScheme: const ColorScheme.light(primary: AppColors.primary),
+              colorScheme: ColorScheme.light(primary: AppColors.primary),
             ),
             child: child!,
           ),
@@ -716,7 +716,7 @@ class _ExportSheetState extends State<_ExportSheet> {
           color: isPrimary ? AppColors.primary : Colors.white,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: isPrimary ? AppColors.primary : const Color(0xFFDDE0F0),
+            color: isPrimary ? AppColors.primary : Color(0xFFDDE0F0),
           ),
           boxShadow: isPrimary
               ? [

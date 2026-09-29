@@ -24,7 +24,7 @@ class AppTopBar extends StatelessWidget {
     this.rightWidget,
     this.isSubScreen = false,
   });
-  static const _primaryBlue = AppColors.primary;
+  static _primaryBlue = AppColors.primary;
   static const _textDark = AppColors.textDark;
   @override
   Widget build(BuildContext context) {
@@ -70,7 +70,7 @@ class AppTopBar extends StatelessWidget {
 }
 class AppBottomNav extends StatelessWidget {
   const AppBottomNav({super.key});
-  static const _primaryBlue = AppColors.primary;
+  static _primaryBlue = AppColors.primary;
   static const _textGray = AppColors.textLight;
   @override
   Widget build(BuildContext context) {

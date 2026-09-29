@@ -215,7 +215,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                 left: 20,
                 right: 20,
               ),
-              decoration: const BoxDecoration(color: AppColors.primary),
+              decoration: BoxDecoration(color: AppColors.primary),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -302,7 +302,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.language, color: AppColors.primary),
+              leading: Icon(Icons.language, color: AppColors.primary),
               title: const Text('Web Portal', style: TextStyle(color: AppColors.textDark)),
               onTap: () async {
                 Navigator.pop(context);
@@ -658,7 +658,7 @@ class _AdminDashboard extends StatefulWidget {
   State<_AdminDashboard> createState() => _AdminDashboardState();
 }
 class _AdminDashboardState extends State<_AdminDashboard> {
-  static const primaryBlue = AppColors.primary;
+  static primaryBlue = AppColors.primary;
   static const textDark = AppColors.textDark;
   static const textGray = AppColors.textLight;
   List<dynamic> _revenueEntries = [];

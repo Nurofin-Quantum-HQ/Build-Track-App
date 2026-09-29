@@ -337,7 +337,7 @@ class AppLoadingOverlay extends StatelessWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const CircularProgressIndicator(color: AppTheme.primary),
+                    CircularProgressIndicator(color: AppTheme.primary),
                     if (message != null) ...[
                       const SizedBox(height: AppTheme.spacingMd),
                       Text(message!, style: AppTheme.body),

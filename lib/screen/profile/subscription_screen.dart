@@ -608,7 +608,7 @@ class _PlanCard extends StatelessWidget {
             color: Colors.white,
             borderRadius: BorderRadius.circular(24),
             border: Border.all(
-              color: isPro ? AppColors.primary : const Color(0xFFEAECF0),
+              color: isPro ? AppColors.primary : Color(0xFFEAECF0),
               width: isPro ? 2 : 1,
             ),
             boxShadow: isPro

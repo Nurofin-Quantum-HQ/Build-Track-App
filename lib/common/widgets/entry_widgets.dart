@@ -100,7 +100,7 @@ String normalizeUnit(String raw) {
   };
   return aliases[s] ?? s;
 }
-const _kBlue = AppColors.primary;
+_kBlue = AppColors.primary;
 const _kGray = AppColors.textLight;
 const _kDark = AppColors.textDark;
 const _kRed = AppColors.error;

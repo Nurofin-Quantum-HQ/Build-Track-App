@@ -170,7 +170,7 @@ class _ProjectsScreenContent extends StatefulWidget {
 }
 
 class _ProjectsScreenContentState extends State<_ProjectsScreenContent> {
-  static const primaryBlue = AppColors.primary;
+  static primaryBlue = AppColors.primary;
   static const bgColor = AppColors.gradientStart;
   static const textDark = AppColors.textDark;
   static const textGray = AppColors.textLight;

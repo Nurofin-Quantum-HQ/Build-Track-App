@@ -277,7 +277,7 @@ class _PromptCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(Icons.insights, color: AppColors.primary, size: 20),
+            Icon(Icons.insights, color: AppColors.primary, size: 20),
             const SizedBox(height: 12),
             Text(
               prompt,
@@ -316,7 +316,7 @@ class _LoadingState extends StatelessWidget {
           Center(
             child: Column(
               children: [
-                const CircularProgressIndicator(color: AppColors.primary),
+                CircularProgressIndicator(color: AppColors.primary),
                 const SizedBox(height: 16),
                 Text(
                   'Generating analytics...',
@@ -869,7 +869,7 @@ class _ResultsStateState extends State<_ResultsState> {
                   label: Text(result.actions[i]),
                   onPressed: () => widget.onActionTap(result.actions[i]),
                   backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-                  labelStyle: const TextStyle(color: AppColors.primary),
+                  labelStyle: TextStyle(color: AppColors.primary),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(20),
                     side: const BorderSide(color: Colors.transparent),

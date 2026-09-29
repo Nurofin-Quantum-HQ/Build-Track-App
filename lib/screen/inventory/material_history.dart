@@ -7,8 +7,8 @@ class CementHistoryScreen extends StatefulWidget {
   State<CementHistoryScreen> createState() => _CementHistoryScreenState();
 }
 class _CementHistoryScreenState extends State<CementHistoryScreen> {
-  static const primaryBlue = AppColors.primary;
-  static const purple = AppColors.primary;
+  static primaryBlue = AppColors.primary;
+  static purple = AppColors.primary;
   static const bgColor = AppColors.gradientStart;
   static const textDark = AppColors.textDark;
   static const textGray = AppColors.textLight;

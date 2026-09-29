@@ -191,7 +191,7 @@ class _CreateWorkspaceScreenState extends State<CreateWorkspaceScreen> {
                 child: DropdownButton<String>(
                   isExpanded: true,
                   value: _selectedFontStyle,
-                  icon: const Icon(Icons.keyboard_arrow_down, color: AppColors.primary),
+                  icon: Icon(Icons.keyboard_arrow_down, color: AppColors.primary),
                   items: _fontOptions.map((font) {
                     return DropdownMenuItem<String>(
                       value: font,
@@ -305,7 +305,7 @@ class _CreateWorkspaceScreenState extends State<CreateWorkspaceScreen> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Icon(Icons.add_photo_alternate_outlined, color: AppColors.primary, size: 20),
+                          Icon(Icons.add_photo_alternate_outlined, color: AppColors.primary, size: 20),
                           const SizedBox(width: 10),
                           Text(
                             'Upload Company Logo (Optional)',

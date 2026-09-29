@@ -17,7 +17,7 @@ class AssignTaskScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ShowCaseWidget(
-      globalTooltipActions: const [TooltipActionButton(type: TooltipDefaultActionType.skip, backgroundColor: Colors.transparent, textStyle: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold)), TooltipActionButton(type: TooltipDefaultActionType.next, backgroundColor: AppColors.primary, textStyle: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))], 
+      globalTooltipActions: [TooltipActionButton(type: TooltipDefaultActionType.skip, backgroundColor: Colors.transparent, textStyle: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold)), TooltipActionButton(type: TooltipDefaultActionType.next, backgroundColor: AppColors.primary, textStyle: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))], 
       enableAutoScroll: true,
       onFinish: () => UserSession.markModuleVisited('AssignTaskScreen'),
       builder: (context) => _AssignTaskScreenContent(initialProject: initialProject),
@@ -194,7 +194,7 @@ class _AssignTaskScreenContentState extends State<_AssignTaskScreenContent> {
                 key: _helpKey,
                 description: 'Get help and understand how this screen works.',
                 child: IconButton(
-                  icon: const Icon(Icons.help_outline, color: AppColors.primary),
+                  icon: Icon(Icons.help_outline, color: AppColors.primary),
                   onPressed: () {
                     ShowCaseWidget.of(context).startShowCase([_helpKey]);
                   },

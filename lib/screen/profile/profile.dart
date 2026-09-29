@@ -14,6 +14,7 @@ import 'package:buildtrack_mobile/controller/subscription_provider.dart';
 import 'package:buildtrack_mobile/services/api_service.dart';
 import 'package:buildtrack_mobile/services/auth_service.dart';
 import 'package:provider/provider.dart';
+import 'package:buildtrack_mobile/controller/theme_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:buildtrack_mobile/common/utils/image_pick_helper.dart';
 import 'package:showcaseview/showcaseview.dart';
@@ -260,7 +261,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return ShowCaseWidget(
-      globalTooltipActions: const [TooltipActionButton(type: TooltipDefaultActionType.skip, backgroundColor: Colors.transparent, textStyle: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold)), TooltipActionButton(type: TooltipDefaultActionType.next, backgroundColor: AppColors.primary, textStyle: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))], enableAutoScroll: true, 
+      globalTooltipActions: [TooltipActionButton(type: TooltipDefaultActionType.skip, backgroundColor: Colors.transparent, textStyle: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold)), TooltipActionButton(type: TooltipDefaultActionType.next, backgroundColor: AppColors.primary, textStyle: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))], enableAutoScroll: true, 
       builder: (context) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           final _projProvider = Provider.of<ProjectProvider>(context, listen: false);
@@ -270,7 +271,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ShowcaseKeys.profileFields,
               _settingsCardKey,
               ShowcaseKeys.profileSubscription,
-              if (RoleManager.canViewTeamAccess) _teamAccessKey,
+              const _ThemePicker(),
+                          const SizedBox(height: 16),
+                          if (RoleManager.canViewTeamAccess) _teamAccessKey,
               _logoutKey,
             ];
             ShowCaseWidget.of(context).startShowCase(keys);
@@ -286,7 +289,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ShowcaseKeys.profileFields,
                     _settingsCardKey,
                     ShowcaseKeys.profileSubscription,
-                    if (RoleManager.canViewTeamAccess) _teamAccessKey,
+                    const _ThemePicker(),
+                          const SizedBox(height: 16),
+                          if (RoleManager.canViewTeamAccess) _teamAccessKey,
                     _logoutKey,
                   ];
                   ShowCaseWidget.of(context).startShowCase(keys);
@@ -333,7 +338,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         child: _buildSettingsCard(),
                       ),
                       const SizedBox(height: AppTheme.spacingLg),
-                      if (RoleManager.canViewTeamAccess) ...[
+                      const _ThemePicker(),
+                          const SizedBox(height: 16),
+                          if (RoleManager.canViewTeamAccess) ...[
                         Showcase(
                           key: _teamAccessKey,
                           description: 'Assign roles and manage team access from here.',
@@ -437,7 +444,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ],
               ),
-              child: const Icon(Icons.edit, color: AppColors.primary, size: 14),
+              child: Icon(Icons.edit, color: AppColors.primary, size: 14),
             ),
           ),
         ),
@@ -751,8 +758,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
   Widget _teamIllustration() {
-    const purple = AppColors.primaryPurple;
-    const purpleLight = AppColors.primaryLightBlue;
+    purple = AppColors.primaryPurple;
+    purpleLight = AppColors.primaryLightBlue;
     return SizedBox(
       width: 68,
       height: 68,
@@ -901,3 +908,57 @@ class _ErrorBanner extends StatelessWidget {
   }
 }
 
+
+
+class _ThemePicker extends StatelessWidget {
+  const _ThemePicker();
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProvider, _) {
+        return Container(
+          margin: const EdgeInsets.only(bottom: 24),
+          decoration: AppTheme.cardDecoration,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Padding(
+                padding: EdgeInsets.all(16.0),
+                child: Text('App Theme', style: AppTheme.cardTitle),
+              ),
+              const Divider(height: 1),
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: themeProvider.availableThemes.map((theme) {
+                    final isSelected = themeProvider.currentColor.value == theme['color'].value;
+                    return GestureDetector(
+                      onTap: () => themeProvider.setTheme(theme['color']),
+                      child: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: theme['color'],
+                          shape: BoxShape.circle,
+                          border: isSelected ? Border.all(color: AppColors.textDark, width: 3) : null,
+                          boxShadow: [
+                            if (isSelected)
+                              BoxShadow(color: theme['color'].withValues(alpha: 0.4), blurRadius: 8, spreadRadius: 2)
+                          ],
+                        ),
+                        child: isSelected ? const Icon(Icons.check, color: Colors.white, size: 20) : null,
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}

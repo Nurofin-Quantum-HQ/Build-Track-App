@@ -17,7 +17,7 @@ class UpdateProgressScreen extends StatefulWidget {
   State<UpdateProgressScreen> createState() => _UpdateProgressScreenState();
 }
 class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
-  static const primaryBlue = AppColors.primary;
+  static primaryBlue = AppColors.primary;
   static const bgColor = AppColors.gradientStart;
   static const textDark = AppColors.textDark;
   static const textGray = AppColors.textLight;

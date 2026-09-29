@@ -80,7 +80,7 @@ class VoiceConfirmationSheet extends StatefulWidget {
 }
 class _VoiceConfirmationSheetState extends State<VoiceConfirmationSheet>
     with TickerProviderStateMixin {
-  static const _blue = AppColors.primaryBlue;
+  static _blue = AppColors.primaryBlue;
   static const _bgColor = Color(0xFFF4F6FC);
   static const _cardBg = Colors.white;
   static const _textDark = Color(0xFF0F1724);
@@ -2169,7 +2169,7 @@ class _AnswerChip extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 4),
-          const Icon(Icons.check, size: 11, color: AppColors.primaryBlue),
+          Icon(Icons.check, size: 11, color: AppColors.primaryBlue),
         ],
       ),
     );

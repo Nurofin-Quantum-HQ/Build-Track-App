@@ -64,7 +64,7 @@ class _InventoryScreenContent extends StatefulWidget {
 
 class _InventoryScreenContentState extends State<_InventoryScreenContent> {
   final GlobalKey _helpKey = GlobalKey();
-  static const Color _blue = AppColors.primary;
+  static Color _blue = AppColors.primary;
   static const Color _bg = AppColors.gradientStart;
   static const Color _dark = AppColors.textDark;
   static const Color _gray = AppColors.textLight;
@@ -507,7 +507,7 @@ class _InventoryScreenContentState extends State<_InventoryScreenContent> {
                     tooltipBorderRadius: BorderRadius.circular(16),
                     tooltipPadding: const EdgeInsets.all(16),
                     child: IconButton(
-                      icon: const Icon(Icons.help_outline, color: AppColors.primary),
+                      icon: Icon(Icons.help_outline, color: AppColors.primary),
                       onPressed: () {
                         ShowCaseWidget.of(context).startShowCase([
                           ShowcaseKeys.inventoryProjectContext,
@@ -1692,7 +1692,7 @@ class _MetricCell extends StatelessWidget {
           style: TextStyle(
             fontSize: highlight ? 14 : 12.5,
             fontWeight: highlight ? FontWeight.w900 : FontWeight.w700,
-            color: highlight ? AppColors.primaryBlue : const Color(0xFF1A1A2E),
+            color: highlight ? AppColors.primaryBlue : Color(0xFF1A1A2E),
             letterSpacing: -0.2,
           ),
           textAlign: TextAlign.center,

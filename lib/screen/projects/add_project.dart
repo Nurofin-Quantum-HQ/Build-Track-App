@@ -18,7 +18,7 @@ class AddProjectScreen extends StatefulWidget {
   State<AddProjectScreen> createState() => _AddProjectScreenState();
 }
 class _AddProjectScreenState extends State<AddProjectScreen> {
-  static const primaryBlue = AppColors.primary;
+  static primaryBlue = AppColors.primary;
   static const bgColor = AppColors.gradientStart;
   static const textDark = AppColors.textDark;
   static const textGray = AppColors.textLight;

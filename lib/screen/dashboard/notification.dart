@@ -182,7 +182,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     children: [
                       if (unreadCount > 0)
                         IconButton(
-                          icon: const Icon(Icons.done_all, color: AppColors.primary),
+                          icon: Icon(Icons.done_all, color: AppColors.primary),
                           onPressed: _markAllRead,
                           tooltip: 'Mark all as read',
                         ),

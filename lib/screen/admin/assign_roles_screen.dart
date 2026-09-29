@@ -420,7 +420,7 @@ class _AssignRolesScreenState extends State<AssignRolesScreen> {
     final subProvider = context.watch<SubscriptionProvider>();
     final plan = subProvider.currentPlan;
     return ShowCaseWidget(
-      globalTooltipActions: const [TooltipActionButton(type: TooltipDefaultActionType.skip, backgroundColor: Colors.transparent, textStyle: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold)), TooltipActionButton(type: TooltipDefaultActionType.next, backgroundColor: AppColors.primary, textStyle: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))], 
+      globalTooltipActions: [TooltipActionButton(type: TooltipDefaultActionType.skip, backgroundColor: Colors.transparent, textStyle: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold)), TooltipActionButton(type: TooltipDefaultActionType.next, backgroundColor: AppColors.primary, textStyle: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))], 
       enableAutoScroll: true,
       builder: (context) => Scaffold(
           backgroundColor: AppColors.gradientStart,
@@ -520,7 +520,7 @@ class _AssignRolesScreenState extends State<AssignRolesScreen> {
       ),
       child: Row(
         children: [
-          const Icon(Icons.info_outline, color: AppColors.primary, size: 20),
+          Icon(Icons.info_outline, color: AppColors.primary, size: 20),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
@@ -1387,7 +1387,7 @@ class _AssignRolesScreenState extends State<AssignRolesScreen> {
             const SizedBox(width: 8),
             IconButton(
               onPressed: _addCustomOverseesRole,
-              icon: const Icon(Icons.add_circle, color: AppColors.primary),
+              icon: Icon(Icons.add_circle, color: AppColors.primary),
               tooltip: 'Add role',
             ),
           ],
