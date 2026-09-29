@@ -13,6 +13,7 @@ import 'package:buildtrack_mobile/controller/subscription_provider.dart';
 import 'package:buildtrack_mobile/common/utils/currency_formatter.dart';
 import 'package:buildtrack_mobile/common/utils/image_pick_helper.dart';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:buildtrack_mobile/services/api_service.dart';
@@ -297,6 +298,17 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                 final keysToShow = _getShowcaseKeys(isReplay: true);
                 if (keysToShow.isNotEmpty) {
                   ShowcaseView.get().startShowCase(keysToShow);
+                }
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.language, color: AppColors.primary),
+              title: const Text('Web Portal', style: TextStyle(color: AppColors.textDark)),
+              onTap: () async {
+                Navigator.pop(context);
+                final url = Uri.parse('https://buildtrack.nurofin.com');
+                if (await canLaunchUrl(url)) {
+                  await launchUrl(url, mode: LaunchMode.externalApplication);
                 }
               },
             ),
