@@ -1,4 +1,7 @@
 ﻿import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:buildtrack_mobile/config/api_config.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:buildtrack_mobile/common/themes/app_colors.dart';
 
@@ -8,10 +11,11 @@ class ThemeProvider extends ChangeNotifier {
   // Available theme colors mirroring the web portal
   final List<Map<String, dynamic>> availableThemes = [
     {'name': 'Orange', 'color': const Color(0xFFF97316)},
-    {'name': 'Blue', 'color': const Color(0xFF173EEA)},
-    {'name': 'Purple', 'color': const Color(0xFFB137FF)},
+    {'name': 'Blue', 'color': const Color(0xFF3B82F6)},
     {'name': 'Green', 'color': const Color(0xFF10B981)},
-    {'name': 'Rose', 'color': const Color(0xFFE11D48)},
+    {'name': 'Purple', 'color': const Color(0xFF8B5CF6)},
+    {'name': 'Rose', 'color': const Color(0xFFF43F5E)},
+    {'name': 'Slate', 'color': const Color(0xFF64748B)},
   ];
 
   Color _currentColor = AppColors.primaryBlue;
@@ -39,5 +43,22 @@ class ThemeProvider extends ChangeNotifier {
     await prefs.setInt(_themeKey, color.value);
     
     notifyListeners();
+
+    try {
+      final token = prefs.getString('auth_token') ?? '';
+      if (token.isNotEmpty) {
+        final hexColor = '#' + (color.value & 0xFFFFFF).toRadixString(16).padLeft(6, '0').toUpperCase();
+        await http.put(
+          Uri.parse(ApiConfig.baseUrl + '/auth/profile'),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token,
+          },
+          body: json.encode({'themePreference': hexColor}),
+        );
+      }
+    } catch (e) {
+      debugPrint('Failed to sync theme to backend: ' + e.toString());
+    }
   }
 }

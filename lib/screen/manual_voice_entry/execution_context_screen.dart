@@ -199,7 +199,7 @@ class _ExecutionContextScreenState extends State<ExecutionContextScreen> {
                           const SizedBox(width: 6),
                           Text(
                             '$_entryTypeLabel Entry',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w700,
                               color: AppColors.primary,

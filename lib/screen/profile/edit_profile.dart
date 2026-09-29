@@ -348,7 +348,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       title: 'Edit Profile',
       scrollable: true,
       child: _isLoadingInitial
-          ? const Padding(
+          ? Padding(
               padding: EdgeInsets.symmetric(vertical: 60),
               child: Center(
                 child: CircularProgressIndicator(color: AppColors.primary),
@@ -406,7 +406,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                 BoxShadow(color: Colors.black12, blurRadius: 6),
                               ],
                             ),
-                            child: const Icon(
+                            child: Icon(
                               Icons.edit,
                               color: AppColors.primary,
                               size: 14,
@@ -569,7 +569,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                       ),
                                       GestureDetector(
                                         onTap: _showLogoOptions,
-                                        child: const Text(
+                                        child: Text(
                                           'Change logo',
                                           style: TextStyle(
                                             fontSize: 12,
@@ -697,7 +697,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 ),
                 const SizedBox(height: AppTheme.spacingXl),
                 _isSaving
-                    ? const Center(
+                    ? Center(
                         child: CircularProgressIndicator(
                           color: AppColors.primary,
                         ),

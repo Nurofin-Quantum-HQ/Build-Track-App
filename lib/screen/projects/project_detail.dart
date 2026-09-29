@@ -91,7 +91,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
               onLeftTap: () => Navigator.maybePop(context),
               rightWidget: RoleManager.canAssignTasks
                   ? IconButton(
-                      icon: const Icon(
+                      icon: Icon(
                         Icons.assignment_turned_in,
                         color: AppColors.primary,
                       ),
@@ -702,7 +702,7 @@ class _TrackerActivityRowState extends State<_TrackerActivityRow> {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(
+              borderSide: BorderSide(
                 color: AppColors.primary,
                 width: 1.5,
               ),
@@ -831,7 +831,7 @@ class _TrackerActivityRowState extends State<_TrackerActivityRow> {
                     color: AppColors.primary.withValues(alpha: 0.10),
                     borderRadius: BorderRadius.circular(6),
                   ),
-                  child: const Row(
+                  child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
@@ -1086,7 +1086,7 @@ class _TrackerActivityRowState extends State<_TrackerActivityRow> {
                         width: 1,
                       ),
                     ),
-                    child: const Text(
+                    child: Text(
                       'ADD',
                       style: TextStyle(
                         fontSize: 9.5,
@@ -1209,7 +1209,7 @@ class _TrackerActivityRowState extends State<_TrackerActivityRow> {
                               ),
                               child: Text(
                                 widget.phaseName,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w700,
                                   color: AppColors.primary,
@@ -1257,7 +1257,7 @@ class _TrackerActivityRowState extends State<_TrackerActivityRow> {
                           if (widget.activity.notes != null &&
                               widget.activity.notes!.trim().isNotEmpty) ...[
                             const SizedBox(height: 20),
-                            const Text(
+                            Text(
                               'Notes & Remarks',
                               style: TextStyle(
                                 fontSize: 14,
@@ -1293,7 +1293,7 @@ class _TrackerActivityRowState extends State<_TrackerActivityRow> {
                               (widget.activity.photo != null &&
                                   widget.activity.photo!.isNotEmpty)) ...[
                             const SizedBox(height: 20),
-                            const Text(
+                            Text(
                               'Progress Photos',
                               style: TextStyle(
                                 fontSize: 14,
@@ -1596,7 +1596,7 @@ class _SummaryCard extends StatelessWidget {
                       ),
                       child: Text(
                         f,
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: AppColors.primary,
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
@@ -1728,7 +1728,7 @@ class _ProjectInfoCard extends StatelessWidget {
         children: [
           if (project.projectCode?.isNotEmpty == true) ...[
             _buildProjectCodeChip(project.projectCode!),
-            const AppDivider(verticalPadding: 10),
+            AppDivider(verticalPadding: 10),
           ],
           ...rows
               .where((r) => r.label != 'Project Code')
@@ -1789,7 +1789,7 @@ class _ProjectInfoCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(
+          Icon(
             Icons.qr_code_scanner_rounded,
             color: AppColors.primary,
             size: 18,
@@ -1905,7 +1905,7 @@ class _BuildingTypeCard extends StatelessWidget {
                   ),
                   child: Text(
                     subType,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w800,
                       color: AppColors.primary,
@@ -1915,7 +1915,7 @@ class _BuildingTypeCard extends StatelessWidget {
             ],
           ),
           if (subType != null) ...[
-            const AppDivider(verticalPadding: 10),
+            AppDivider(verticalPadding: 10),
             Row(
               children: [
                 Container(
@@ -1925,7 +1925,7 @@ class _BuildingTypeCard extends StatelessWidget {
                     color: AppColors.primary.withValues(alpha: 0.06),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.category_outlined,
                     color: AppColors.primary,
                     size: 16,
@@ -1997,7 +1997,7 @@ class _LandFloorsCard extends StatelessWidget {
                     color: AppColors.primary.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.landscape_outlined,
                     color: AppColors.primary,
                     size: 16,
@@ -2052,7 +2052,7 @@ class _LandFloorsCard extends StatelessWidget {
                       ),
                       child: Text(
                         f,
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: AppColors.primary,
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
@@ -2326,7 +2326,7 @@ class _FeatureGroupCardState extends State<_FeatureGroupCard> {
                         ),
                         child: Text(
                           f,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w700,
                             color: AppColors.primary,
@@ -2416,7 +2416,7 @@ class _ProjectTimelineCard extends StatelessWidget {
                 ),
               ],
             ),
-            const AppDivider(verticalPadding: 12),
+            AppDivider(verticalPadding: 12),
           ],
           Text(
             'PROJECT TIMELINE',
@@ -2535,7 +2535,7 @@ class _FinancialCard extends StatelessWidget {
                     color: AppColors.primary.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.account_balance_wallet_rounded,
                     color: AppColors.primary,
                     size: 18,
@@ -2568,14 +2568,14 @@ class _FinancialCard extends StatelessWidget {
               ],
             ),
           ),
-          const AppDivider(verticalPadding: 12),
+          AppDivider(verticalPadding: 12),
           _frow(
             'Spent Amount',
             project.formattedSpent,
             over ? AppColors.error : AppColors.primary,
             Icons.payments_outlined,
           ),
-          const AppDivider(verticalPadding: 8),
+          AppDivider(verticalPadding: 8),
           _frow(
             'Remaining',
             project.formattedRemaining,
@@ -2602,7 +2602,7 @@ class _FinancialCard extends StatelessWidget {
                 AppColors.primary,
                 Icons.category_outlined,
               ),
-              const AppDivider(verticalPadding: 6),
+              AppDivider(verticalPadding: 6),
             ],
             if (bLab > 0) ...[
               _catRow(
@@ -2611,7 +2611,7 @@ class _FinancialCard extends StatelessWidget {
                 AppColors.info,
                 Icons.people_outline_rounded,
               ),
-              const AppDivider(verticalPadding: 6),
+              AppDivider(verticalPadding: 6),
             ],
             if (bEq > 0) ...[
               _catRow(
@@ -2620,7 +2620,7 @@ class _FinancialCard extends StatelessWidget {
                 const Color(0xFF7B3FE7),
                 Icons.precision_manufacturing_outlined,
               ),
-              const AppDivider(verticalPadding: 6),
+              AppDivider(verticalPadding: 6),
             ],
             if (bMisc > 0)
               _catRow(
@@ -2854,7 +2854,7 @@ class _EntryTile extends StatelessWidget {
         showDialog(
           context: context,
           barrierDismissible: false,
-          builder: (lCtx) => const Center(
+          builder: (lCtx) => Center(
             child: CircularProgressIndicator(color: AppColors.primary),
           ),
         );
@@ -3123,7 +3123,7 @@ class _AllProjectEntriesScreen extends StatelessWidget {
               onLeftTap: () => Navigator.maybePop(context),
               rightWidget: canEdit
                   ? IconButton(
-                      icon: const Icon(
+                      icon: Icon(
                         Icons.edit_outlined,
                         color: AppColors.primary,
                       ),

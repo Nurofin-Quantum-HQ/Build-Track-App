@@ -81,7 +81,7 @@ class _ReportInsightsScreenState extends State<ReportInsightsScreen> {
           : provider.selectedProject;
     }
     if (provider.isLoading) {
-      return const Scaffold(
+      return Scaffold(
         backgroundColor: AppColors.gradientStart,
         body: Center(
           child: CircularProgressIndicator(color: AppColors.primary),
@@ -360,7 +360,7 @@ class _DateRangeRow extends StatelessWidget {
         ),
         child: Row(
           children: [
-            const Icon(
+            Icon(
               Icons.calendar_today_outlined,
               size: 15,
               color: AppColors.primary,
@@ -495,7 +495,7 @@ class _ExportSheetState extends State<_ExportSheet> {
                       color: AppColors.primary.withValues(alpha: 0.10),
                       borderRadius: BorderRadius.circular(13),
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.picture_as_pdf_outlined,
                       color: AppColors.primary,
                       size: 20,
@@ -542,7 +542,7 @@ class _ExportSheetState extends State<_ExportSheet> {
                 ),
                 child: Row(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.date_range,
                       size: 15,
                       color: AppColors.primary,
@@ -550,7 +550,7 @@ class _ExportSheetState extends State<_ExportSheet> {
                     const SizedBox(width: 8),
                     Text(
                       _dateRangeLabel,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
                         color: AppColors.primary,

@@ -2296,7 +2296,7 @@ class _AddEquipmentScreenState extends State<AddEquipmentScreen> {
                                 lastDate: DateTime(2100),
                                 builder: (ctx, child) => Theme(
                                   data: Theme.of(ctx).copyWith(
-                                    colorScheme: const ColorScheme.light(
+                                    colorScheme: ColorScheme.light(
                                       primary: AppColors.primary,
                                       onPrimary: Colors.white,
                                       onSurface: AppColors.textDark,
@@ -2335,7 +2335,7 @@ class _AddEquipmentScreenState extends State<AddEquipmentScreen> {
                               ),
                               child: Row(
                                 children: [
-                                  const Icon(
+                                  Icon(
                                     Icons.calendar_today_outlined,
                                     color: AppColors.primary,
                                     size: 18,
@@ -2350,7 +2350,7 @@ class _AddEquipmentScreenState extends State<AddEquipmentScreen> {
                                     ),
                                   ),
                                   const Spacer(),
-                                  const Icon(
+                                  Icon(
                                     Icons.keyboard_arrow_down_rounded,
                                     color: AppColors.primary,
                                     size: 22,

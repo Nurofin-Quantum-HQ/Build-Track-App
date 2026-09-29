@@ -16,6 +16,8 @@ import 'package:buildtrack_mobile/services/auth_service.dart';
 import 'package:provider/provider.dart';
 import 'package:buildtrack_mobile/controller/theme_provider.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_colorpicker/flutter_colorpicker.dart';
+
 import 'package:buildtrack_mobile/common/utils/image_pick_helper.dart';
 import 'package:showcaseview/showcaseview.dart';
 import 'package:buildtrack_mobile/controller/showcase_keys.dart';
@@ -268,14 +270,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
           if (_projProvider.projectsLoaded && _projProvider.projects.isEmpty && !UserSession.hasSkippedTour && !UserSession.visitedModules.contains('profile')) {
             UserSession.markModuleVisited('profile');
             final keys = <GlobalKey>[
-              ShowcaseKeys.profileFields,
-              _settingsCardKey,
-              ShowcaseKeys.profileSubscription,
-              const _ThemePicker(),
-                          const SizedBox(height: 16),
-                          if (RoleManager.canViewTeamAccess) _teamAccessKey,
-              _logoutKey,
-            ];
+                ShowcaseKeys.profileFields,
+                _settingsCardKey,
+                ShowcaseKeys.profileSubscription,
+                if (RoleManager.canViewTeamAccess) _teamAccessKey,
+                _logoutKey,
+              ];
             ShowCaseWidget.of(context).startShowCase(keys);
           }
         });
@@ -283,24 +283,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
             title: 'Profile',
             actions: [
               IconButton(
-                icon: const Icon(Icons.help_outline, color: Colors.black87),
+                icon: Icon(Icons.help_outline, color: Colors.black87),
                 onPressed: () {
                   final keys = <GlobalKey>[
-                    ShowcaseKeys.profileFields,
-                    _settingsCardKey,
-                    ShowcaseKeys.profileSubscription,
-                    const _ThemePicker(),
-                          const SizedBox(height: 16),
-                          if (RoleManager.canViewTeamAccess) _teamAccessKey,
-                    _logoutKey,
-                  ];
+                ShowcaseKeys.profileFields,
+                _settingsCardKey,
+                ShowcaseKeys.profileSubscription,
+                if (RoleManager.canViewTeamAccess) _teamAccessKey,
+                _logoutKey,
+              ];
                   ShowCaseWidget.of(context).startShowCase(keys);
                 },
               ),
             ],
             scrollable: true,
             child: _isLoadingProfile
-                ? const Padding(
+                ? Padding(
                     padding: EdgeInsets.symmetric(vertical: 60),
                     child: Center(
                       child: CircularProgressIndicator(color: AppColors.primary),
@@ -339,8 +337,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                       const SizedBox(height: AppTheme.spacingLg),
                       const _ThemePicker(),
-                          const SizedBox(height: 16),
-                          if (RoleManager.canViewTeamAccess) ...[
+                      const SizedBox(height: 16),
+                      if (RoleManager.canViewTeamAccess) ...[
                         Showcase(
                           key: _teamAccessKey,
                           description: 'Assign roles and manage team access from here.',
@@ -758,8 +756,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
   Widget _teamIllustration() {
-    purple = AppColors.primaryPurple;
-    purpleLight = AppColors.primaryLightBlue;
+    final purple = AppColors.primaryPurple;
+    final purpleLight = AppColors.primaryLightBlue;
     return SizedBox(
       width: 68,
       height: 68,
@@ -777,7 +775,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Container(
             width: 28,
             height: 28,
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               color: purple,
               shape: BoxShape.circle,
             ),
@@ -925,36 +923,69 @@ class _ThemePicker extends StatelessWidget {
             children: [
               const Padding(
                 padding: EdgeInsets.all(16.0),
-                child: Text('App Theme', style: AppTheme.cardTitle),
+                child: Text('App Theme', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               ),
               const Divider(height: 1),
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
-                  children: themeProvider.availableThemes.map((theme) {
-                    final isSelected = themeProvider.currentColor.value == theme['color'].value;
-                    return GestureDetector(
-                      onTap: () => themeProvider.setTheme(theme['color']),
-                      child: Container(
+                              Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Row(
+                    children: [
+                      Container(
                         width: 40,
                         height: 40,
                         decoration: BoxDecoration(
-                          color: theme['color'],
+                          color: themeProvider.currentColor,
                           shape: BoxShape.circle,
-                          border: isSelected ? Border.all(color: AppColors.textDark, width: 3) : null,
-                          boxShadow: [
-                            if (isSelected)
-                              BoxShadow(color: theme['color'].withValues(alpha: 0.4), blurRadius: 8, spreadRadius: 2)
-                          ],
+                          border: Border.all(color: AppColors.textDark, width: 2),
                         ),
-                        child: isSelected ? const Icon(Icons.check, color: Colors.white, size: 20) : null,
                       ),
-                    );
-                  }).toList(),
+                      const SizedBox(width: 16),
+                      ElevatedButton(
+                        onPressed: () {
+                          showDialog(
+                            context: context,
+                            builder: (BuildContext context) {
+                              Color tempColor = themeProvider.currentColor;
+                              return AlertDialog(
+                                title: const Text('Pick a color'),
+                                content: SingleChildScrollView(
+                                  child: ColorPicker(
+                                    pickerColor: tempColor,
+                                    onColorChanged: (color) {
+                                      tempColor = color;
+                                    },
+                                    pickerAreaHeightPercent: 0.8,
+                                    enableAlpha: false,
+                                  ),
+                                ),
+                                actions: <Widget>[
+                                  TextButton(
+                                    child: const Text('Cancel'),
+                                    onPressed: () {
+                                      Navigator.of(context).pop();
+                                    },
+                                  ),
+                                  TextButton(
+                                    child: const Text('Apply'),
+                                    onPressed: () {
+                                      themeProvider.setTheme(tempColor);
+                                      Navigator.of(context).pop();
+                                    },
+                                  ),
+                                ],
+                              );
+                            },
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: themeProvider.currentColor,
+                          foregroundColor: Colors.white,
+                        ),
+                        child: const Text('Choose Custom Color'),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
             ],
           ),
         );

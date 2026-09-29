@@ -15,7 +15,7 @@ class AppTopBar extends StatelessWidget {
   final VoidCallback? onLeftTap;
   final Widget? rightWidget;
   final bool isSubScreen;
-  const AppTopBar({
+  AppTopBar({
     super.key,
     required this.title,
     this.titleWidget,
@@ -24,7 +24,7 @@ class AppTopBar extends StatelessWidget {
     this.rightWidget,
     this.isSubScreen = false,
   });
-  static _primaryBlue = AppColors.primary;
+  static var _primaryBlue = AppColors.primary;
   static const _textDark = AppColors.textDark;
   @override
   Widget build(BuildContext context) {
@@ -61,7 +61,7 @@ class AppTopBar extends StatelessWidget {
                     ),
                   ),
             ),
-            IntrinsicWidth(child: rightWidget ?? const SizedBox(width: 32)),
+            IntrinsicWidth(child: rightWidget ?? SizedBox(width: 32)),
           ],
         ),
       ),
@@ -69,8 +69,8 @@ class AppTopBar extends StatelessWidget {
   }
 }
 class AppBottomNav extends StatelessWidget {
-  const AppBottomNav({super.key});
-  static _primaryBlue = AppColors.primary;
+  AppBottomNav({super.key});
+  static var _primaryBlue = AppColors.primary;
   static const _textGray = AppColors.textLight;
   @override
   Widget build(BuildContext context) {

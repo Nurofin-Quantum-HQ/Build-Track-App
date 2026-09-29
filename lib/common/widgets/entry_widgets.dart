@@ -100,7 +100,7 @@ String normalizeUnit(String raw) {
   };
   return aliases[s] ?? s;
 }
-_kBlue = AppColors.primary;
+var _kBlue = AppColors.primary;
 const _kGray = AppColors.textLight;
 const _kDark = AppColors.textDark;
 const _kRed = AppColors.error;
@@ -193,7 +193,7 @@ class EntryFieldLabel extends StatelessWidget {
     return RichText(
       text: TextSpan(
         text: label,
-        style: const TextStyle(
+        style: TextStyle(
           color: _kBlue,
           fontWeight: FontWeight.w700,
           fontSize: 12.5,
@@ -454,7 +454,7 @@ class UnitSelectorField extends StatelessWidget {
                     ),
                   )
                 else
-                  const Icon(
+                  Icon(
                     Icons.keyboard_arrow_down_rounded,
                     color: _kBlue,
                     size: 22,
@@ -600,12 +600,12 @@ class _UnitPickerSheetState extends State<_UnitPickerSheet> {
                   ),
                   TextButton.icon(
                     onPressed: () => _addCustom(context),
-                    icon: const Icon(
+                    icon: Icon(
                       Icons.add_circle_outline,
                       size: 18,
                       color: _kBlue,
                     ),
-                    label: const Text(
+                    label: Text(
                       'Custom',
                       style: TextStyle(
                         color: _kBlue,
@@ -655,12 +655,12 @@ class _UnitPickerSheetState extends State<_UnitPickerSheet> {
                           const SizedBox(height: 12),
                           TextButton.icon(
                             onPressed: () => _addCustom(context),
-                            icon: const Icon(
+                            icon: Icon(
                               Icons.add,
                               color: _kBlue,
                               size: 18,
                             ),
-                            label: const Text(
+                            label: Text(
                               'Add Custom Unit',
                               style: TextStyle(
                                 color: _kBlue,
@@ -1061,7 +1061,7 @@ class CostSummaryCard extends StatelessWidget {
                         formatCurrency(totalAmount),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: _kBlue,
                           fontSize: 26,
                           fontWeight: FontWeight.w900,
@@ -1079,7 +1079,7 @@ class CostSummaryCard extends StatelessWidget {
                     color: _kBlue.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(14),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.calculate_outlined,
                     color: _kBlue,
                     size: 22,
@@ -1130,7 +1130,7 @@ class VoiceParseCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'Parsed from Voice',
                       style: TextStyle(
                         fontSize: 15,
@@ -1183,9 +1183,9 @@ class VoiceParseCard extends StatelessWidget {
           const SizedBox(height: 14),
           Row(
             children: [
-              const Icon(Icons.format_align_left, color: _kBlue, size: 14),
+              Icon(Icons.format_align_left, color: _kBlue, size: 14),
               const SizedBox(width: 6),
-              const Text(
+              Text(
                 'VOICE TRANSCRIPT',
                 style: TextStyle(
                   color: _kBlue,
@@ -2769,7 +2769,7 @@ class InvoiceAttachmentCard extends StatelessWidget {
                 color: const Color(0xFFF5F7FF),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Text(
+              child: Text(
                 'View',
                 style: TextStyle(
                   color: AppColors.primary,

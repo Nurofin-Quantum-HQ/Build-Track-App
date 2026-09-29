@@ -78,7 +78,7 @@ class HomeScreen extends StatelessWidget {
             _showcaseKey.currentState?.dismiss();
           }
         ), 
-        const TooltipActionButton(
+        TooltipActionButton(
           type: TooltipDefaultActionType.next, 
           backgroundColor: AppColors.primary, 
           textStyle: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)
@@ -473,7 +473,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                               color: AppColors.primary.withValues(alpha: 0.1),
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(
+                            child: Icon(
                               Icons.help_outline,
                               color: AppColors.primary,
                               size: 19,
@@ -521,7 +521,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
           ),
         ),
       ),
-      bottomNavigationBar: const AppBottomNav(),
+      bottomNavigationBar: AppBottomNav(),
     );
   }
 }
@@ -597,7 +597,7 @@ class _TaskCard extends StatelessWidget {
                 ),
                 if (displayStatus != 'Completed' && onEdit != null) ...[
                   const SizedBox(width: 8),
-                  const Icon(
+                  Icon(
                     Icons.edit,
                     size: 18,
                     color: AppColors.primary,
@@ -658,7 +658,7 @@ class _AdminDashboard extends StatefulWidget {
   State<_AdminDashboard> createState() => _AdminDashboardState();
 }
 class _AdminDashboardState extends State<_AdminDashboard> {
-  static primaryBlue = AppColors.primary;
+  static var primaryBlue = AppColors.primary;
   static const textDark = AppColors.textDark;
   static const textGray = AppColors.textLight;
   List<dynamic> _revenueEntries = [];
@@ -1039,7 +1039,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                        const SizedBox(height: 8),
                        Container(
                          padding: const EdgeInsets.all(12),
-                         decoration: BoxDecoration(color: Colors.green.shade50, borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.green)),
+                         decoration: BoxDecoration(color: Colors.green.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.green)),
                          child: const Row(children: [Icon(Icons.check_circle, color: Colors.green), SizedBox(width: 8), Text('Signature successfully captured!', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold))])
                        )
                     ],
@@ -2141,8 +2141,8 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                         attachments,
                       );
                     },
-                    icon: const Icon(Icons.share_outlined, color: primaryBlue),
-                    label: const Text(
+                    icon: Icon(Icons.share_outlined, color: primaryBlue),
+                    label: Text(
                       'Share Receipt Summary',
                       style: TextStyle(
                         color: primaryBlue,
@@ -2150,7 +2150,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                       ),
                     ),
                     style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: primaryBlue, width: 1.5),
+                      side: BorderSide(color: primaryBlue, width: 1.5),
                       minimumSize: const Size(double.infinity, 48),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -2699,7 +2699,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.trending_up_rounded,
                           color: AppColors.primary,
                           size: 14,
@@ -3035,7 +3035,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                       color: AppColors.primary.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.domain_rounded,
                       color: AppColors.primary,
                       size: 20,
@@ -3799,13 +3799,13 @@ class _SupervisorDashboardState extends State<_SupervisorDashboard> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.refresh,
                         size: 14,
                         color: AppColors.primary,
                       ),
                       const SizedBox(width: 4),
-                      const Text(
+                      Text(
                         'Refresh',
                         style: TextStyle(
                           fontSize: 12,
@@ -3846,7 +3846,7 @@ class _SupervisorDashboardState extends State<_SupervisorDashboard> {
           ),
         const SizedBox(height: 24),
         if (_isLoading)
-          const Padding(
+          Padding(
             padding: EdgeInsets.symmetric(vertical: 40),
             child: Center(
               child: CircularProgressIndicator(color: AppColors.primary),
@@ -4240,7 +4240,7 @@ class _PendingTxCard extends StatelessWidget {
               ),
               Text(
                 '₹${amount.toStringAsFixed(0)}',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 17,
                   fontWeight: FontWeight.w800,
                   color: AppColors.primary,
@@ -4603,7 +4603,7 @@ class _MasonDashboardState extends State<_MasonDashboard> {
               CircleAvatar(
                 radius: 24,
                 backgroundColor: AppTheme.primary.withValues(alpha: 0.12),
-                child: const Icon(
+                child: Icon(
                   Icons.person_outline,
                   color: AppTheme.primary,
                   size: 26,
@@ -4647,7 +4647,7 @@ class _MasonDashboardState extends State<_MasonDashboard> {
         ),
         const SizedBox(height: 12),
         if (_isLoadingTasks)
-          const Padding(
+          Padding(
             padding: EdgeInsets.symmetric(vertical: 20),
             child: Center(
               child: CircularProgressIndicator(color: AppColors.primary),
@@ -4680,7 +4680,7 @@ class _MasonDashboardState extends State<_MasonDashboard> {
           future: _recentEntriesFuture,
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Padding(
+              return Padding(
                 padding: EdgeInsets.symmetric(vertical: 30),
                 child: Center(
                   child: CircularProgressIndicator(color: AppTheme.primary),
@@ -4940,7 +4940,7 @@ class _ApprovalsAlertWidgetState extends State<ApprovalsAlertWidget> {
                   ),
                 ],
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.warning_amber_rounded,
                 color: AppColors.primary,
                 size: 24,
@@ -4977,7 +4977,7 @@ class _ApprovalsAlertWidgetState extends State<ApprovalsAlertWidget> {
             Container(
               width: 32,
               height: 32,
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 color: AppColors.primary,
                 shape: BoxShape.circle,
               ),
@@ -5102,7 +5102,7 @@ class _TeamApprovalHistoryWidgetState
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Padding(
+      return Padding(
         padding: EdgeInsets.symmetric(vertical: 12),
         child: Center(
           child: CircularProgressIndicator(
@@ -5142,7 +5142,7 @@ class _TeamApprovalHistoryWidgetState
                     color: AppColors.primary.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.people_outline,
                     color: AppColors.primary,
                     size: 16,
@@ -5164,7 +5164,7 @@ class _TeamApprovalHistoryWidgetState
                     onTap: () => setState(() => _expanded = !_expanded),
                     child: Text(
                       _expanded ? 'Show Less' : 'Show All',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
                         color: AppColors.primary,
                         fontWeight: FontWeight.w700,

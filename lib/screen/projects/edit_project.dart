@@ -18,7 +18,7 @@ class EditProjectScreen extends StatefulWidget {
   State<EditProjectScreen> createState() => _EditProjectScreenState();
 }
 class _EditProjectScreenState extends State<EditProjectScreen> {
-  static primaryBlue = AppColors.primary;
+  static var primaryBlue = AppColors.primary;
   static const bgColor = AppColors.gradientStart;
   static const textDark = AppColors.textDark;
   static const textGray = AppColors.textLight;
@@ -732,7 +732,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
                       ),
                       child: Text(
                         _currentProject.projectCode!,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w800,
                           color: primaryBlue,
@@ -756,7 +756,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(color: primaryBlue.withValues(alpha: 0.2)),
                 ),
-                child: const Row(
+                child: Row(
                   children: [
                     SizedBox(
                       width: 14,
@@ -1739,7 +1739,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: primaryBlue, width: 2),
+          borderSide: BorderSide(color: primaryBlue, width: 2),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
@@ -1855,7 +1855,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
                   width: 36,
                   height: 36,
                   color: Colors.transparent,
-                  child: const Icon(Icons.add, size: 16, color: primaryBlue),
+                  child: Icon(Icons.add, size: 16, color: primaryBlue),
                 ),
               ),
             ],
@@ -2011,7 +2011,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
                         }
                       }
                     }),
-                    child: const Text(
+                    child: Text(
                       'Select All',
                       style: TextStyle(
                         fontSize: 12,
@@ -2060,7 +2060,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
               const SizedBox(height: 8),
               Text(
                 '$done of $total activities selected',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
                   color: primaryBlue,
@@ -2079,7 +2079,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
         const SizedBox(height: 12),
         GestureDetector(
           onTap: _showAddCustomStageDialog,
-          child: const Padding(
+          child: Padding(
             padding: EdgeInsets.symmetric(vertical: 4),
             child: Text(
               '+ Add Custom Phase',
@@ -2345,7 +2345,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
                         width: 1,
                       ),
                     ),
-                    child: const Text(
+                    child: Text(
                       '+ Add Custom Activity',
                       style: TextStyle(
                         fontSize: 13,
@@ -2386,7 +2386,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
           controller: ctrl,
           focusNode: focusNode,
           autofocus: true,
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             hintText: 'Enter name',
             focusedBorder: UnderlineInputBorder(
               borderSide: BorderSide(color: primaryBlue, width: 2),
@@ -2475,7 +2475,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
         content: TextField(
           controller: _customStageNameCtrl,
           autofocus: true,
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             hintText: 'Enter name',
             focusedBorder: UnderlineInputBorder(
               borderSide: BorderSide(color: primaryBlue, width: 2),
@@ -2549,7 +2549,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
           controller: ctrl,
           focusNode: focusNode,
           autofocus: true,
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             hintText: 'Enter name',
             focusedBorder: UnderlineInputBorder(
               borderSide: BorderSide(color: primaryBlue, width: 2),

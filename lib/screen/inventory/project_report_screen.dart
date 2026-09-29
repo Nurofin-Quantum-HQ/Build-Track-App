@@ -14,7 +14,7 @@ class ProjectReportScreen extends StatelessWidget {
     final provider = context.watch<ProjectProvider>();
     final project = provider.selectedProject;
     if (provider.isLoading) {
-      return const Scaffold(
+      return Scaffold(
         backgroundColor: AppColors.gradientStart,
         body: Center(
           child: CircularProgressIndicator(color: AppColors.primary),

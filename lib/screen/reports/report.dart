@@ -32,13 +32,13 @@ class ReportsScreen extends StatelessWidget {
             TooltipActionButton(
               type: TooltipDefaultActionType.skip,
               backgroundColor: Colors.transparent,
-              textStyle: const TextStyle(color: Colors.white70, fontWeight: FontWeight.bold),
+              textStyle: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold),
               onTap: () {
                 UserSession.skipTour();
                 _showcaseKey.currentState?.dismiss();
               }
             ),
-            const TooltipActionButton(
+            TooltipActionButton(
               type: TooltipDefaultActionType.next,
               backgroundColor: AppColors.primary,
               textStyle: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
@@ -50,7 +50,7 @@ class ReportsScreen extends StatelessWidget {
               UserSession.setGlobalTourActive(false);
             }
           },
-          builder: (context) => const _ReportsView(),
+          builder: (context) => _ReportsView(),
         ),
       ),
     );
@@ -58,7 +58,7 @@ class ReportsScreen extends StatelessWidget {
 }
 
 class _ReportsView extends StatefulWidget {
-  const _ReportsView();
+  _ReportsView();
   @override
   State<_ReportsView> createState() => _ReportsViewState();
 }
@@ -361,7 +361,7 @@ class _ReportsViewState extends State<_ReportsView> {
               backgroundColor: Colors.white,
               child: Container(
                 width: 320,
-                padding: const EdgeInsets.all(20),
+                padding: EdgeInsets.all(20),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -369,7 +369,7 @@ class _ReportsViewState extends State<_ReportsView> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text(
+                        Text(
                           'Customize Columns',
                           style: TextStyle(
                             fontSize: 16,
@@ -378,21 +378,21 @@ class _ReportsViewState extends State<_ReportsView> {
                           ),
                         ),
                         IconButton(
-                          icon: const Icon(Icons.close, size: 20),
+                          icon: Icon(Icons.close, size: 20),
                           onPressed: () => Navigator.of(context).pop(),
                         ),
                       ],
                     ),
-                    const Divider(height: 1),
-                    const SizedBox(height: 10),
-                    const Text(
+                    Divider(height: 1),
+                    SizedBox(height: 10),
+                    Text(
                       'Drag items to reorder. Toggle checkbox to show/hide columns.',
                       style: TextStyle(
                         fontSize: 11,
                         color: AppColors.textSecondary,
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    SizedBox(height: 12),
                     SizedBox(
                       height: 300,
                       child: ReorderableListView.builder(
@@ -423,7 +423,7 @@ class _ReportsViewState extends State<_ReportsView> {
                             dense: true,
                             title: Text(
                               col,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -449,7 +449,7 @@ class _ReportsViewState extends State<_ReportsView> {
                                       ScaffoldMessenger.of(
                                         context,
                                       ).showSnackBar(
-                                        const SnackBar(
+                                        SnackBar(
                                           content: Text(
                                             'At least one column must be visible.',
                                           ),
@@ -461,7 +461,7 @@ class _ReportsViewState extends State<_ReportsView> {
                                 });
                               },
                             ),
-                            trailing: const Icon(
+                            trailing: Icon(
                               Icons.drag_handle,
                               size: 20,
                               color: Colors.grey,
@@ -470,7 +470,7 @@ class _ReportsViewState extends State<_ReportsView> {
                         },
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    SizedBox(height: 16),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
@@ -481,12 +481,12 @@ class _ReportsViewState extends State<_ReportsView> {
                               tempAll = List.from(allCols);
                             });
                           },
-                          child: const Text(
+                          child: Text(
                             'Reset',
                             style: TextStyle(color: Colors.grey, fontSize: 13),
                           ),
                         ),
-                        const SizedBox(width: 8),
+                        SizedBox(width: 8),
                         ElevatedButton(
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.primary,
@@ -499,7 +499,7 @@ class _ReportsViewState extends State<_ReportsView> {
                             _setActiveColumnsForTab(tabName, tempActive);
                             Navigator.of(context).pop();
                           },
-                          child: const Text(
+                          child: Text(
                             'Save',
                             style: TextStyle(
                               fontSize: 13,
@@ -629,7 +629,7 @@ class _ReportsViewState extends State<_ReportsView> {
             now.year,
             now.month,
             now.day,
-          ).subtract(const Duration(days: 30));
+          ).subtract(Duration(days: 30));
           _endDate = null;
           break;
         case 'This Year':
@@ -647,7 +647,7 @@ class _ReportsViewState extends State<_ReportsView> {
       context: context,
       initialDate: _startDate ?? DateTime.now(),
       firstDate: DateTime(2020),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
+      lastDate: DateTime.now().add(Duration(days: 365)),
     );
     if (picked != null) {
       setState(() {
@@ -663,7 +663,7 @@ class _ReportsViewState extends State<_ReportsView> {
       context: context,
       initialDate: _endDate ?? DateTime.now(),
       firstDate: DateTime(2020),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
+      lastDate: DateTime.now().add(Duration(days: 365)),
     );
     if (picked != null) {
       setState(() {
@@ -682,7 +682,7 @@ class _ReportsViewState extends State<_ReportsView> {
   }) async {
     if (filtered.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No report entries to export.')),
+        SnackBar(content: Text('No report entries to export.')),
       );
       return;
     }
@@ -708,7 +708,7 @@ class _ReportsViewState extends State<_ReportsView> {
   }) async {
     if (filtered.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No report entries to export.')),
+        SnackBar(content: Text('No report entries to export.')),
       );
       return;
     }
@@ -769,7 +769,7 @@ class _ReportsViewState extends State<_ReportsView> {
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text('Import template downloaded!'),
             backgroundColor: Color(0xFF15803D),
           ),
@@ -791,14 +791,14 @@ class _ReportsViewState extends State<_ReportsView> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Revert Last Upload'),
-        content: const Text('Are you sure you want to undo the last CSV import? This will restore the transactions to their previous state.'),
+        title: Text('Revert Last Upload'),
+        content: Text('Are you sure you want to undo the last CSV import? This will restore the transactions to their previous state.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('Cancel')),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
-            child: const Text('Revert', style: TextStyle(color: Colors.white)),
+            child: Text('Revert', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -811,12 +811,12 @@ class _ReportsViewState extends State<_ReportsView> {
     
     if (success) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Successfully reverted last CSV import')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Successfully reverted last CSV import')));
         context.read<ReportProvider>().refresh();
       }
     } else {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to revert CSV import')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to revert CSV import')));
       }
     }
   }
@@ -845,7 +845,7 @@ class _ReportsViewState extends State<_ReportsView> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
-          title: const Text(
+          title: Text(
             'Import Results',
             style: TextStyle(fontWeight: FontWeight.bold),
           ),
@@ -855,16 +855,16 @@ class _ReportsViewState extends State<_ReportsView> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text('Total rows processed: ${result.totalRows}'),
-                const SizedBox(height: 8),
+                SizedBox(height: 8),
                 Text(
                   'Successfully imported: ${result.successCount}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: Color(0xFF15803D),
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.only(left: 16, top: 4),
+                  padding: EdgeInsets.only(left: 16, top: 4),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -874,7 +874,7 @@ class _ReportsViewState extends State<_ReportsView> {
                     ],
                   ),
                 ),
-                const SizedBox(height: 8),
+                SizedBox(height: 8),
                 Text(
                   'Failed: ${result.failedCount}',
                   style: TextStyle(
@@ -883,15 +883,15 @@ class _ReportsViewState extends State<_ReportsView> {
                   ),
                 ),
                 if (result.errors.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  const Text(
+                  SizedBox(height: 12),
+                  Text(
                     'Details/Errors:',
                     style: TextStyle(fontWeight: FontWeight.bold),
                   ),
-                  const SizedBox(height: 6),
+                  SizedBox(height: 6),
                   Container(
-                    constraints: const BoxConstraints(maxHeight: 150),
-                    padding: const EdgeInsets.all(8),
+                    constraints: BoxConstraints(maxHeight: 150),
+                    padding: EdgeInsets.all(8),
                     decoration: BoxDecoration(
                       color: Colors.grey[50],
                       borderRadius: BorderRadius.circular(8),
@@ -901,7 +901,7 @@ class _ReportsViewState extends State<_ReportsView> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: result.errors.map((err) => Padding(
-                          padding: const EdgeInsets.only(bottom: 4),
+                          padding: EdgeInsets.only(bottom: 4),
                           child: Text(
                             err,
                             style: TextStyle(
@@ -920,7 +920,7 @@ class _ReportsViewState extends State<_ReportsView> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text(
+              child: Text(
                 'OK',
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
@@ -944,7 +944,7 @@ class _ReportsViewState extends State<_ReportsView> {
 
   Widget _buildCsvImportCard(String quickCategoryTab, List<String> activeCols) {
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: AppColors.cardBg,
         borderRadius: BorderRadius.circular(16),
@@ -953,7 +953,7 @@ class _ReportsViewState extends State<_ReportsView> {
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.02),
             blurRadius: 10,
-            offset: const Offset(0, 4),
+            offset: Offset(0, 4),
           ),
         ],
       ),
@@ -963,18 +963,18 @@ class _ReportsViewState extends State<_ReportsView> {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(8),
+                padding: EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF173EEA).withValues(alpha: 0.1),
+                  color: Color(0xFF173EEA).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.upload_file_rounded,
                   color: Color(0xFF173EEA),
                   size: 22,
                 ),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -988,7 +988,7 @@ class _ReportsViewState extends State<_ReportsView> {
                         letterSpacing: -0.3,
                       ),
                     ),
-                    const SizedBox(height: 2),
+                    SizedBox(height: 2),
                     Text(
                       'Download template, customize columns, then upload',
                       style: TextStyle(
@@ -1001,7 +1001,7 @@ class _ReportsViewState extends State<_ReportsView> {
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          SizedBox(height: 14),
           Row(
             children: [
               Expanded(
@@ -1012,14 +1012,14 @@ class _ReportsViewState extends State<_ReportsView> {
                           quickCategoryTab,
                           activeCols,
                         ),
-                  icon: const Icon(Icons.download_rounded, size: 16),
-                  label: const Text(
+                  icon: Icon(Icons.download_rounded, size: 16),
+                  label: Text(
                     'Download Template',
                     style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
                   ),
                   style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    side: const BorderSide(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    side: BorderSide(
                       color: AppColors.primary,
                       width: 1.5,
                     ),
@@ -1030,7 +1030,7 @@ class _ReportsViewState extends State<_ReportsView> {
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: 8),
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: _isImportingCsv
@@ -1039,14 +1039,14 @@ class _ReportsViewState extends State<_ReportsView> {
                           context,
                           quickCategoryTab,
                         ),
-                  icon: const Icon(Icons.edit_note, size: 16),
-                  label: const Text(
+                  icon: Icon(Icons.edit_note, size: 16),
+                  label: Text(
                     'Customize Columns',
                     style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
                   ),
                   style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    side: const BorderSide(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    side: BorderSide(
                       color: AppColors.primary,
                       width: 1.5,
                     ),
@@ -1059,14 +1059,14 @@ class _ReportsViewState extends State<_ReportsView> {
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: 8),
           Row(
             children: [
               Expanded(
                 child: ElevatedButton.icon(
                   onPressed: _isImportingCsv ? null : _handleUploadCsv,
                   icon: _isImportingCsv
-                      ? const SizedBox(
+                      ? SizedBox(
                           width: 16,
                           height: 16,
                           child: CircularProgressIndicator(
@@ -1074,10 +1074,10 @@ class _ReportsViewState extends State<_ReportsView> {
                             color: Colors.white,
                           ),
                         )
-                      : const Icon(Icons.upload_file_rounded, size: 16),
+                      : Icon(Icons.upload_file_rounded, size: 16),
                   label: Text(
                     _isImportingCsv ? 'Importing...' : 'Upload CSV File',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
                     ),
@@ -1086,14 +1086,14 @@ class _ReportsViewState extends State<_ReportsView> {
                     backgroundColor: AppColors.primary,
                     foregroundColor: Colors.white,
                     elevation: 0,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    padding: EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
                     ),
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: 8),
               Container(
                 decoration: BoxDecoration(
                   color: AppColors.primary.withValues(alpha: 0.1),
@@ -1276,7 +1276,7 @@ class _ReportsViewState extends State<_ReportsView> {
           _endDate!.year,
           _endDate!.month,
           _endDate!.day,
-        ).add(const Duration(days: 1));
+        ).add(Duration(days: 1));
         if (!entryDate.isBefore(end)) return false;
       }
       return true;
@@ -1339,7 +1339,7 @@ class _ReportsViewState extends State<_ReportsView> {
     final List<DataColumn> columns = uiActiveCols.map((colName) {
       if (colName == 'Date') {
         return DataColumn(
-          label: const Text(
+          label: Text(
             'Date',
             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
           ),
@@ -1352,7 +1352,7 @@ class _ReportsViewState extends State<_ReportsView> {
         );
       } else if (colName == 'Project') {
         return DataColumn(
-          label: const Text(
+          label: Text(
             'Project',
             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
           ),
@@ -1365,7 +1365,7 @@ class _ReportsViewState extends State<_ReportsView> {
         );
       } else if (colName == 'Amount') {
         return DataColumn(
-          label: const Text(
+          label: Text(
             'Amount (INR)',
             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
           ),
@@ -1386,13 +1386,13 @@ class _ReportsViewState extends State<_ReportsView> {
         return DataColumn(
           label: Text(
             colName,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
           ),
           numeric: true,
         );
       } else if (colName == 'Paid') {
         return DataColumn(
-          label: const Text(
+          label: Text(
             'Paid (INR)',
             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
           ),
@@ -1400,7 +1400,7 @@ class _ReportsViewState extends State<_ReportsView> {
         );
       } else if (colName == 'Remaining') {
         return DataColumn(
-          label: const Text(
+          label: Text(
             'Remaining (INR)',
             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
           ),
@@ -1412,14 +1412,14 @@ class _ReportsViewState extends State<_ReportsView> {
         return DataColumn(
           label: Text(
             colName,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
           ),
         );
       } else {
         return DataColumn(
           label: Text(
             colName,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
           ),
         );
       }
@@ -1438,10 +1438,10 @@ class _ReportsViewState extends State<_ReportsView> {
                   Showcase(
                     key: ShowcaseKeys.helpButton,
                     description: 'Tap here anytime to replay this tour and get help.',
-                    tooltipBackgroundColor: const Color(0xFF1E1E2C),
+                    tooltipBackgroundColor: Color(0xFF1E1E2C),
                     textColor: Colors.white,
                     tooltipBorderRadius: BorderRadius.circular(16),
-                    tooltipPadding: const EdgeInsets.all(16),
+                    tooltipPadding: EdgeInsets.all(16),
                     child: IconButton(
                       icon: Icon(Icons.help_outline, color: AppColors.primary),
                       onPressed: () {
@@ -1455,10 +1455,10 @@ class _ReportsViewState extends State<_ReportsView> {
                       },
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  SizedBox(width: 8),
                   GestureDetector(
                     onTap: () => Navigator.pushNamed(context, '/profile'),
-                    child: const ProfileAvatar(radius: 18),
+                    child: ProfileAvatar(radius: 18),
                   ),
                 ],
               ),
@@ -1469,37 +1469,37 @@ class _ReportsViewState extends State<_ReportsView> {
                 onRefresh: provider.refresh,
                 child: SingleChildScrollView(
                   controller: _scrollController,
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 100),
+                  physics: AlwaysScrollableScrollPhysics(),
+                  padding: EdgeInsets.fromLTRB(16, 14, 16, 100),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Showcase(
                         key: ShowcaseKeys.reportAskAI,
                         description: 'Ask AI about costs, missing entries, or anything related to this report.',
-                        tooltipBackgroundColor: const Color(0xFF1E1E2C),
+                        tooltipBackgroundColor: Color(0xFF1E1E2C),
                         textColor: Colors.white,
                         tooltipBorderRadius: BorderRadius.circular(16),
-                        tooltipPadding: const EdgeInsets.all(16),
+                        tooltipPadding: EdgeInsets.all(16),
                         child: _AskAiBanner(projectName: provider.selectedProjectName),
                       ),
-                      const SizedBox(height: 14),
+                      SizedBox(height: 14),
                       EfficiencyBanner(
                         note: 'Tap to view category breakdowns, monthly spending trends, and budget health charts.',
                         isExceeded: grandRemaining > 0,
                       ),
-                      const SizedBox(height: 18),
+                      SizedBox(height: 18),
                       Showcase(
                         key: ShowcaseKeys.reportFilters,
                         description: 'Filter your reports by project, date, status and more.',
-                        tooltipBackgroundColor: const Color(0xFF1E1E2C),
+                        tooltipBackgroundColor: Color(0xFF1E1E2C),
                         textColor: Colors.white,
                         tooltipBorderRadius: BorderRadius.circular(16),
-                        tooltipPadding: const EdgeInsets.all(16),
+                        tooltipPadding: EdgeInsets.all(16),
                         child: _buildFiltersCard(context, projectProvider),
                       ),
-                      const SizedBox(height: 20),
-                      const Text(
+                      SizedBox(height: 20),
+                      Text(
                         'Filtered Cost Summary',
                         style: TextStyle(
                           fontSize: 16,
@@ -1508,18 +1508,18 @@ class _ReportsViewState extends State<_ReportsView> {
                           letterSpacing: -0.3,
                         ),
                       ),
-                      const SizedBox(height: 10),
+                      SizedBox(height: 10),
                       Showcase(
                         key: _chartsKey,
                         description: 'View a quick financial summary based on your filters.',
-                        tooltipBackgroundColor: const Color(0xFF1E1E2C),
+                        tooltipBackgroundColor: Color(0xFF1E1E2C),
                         textColor: Colors.white,
                         tooltipBorderRadius: BorderRadius.circular(16),
-                        tooltipPadding: const EdgeInsets.all(16),
+                        tooltipPadding: EdgeInsets.all(16),
                         child: GridView.count(
                         crossAxisCount: 3,
                         shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
+                        physics: NeverScrollableScrollPhysics(),
                         crossAxisSpacing: 10,
                         mainAxisSpacing: 10,
                         childAspectRatio: 1.35,
@@ -1533,39 +1533,39 @@ class _ReportsViewState extends State<_ReportsView> {
                           _buildCostCard(
                             title: 'Paid',
                             value: grandPaid,
-                            color: const Color(0xFF15803D),
+                            color: Color(0xFF15803D),
                             icon: Icons.check_circle_outline,
                           ),
                           _buildCostCard(
                             title: 'Remaining',
                             value: grandRemaining,
                             color: grandRemaining > 0
-                                ? const Color(0xFFDC2626)
-                                : const Color(0xFF15803D),
+                                ? Color(0xFFDC2626)
+                                : Color(0xFF15803D),
                             icon: Icons.pending_outlined,
                           ),
                           _buildCostCard(
                             title: 'Material',
                             value: materialTotal,
-                            color: const Color(0xFF5B5FCF),
+                            color: AppColors.primary,
                             icon: Icons.construction,
                           ),
                           _buildCostCard(
                             title: 'Labour',
                             value: labourTotal,
-                            color: AppColors.primaryPurple,
+                            color: Color(0xFF22C55E),
                             icon: Icons.people_outline,
                           ),
                           _buildCostCard(
                             title: 'Equipment',
                             value: equipmentTotal,
-                            color: AppColors.primaryLightBlue,
+                            color: Color(0xFFF59E0B),
                             icon: Icons.precision_manufacturing_outlined,
                           ),
                         ],
                       ),
                       ),
-                      const SizedBox(height: 10),
+                      SizedBox(height: 10),
                       _CategoryTabs(
                         activeTab: quickCategoryTab,
                         onTabChanged: (newTab) {
@@ -1596,21 +1596,21 @@ class _ReportsViewState extends State<_ReportsView> {
                         },
                       ),
                       if (quickCategoryTab != 'All') ...[
-                        const SizedBox(height: 14),
+                        SizedBox(height: 14),
                         _buildCategorySubFilters(
                           context,
                           quickCategoryTab,
                           allEntries,
                         ),
                       ] else ...[
-                        const SizedBox(height: 14),
+                        SizedBox(height: 14),
                         _buildAllTabSearchBar(context),
                       ],
-                      const SizedBox(height: 18),
+                      SizedBox(height: 18),
                       if (quickCategoryTab != 'All' && !_reportGenerated)
                         Center(
                           child: Padding(
-                            padding: const EdgeInsets.symmetric(
+                            padding: EdgeInsets.symmetric(
                               vertical: 40,
                               horizontal: 16,
                             ),
@@ -1618,13 +1618,13 @@ class _ReportsViewState extends State<_ReportsView> {
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Container(
-                                  padding: const EdgeInsets.all(12),
+                                  padding: EdgeInsets.all(12),
                                   decoration: BoxDecoration(
                                     color:
                                         (quickCategoryTab == 'Materials'
-                                                ? const Color(0xFF5B5FCF)
+                                                ? AppColors.primary
                                                 : (quickCategoryTab == 'Labour'
-                                                      ? AppColors.primaryPurple
+                                                      ? Color(0xFF22C55E)
                                                       : AppColors
                                                             .primaryLightBlue))
                                             .withValues(alpha: 0.1),
@@ -1634,13 +1634,13 @@ class _ReportsViewState extends State<_ReportsView> {
                                     Icons.analytics_outlined,
                                     size: 40,
                                     color: quickCategoryTab == 'Materials'
-                                        ? const Color(0xFF5B5FCF)
+                                        ? AppColors.primary
                                         : (quickCategoryTab == 'Labour'
-                                              ? AppColors.primaryPurple
-                                              : AppColors.primaryLightBlue),
+                                              ? Color(0xFF22C55E)
+                                              : Color(0xFFF59E0B)),
                                   ),
                                 ),
-                                const SizedBox(height: 12),
+                                SizedBox(height: 12),
                                 Text(
                                   'Configure filters above and tap\n"Generate CSV Report" to view logs.',
                                   textAlign: TextAlign.center,
@@ -1667,7 +1667,7 @@ class _ReportsViewState extends State<_ReportsView> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Padding(
-                                padding: const EdgeInsets.fromLTRB(
+                                padding: EdgeInsets.fromLTRB(
                                   16,
                                   12,
                                   16,
@@ -1685,23 +1685,23 @@ class _ReportsViewState extends State<_ReportsView> {
                                           quickCategoryTab == 'All'
                                               ? 'Report Logs'
                                               : '$quickCategoryTab Report Logs',
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             fontWeight: FontWeight.w800,
                                             fontSize: 15,
                                             color: AppColors.textPrimary,
                                           ),
                                         ),
-                                        const SizedBox(height: 2),
+                                        SizedBox(height: 2),
                                         Text(
                                           '$totalCount entries found',
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             fontSize: 11,
                                             color: AppColors.textSecondary,
                                           ),
                                         ),
                                       ],
                                     ),
-                                    const SizedBox(width: 8),
+                                    SizedBox(width: 8),
                                     Expanded(
                                       child: FittedBox(
                                         fit: BoxFit.scaleDown,
@@ -1723,7 +1723,7 @@ class _ReportsViewState extends State<_ReportsView> {
                                                     BorderRadius.circular(20),
                                                 child: Container(
                                                   padding:
-                                                      const EdgeInsets.symmetric(
+                                                      EdgeInsets.symmetric(
                                                         horizontal: 10,
                                                         vertical: 6,
                                                       ),
@@ -1747,7 +1747,7 @@ class _ReportsViewState extends State<_ReportsView> {
                                                   child: Row(
                                                     mainAxisSize:
                                                         MainAxisSize.min,
-                                                    children: const [
+                                                    children: [
                                                       Icon(
                                                         Icons.edit_note,
                                                         size: 14,
@@ -1769,7 +1769,7 @@ class _ReportsViewState extends State<_ReportsView> {
                                                   ),
                                                 ),
                                               ),
-                                              const SizedBox(width: 4),
+                                              SizedBox(width: 4),
                                             ],
                                             Theme(
                                               data: Theme.of(context).copyWith(
@@ -1777,7 +1777,7 @@ class _ReportsViewState extends State<_ReportsView> {
                                               ),
                                               child: PopupMenuButton<String>(
                                                 tooltip: 'Export options',
-                                                offset: const Offset(0, 32),
+                                                offset: Offset(0, 32),
                                                 shape: RoundedRectangleBorder(
                                                   borderRadius:
                                                       BorderRadius.circular(12),
@@ -1803,7 +1803,7 @@ class _ReportsViewState extends State<_ReportsView> {
                                                   PopupMenuItem(
                                                     value: 'csv',
                                                     child: Row(
-                                                      children: const [
+                                                      children: [
                                                         Icon(
                                                           Icons
                                                               .description_outlined,
@@ -1819,7 +1819,7 @@ class _ReportsViewState extends State<_ReportsView> {
                                                   PopupMenuItem(
                                                     value: 'pdf',
                                                     child: Row(
-                                                      children: const [
+                                                      children: [
                                                         Icon(
                                                           Icons
                                                               .picture_as_pdf_outlined,
@@ -1835,7 +1835,7 @@ class _ReportsViewState extends State<_ReportsView> {
                                                 ],
                                                 child: Container(
                                                   padding:
-                                                      const EdgeInsets.symmetric(
+                                                      EdgeInsets.symmetric(
                                                         horizontal: 10,
                                                         vertical: 6,
                                                       ),
@@ -1859,7 +1859,7 @@ class _ReportsViewState extends State<_ReportsView> {
                                                   child: Row(
                                                     mainAxisSize:
                                                         MainAxisSize.min,
-                                                    children: const [
+                                                    children: [
                                                       Icon(
                                                         Icons.download,
                                                         size: 14,
@@ -1889,10 +1889,10 @@ class _ReportsViewState extends State<_ReportsView> {
                                                 ),
                                               ),
                                             ),
-                                            const SizedBox(width: 4),
+                                            SizedBox(width: 4),
                                             IconButton(
                                               tooltip: 'View Full Screen',
-                                              icon: const Icon(
+                                              icon: Icon(
                                                 Icons.fullscreen,
                                                 color: AppColors.primary,
                                                 size: 22,
@@ -1944,7 +1944,7 @@ class _ReportsViewState extends State<_ReportsView> {
                                   ],
                                 ),
                               ),
-                              const Divider(height: 1),
+                              Divider(height: 1),
                               if (paginatedEntries.isNotEmpty)
                                 SingleChildScrollView(
                                   scrollDirection: Axis.horizontal,
@@ -1999,7 +1999,7 @@ class _ReportsViewState extends State<_ReportsView> {
                               else
                                 Center(
                                   child: Padding(
-                                    padding: const EdgeInsets.symmetric(
+                                    padding: EdgeInsets.symmetric(
                                       vertical: 40,
                                     ),
                                     child: Column(
@@ -2010,7 +2010,7 @@ class _ReportsViewState extends State<_ReportsView> {
                                           size: 44,
                                           color: Colors.grey.shade400,
                                         ),
-                                        const SizedBox(height: 10),
+                                        SizedBox(height: 10),
                                         Text(
                                           'No transaction logs match filters.',
                                           style: TextStyle(
@@ -2023,9 +2023,9 @@ class _ReportsViewState extends State<_ReportsView> {
                                   ),
                                 ),
                               if (totalCount > 0) ...[
-                                const Divider(height: 1),
+                                Divider(height: 1),
                                 Padding(
-                                  padding: const EdgeInsets.symmetric(
+                                  padding: EdgeInsets.symmetric(
                                     horizontal: 14,
                                     vertical: 8,
                                   ),
@@ -2035,7 +2035,7 @@ class _ReportsViewState extends State<_ReportsView> {
                                     children: [
                                       Row(
                                         children: [
-                                          const Text(
+                                          Text(
                                             'Show: ',
                                             style: TextStyle(
                                               fontSize: 11,
@@ -2044,13 +2044,13 @@ class _ReportsViewState extends State<_ReportsView> {
                                           ),
                                           DropdownButton<int>(
                                             value: _rowsPerPage,
-                                            underline: const SizedBox(),
-                                            style: const TextStyle(
+                                            underline: SizedBox(),
+                                            style: TextStyle(
                                               fontSize: 12,
                                               color: AppColors.textPrimary,
                                               fontWeight: FontWeight.bold,
                                             ),
-                                            items: const [
+                                            items: [
                                               DropdownMenuItem(
                                                 value: 10,
                                                 child: Text('10'),
@@ -2078,7 +2078,7 @@ class _ReportsViewState extends State<_ReportsView> {
                                       Row(
                                         children: [
                                           IconButton(
-                                            icon: const Icon(
+                                            icon: Icon(
                                               Icons.chevron_left,
                                               size: 20,
                                             ),
@@ -2093,13 +2093,13 @@ class _ReportsViewState extends State<_ReportsView> {
                                           ),
                                           Text(
                                             'Page $safeCurrentPage of $totalPages',
-                                            style: const TextStyle(
+                                            style: TextStyle(
                                               fontSize: 11,
                                               color: AppColors.textSecondary,
                                             ),
                                           ),
                                           IconButton(
-                                            icon: const Icon(
+                                            icon: Icon(
                                               Icons.chevron_right,
                                               size: 20,
                                             ),
@@ -2122,17 +2122,17 @@ class _ReportsViewState extends State<_ReportsView> {
                             ],
                           ),
                         ),
-                      const SizedBox(height: 20),
+                      SizedBox(height: 20),
                       Showcase(
                         key: ShowcaseKeys.reportCSV,
                         description: 'Use this to export data to CSV or import bulk entries from a CSV file.',
-                        tooltipBackgroundColor: const Color(0xFF1E1E2C),
+                        tooltipBackgroundColor: Color(0xFF1E1E2C),
                         textColor: Colors.white,
                         tooltipBorderRadius: BorderRadius.circular(16),
-                        tooltipPadding: const EdgeInsets.all(16),
+                        tooltipPadding: EdgeInsets.all(16),
                         child: _buildCsvImportCard(quickCategoryTab, activeCols),
                       ),
-                      const SizedBox(height: 8),
+                      SizedBox(height: 8),
                     ],
                   ),
                 ),
@@ -2141,7 +2141,7 @@ class _ReportsViewState extends State<_ReportsView> {
           ],
         ),
       ),
-      bottomNavigationBar: const AppBottomNav(),
+      bottomNavigationBar: AppBottomNav(),
     );
   }
 
@@ -2154,11 +2154,11 @@ class _ReportsViewState extends State<_ReportsView> {
   }) {
     final currencyStr = _formatIndianCurrency(value);
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: isFeatured ? null : AppColors.cardBg,
         gradient: isFeatured
-            ? const LinearGradient(
+            ? LinearGradient(
                 colors: [Color(0xFF173EEA), Color(0xFF67C8FF)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
@@ -2170,7 +2170,7 @@ class _ReportsViewState extends State<_ReportsView> {
           BoxShadow(
             color: Colors.black.withValues(alpha: isFeatured ? 0.12 : 0.02),
             blurRadius: 10,
-            offset: const Offset(0, 4),
+            offset: Offset(0, 4),
           ),
         ],
       ),
@@ -2198,7 +2198,7 @@ class _ReportsViewState extends State<_ReportsView> {
                   ),
                 ),
               ),
-              const SizedBox(width: 4),
+              SizedBox(width: 4),
               Icon(
                 icon,
                 color: isFeatured ? Colors.white : (color ?? AppColors.primary),
@@ -2264,7 +2264,7 @@ class _ReportsViewState extends State<_ReportsView> {
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.02),
             blurRadius: 10,
-            offset: const Offset(0, 4),
+            offset: Offset(0, 4),
           ),
         ],
       ),
@@ -2272,27 +2272,27 @@ class _ReportsViewState extends State<_ReportsView> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.all(16),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF173EEA).withValues(alpha: 0.1),
+                    color: Color(0xFF173EEA).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.business,
                     color: Color(0xFF173EEA),
                     size: 24,
                   ),
                 ),
-                const SizedBox(width: 12),
+                SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
+                    children: [
                       Text(
                         'Project Context',
                         style: TextStyle(
@@ -2316,9 +2316,9 @@ class _ReportsViewState extends State<_ReportsView> {
               ],
             ),
           ),
-          const Divider(height: 1),
+          Divider(height: 1),
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -2329,7 +2329,7 @@ class _ReportsViewState extends State<_ReportsView> {
                         label: 'Project',
                         selectedLabel: projectNameSelected,
                         items: [
-                          const PopupMenuItem(
+                          PopupMenuItem(
                             value: 'all',
                             child: Text('All projects'),
                           ),
@@ -2357,7 +2357,7 @@ class _ReportsViewState extends State<_ReportsView> {
                         },
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    SizedBox(width: 12),
                     Expanded(
                       child: _buildProjectContextDropdown(
                         label: 'Floor',
@@ -2365,7 +2365,7 @@ class _ReportsViewState extends State<_ReportsView> {
                         enabled:
                             _selectedProjectId != 'all' && floors.isNotEmpty,
                         items: [
-                          const PopupMenuItem(
+                          PopupMenuItem(
                             value: 'Select Floor',
                             child: Text('Select Floor (All)'),
                           ),
@@ -2385,7 +2385,7 @@ class _ReportsViewState extends State<_ReportsView> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: 12),
                 Row(
                   children: [
                     Expanded(
@@ -2396,7 +2396,7 @@ class _ReportsViewState extends State<_ReportsView> {
                             _selectedProjectId != 'all' &&
                             (proj?.selectedPhases?.isNotEmpty ?? false),
                         items: [
-                          const PopupMenuItem(
+                          PopupMenuItem(
                             value: 'Select Phase',
                             child: Text('Select Phase (All)'),
                           ),
@@ -2419,7 +2419,7 @@ class _ReportsViewState extends State<_ReportsView> {
                         },
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    SizedBox(width: 12),
                     Expanded(
                       child: _buildProjectContextDropdown(
                         label: 'Activity',
@@ -2429,7 +2429,7 @@ class _ReportsViewState extends State<_ReportsView> {
                             _selectedProjectId != 'all' &&
                             uniqueActivityNames.isNotEmpty,
                         items: [
-                          const PopupMenuItem(
+                          PopupMenuItem(
                             value: 'Select Activity',
                             child: Text('Select Activity (All)'),
                           ),
@@ -2450,14 +2450,14 @@ class _ReportsViewState extends State<_ReportsView> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: 12),
                 Row(
                   children: [
                     Expanded(
                       child: _buildProjectContextDropdown(
                         label: 'Date Period',
                         selectedLabel: _datePreset,
-                        items: const [
+                        items: [
                           PopupMenuItem(
                             value: 'All Time',
                             child: Text('All Time'),
@@ -2491,12 +2491,12 @@ class _ReportsViewState extends State<_ReportsView> {
                         },
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    SizedBox(width: 12),
                     Expanded(
                       child: _buildProjectContextDropdown(
                         label: 'Payment Status',
                         selectedLabel: _selectedStatus,
-                        items: const [
+                        items: [
                           PopupMenuItem(
                             value: 'All',
                             child: Text('All Statuses'),
@@ -2527,7 +2527,7 @@ class _ReportsViewState extends State<_ReportsView> {
                   ],
                 ),
                 if (_datePreset == 'Custom') ...[
-                  const SizedBox(height: 12),
+                  SizedBox(height: 12),
                   Row(
                     children: [
                       Expanded(
@@ -2539,7 +2539,7 @@ class _ReportsViewState extends State<_ReportsView> {
                           onTap: () => _selectStartDate(context),
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      SizedBox(width: 12),
                       Expanded(
                         child: _buildDatePickerBox(
                           label: 'End Date',
@@ -2573,15 +2573,15 @@ class _ReportsViewState extends State<_ReportsView> {
         enabled: enabled,
         onSelected: onSelected,
         itemBuilder: (context) => items,
-        offset: const Offset(0, 50),
+        offset: Offset(0, 50),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
             color: enabled ? Colors.white : Colors.grey.shade50,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: enabled ? const Color(0xFFE2E4FA) : Colors.grey.shade200,
+              color: enabled ? Color(0xFFE2E4FA) : Colors.grey.shade200,
               width: 1.2,
             ),
           ),
@@ -2602,7 +2602,7 @@ class _ReportsViewState extends State<_ReportsView> {
                             : Colors.grey.shade400,
                       ),
                     ),
-                    const SizedBox(height: 2),
+                    SizedBox(height: 2),
                     Text(
                       selectedLabel,
                       style: TextStyle(
@@ -2620,7 +2620,7 @@ class _ReportsViewState extends State<_ReportsView> {
               ),
               Icon(
                 Icons.keyboard_arrow_down,
-                color: enabled ? const Color(0xFF6B7280) : Colors.grey.shade300,
+                color: enabled ? Color(0xFF6B7280) : Colors.grey.shade300,
                 size: 20,
               ),
             ],
@@ -2636,7 +2636,7 @@ class _ReportsViewState extends State<_ReportsView> {
       borderRadius: BorderRadius.circular(12),
       child: Container(
         height: 46,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
+        padding: EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
           color: AppColors.primary.withValues(alpha: 0.06),
           borderRadius: BorderRadius.circular(12),
@@ -2647,7 +2647,7 @@ class _ReportsViewState extends State<_ReportsView> {
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
-          children: const [
+          children: [
             Icon(Icons.edit_note, size: 16, color: AppColors.primary),
             SizedBox(width: 4),
             Text(
@@ -2673,11 +2673,11 @@ class _ReportsViewState extends State<_ReportsView> {
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFE2E4FA), width: 1.2),
+          border: Border.all(color: Color(0xFFE2E4FA), width: 1.2),
         ),
         child: Row(
           children: [
@@ -2688,16 +2688,16 @@ class _ReportsViewState extends State<_ReportsView> {
                 children: [
                   Text(
                     label,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w500,
                       color: AppColors.textSecondary,
                     ),
                   ),
-                  const SizedBox(height: 2),
+                  SizedBox(height: 2),
                   Text(
                     selectedLabel,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
                       color: AppColors.textPrimary,
@@ -2708,7 +2708,7 @@ class _ReportsViewState extends State<_ReportsView> {
                 ],
               ),
             ),
-            const Icon(
+            Icon(
               Icons.date_range_outlined,
               color: Color(0xFF6B7280),
               size: 20,
@@ -2721,7 +2721,7 @@ class _ReportsViewState extends State<_ReportsView> {
 
   Widget _buildAllTabSearchBar(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.cardBg,
         borderRadius: BorderRadius.circular(16),
@@ -2730,7 +2730,7 @@ class _ReportsViewState extends State<_ReportsView> {
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.02),
             blurRadius: 10,
-            offset: const Offset(0, 4),
+            offset: Offset(0, 4),
           ),
         ],
       ),
@@ -2744,22 +2744,22 @@ class _ReportsViewState extends State<_ReportsView> {
                 _searchQuery = val.trim();
               });
             },
-            style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
+            style: TextStyle(fontSize: 13, color: AppColors.textPrimary),
             decoration: InputDecoration(
               hintText:
                   'Search by description, brand, project, phase, activity...',
-              hintStyle: const TextStyle(
+              hintStyle: TextStyle(
                 fontSize: 13,
                 color: AppColors.textSecondary,
               ),
-              prefixIcon: const Icon(
+              prefixIcon: Icon(
                 Icons.search,
                 color: AppColors.textSecondary,
                 size: 20,
               ),
               suffixIcon: _searchQuery.isNotEmpty
                   ? IconButton(
-                      icon: const Icon(
+                      icon: Icon(
                         Icons.clear,
                         color: AppColors.textSecondary,
                         size: 18,
@@ -2772,17 +2772,17 @@ class _ReportsViewState extends State<_ReportsView> {
                       },
                     )
                   : null,
-              contentPadding: const EdgeInsets.symmetric(
+              contentPadding: EdgeInsets.symmetric(
                 horizontal: 14,
                 vertical: 10,
               ),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Color(0xFFE2E4FA)),
+                borderSide: BorderSide(color: Color(0xFFE2E4FA)),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Color(0xFFE2E4FA)),
+                borderSide: BorderSide(color: Color(0xFFE2E4FA)),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -2845,7 +2845,7 @@ class _ReportsViewState extends State<_ReportsView> {
         });
       },
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: AppColors.cardBg,
           borderRadius: BorderRadius.circular(16),
@@ -2854,7 +2854,7 @@ class _ReportsViewState extends State<_ReportsView> {
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.02),
               blurRadius: 10,
-              offset: const Offset(0, 4),
+              offset: Offset(0, 4),
             ),
           ],
         ),
@@ -2873,32 +2873,32 @@ class _ReportsViewState extends State<_ReportsView> {
                   }
                 });
               },
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13,
                 color: AppColors.textPrimary,
               ),
               decoration: InputDecoration(
                 hintText: searchPlaceholder,
-                hintStyle: const TextStyle(
+                hintStyle: TextStyle(
                   fontSize: 13,
                   color: AppColors.textSecondary,
                 ),
-                prefixIcon: const Icon(
+                prefixIcon: Icon(
                   Icons.search,
                   color: AppColors.textSecondary,
                   size: 20,
                 ),
-                contentPadding: const EdgeInsets.symmetric(
+                contentPadding: EdgeInsets.symmetric(
                   horizontal: 14,
                   vertical: 10,
                 ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Color(0xFFE2E4FA)),
+                  borderSide: BorderSide(color: Color(0xFFE2E4FA)),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Color(0xFFE2E4FA)),
+                  borderSide: BorderSide(color: Color(0xFFE2E4FA)),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -2907,27 +2907,27 @@ class _ReportsViewState extends State<_ReportsView> {
               ),
             ),
             if (showSuggestionsList) ...[
-              const SizedBox(height: 6),
+              SizedBox(height: 6),
               Container(
-                constraints: const BoxConstraints(maxHeight: 180),
+                constraints: BoxConstraints(maxHeight: 180),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFE2E4FA)),
+                  border: Border.all(color: Color(0xFFE2E4FA)),
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withValues(alpha: 0.04),
                       blurRadius: 8,
-                      offset: const Offset(0, 3),
+                      offset: Offset(0, 3),
                     ),
                   ],
                 ),
                 child: ListView.separated(
                   shrinkWrap: true,
-                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  padding: EdgeInsets.symmetric(vertical: 4),
                   itemCount: suggestions.length,
                   separatorBuilder: (context, index) =>
-                      const Divider(height: 1, color: Color(0xFFF3F4F6)),
+                      Divider(height: 1, color: Color(0xFFF3F4F6)),
                   itemBuilder: (context, index) {
                     final name = suggestions[index];
                     return InkWell(
@@ -2940,22 +2940,22 @@ class _ReportsViewState extends State<_ReportsView> {
                         });
                       },
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(
+                        padding: EdgeInsets.symmetric(
                           horizontal: 14,
                           vertical: 10,
                         ),
                         child: Row(
                           children: [
-                            const Icon(
+                            Icon(
                               Icons.subdirectory_arrow_right_outlined,
                               size: 14,
                               color: AppColors.primary,
                             ),
-                            const SizedBox(width: 8),
+                            SizedBox(width: 8),
                             Expanded(
                               child: Text(
                                 name,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 13,
                                   color: AppColors.textPrimary,
                                   fontWeight: FontWeight.w500,
@@ -2970,7 +2970,7 @@ class _ReportsViewState extends State<_ReportsView> {
                 ),
               ),
             ],
-            const SizedBox(height: 12),
+            SizedBox(height: 12),
             Row(
               children: [
                 Expanded(
@@ -2978,7 +2978,7 @@ class _ReportsViewState extends State<_ReportsView> {
                     label: dropdownLabel,
                     selectedLabel: _selectedItemName ?? 'All',
                     items: [
-                      const PopupMenuItem(value: 'All', child: Text('All')),
+                      PopupMenuItem(value: 'All', child: Text('All')),
                       ...uniqueNames.map(
                         (name) => PopupMenuItem(value: name, child: Text(name)),
                       ),
@@ -2996,30 +2996,30 @@ class _ReportsViewState extends State<_ReportsView> {
                     },
                   ),
                 ),
-                const SizedBox(width: 8),
+                SizedBox(width: 8),
                 _buildEditColumnsButton(tabName),
               ],
             ),
-            const SizedBox(height: 14),
+            SizedBox(height: 14),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
-                icon: const Icon(Icons.analytics_outlined, size: 18),
-                label: const Text(
+                icon: Icon(Icons.analytics_outlined, size: 18),
+                label: Text(
                   'Generate CSV Report',
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: tabName == 'Materials'
-                      ? const Color(0xFF5B5FCF)
+                      ? AppColors.primary
                       : (tabName == 'Labour'
-                            ? AppColors.primaryPurple
-                            : AppColors.primaryLightBlue),
+                            ? Color(0xFF22C55E)
+                            : Color(0xFFF59E0B)),
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  padding: EdgeInsets.symmetric(vertical: 14),
                   elevation: 0,
                 ),
                 onPressed: () {
@@ -3042,20 +3042,20 @@ class _ReportsViewState extends State<_ReportsView> {
     IconData icon;
     switch (type) {
       case EntryType.material:
-        color = const Color(0xFF5B5FCF);
+        color = AppColors.primary;
         icon = Icons.construction;
         break;
       case EntryType.labour:
-        color = AppColors.primaryPurple;
+        color = Color(0xFF22C55E);
         icon = Icons.people_outline;
         break;
       case EntryType.equipment:
-        color = AppColors.primaryLightBlue;
+        color = Color(0xFFF59E0B);
         icon = Icons.precision_manufacturing_outlined;
         break;
     }
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      padding: EdgeInsets.symmetric(horizontal: 6, vertical: 3),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(6),
@@ -3064,7 +3064,7 @@ class _ReportsViewState extends State<_ReportsView> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(icon, size: 10, color: color),
-          const SizedBox(width: 4),
+          SizedBox(width: 4),
           Text(
             type.name.toUpperCase(),
             style: TextStyle(
@@ -3092,21 +3092,21 @@ class _ReportsViewState extends State<_ReportsView> {
     );
     switch (label) {
       case 'Fully Paid':
-        bg = const Color(0xFFDCFCE7);
-        text = const Color(0xFF15803D);
+        bg = Color(0xFFDCFCE7);
+        text = Color(0xFF15803D);
         break;
       case 'Partial':
-        bg = const Color(0xFFFFFBEB);
-        text = const Color(0xFFB45309);
+        bg = Color(0xFFFFFBEB);
+        text = Color(0xFFB45309);
         break;
       case 'Not Paid':
       default:
-        bg = const Color(0xFFFEE2E2);
-        text = const Color(0xFFDC2626);
+        bg = Color(0xFFFEE2E2);
+        text = Color(0xFFDC2626);
         break;
     }
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      padding: EdgeInsets.symmetric(horizontal: 6, vertical: 3),
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(8),
@@ -3132,7 +3132,7 @@ class _ReportsViewState extends State<_ReportsView> {
           ),
           backgroundColor: Colors.white,
           child: Padding(
-            padding: const EdgeInsets.all(20),
+            padding: EdgeInsets.all(20),
             child: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -3141,7 +3141,7 @@ class _ReportsViewState extends State<_ReportsView> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
+                      Text(
                         'Entry Details',
                         style: TextStyle(
                           fontSize: 16,
@@ -3150,13 +3150,13 @@ class _ReportsViewState extends State<_ReportsView> {
                         ),
                       ),
                       IconButton(
-                        icon: const Icon(Icons.close, size: 20),
+                        icon: Icon(Icons.close, size: 20),
                         onPressed: () => Navigator.of(dialogContext).pop(),
                       ),
                     ],
                   ),
-                  const Divider(height: 1),
-                  const SizedBox(height: 12),
+                  Divider(height: 1),
+                  SizedBox(height: 12),
                   _buildDetailRow('Project', projectName),
                   _buildDetailRow('Type', entry.type.name.toUpperCase()),
                   _buildDetailRow('Date', _formatDateLong(entry.date)),
@@ -3202,9 +3202,9 @@ class _ReportsViewState extends State<_ReportsView> {
                       entry.rejectionReason!,
                       isWarning: true,
                     ),
-                  const SizedBox(height: 12),
-                  const Divider(height: 1),
-                  const SizedBox(height: 16),
+                  SizedBox(height: 12),
+                  Divider(height: 1),
+                  SizedBox(height: 16),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
@@ -3219,7 +3219,7 @@ class _ReportsViewState extends State<_ReportsView> {
                           },
                         ),
                       ),
-                      const SizedBox(width: 8),
+                      SizedBox(width: 8),
                       Expanded(
                         child: _ReportActionBtn(
                           label: 'Record Payment',
@@ -3235,7 +3235,7 @@ class _ReportsViewState extends State<_ReportsView> {
                           },
                         ),
                       ),
-                      const SizedBox(width: 8),
+                      SizedBox(width: 8),
                       Expanded(
                         child: _ReportActionBtn(
                           label: 'Edit Entry',
@@ -3260,7 +3260,7 @@ class _ReportsViewState extends State<_ReportsView> {
 
   Widget _buildDetailRow(String label, String value, {bool isWarning = false}) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 5),
+      padding: EdgeInsets.symmetric(vertical: 5),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -3268,7 +3268,7 @@ class _ReportsViewState extends State<_ReportsView> {
             width: 100,
             child: Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 fontWeight: FontWeight.w600,
                 color: AppColors.textSecondary,
                 fontSize: 12,
@@ -3308,17 +3308,17 @@ class _ReportsViewState extends State<_ReportsView> {
         return DataCell(
           Text(
             _formatDateShort(entry.date),
-            style: const TextStyle(fontSize: 12),
+            style: TextStyle(fontSize: 12),
           ),
         );
       } else if (colName == 'Payment Date') {
         final payDateStr = entry.paymentDate != null
             ? _formatDateShort(entry.paymentDate!)
             : '—';
-        return DataCell(Text(payDateStr, style: const TextStyle(fontSize: 12)));
+        return DataCell(Text(payDateStr, style: TextStyle(fontSize: 12)));
       } else if (colName == 'Project') {
         return DataCell(
-          Text(projectName, style: const TextStyle(fontSize: 12)),
+          Text(projectName, style: TextStyle(fontSize: 12)),
         );
       } else if (colName == 'Type') {
         return DataCell(_buildTypeChip(entry.type));
@@ -3326,34 +3326,34 @@ class _ReportsViewState extends State<_ReportsView> {
         return DataCell(
           Text(
             entry.description.isEmpty ? '—' : entry.description,
-            style: const TextStyle(fontSize: 12),
+            style: TextStyle(fontSize: 12),
           ),
         );
       } else if (colName == 'Material' ||
           colName == 'Worker Type' ||
           colName == 'Equipment') {
         return DataCell(
-          Text(entry.description, style: const TextStyle(fontSize: 12)),
+          Text(entry.description, style: TextStyle(fontSize: 12)),
         );
       } else if (colName == 'Brand') {
         return DataCell(
-          Text(entry.brand ?? '—', style: const TextStyle(fontSize: 12)),
+          Text(entry.brand ?? '—', style: TextStyle(fontSize: 12)),
         );
       } else if (colName == 'Floor') {
         return DataCell(
-          Text(entry.floor ?? '—', style: const TextStyle(fontSize: 12)),
+          Text(entry.floor ?? '—', style: TextStyle(fontSize: 12)),
         );
       } else if (colName == 'Phase') {
         return DataCell(
-          Text(entry.phase ?? '—', style: const TextStyle(fontSize: 12)),
+          Text(entry.phase ?? '—', style: TextStyle(fontSize: 12)),
         );
       } else if (colName == 'Activity') {
         return DataCell(
-          Text(entry.activity ?? '—', style: const TextStyle(fontSize: 12)),
+          Text(entry.activity ?? '—', style: TextStyle(fontSize: 12)),
         );
       } else if (colName == 'Unit') {
         return DataCell(
-          Text(entry.unit ?? '—', style: const TextStyle(fontSize: 12)),
+          Text(entry.unit ?? '—', style: TextStyle(fontSize: 12)),
         );
       } else if (colName == 'Status') {
         return DataCell(
@@ -3367,7 +3367,7 @@ class _ReportsViewState extends State<_ReportsView> {
         return DataCell(
           Text(
             _formatIndianCurrency(entry.amount),
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
           ),
         );
       } else if (colName == 'Paid') {
@@ -3377,7 +3377,7 @@ class _ReportsViewState extends State<_ReportsView> {
             style: TextStyle(
               fontSize: 12,
               color: entry.paidAmount > 0
-                  ? const Color(0xFF15803D)
+                  ? Color(0xFF15803D)
                   : AppColors.textSecondary,
             ),
           ),
@@ -3391,8 +3391,8 @@ class _ReportsViewState extends State<_ReportsView> {
               fontSize: 12,
               fontWeight: FontWeight.w600,
               color: rem > 0
-                  ? const Color(0xFFDC2626)
-                  : const Color(0xFF15803D),
+                  ? Color(0xFFDC2626)
+                  : Color(0xFF15803D),
             ),
           ),
         );
@@ -3403,7 +3403,7 @@ class _ReportsViewState extends State<_ReportsView> {
         return DataCell(
           Text(
             _formatIndianCurrency(rate),
-            style: const TextStyle(fontSize: 12),
+            style: TextStyle(fontSize: 12),
           ),
         );
       } else if (colName == 'Qty' ||
@@ -3412,7 +3412,7 @@ class _ReportsViewState extends State<_ReportsView> {
         final rate = entry.ratePerUnit ?? 0.0;
         final val = (rate == 0) ? 0.0 : entry.amount / rate;
         return DataCell(
-          Text(val.toStringAsFixed(1), style: const TextStyle(fontSize: 12)),
+          Text(val.toStringAsFixed(1), style: TextStyle(fontSize: 12)),
         );
       } else if (colName == 'Add More') {
         return DataCell(
@@ -3443,7 +3443,7 @@ class _ReportsViewState extends State<_ReportsView> {
           ),
         );
       } else {
-        return const DataCell(SizedBox.shrink());
+        return DataCell(SizedBox.shrink());
       }
     }).toList();
     return DataRow(
@@ -3458,7 +3458,7 @@ class _ReportsViewState extends State<_ReportsView> {
 }
 
 class _AskAiBanner extends StatelessWidget {
-  const _AskAiBanner({required this.projectName});
+  _AskAiBanner({required this.projectName});
   final String projectName;
   @override
   Widget build(BuildContext context) {
@@ -3476,14 +3476,14 @@ class _AskAiBanner extends StatelessWidget {
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [
-                const Color(0xFF5B5FCF),
+                AppColors.primary,
                 AppColors.primary.withValues(alpha: 0.80),
               ],
             ),
             borderRadius: BorderRadius.circular(16),
           ),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+            padding: EdgeInsets.symmetric(horizontal: 18, vertical: 14),
             child: Row(
               children: [
                 Container(
@@ -3493,14 +3493,14 @@ class _AskAiBanner extends StatelessWidget {
                     color: Colors.white.withValues(alpha: 0.18),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.auto_awesome,
                     color: Colors.white,
                     size: 20,
                   ),
                 ),
-                const SizedBox(width: 14),
-                const Expanded(
+                SizedBox(width: 14),
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -3524,7 +3524,7 @@ class _AskAiBanner extends StatelessWidget {
                     ],
                   ),
                 ),
-                const Icon(
+                Icon(
                   Icons.arrow_forward_ios,
                   color: Colors.white70,
                   size: 14,
@@ -3539,14 +3539,14 @@ class _AskAiBanner extends StatelessWidget {
 }
 
 class _CategoryTabs extends StatelessWidget {
-  const _CategoryTabs({required this.activeTab, required this.onTabChanged});
+  _CategoryTabs({required this.activeTab, required this.onTabChanged});
   final String activeTab;
   final ValueChanged<String> onTabChanged;
   static const _tabs = ['All', 'Materials', 'Labour', 'Equipment'];
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(4),
+      padding: EdgeInsets.all(4),
       decoration: BoxDecoration(
         color: AppColors.cardBg,
         borderRadius: BorderRadius.circular(12),
@@ -3558,13 +3558,13 @@ class _CategoryTabs extends StatelessWidget {
           Color activeColor;
           switch (tab) {
             case 'Materials':
-              activeColor = const Color(0xFF5B5FCF);
+              activeColor = AppColors.primary;
               break;
             case 'Labour':
-              activeColor = AppColors.primaryPurple;
+              activeColor = Color(0xFF22C55E);
               break;
             case 'Equipment':
-              activeColor = AppColors.primaryLightBlue;
+              activeColor = Color(0xFFF59E0B);
               break;
             case 'All':
             default:
@@ -3575,8 +3575,8 @@ class _CategoryTabs extends StatelessWidget {
             child: GestureDetector(
               onTap: () => onTabChanged(tab),
               child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(vertical: 8),
+                duration: Duration(milliseconds: 200),
+                padding: EdgeInsets.symmetric(vertical: 8),
                 decoration: BoxDecoration(
                   color: active
                       ? activeColor.withValues(alpha: 0.12)
@@ -3602,7 +3602,7 @@ class _CategoryTabs extends StatelessWidget {
 }
 
 class _FullScreenLogsViewer extends StatefulWidget {
-  const _FullScreenLogsViewer({
+  _FullScreenLogsViewer({
     required this.columns,
     required this.filteredEntries,
     required this.getProjectName,
@@ -3680,20 +3680,20 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
     IconData icon;
     switch (type) {
       case EntryType.material:
-        color = const Color(0xFF5B5FCF);
+        color = AppColors.primary;
         icon = Icons.construction;
         break;
       case EntryType.labour:
-        color = AppColors.primaryPurple;
+        color = Color(0xFF22C55E);
         icon = Icons.people_outline;
         break;
       case EntryType.equipment:
-        color = AppColors.primaryLightBlue;
+        color = Color(0xFFF59E0B);
         icon = Icons.precision_manufacturing_outlined;
         break;
     }
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      padding: EdgeInsets.symmetric(horizontal: 6, vertical: 3),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(6),
@@ -3702,7 +3702,7 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(icon, size: 10, color: color),
-          const SizedBox(width: 4),
+          SizedBox(width: 4),
           Text(
             type.name.toUpperCase(),
             style: TextStyle(
@@ -3722,21 +3722,21 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
     final label = _getPaymentStatusLabel(status);
     switch (label) {
       case 'Fully Paid':
-        bg = const Color(0xFFDCFCE7);
-        text = const Color(0xFF15803D);
+        bg = Color(0xFFDCFCE7);
+        text = Color(0xFF15803D);
         break;
       case 'Partial':
-        bg = const Color(0xFFFFFBEB);
-        text = const Color(0xFFB45309);
+        bg = Color(0xFFFFFBEB);
+        text = Color(0xFFB45309);
         break;
       case 'Not Paid':
       default:
-        bg = const Color(0xFFFEE2E2);
-        text = const Color(0xFFDC2626);
+        bg = Color(0xFFFEE2E2);
+        text = Color(0xFFDC2626);
         break;
     }
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      padding: EdgeInsets.symmetric(horizontal: 6, vertical: 3),
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(8),
@@ -3793,7 +3793,7 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
 
     Widget detailRow(String label, String value, {bool isWarning = false}) {
       return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 5),
+        padding: EdgeInsets.symmetric(vertical: 5),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -3801,7 +3801,7 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
               width: 100,
               child: Text(
                 label,
-                style: const TextStyle(
+                style: TextStyle(
                   fontWeight: FontWeight.w600,
                   color: AppColors.textSecondary,
                   fontSize: 12,
@@ -3832,7 +3832,7 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
           ),
           backgroundColor: Colors.white,
           child: Padding(
-            padding: const EdgeInsets.all(20),
+            padding: EdgeInsets.all(20),
             child: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -3841,7 +3841,7 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
+                      Text(
                         'Entry Details',
                         style: TextStyle(
                           fontSize: 16,
@@ -3850,13 +3850,13 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
                         ),
                       ),
                       IconButton(
-                        icon: const Icon(Icons.close, size: 20),
+                        icon: Icon(Icons.close, size: 20),
                         onPressed: () => Navigator.of(dialogContext).pop(),
                       ),
                     ],
                   ),
-                  const Divider(height: 1),
-                  const SizedBox(height: 12),
+                  Divider(height: 1),
+                  SizedBox(height: 12),
                   detailRow('Project', projectName),
                   detailRow('Type', entry.type.name.toUpperCase()),
                   detailRow('Date', formatDateLong(entry.date)),
@@ -3892,9 +3892,9 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
                       entry.rejectionReason!,
                       isWarning: true,
                     ),
-                  const SizedBox(height: 12),
-                  const Divider(height: 1),
-                  const SizedBox(height: 16),
+                  SizedBox(height: 12),
+                  Divider(height: 1),
+                  SizedBox(height: 16),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
@@ -3909,7 +3909,7 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
                           },
                         ),
                       ),
-                      const SizedBox(width: 8),
+                      SizedBox(width: 8),
                       Expanded(
                         child: _ReportActionBtn(
                           label: 'Record Payment',
@@ -3925,7 +3925,7 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
                           },
                         ),
                       ),
-                      const SizedBox(width: 8),
+                      SizedBox(width: 8),
                       Expanded(
                         child: _ReportActionBtn(
                           label: 'Edit Entry',
@@ -3956,7 +3956,7 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
       appBar: AppBar(
         title: Text(
           '${widget.title} (${widget.filteredEntries.length} entries)',
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.bold,
             color: AppColors.textPrimary,
@@ -3965,7 +3965,7 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
         backgroundColor: Colors.white,
         elevation: 0.5,
         leading: IconButton(
-          icon: const Icon(Icons.close, color: AppColors.textPrimary),
+          icon: Icon(Icons.close, color: AppColors.textPrimary),
           onPressed: () => Navigator.of(context).pop(),
         ),
         actions: [
@@ -3996,7 +3996,7 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
                 PopupMenuItem(
                   value: 'csv',
                   child: Row(
-                    children: const [
+                    children: [
                       Icon(
                         Icons.description_outlined,
                         color: AppColors.primary,
@@ -4010,7 +4010,7 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
                 PopupMenuItem(
                   value: 'pdf',
                   child: Row(
-                    children: const [
+                    children: [
                       Icon(
                         Icons.picture_as_pdf_outlined,
                         color: AppColors.primary,
@@ -4036,7 +4036,7 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
                   return DataCell(
                     Text(
                       _formatDateShort(entry.date),
-                      style: const TextStyle(fontSize: 12),
+                      style: TextStyle(fontSize: 12),
                     ),
                   );
                 } else if (colName == 'Payment Date') {
@@ -4044,11 +4044,11 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
                       ? _formatDateShort(entry.paymentDate!)
                       : '—';
                   return DataCell(
-                    Text(payDateStr, style: const TextStyle(fontSize: 12)),
+                    Text(payDateStr, style: TextStyle(fontSize: 12)),
                   );
                 } else if (colName == 'Project') {
                   return DataCell(
-                    Text(projectName, style: const TextStyle(fontSize: 12)),
+                    Text(projectName, style: TextStyle(fontSize: 12)),
                   );
                 } else if (colName == 'Type') {
                   return DataCell(_buildTypeChip(entry.type));
@@ -4056,7 +4056,7 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
                   return DataCell(
                     Text(
                       entry.description.isEmpty ? '—' : entry.description,
-                      style: const TextStyle(fontSize: 12),
+                      style: TextStyle(fontSize: 12),
                     ),
                   );
                 } else if (colName == 'Material' ||
@@ -4065,42 +4065,42 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
                   return DataCell(
                     Text(
                       entry.description,
-                      style: const TextStyle(fontSize: 12),
+                      style: TextStyle(fontSize: 12),
                     ),
                   );
                 } else if (colName == 'Brand') {
                   return DataCell(
                     Text(
                       entry.brand ?? '—',
-                      style: const TextStyle(fontSize: 12),
+                      style: TextStyle(fontSize: 12),
                     ),
                   );
                 } else if (colName == 'Floor') {
                   return DataCell(
                     Text(
                       entry.floor ?? '—',
-                      style: const TextStyle(fontSize: 12),
+                      style: TextStyle(fontSize: 12),
                     ),
                   );
                 } else if (colName == 'Phase') {
                   return DataCell(
                     Text(
                       entry.phase ?? '—',
-                      style: const TextStyle(fontSize: 12),
+                      style: TextStyle(fontSize: 12),
                     ),
                   );
                 } else if (colName == 'Activity') {
                   return DataCell(
                     Text(
                       entry.activity ?? '—',
-                      style: const TextStyle(fontSize: 12),
+                      style: TextStyle(fontSize: 12),
                     ),
                   );
                 } else if (colName == 'Unit') {
                   return DataCell(
                     Text(
                       entry.unit ?? '—',
-                      style: const TextStyle(fontSize: 12),
+                      style: TextStyle(fontSize: 12),
                     ),
                   );
                 } else if (colName == 'Status') {
@@ -4109,7 +4109,7 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
                   return DataCell(
                     Text(
                       _formatIndianCurrency(entry.amount),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 12,
                       ),
@@ -4122,7 +4122,7 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
                       style: TextStyle(
                         fontSize: 12,
                         color: entry.paidAmount > 0
-                            ? const Color(0xFF15803D)
+                            ? Color(0xFF15803D)
                             : AppColors.textSecondary,
                       ),
                     ),
@@ -4136,8 +4136,8 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                         color: rem > 0
-                            ? const Color(0xFFDC2626)
-                            : const Color(0xFF15803D),
+                            ? Color(0xFFDC2626)
+                            : Color(0xFF15803D),
                       ),
                     ),
                   );
@@ -4148,7 +4148,7 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
                   return DataCell(
                     Text(
                       _formatIndianCurrency(rate),
-                      style: const TextStyle(fontSize: 12),
+                      style: TextStyle(fontSize: 12),
                     ),
                   );
                 } else if (colName == 'Qty' ||
@@ -4159,7 +4159,7 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
                   return DataCell(
                     Text(
                       val.toStringAsFixed(1),
-                      style: const TextStyle(fontSize: 12),
+                      style: TextStyle(fontSize: 12),
                     ),
                   );
                 } else if (colName == 'Add More') {
@@ -4194,7 +4194,7 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
                     ),
                   );
                 } else {
-                  return const DataCell(SizedBox.shrink());
+                  return DataCell(SizedBox.shrink());
                 }
               }).toList();
               return DataRow(
@@ -4299,7 +4299,7 @@ class _ReportActionBtn extends StatelessWidget {
   final IconData icon;
   final _ReportActionStyle style;
   final VoidCallback onTap;
-  const _ReportActionBtn({
+  _ReportActionBtn({
     required this.label,
     required this.icon,
     required this.style,
@@ -4312,7 +4312,7 @@ class _ReportActionBtn extends StatelessWidget {
     switch (style) {
       case _ReportActionStyle.primary:
         deco = BoxDecoration(
-          gradient: const LinearGradient(
+          gradient: LinearGradient(
             colors: [Color(0xFF3B82F6), Color(0xFF1D4ED8)],
           ),
           borderRadius: BorderRadius.circular(6),
@@ -4323,17 +4323,17 @@ class _ReportActionBtn extends StatelessWidget {
         deco = BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: const Color(0xFF3B82F6), width: 1.0),
+          border: Border.all(color: Color(0xFF3B82F6), width: 1.0),
         );
-        color = const Color(0xFF3B82F6);
+        color = Color(0xFF3B82F6);
         break;
       case _ReportActionStyle.tertiary:
         deco = BoxDecoration(
-          color: const Color(0xFFF3F4F6),
+          color: Color(0xFFF3F4F6),
           borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: const Color(0xFFE5E7EB), width: 1.0),
+          border: Border.all(color: Color(0xFFE5E7EB), width: 1.0),
         );
-        color = const Color(0xFF4B5563);
+        color = Color(0xFF4B5563);
         break;
     }
     return MouseRegion(
@@ -4341,14 +4341,14 @@ class _ReportActionBtn extends StatelessWidget {
       child: GestureDetector(
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+          padding: EdgeInsets.symmetric(vertical: 6, horizontal: 8),
           decoration: deco,
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(icon, size: 12, color: color),
-              const SizedBox(width: 4),
+              SizedBox(width: 4),
               Flexible(
                 child: Text(
                   label,
@@ -4427,7 +4427,7 @@ class _ReportActions {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const Center(child: CircularProgressIndicator()),
+      builder: (context) => Center(child: CircularProgressIndicator()),
     );
     final tx = await ApiService.fetchTransactionById(entry.id);
     if (context.mounted) {
@@ -4436,7 +4436,7 @@ class _ReportActions {
     if (tx == null) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to load transaction details.')),
+          SnackBar(content: Text('Failed to load transaction details.')),
         );
       }
       return;
@@ -4499,7 +4499,7 @@ class _PaymentHistorySection extends StatefulWidget {
   final EntryModel entry;
   final String Function(double) formatCurrency;
   final String Function(DateTime) formatDate;
-  const _PaymentHistorySection({
+  _PaymentHistorySection({
     required this.entry,
     required this.formatCurrency,
     required this.formatDate,
@@ -4557,7 +4557,7 @@ class _PaymentHistorySectionState extends State<_PaymentHistorySection> {
     Widget header = Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        const Text(
+        Text(
           'PAYMENT HISTORY',
           style: TextStyle(
             fontSize: 12,
@@ -4574,10 +4574,10 @@ class _PaymentHistorySectionState extends State<_PaymentHistorySection> {
             },
             child: Text(
               _viewAll ? 'View Less' : 'View All (${history.length})',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.bold,
-                color: AppColors.primaryBlue,
+                color: AppColors.primary,
               ),
             ),
           ),
@@ -4585,7 +4585,7 @@ class _PaymentHistorySectionState extends State<_PaymentHistorySection> {
     );
     Widget content;
     if (_isLoading) {
-      content = const Padding(
+      content = Padding(
         padding: EdgeInsets.symmetric(vertical: 8),
         child: Row(
           children: [
@@ -4595,7 +4595,7 @@ class _PaymentHistorySectionState extends State<_PaymentHistorySection> {
               child: CircularProgressIndicator(
                 strokeWidth: 1.5,
                 valueColor: AlwaysStoppedAnimation<Color>(
-                  AppColors.primaryBlue,
+                  AppColors.primary,
                 ),
               ),
             ),
@@ -4613,7 +4613,7 @@ class _PaymentHistorySectionState extends State<_PaymentHistorySection> {
       );
     } else if (history.isEmpty) {
       if (widget.entry.paidAmount > 0) {
-        content = const Padding(
+        content = Padding(
           padding: EdgeInsets.symmetric(vertical: 8),
           child: Text(
             'Detailed payment history is unavailable for payments recorded before transaction tracking was introduced.',
@@ -4625,7 +4625,7 @@ class _PaymentHistorySectionState extends State<_PaymentHistorySection> {
           ),
         );
       } else {
-        content = const Padding(
+        content = Padding(
           padding: EdgeInsets.symmetric(vertical: 8),
           child: Text(
             'No payments recorded yet.',
@@ -4642,10 +4642,10 @@ class _PaymentHistorySectionState extends State<_PaymentHistorySection> {
       final itemsToShow = _viewAll ? displayedList : [displayedList.first];
       Widget list = ListView.separated(
         shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
+        physics: NeverScrollableScrollPhysics(),
         itemCount: itemsToShow.length,
         separatorBuilder: (_, _) =>
-            const Divider(height: 12, color: Color(0xFFF0F0F8)),
+            Divider(height: 12, color: Color(0xFFF0F0F8)),
         itemBuilder: (context, idx) {
           final item = itemsToShow[idx];
           final amt = (item['amount'] as num?)?.toDouble() ?? 0.0;
@@ -4661,7 +4661,7 @@ class _PaymentHistorySectionState extends State<_PaymentHistorySection> {
           final note = item['note'] as String? ?? '';
           final receipt = item['receipt'] as String?;
           return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
+            padding: EdgeInsets.symmetric(vertical: 4),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -4674,17 +4674,17 @@ class _PaymentHistorySectionState extends State<_PaymentHistorySection> {
                         children: [
                           Text(
                             dateStr,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
                               color: AppColors.textPrimary,
                             ),
                           ),
-                          const SizedBox(height: 4),
+                          SizedBox(height: 4),
                           Row(
                             children: [
                               Container(
-                                padding: const EdgeInsets.symmetric(
+                                padding: EdgeInsets.symmetric(
                                   horizontal: 6,
                                   vertical: 2,
                                 ),
@@ -4694,7 +4694,7 @@ class _PaymentHistorySectionState extends State<_PaymentHistorySection> {
                                 ),
                                 child: Text(
                                   method.toUpperCase(),
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 9,
                                     fontWeight: FontWeight.bold,
                                     color: AppColors.badgeInfoText,
@@ -4702,7 +4702,7 @@ class _PaymentHistorySectionState extends State<_PaymentHistorySection> {
                                 ),
                               ),
                               if (receipt != null && receipt.isNotEmpty) ...[
-                                const SizedBox(width: 8),
+                                SizedBox(width: 8),
                                 GestureDetector(
                                   onTap: () async {
                                     final uri = Uri.parse(receipt);
@@ -4710,12 +4710,12 @@ class _PaymentHistorySectionState extends State<_PaymentHistorySection> {
                                       await launchUrl(uri);
                                     }
                                   },
-                                  child: const Text(
+                                  child: Text(
                                     'Receipt ↗',
                                     style: TextStyle(
                                       fontSize: 10,
                                       fontWeight: FontWeight.bold,
-                                      color: AppColors.primaryBlue,
+                                      color: AppColors.primary,
                                       decoration: TextDecoration.underline,
                                     ),
                                   ),
@@ -4728,7 +4728,7 @@ class _PaymentHistorySectionState extends State<_PaymentHistorySection> {
                     ),
                     Text(
                       widget.formatCurrency(amt),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
                         color: AppColors.badgeSuccessText,
@@ -4737,10 +4737,10 @@ class _PaymentHistorySectionState extends State<_PaymentHistorySection> {
                   ],
                 ),
                 if (note.isNotEmpty) ...[
-                  const SizedBox(height: 4),
+                  SizedBox(height: 4),
                   Text(
                     'Note: $note',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 11,
                       fontStyle: FontStyle.italic,
                       color: AppColors.textSecondary,
@@ -4754,7 +4754,7 @@ class _PaymentHistorySectionState extends State<_PaymentHistorySection> {
       );
       if (_viewAll && displayedList.length > 3) {
         content = Container(
-          constraints: const BoxConstraints(maxHeight: 180),
+          constraints: BoxConstraints(maxHeight: 180),
           child: Scrollbar(
             thumbVisibility: true,
             child: SingleChildScrollView(child: list),
@@ -4765,15 +4765,15 @@ class _PaymentHistorySectionState extends State<_PaymentHistorySection> {
       }
     }
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: EdgeInsets.symmetric(vertical: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Divider(height: 16),
+          Divider(height: 16),
           header,
-          const SizedBox(height: 8),
+          SizedBox(height: 8),
           content,
-          const Divider(height: 16),
+          Divider(height: 16),
         ],
       ),
     );

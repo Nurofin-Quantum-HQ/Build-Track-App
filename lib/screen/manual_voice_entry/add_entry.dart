@@ -38,7 +38,7 @@ class AddEntryScreen extends StatelessWidget {
             _showcaseKey.currentState?.dismiss();
           }
         ), 
-        const TooltipActionButton(
+        TooltipActionButton(
           type: TooltipDefaultActionType.next, 
           backgroundColor: AppColors.primary, 
           textStyle: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)
@@ -67,7 +67,7 @@ class _AddEntryScreenContent extends StatefulWidget {
   State<_AddEntryScreenContent> createState() => _AddEntryScreenContentState();
 }
 class _AddEntryScreenContentState extends State<_AddEntryScreenContent> {
-  static primaryBlue = AppColors.primary;
+  static var primaryBlue = AppColors.primary;
   static const bgColor = AppColors.gradientStart;
   static const textDark = AppColors.textDark;
   static const textGray = AppColors.textLight;
@@ -444,7 +444,7 @@ class _AddEntryScreenContentState extends State<_AddEntryScreenContent> {
                     LinearProgressIndicator(
                       value: progressValue,
                       backgroundColor: Colors.grey[200],
-                      valueColor: const AlwaysStoppedAnimation<Color>(
+                      valueColor: AlwaysStoppedAnimation<Color>(
                         AppColors.primary,
                       ),
                     ),
@@ -1218,7 +1218,7 @@ class _AddEntryScreenContentState extends State<_AddEntryScreenContent> {
                   color: AppColors.primary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.receipt_long_rounded,
                   color: AppColors.primary,
                   size: 22,
@@ -1272,7 +1272,7 @@ class _AddEntryScreenContentState extends State<_AddEntryScreenContent> {
                   label: const Text('Download Template'),
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 14),
-                    side: const BorderSide(
+                    side: BorderSide(
                       color: AppColors.primary,
                       width: 1.5,
                     ),
@@ -1379,7 +1379,7 @@ class _AddEntryScreenContentState extends State<_AddEntryScreenContent> {
                         color: AppColors.primary.withValues(alpha: 0.1),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.help_outline,
                         color: AppColors.primary,
                         size: 19,
@@ -1431,7 +1431,7 @@ class _AddEntryScreenContentState extends State<_AddEntryScreenContent> {
           ],
         ),
       ),
-      bottomNavigationBar: const AppBottomNav(),
+      bottomNavigationBar: AppBottomNav(),
     );
   }
   Widget _entryCard(BuildContext context, int index) {
@@ -1539,7 +1539,7 @@ class _AddEntryScreenContentState extends State<_AddEntryScreenContent> {
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text('Template customization applied! Ready to download.'),
             backgroundColor: AppColors.primary,
           ),

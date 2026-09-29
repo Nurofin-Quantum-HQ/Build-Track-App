@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:buildtrack_mobile/common/themes/app_colors.dart';
 import 'package:buildtrack_mobile/services/api_service.dart';
 enum UserRole { admin, supervisor, mason }
 class UserSession extends ChangeNotifier {
@@ -181,6 +182,23 @@ class UserSession extends ChangeNotifier {
   static Future<void> fromLoginResponse(Map<String, dynamic> user) async {
     _userId = user['id']?.toString() ?? '';
     final rawRoleStr = user['role']?.toString() ?? '';
+    
+    // Sync themePreference from backend
+    final themePref = user['themePreference']?.toString();
+    if (themePref != null && themePref.isNotEmpty) {
+      try {
+        final hex = themePref.replaceAll('#', '');
+        if (hex.length == 6) {
+          final colorVal = int.parse('FF', radix: 16);
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setInt('app_theme_color', colorVal);
+          // Update global color for immediate effect before provider reloads
+          AppColors.primary = Color(colorVal);
+        }
+      } catch (e) {
+        debugPrint('Failed to parse themePreference: ');
+      }
+    }
     _rawRoleName = _toDisplayName(rawRoleStr);
     _role = _parseRole(rawRoleStr);
     _globalTourActive = false;

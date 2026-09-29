@@ -45,7 +45,7 @@ class _NotificationsBellState extends State<NotificationsBell> {
               color: AppColors.primary.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
-            child: const Icon(
+            child: Icon(
               Icons.notifications_none_outlined,
               color: AppColors.primary,
               size: 19,

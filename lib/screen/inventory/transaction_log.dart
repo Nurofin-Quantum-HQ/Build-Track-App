@@ -16,8 +16,8 @@ class TransactionLogsScreen extends StatefulWidget {
   State<TransactionLogsScreen> createState() => _TransactionLogsScreenState();
 }
 class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
-  static primaryBlue = AppColors.primary;
-  static purple = AppColors.primary;
+  static var primaryBlue = AppColors.primary;
+  static var purple = AppColors.primary;
   static const bgColor = AppColors.gradientStart;
   static const textDark = AppColors.textDark;
   static const textGray = AppColors.textLight;
@@ -481,7 +481,7 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
                     _buildLogsHeader(),
                     const SizedBox(height: 14),
                     if (_isLoading)
-                      const Padding(
+                      Padding(
                         padding: EdgeInsets.symmetric(vertical: 60),
                         child: Center(
                           child: CircularProgressIndicator(
@@ -529,7 +529,7 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
                 Container(
                   width: 6,
                   height: 6,
-                  decoration: const BoxDecoration(
+                  decoration: BoxDecoration(
                     color: primaryBlue,
                     shape: BoxShape.circle,
                   ),
@@ -537,7 +537,7 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
                 const SizedBox(width: 8),
                 Text(
                   groupLabel,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12.5,
                     fontWeight: FontWeight.w800,
                     color: primaryBlue,
@@ -557,7 +557,7 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
                 AnimatedRotation(
                   duration: const Duration(milliseconds: 200),
                   turns: collapsed ? 0 : 0.5,
-                  child: const Icon(
+                  child: Icon(
                     Icons.keyboard_arrow_down,
                     color: primaryBlue,
                     size: 18,
@@ -937,11 +937,11 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.add, color: primaryBlue, size: 16),
+                    Icon(Icons.add, color: primaryBlue, size: 16),
                     const SizedBox(width: 6),
                     Text(
                       _primaryActionLabel,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: primaryBlue,
                         fontWeight: FontWeight.w700,
                         fontSize: 13,

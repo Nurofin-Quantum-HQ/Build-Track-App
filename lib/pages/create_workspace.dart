@@ -267,7 +267,7 @@ class _CreateWorkspaceScreenState extends State<CreateWorkspaceScreen> {
                               ),
                               GestureDetector(
                                 onTap: _pickLogo,
-                                child: const Text(
+                                child: Text(
                                   'Change logo',
                                   style: TextStyle(
                                     fontSize: 12,
@@ -398,7 +398,7 @@ class _CreateWorkspaceScreenState extends State<CreateWorkspaceScreen> {
             ),
             child: Row(
               children: [
-                const Icon(
+                Icon(
                   Icons.admin_panel_settings_outlined,
                   color: AppColors.primary,
                   size: 20,

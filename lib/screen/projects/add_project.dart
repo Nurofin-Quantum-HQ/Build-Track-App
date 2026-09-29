@@ -18,7 +18,7 @@ class AddProjectScreen extends StatefulWidget {
   State<AddProjectScreen> createState() => _AddProjectScreenState();
 }
 class _AddProjectScreenState extends State<AddProjectScreen> {
-  static primaryBlue = AppColors.primary;
+  static var primaryBlue = AppColors.primary;
   static const bgColor = AppColors.gradientStart;
   static const textDark = AppColors.textDark;
   static const textGray = AppColors.textLight;
@@ -272,7 +272,7 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              const Text(
+              Text(
                 'Project Limit Reached',
                 textAlign: TextAlign.center,
                 style: TextStyle(
@@ -336,9 +336,9 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
     }
     if (_startDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text('Please select a start date'),
-          backgroundColor: Colors.orange,
+          backgroundColor: AppColors.primary,
         ),
       );
       return;
@@ -1646,7 +1646,7 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: primaryBlue, width: 2),
+          borderSide: BorderSide(color: primaryBlue, width: 2),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
@@ -1790,7 +1790,7 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
                   width: 36,
                   height: 36,
                   color: Colors.transparent,
-                  child: const Icon(Icons.add, size: 16, color: primaryBlue),
+                  child: Icon(Icons.add, size: 16, color: primaryBlue),
                 ),
               ),
             ],
@@ -1938,7 +1938,7 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
                         }
                       }
                     }),
-                    child: const Text(
+                    child: Text(
                       'Select All',
                       style: TextStyle(
                         fontSize: 12,
@@ -1987,7 +1987,7 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
               const SizedBox(height: 8),
               Text(
                 '$done of $total activities selected',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
                   color: primaryBlue,
@@ -2006,7 +2006,7 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
         const SizedBox(height: 12),
         GestureDetector(
           onTap: _showAddCustomStageDialog,
-          child: const Padding(
+          child: Padding(
             padding: EdgeInsets.symmetric(vertical: 4),
             child: Text(
               '+ Add Custom Phase',
@@ -2229,7 +2229,7 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
                         width: 1,
                       ),
                     ),
-                    child: const Text(
+                    child: Text(
                       '+ Add Custom Activity',
                       style: TextStyle(
                         fontSize: 13,
@@ -2268,7 +2268,7 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
         content: TextField(
           controller: _customStageNameCtrl,
           autofocus: true,
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             hintText: 'Enter name',
             focusedBorder: UnderlineInputBorder(
               borderSide: BorderSide(color: primaryBlue, width: 2),
@@ -2346,7 +2346,7 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
           controller: ctrl,
           focusNode: focusNode,
           autofocus: true,
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             hintText: 'Enter name',
             focusedBorder: UnderlineInputBorder(
               borderSide: BorderSide(color: primaryBlue, width: 2),
@@ -2422,9 +2422,9 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: Colors.red.shade50,
+          color: Colors.red.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: Colors.red.shade200),
+          border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
         ),
         child: Row(
           children: [

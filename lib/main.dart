@@ -131,7 +131,9 @@ class MyApp extends StatelessWidget {
   final bool isLoggedIn;
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProvider, child) {
+        return MaterialApp(
       navigatorKey: globalNavigatorKey,
       title: 'BuildTrack',
       debugShowCheckedModeBanner: false,
@@ -225,6 +227,8 @@ class MyApp extends StatelessWidget {
           );
         }
         return null;
+      },
+    );
       },
     );
   }

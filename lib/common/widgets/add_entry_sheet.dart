@@ -144,7 +144,7 @@ class _EntryCard extends StatelessWidget {
     required this.isSelected,
     required this.onTap,
   });
-  static primaryBlue = AppColors.primary;
+  static var primaryBlue = AppColors.primary;
   static const textDark = AppColors.textDark;
   static const textGray = AppColors.textLight;
   @override

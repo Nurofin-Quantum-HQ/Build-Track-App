@@ -2206,7 +2206,7 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
                                 lastDate: DateTime(2100),
                                 builder: (ctx, child) => Theme(
                                   data: Theme.of(ctx).copyWith(
-                                    colorScheme: const ColorScheme.light(
+                                    colorScheme: ColorScheme.light(
                                       primary: AppColors.primary,
                                       onPrimary: Colors.white,
                                       onSurface: AppColors.textDark,
@@ -2244,7 +2244,7 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
                               ),
                               child: Row(
                                 children: [
-                                  const Icon(
+                                  Icon(
                                     Icons.calendar_today_outlined,
                                     color: AppColors.primary,
                                     size: 18,
@@ -2259,7 +2259,7 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
                                     ),
                                   ),
                                   const Spacer(),
-                                  const Icon(
+                                  Icon(
                                     Icons.keyboard_arrow_down_rounded,
                                     color: AppColors.primary,
                                     size: 22,

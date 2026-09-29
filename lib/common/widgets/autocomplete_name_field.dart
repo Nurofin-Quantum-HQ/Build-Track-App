@@ -173,7 +173,7 @@ class _AutocompleteNameFieldState extends State<AutocompleteNameField> {
               contentPadding: const EdgeInsets.symmetric(vertical: 10),
               isDense: true,
               suffixIcon: widget.suggestions.isNotEmpty
-                  ? const Padding(
+                  ? Padding(
                       padding: EdgeInsets.only(right: 2),
                       child: Icon(
                         Icons.auto_awesome,
@@ -299,13 +299,13 @@ class _SuggestionDropdown extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.history_rounded,
                     size: 14,
                     color: AppColors.primary,
                   ),
                   const SizedBox(width: 6),
-                  const Text(
+                  Text(
                     'Recent Entries',
                     style: TextStyle(
                       fontSize: 11,
@@ -475,7 +475,7 @@ class _SuggestionRow extends StatelessWidget {
                 ),
                 child: Text(
                   unit,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
                     color: AppColors.primary,

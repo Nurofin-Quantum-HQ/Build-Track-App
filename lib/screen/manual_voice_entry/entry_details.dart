@@ -17,7 +17,7 @@ class EntryDetailScreen extends StatefulWidget {
   State<EntryDetailScreen> createState() => _EntryDetailScreenState();
 }
 class _EntryDetailScreenState extends State<EntryDetailScreen> {
-  static primaryBlue = AppColors.primary;
+  static var primaryBlue = AppColors.primary;
   static const bgColor = AppColors.gradientStart;
   static const textDark = AppColors.textDark;
   static const textGray = AppColors.textLight;
@@ -440,7 +440,7 @@ class _EntryDetailScreenState extends State<EntryDetailScreen> {
                               ),
                             ],
                           ),
-                          const AppDivider(verticalPadding: 12),
+                          AppDivider(verticalPadding: 12),
                           _fieldLabel('PURCHASE DATE'),
                           const SizedBox(height: 6),
                           Row(
@@ -597,7 +597,7 @@ class _EntryDetailScreenState extends State<EntryDetailScreen> {
                   borderRadius: BorderRadius.circular(16),
                 ),
               ),
-              child: const Text(
+              child: Text(
                 'Edit',
                 style: TextStyle(
                   color: primaryBlue,
@@ -926,7 +926,7 @@ class _EntryDetailScreenState extends State<EntryDetailScreen> {
                     _viewAllPayments
                         ? 'View Less'
                         : 'View All (${_paymentHistory.length})',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
                       color: primaryBlue,
@@ -981,7 +981,7 @@ class _EntryDetailScreenState extends State<EntryDetailScreen> {
                               ),
                               child: Text(
                                 method.toUpperCase(),
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 10,
                                   fontWeight: FontWeight.w800,
                                   color: primaryBlue,

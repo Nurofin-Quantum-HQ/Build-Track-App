@@ -8,14 +8,14 @@ class AppCard extends StatelessWidget {
     required this.child,
     this.padding = const EdgeInsets.all(AppTheme.spacingMd),
     this.margin = const EdgeInsets.only(bottom: AppTheme.spacingMd),
-    this.color = AppTheme.surface,
+    this.color,
     this.borderRadius = AppTheme.radiusLg,
     this.onTap,
   });
   final Widget child;
   final EdgeInsetsGeometry padding;
   final EdgeInsetsGeometry margin;
-  final Color color;
+  final Color? color;
   final double borderRadius;  
   final VoidCallback? onTap;
   @override
@@ -349,26 +349,26 @@ class AppSectionHeader extends StatelessWidget {
   }
 }
 class AppDivider extends StatelessWidget {
-  const AppDivider({super.key, this.verticalPadding = AppTheme.spacingMd});
+  AppDivider({super.key, this.verticalPadding = AppTheme.spacingMd});
   final double verticalPadding;
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: EdgeInsets.symmetric(vertical: verticalPadding),
-      child: const Divider(color: AppTheme.divider, thickness: 1),
+      child: Divider(color: AppTheme.divider, thickness: 1),
     );
   }
 }
 class AppProgressBar extends StatelessWidget {
-  const AppProgressBar({
+  AppProgressBar({
     super.key,
     required this.label,
     required this.percent,
-    this.color = AppTheme.secondary,
+    this.color,
   });
   final String label;
   final double percent;
-  final Color color;
+  final Color? color;
   @override
   Widget build(BuildContext context) {
     return Column(

@@ -2276,7 +2276,7 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'LIVE TRANSCRIPT',
             style: TextStyle(
               fontSize: 10,
@@ -2612,7 +2612,7 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(
+          Icon(
             Icons.lightbulb_outline_rounded,
             color: AppColors.primary,
             size: 18,
@@ -2622,7 +2622,7 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Example Phrase:',
                   style: TextStyle(
                     fontSize: 11.5,
@@ -2892,7 +2892,7 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
                   color: Color(0xFFF0EDFF),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.cloud_upload_outlined,
                   color: AppColors.primary,
                   size: 22,
@@ -2925,7 +2925,7 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
                           ),
                           child: Text(
                             _entryType.toUpperCase(),
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 9,
                               fontWeight: FontWeight.bold,
                               color: AppColors.primary,
@@ -2994,7 +2994,7 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
                     textColor = AppColors.textDark;
                     fontWeight = FontWeight.w600;
                   } else {
-                    indicator = const Icon(
+                    indicator = Icon(
                       Icons.refresh_rounded,
                       color: AppColors.primary,
                       size: 18,
@@ -3003,7 +3003,7 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
                     fontWeight = FontWeight.w500;
                   }
                 } else if (isCurrent) {
-                  indicator = const SizedBox(
+                  indicator = SizedBox(
                     width: 14,
                     height: 14,
                     child: CircularProgressIndicator(
@@ -3063,7 +3063,7 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: const Color(0xFFEBE8FF)),
           ),
-          child: const Row(
+          child: Row(
             children: [
               Icon(
                 Icons.lightbulb_outline_rounded,
@@ -3285,7 +3285,7 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: const Color(0xFFEBE8FF)),
               ),
-              child: const Row(
+              child: Row(
                 children: [
                   Icon(
                     Icons.lightbulb_outline_rounded,
@@ -3529,7 +3529,7 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
                               color: AppColors.primary.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(12),
                             ),
-                            child: const Icon(
+                            child: Icon(
                               Icons.mic_rounded,
                               color: AppColors.primary,
                               size: 20,
@@ -3907,7 +3907,7 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
             const SizedBox(width: 6),
             Text(
               timer,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13.5,
                 fontWeight: FontWeight.bold,
                 color: AppColors.primary,
@@ -3915,7 +3915,7 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
               ),
             ),
             const SizedBox(width: 5),
-            const Text(
+            Text(
               'Listening',
               style: TextStyle(
                 fontSize: 13.5,

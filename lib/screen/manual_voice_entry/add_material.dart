@@ -1315,7 +1315,7 @@ class _AddMaterialScreenState extends State<AddMaterialScreen> {
                             color: AppColors.primary.withValues(alpha: 0.10),
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: const Icon(
+                          child: Icon(
                             Icons.history_rounded,
                             color: AppColors.primary,
                             size: 20,
@@ -1416,7 +1416,7 @@ class _AddMaterialScreenState extends State<AddMaterialScreen> {
                                       ),
                                       borderRadius: BorderRadius.circular(12),
                                     ),
-                                    child: const Icon(
+                                    child: Icon(
                                       Icons.category_outlined,
                                       color: AppColors.primary,
                                       size: 20,
@@ -1469,7 +1469,7 @@ class _AddMaterialScreenState extends State<AddMaterialScreen> {
                                       ),
                                       borderRadius: BorderRadius.circular(10),
                                     ),
-                                    child: const Text(
+                                    child: Text(
                                       'Use',
                                       style: TextStyle(
                                         fontSize: 12,
@@ -2257,7 +2257,7 @@ class _AddMaterialScreenState extends State<AddMaterialScreen> {
                                 lastDate: DateTime(2100),
                                 builder: (ctx, child) => Theme(
                                   data: Theme.of(ctx).copyWith(
-                                    colorScheme: const ColorScheme.light(
+                                    colorScheme: ColorScheme.light(
                                       primary: AppColors.primary,
                                       onPrimary: Colors.white,
                                       onSurface: AppColors.textDark,
@@ -2296,7 +2296,7 @@ class _AddMaterialScreenState extends State<AddMaterialScreen> {
                               ),
                               child: Row(
                                 children: [
-                                  const Icon(
+                                  Icon(
                                     Icons.calendar_today_outlined,
                                     color: AppColors.primary,
                                     size: 18,
@@ -2311,7 +2311,7 @@ class _AddMaterialScreenState extends State<AddMaterialScreen> {
                                     ),
                                   ),
                                   const Spacer(),
-                                  const Icon(
+                                  Icon(
                                     Icons.keyboard_arrow_down_rounded,
                                     color: AppColors.primary,
                                     size: 22,
@@ -2798,7 +2798,7 @@ class _AddMaterialScreenState extends State<AddMaterialScreen> {
                                     ),
                                     borderRadius: BorderRadius.circular(11),
                                   ),
-                                  child: const Icon(
+                                  child: Icon(
                                     Icons.history_rounded,
                                     color: AppColors.primary,
                                     size: 20,

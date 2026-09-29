@@ -33,7 +33,7 @@ class InventoryScreen extends StatelessWidget {
             _showcaseKey.currentState?.dismiss();
           }
         ), 
-        const TooltipActionButton(
+        TooltipActionButton(
           type: TooltipDefaultActionType.next, 
           backgroundColor: AppColors.primary, 
           textStyle: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)
@@ -568,7 +568,7 @@ class _InventoryScreenContentState extends State<_InventoryScreenContent> {
           ],
         ),
       ),
-      bottomNavigationBar: const AppBottomNav(),
+      bottomNavigationBar: AppBottomNav(),
     );
   }
   Widget _buildProjectSelector() {
@@ -604,7 +604,7 @@ class _InventoryScreenContentState extends State<_InventoryScreenContent> {
                 color: _blue.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(9),
               ),
-              child: const Icon(Icons.folder_outlined, color: _blue, size: 17),
+              child: Icon(Icons.folder_outlined, color: _blue, size: 17),
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -788,7 +788,7 @@ class _InventoryScreenContentState extends State<_InventoryScreenContent> {
   Widget _buildMaterialsTab(BuildContext ctx) {
     final provider = ctx.watch<InventoryProvider>();
     if (provider.isLoading) {
-      return const Center(child: CircularProgressIndicator(color: _blue));
+      return Center(child: CircularProgressIndicator(color: _blue));
     }
     final all = provider.materialInventory;
     final flat = _flatten(all);
@@ -823,7 +823,7 @@ class _InventoryScreenContentState extends State<_InventoryScreenContent> {
   Widget _buildLabourTab(BuildContext ctx) {
     final provider = ctx.watch<InventoryProvider>();
     if (provider.isLoading) {
-      return const Center(child: CircularProgressIndicator(color: _blue));
+      return Center(child: CircularProgressIndicator(color: _blue));
     }
     final all = provider.labourInventory;
     final flat = _flatten(all);
@@ -858,7 +858,7 @@ class _InventoryScreenContentState extends State<_InventoryScreenContent> {
   Widget _buildEquipmentTab(BuildContext ctx) {
     final provider = ctx.watch<InventoryProvider>();
     if (provider.isLoading) {
-      return const Center(child: CircularProgressIndicator(color: _blue));
+      return Center(child: CircularProgressIndicator(color: _blue));
     }
     final all = provider.equipmentInventory;
     final flat = _flatten(all);
@@ -1736,7 +1736,7 @@ class _PurchaseActionBtn extends StatelessWidget {
           borderRadius: BorderRadius.circular(10),
           boxShadow: [
             BoxShadow(
-              color: AppColors.primaryBlue.withValues(alpha: 0.15),
+              color: AppColors.primary.withValues(alpha: 0.15),
               blurRadius: 6,
               offset: const Offset(0, 2),
             ),

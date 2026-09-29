@@ -107,11 +107,11 @@ class AppTheme {
     color: AppColors.textSecondary,
     letterSpacing: 0.3,
   );
-  static final ThemeData lightTheme = ThemeData(
+  static ThemeData get lightTheme => ThemeData(
     useMaterial3: true,
     colorScheme: ColorScheme.fromSeed(
-      seedColor: AppColors.primaryBlue,
-      primary: AppColors.primaryBlue,
+      seedColor: AppColors.primary,
+      primary: AppColors.primary,
       secondary: AppColors.primaryPurple,
       surface: AppColors.cardBg,
     ),
@@ -151,7 +151,7 @@ class AppTheme {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(radiusMd),
-        borderSide: BorderSide(color: AppColors.primaryBlue, width: 1.5),
+        borderSide: BorderSide(color: AppColors.primary, width: 1.5),
       ),
       hintStyle: GoogleFonts.inter(
         color: AppColors.textSecondary,

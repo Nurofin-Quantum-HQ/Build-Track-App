@@ -446,7 +446,7 @@ class _AssignRolesScreenState extends State<AssignRolesScreen> {
                     color: AppColors.primary.withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.help_outline,
                     color: AppColors.primary,
                     size: 22,
@@ -977,7 +977,7 @@ class _AssignRolesScreenState extends State<AssignRolesScreen> {
             padding: const EdgeInsets.symmetric(vertical: 14),
             child: Row(
               children: [
-                const SizedBox(
+                SizedBox(
                   width: 18,
                   height: 18,
                   child: CircularProgressIndicator(

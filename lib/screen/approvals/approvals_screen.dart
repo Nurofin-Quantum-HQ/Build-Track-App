@@ -87,7 +87,7 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
                       ),
                     ),
                   if (_transactions.isNotEmpty) ...[
-                    const Text(
+                    Text(
                       'Transactions',
                       style: TextStyle(
                         fontSize: 18,
@@ -124,7 +124,7 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
                 ),
                 Text(
                   '₹${tx['amount']}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.bold,
                     color: AppColors.primary,
                     fontSize: 16,

@@ -196,7 +196,7 @@ class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
           if (_isLoading)
             Container(
               color: Colors.white,
-              child: const Center(
+              child: Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [

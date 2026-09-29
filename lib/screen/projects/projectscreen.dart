@@ -140,7 +140,7 @@ class ProjectsScreen extends StatelessWidget {
             _showcaseKey.currentState?.dismiss();
           }
         ), 
-        const TooltipActionButton(
+        TooltipActionButton(
           type: TooltipDefaultActionType.next, 
           backgroundColor: AppColors.primary, 
           textStyle: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)
@@ -170,7 +170,7 @@ class _ProjectsScreenContent extends StatefulWidget {
 }
 
 class _ProjectsScreenContentState extends State<_ProjectsScreenContent> {
-  static primaryBlue = AppColors.primary;
+  static var primaryBlue = AppColors.primary;
   static const bgColor = AppColors.gradientStart;
   static const textDark = AppColors.textDark;
   static const textGray = AppColors.textLight;
@@ -246,7 +246,7 @@ class _ProjectsScreenContentState extends State<_ProjectsScreenContent> {
                             color: AppColors.primary.withValues(alpha: 0.1),
                             shape: BoxShape.circle,
                           ),
-                          child: const Icon(
+                          child: Icon(
                             Icons.assignment_outlined,
                             color: AppColors.primary,
                             size: 19,
@@ -274,7 +274,7 @@ class _ProjectsScreenContentState extends State<_ProjectsScreenContent> {
                         color: AppColors.primary.withValues(alpha: 0.1),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.help_outline,
                         color: AppColors.primary,
                         size: 19,
@@ -293,12 +293,12 @@ class _ProjectsScreenContentState extends State<_ProjectsScreenContent> {
           ],
         ),
       ),
-      bottomNavigationBar: const AppBottomNav(),
+      bottomNavigationBar: AppBottomNav(),
     );
   }
   Widget _buildBody(BuildContext context, ProjectProvider provider) {
     if (provider.isLoading) {
-      return const Center(
+      return Center(
         child: CircularProgressIndicator(color: AppColors.primary),
       );
     }
@@ -332,7 +332,7 @@ class _ProjectsScreenContentState extends State<_ProjectsScreenContent> {
                 color: primaryBlue.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(20),
               ),
-              child: const Text(
+              child: Text(
                 'LIVE PIPELINE',
                 style: TextStyle(
                   color: primaryBlue,
@@ -367,7 +367,7 @@ class _ProjectsScreenContentState extends State<_ProjectsScreenContent> {
                   ),
                   child: Text(
                     '${provider.projects.length} Sites',
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: primaryBlue,
                       fontWeight: FontWeight.w800,
                       fontSize: 13,
@@ -463,7 +463,7 @@ class _ProjectsScreenContentState extends State<_ProjectsScreenContent> {
                 const SizedBox(height: 4),
                 Text(
                   '${p.formattedSpent} of ${p.formattedBudget}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: primaryBlue,
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
@@ -484,7 +484,7 @@ class _ProjectsScreenContentState extends State<_ProjectsScreenContent> {
                   ),
                   Text(
                     '${(p.progress * 100).toStringAsFixed(0)}%',
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: primaryBlue,
                       fontWeight: FontWeight.w800,
                       fontSize: 13,
@@ -498,7 +498,7 @@ class _ProjectsScreenContentState extends State<_ProjectsScreenContent> {
                 child: LinearProgressIndicator(
                   value: p.progress,
                   backgroundColor: const Color(0xFFE8ECF8),
-                  valueColor: const AlwaysStoppedAnimation<Color>(primaryBlue),
+                  valueColor: AlwaysStoppedAnimation<Color>(primaryBlue),
                   minHeight: 7,
                 ),
               ),
@@ -516,7 +516,7 @@ class _ProjectsScreenContentState extends State<_ProjectsScreenContent> {
                       horizontal: 4,
                       vertical: 2,
                     ),
-                    child: const Row(
+                    child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(

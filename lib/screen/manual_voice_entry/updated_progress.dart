@@ -17,7 +17,7 @@ class UpdateProgressScreen extends StatefulWidget {
   State<UpdateProgressScreen> createState() => _UpdateProgressScreenState();
 }
 class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
-  static primaryBlue = AppColors.primary;
+  static var primaryBlue = AppColors.primary;
   static const bgColor = AppColors.gradientStart;
   static const textDark = AppColors.textDark;
   static const textGray = AppColors.textLight;
@@ -345,7 +345,7 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
     padding: const EdgeInsets.only(bottom: 8),
     child: Text(
       text,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 13,
         fontWeight: FontWeight.w800,
         color: primaryBlue,
@@ -529,7 +529,7 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
               color: primaryBlue.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(9),
             ),
-            child: const Icon(
+            child: Icon(
               Icons.checklist_rounded,
               color: primaryBlue,
               size: 16,
@@ -540,7 +540,7 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Activity Progress Update',
                   style: TextStyle(
                     fontSize: 13,
@@ -596,7 +596,7 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
                   color: primaryBlue.withValues(alpha: 0.10),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.tune_rounded,
                   color: primaryBlue,
                   size: 17,
@@ -781,7 +781,7 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
               color: primaryBlue.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(20),
             ),
-            child: const Text(
+            child: Text(
               'ACTIVE EXECUTION CONTEXT',
               style: TextStyle(
                 color: primaryBlue,
@@ -806,7 +806,7 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
             const SizedBox(height: 4),
             Text(
               _selectedActivityName!,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w700,
                 color: primaryBlue,
@@ -843,7 +843,7 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
               ),
               Text(
                 '${(_completionProgress * 100).toInt()}%',
-                style: const TextStyle(
+                style: TextStyle(
                   color: primaryBlue,
                   fontWeight: FontWeight.w900,
                   fontSize: 14,
@@ -871,7 +871,7 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
   }
   Widget _buildTaskChecklist() {
     if (_isLoadingTasks) {
-      return const Padding(
+      return Padding(
         padding: EdgeInsets.symmetric(vertical: 24),
         child: Center(child: CircularProgressIndicator(color: primaryBlue)),
       );
@@ -1040,7 +1040,7 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
                     lastDate: DateTime(2100),
                     builder: (ctx, child) => Theme(
                       data: Theme.of(ctx).copyWith(
-                        colorScheme: const ColorScheme.light(
+                        colorScheme: ColorScheme.light(
                           primary: primaryBlue,
                           onPrimary: Colors.white,
                           onSurface: textDark,
@@ -1066,7 +1066,7 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
                   ),
                   child: Row(
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.calendar_month_outlined,
                         color: primaryBlue,
                         size: 19,
@@ -1105,7 +1105,7 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
                     lastDate: DateTime(2100),
                     builder: (ctx, child) => Theme(
                       data: Theme.of(ctx).copyWith(
-                        colorScheme: const ColorScheme.light(
+                        colorScheme: ColorScheme.light(
                           primary: primaryBlue,
                           onPrimary: Colors.white,
                           onSurface: textDark,
@@ -1131,7 +1131,7 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
                   ),
                   child: Row(
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.event_available,
                         color: primaryBlue,
                         size: 19,
@@ -1193,7 +1193,7 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
                       color: primaryBlue.withValues(alpha: 0.1),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.cloud_upload_outlined,
                       color: primaryBlue,
                       size: 22,
@@ -1316,7 +1316,7 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
                         width: 1.5,
                       ),
                     ),
-                    child: const Center(
+                    child: Center(
                       child: Icon(
                         Icons.add_a_photo_outlined,
                         color: primaryBlue,
@@ -1379,7 +1379,7 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
                   '/add-material',
                   arguments: {'type': 'material'},
                 ),
-                child: const Text(
+                child: Text(
                   'ADD MATERIAL',
                   style: TextStyle(
                     color: primaryBlue,
@@ -1421,7 +1421,7 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
         Container(
           width: 7,
           height: 7,
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             color: primaryBlue,
             shape: BoxShape.circle,
           ),
@@ -1445,7 +1445,7 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
           ),
           child: Text(
             qty,
-            style: const TextStyle(
+            style: TextStyle(
               color: primaryBlue,
               fontSize: 12,
               fontWeight: FontWeight.w800,

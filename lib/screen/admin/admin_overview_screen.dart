@@ -119,7 +119,7 @@ class _AdminOverviewScreenState extends State<AdminOverviewScreen>
                             color: AppColors.primarySurface,
                             shape: BoxShape.circle,
                           ),
-                          child: const Icon(
+                          child: Icon(
                             Icons.lock_outline,
                             color: AppColors.primary,
                             size: 34,
@@ -247,7 +247,7 @@ class _AdminOverviewScreenState extends State<AdminOverviewScreen>
   }
   Widget _buildUsersTab() {
     if (_loadingUsers) {
-      return const Center(
+      return Center(
         child: CircularProgressIndicator(color: AppColors.primary),
       );
     }
@@ -293,7 +293,7 @@ class _AdminOverviewScreenState extends State<AdminOverviewScreen>
   }
   Widget _buildTransactionsTab() {
     if (_loadingTx) {
-      return const Center(
+      return Center(
         child: CircularProgressIndicator(color: AppColors.primary),
       );
     }
@@ -377,7 +377,7 @@ class _UserCard extends StatelessWidget {
                 backgroundColor: AppColors.primarySurface,
                 child: Text(
                   name.isNotEmpty ? name[0].toUpperCase() : '?',
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.primary,
                     fontWeight: FontWeight.w800,
                     fontSize: 16,
@@ -436,7 +436,7 @@ class _UserCard extends StatelessWidget {
                       color: AppColors.primarySurface,
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.edit_outlined,
                       color: AppColors.primary,
                       size: 16,
@@ -466,7 +466,7 @@ class _UserCard extends StatelessWidget {
                         ),
                         child: Text(
                           p,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 10,
                             color: AppColors.primary,
                             fontWeight: FontWeight.w600,

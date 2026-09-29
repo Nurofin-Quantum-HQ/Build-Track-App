@@ -154,7 +154,7 @@ class SubscriptionScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ShowCaseWidget(
-      globalTooltipActions: const [
+      globalTooltipActions: [
         TooltipActionButton(
           type: TooltipDefaultActionType.skip,
           backgroundColor: Colors.transparent,
@@ -351,7 +351,7 @@ class _SubscriptionScreenContentState
               color: AppColors.primary.withValues(alpha: 0.15),
             ),
           ),
-          child: const Row(
+          child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(

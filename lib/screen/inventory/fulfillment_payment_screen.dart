@@ -280,7 +280,7 @@ class _FulfillmentPaymentScreenState extends State<FulfillmentPaymentScreen> {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text('Server updated payment, but client failed to parse response: $e'),
-                backgroundColor: Colors.orange.shade600,
+                backgroundColor: Colors.orange.withValues(alpha: 0.8),
                 behavior: SnackBarBehavior.floating,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
@@ -310,7 +310,7 @@ class _FulfillmentPaymentScreenState extends State<FulfillmentPaymentScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(errMsg),
-              backgroundColor: Colors.red.shade600,
+              backgroundColor: Colors.red.withValues(alpha: 0.8),
               behavior: SnackBarBehavior.floating,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -328,7 +328,7 @@ class _FulfillmentPaymentScreenState extends State<FulfillmentPaymentScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Network or processing error: $e'),
-            backgroundColor: Colors.red.shade600,
+            backgroundColor: Colors.red.withValues(alpha: 0.8),
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
@@ -769,7 +769,7 @@ class _FulfillmentPaymentScreenState extends State<FulfillmentPaymentScreen> {
                          const SizedBox(height: 8),
                          Container(
                            padding: const EdgeInsets.all(12),
-                           decoration: BoxDecoration(color: Colors.green.shade50, borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.green)),
+                           decoration: BoxDecoration(color: Colors.green.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.green)),
                            child: const Row(
                              children: [
                                Icon(Icons.check_circle, color: Colors.green),

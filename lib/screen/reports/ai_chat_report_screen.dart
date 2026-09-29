@@ -33,7 +33,7 @@ class _AiChatReportScreenState extends State<AiChatReportScreen> {
   @override
   Widget build(BuildContext context) {
     if (loading) {
-      return const Scaffold(
+      return Scaffold(
         backgroundColor: AppColors.gradientStart,
         body: Center(
           child: CircularProgressIndicator(color: AppColors.primary),
@@ -144,7 +144,7 @@ class _AiDashboardViewState extends State<_AiDashboardView> {
                     hintStyle: AppTheme.body.copyWith(
                       color: AppColors.textLight,
                     ),
-                    prefixIcon: const Icon(
+                    prefixIcon: Icon(
                       Icons.auto_awesome,
                       color: AppColors.primary,
                     ),
@@ -424,7 +424,7 @@ class _ResultsStateState extends State<_ResultsState> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text(
+                        Text(
                           'Customize Columns',
                           style: TextStyle(
                             fontSize: 16,
@@ -580,43 +580,43 @@ class _ResultsStateState extends State<_ResultsState> {
     final provider = context.watch<AiChatReportProvider>();
     final result = widget.result;
     return ListView(
-      padding: const EdgeInsets.only(bottom: 40),
+      padding: EdgeInsets.only(bottom: 40),
       children: [
         if (result.alerts.isNotEmpty)
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: EdgeInsets.symmetric(horizontal: 16),
             child: Column(
               children: result.alerts.map((alert) {
                 final isCritical = alert['type'] == 'critical';
                 return Container(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  padding: const EdgeInsets.all(12),
+                  margin: EdgeInsets.only(bottom: 12),
+                  padding: EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: isCritical
-                        ? Colors.red.shade50
-                        : Colors.orange.shade50,
+                        ? Colors.red.withValues(alpha: 0.1)
+                        : AppColors.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
                       color: isCritical
-                          ? Colors.red.shade200
-                          : Colors.orange.shade200,
+                          ? Colors.red.withValues(alpha: 0.3)
+                          : AppColors.primary.withValues(alpha: 0.3),
                     ),
                   ),
                   child: Row(
                     children: [
                       Icon(
                         isCritical ? Icons.warning : Icons.info,
-                        color: isCritical ? Colors.red : Colors.orange,
+                        color: isCritical ? Colors.red : AppColors.primary,
                         size: 24,
                       ),
-                      const SizedBox(width: 12),
+                      SizedBox(width: 12),
                       Expanded(
                         child: Text(
                           alert['message'] ?? '',
                           style: TextStyle(
                             color: isCritical
-                                ? Colors.red.shade900
-                                : Colors.orange.shade900,
+                                ? Colors.red.withValues(alpha: 0.95)
+                                : AppColors.primary.withValues(alpha: 0.95),
                             fontWeight: FontWeight.bold,
                             fontSize: 13,
                           ),
@@ -653,7 +653,7 @@ class _ResultsStateState extends State<_ResultsState> {
               children: [
                 Row(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.auto_awesome,
                       color: AppColors.primary,
                       size: 18,
@@ -1149,7 +1149,7 @@ class _ResultsStateState extends State<_ResultsState> {
         final severity = r['severity']?.toString() ?? 'ok';
         Color statusColor = AppColors.success;
         if (severity == 'critical') statusColor = AppColors.error;
-        if (severity == 'low') statusColor = Colors.orange;
+        if (severity == 'low') statusColor = AppColors.primary;
         return DataRow(
           cells: [
             DataCell(Text(r['name']?.toString() ?? '-')),
