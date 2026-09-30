@@ -26,6 +26,7 @@ class BillingService {
       if (planName == null) return null;
       final response = await ApiService.post('/subscriptions/initiate', {
         'plan': planName,
+        'isRecurring': true,
       });
       if (response.statusCode == 200) {
         final data = json.decode(response.body) as Map<String, dynamic>;
