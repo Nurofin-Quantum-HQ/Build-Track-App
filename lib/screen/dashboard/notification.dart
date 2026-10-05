@@ -122,7 +122,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   String _formatTime(String dateStr) {
     try {
-      final date = DateTime.parse(dateStr);
+      final date = DateTime.parse(dateStr).toLocal();
       return DateFormat('MMM d, h:mm a').format(date);
     } catch (e) {
       return '';

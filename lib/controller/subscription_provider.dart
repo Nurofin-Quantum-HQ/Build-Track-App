@@ -131,7 +131,7 @@ class SubscriptionProvider extends ChangeNotifier {
       if (data != null && data['hasSubscription'] == true) {
         _currentPlan = SubscriptionPlanX.fromString(data['plan']?.toString());
         if (data['endDate'] != null) {
-          _expiryDate = DateTime.tryParse(data['endDate'].toString());
+          _expiryDate = DateTime.tryParse(data['endDate'].toString())?.toLocal();
         } else {
           _expiryDate = null;
         }
@@ -275,7 +275,7 @@ class SubscriptionProvider extends ChangeNotifier {
         );
       }
       if (expiryStr != null) {
-        _expiryDate = DateTime.tryParse(expiryStr);
+        _expiryDate = DateTime.tryParse(expiryStr)?.toLocal();
       }
     } catch (e) {
       debugPrint('Load persisted subscription error: $e');

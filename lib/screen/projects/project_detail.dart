@@ -167,7 +167,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                     const AppSectionHeader(title: 'Timeline & Status'),
                     _ProjectTimelineCard(project: project),
                     const SizedBox(height: 14),
-                    if (UserSession.isAdmin) ...[
+                    if (true) ...[
                       const AppSectionHeader(title: 'Financial Overview'),
                       _FinancialCard(project: project),
                       const SizedBox(height: 14),
@@ -407,15 +407,7 @@ class _TrackerPhaseCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 4),
-                      AnimatedRotation(
-                        turns: isExpanded ? 0.5 : 0,
-                        duration: const Duration(milliseconds: 180),
-                        child: const Icon(
-                          Icons.keyboard_arrow_down_rounded,
-                          color: AppColors.textLight,
-                          size: 20,
-                        ),
-                      ),
+                      
                     ],
                   ),
                 ],
@@ -437,9 +429,7 @@ class _TrackerPhaseCard extends StatelessWidget {
                 ),
               ),
             ),
-          AnimatedCrossFade(
-            firstChild: const SizedBox(width: double.infinity, height: 0),
-            secondChild: Column(
+          Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Divider(height: 1, color: Color(0xFFEEF0F5)),
@@ -453,11 +443,6 @@ class _TrackerPhaseCard extends StatelessWidget {
                 ),
               ],
             ),
-            crossFadeState: isExpanded
-                ? CrossFadeState.showSecond
-                : CrossFadeState.showFirst,
-            duration: const Duration(milliseconds: 200),
-          ),
         ],
       ),
     );
@@ -967,7 +952,7 @@ class _TrackerActivityRowState extends State<_TrackerActivityRow> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         InkWell(
-          onTap: UserSession.isAdmin ? () => setState(() => _isBudgetExpanded = !_isBudgetExpanded) : null,
+          onTap: () => setState(() => _isBudgetExpanded = !_isBudgetExpanded),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 10, 8, 10),
             child: Row(
@@ -1127,7 +1112,7 @@ class _TrackerActivityRowState extends State<_TrackerActivityRow> {
                     ),
                   ),
                 ],
-                if (UserSession.isAdmin) ...[
+                if (true) ...[
                   const SizedBox(width: 2),
                   AnimatedRotation(
                     turns: _isBudgetExpanded ? 0.5 : 0,
@@ -1143,7 +1128,7 @@ class _TrackerActivityRowState extends State<_TrackerActivityRow> {
             ),
           ),
         ),
-        if (_isBudgetExpanded && UserSession.isAdmin) _buildBudgetSection(context),
+        _buildBudgetSection(context),
       ],
     );
   }
@@ -2741,7 +2726,7 @@ class _RecentEntriesSection extends StatelessWidget {
   final String? currentUserId;
   @override
   Widget build(BuildContext context) {
-    final isAdmin = UserSession.isAdmin;
+    final isAdmin = true;
     final isSupervisor = UserSession.isSupervisor || RoleManager.isSupervisor;
     final hasProjectAccess = UserSession.hasProjectAccess(project.id);
     final allEntries = provider.entriesForProject(project.id).toList();
@@ -3779,3 +3764,5 @@ class _DocumentsCard extends StatelessWidget {
     );
   }
 }
+
+

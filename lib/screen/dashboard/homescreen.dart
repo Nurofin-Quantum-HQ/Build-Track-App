@@ -662,6 +662,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
   static const textDark = AppColors.textDark;
   static const textGray = AppColors.textLight;
   List<dynamic> _revenueEntries = [];
+  bool _isGlobalView = true;
   bool _loadingRevenue = false;
   String? _lastProjectId;
   double get _totalRevenueSum {
@@ -690,9 +691,9 @@ class _AdminDashboardState extends State<_AdminDashboard> {
         }
         entries.sort((a, b) {
           final dateA =
-              DateTime.tryParse(a['date']?.toString() ?? '') ?? DateTime.now();
+              DateTime.tryParse(a['date']?.toString() ?? '')?.toLocal() ?? DateTime.now();
           final dateB =
-              DateTime.tryParse(b['date']?.toString() ?? '') ?? DateTime.now();
+              DateTime.tryParse(b['date']?.toString() ?? '')?.toLocal() ?? DateTime.now();
           return dateB.compareTo(dateA);
         });
         if (mounted && projectId == _lastProjectId) {
@@ -738,7 +739,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
     DateTime selectedDate = DateTime.now();
     if (editingTx?['date'] != null) {
       try {
-        selectedDate = DateTime.parse(editingTx!['date'].toString());
+        selectedDate = DateTime.parse(editingTx!['date'].toString()).toLocal();
       } catch (_) {}
     }
     PickedImage? pickedImage;
@@ -1804,7 +1805,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
     DateTime date = DateTime.now();
     if (tx['date'] != null) {
       try {
-        date = DateTime.parse(tx['date'].toString());
+        date = DateTime.parse(tx['date'].toString()).toLocal();
       } catch (_) {}
     }
     final dateStr =
@@ -2477,7 +2478,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
     DateTime date = DateTime.now();
     if (tx['date'] != null) {
       try {
-        date = DateTime.parse(tx['date'].toString());
+        date = DateTime.parse(tx['date'].toString()).toLocal();
       } catch (_) {}
     }
     final dateStr =
@@ -2643,7 +2644,23 @@ class _AdminDashboardState extends State<_AdminDashboard> {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<ProjectProvider>();
-    final project = provider.selectedProject;
+    final project = _isGlobalView ? null : provider.selectedProject;
+
+    double gBudget = 0;
+    double gSpent = 0;
+    double gRev = 0;
+    double gProg = 0;
+    if (_isGlobalView) {
+      for (var p in provider.projects) {
+        gBudget += p.totalBudget;
+        gSpent += provider.totalSpentForProject(p.id);
+        gRev += p.totalIncome;
+        gProg += p.progress;
+      }
+      if (provider.projects.isNotEmpty) gProg /= provider.projects.length;
+    }
+    bool globalIsLoss = (gRev - gSpent) < 0;
+
     if (project != null && project.id != _lastProjectId) {
       _lastProjectId = project.id;
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -2745,9 +2762,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                 textBaseline: TextBaseline.alphabetic,
                 children: [
                   Text(
-                    project != null
-                        ? '${(project.progress * 100).toStringAsFixed(1)}%'
-                        : '—',
+                    _isGlobalView ? '${(gProg * 100).toStringAsFixed(1)}%' : project != null ? '${(project.progress * 100).toStringAsFixed(1)}%' : '--',
                     style: TextStyle(
                       fontSize: 40,
                       fontWeight: FontWeight.w900,
@@ -2760,7 +2775,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Text(
-                          project?.name ?? 'No project',
+                          _isGlobalView ? 'Global Financial Overview' : project?.name ?? 'No project',
                           textAlign: TextAlign.end,
                           style: TextStyle(
                             color: textDark,
@@ -2799,7 +2814,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                           ),
                         ),
                         FractionallySizedBox(
-                          widthFactor: (project?.progress ?? 0).clamp(0.0, 1.0),
+                          widthFactor: _isGlobalView ? gProg.clamp(0.0, 1.0) : (project?.progress ?? 0).clamp(0.0, 1.0),
                           child: Container(
                             decoration: BoxDecoration(
                               gradient: AppGradients.progressBar,
@@ -2832,9 +2847,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                         ),
                       ),
                       Text(
-                        project != null
-                            ? '${(project.progress * 100).toStringAsFixed(0)}% Completed'
-                            : '—',
+                        _isGlobalView ? '${(gProg * 100).toStringAsFixed(0)}% Completed' : project != null ? '${(project.progress * 100).toStringAsFixed(0)}% Completed' : '--',
                         style: const TextStyle(
                           color: AppColors.primaryPurple,
                           fontSize: 11,
@@ -2862,13 +2875,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                 tooltipPadding: const EdgeInsets.all(16),
                 child: _costCard(
                   'TOTAL COST',
-                  project != null
-                      ? formatCurrency(
-                          context.read<ProjectProvider>().totalSpentForProject(
-                            project.id,
-                          ),
-                        )
-                      : '₹—',
+                  _isGlobalView ? formatCurrency(gSpent) : project != null ? formatCurrency(context.read<ProjectProvider>().totalSpentForProject(project.id)) : '--',
                   project != null
                       ? () {
                           final paid = context
@@ -2881,11 +2888,9 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                           return '$pct% Used';
                         }()
                       : '—',
-                  project != null &&
-                      context.read<ProjectProvider>().totalSpentForProject(
-                            project.id,
-                          ) >
-                          project.totalBudget * 0.9,
+                  _isGlobalView
+                      ? gSpent > gBudget * 0.9
+                      : project != null && context.read<ProjectProvider>().totalSpentForProject(project.id) > project.totalBudget * 0.9,
                   indicatorIcon: Icons.trending_up,
                 ),
               ),
@@ -2905,7 +2910,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                   'Remaining: ${project?.formattedRemaining ?? '—'}',
                   project != null && project.remainingBudget < 0,
                   isInvoice: true,
-                  indicatorIcon: (project != null && project.remainingBudget < 0)
+                  indicatorIcon: (_isGlobalView ? (gBudget - gSpent < 0) : project != null && project.remainingBudget < 0)
                       ? Icons.trending_down
                       : Icons.trending_flat,
                 ),
@@ -2937,12 +2942,11 @@ class _AdminDashboardState extends State<_AdminDashboard> {
             Expanded(
               child: Builder(
                 builder: (_) {
-                  final netCash = project != null
-                      ? (_totalRevenueSum -
-                          context
-                              .read<ProjectProvider>()
-                              .totalSpentForProject(project.id))
-                      : 0.0;
+                  final netCash = _isGlobalView
+                      ? gRev - gSpent
+                      : project != null
+                          ? (_totalRevenueSum - context.read<ProjectProvider>().totalSpentForProject(project.id))
+                          : 0.0;
                   final isLoss = netCash < 0;
                   return Showcase(
                     key: ShowcaseKeys.dashboardNetCashFlow,
@@ -2953,8 +2957,8 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                     tooltipPadding: const EdgeInsets.all(16),
                     child: _costCard(
                       'NET CASH FLOW',
-                      project != null ? formatCurrency(netCash) : '₹—',
-                      project != null ? (isLoss ? 'Net Loss' : 'Net Profit') : '—',
+                      _isGlobalView || project != null ? formatCurrency(netCash) : '--',
+                      _isGlobalView || project != null ? (isLoss ? 'Net Loss' : 'Net Profit') : '--',
                       isLoss,
                       isInvoice: !isLoss,
                       indicatorIcon: isLoss ? Icons.trending_down : Icons.trending_up,
@@ -2971,7 +2975,11 @@ class _AdminDashboardState extends State<_AdminDashboard> {
             Expanded(
               child: _costCard(
                 'UPCOMING PAY / PLANNED',
-                project != null ? formatCurrency(project.remainingBudget < 0 ? 0 : project.remainingBudget) : '₹—',
+                _isGlobalView
+                    ? formatCurrency((gBudget - gSpent) < 0 ? 0 : (gBudget - gSpent))
+                    : project != null
+                        ? formatCurrency(project.remainingBudget < 0 ? 0 : project.remainingBudget)
+                        : '--',
                 'Planned to spend',
                 false,
                 isInvoice: true,
@@ -3002,7 +3010,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
     );
   }
   Widget _buildProjectSelector(BuildContext context, ProjectProvider provider) {
-    final selectedName = provider.selectedProject?.name ?? 'Select Project';
+    final selectedName = _isGlobalView ? 'Global Financial Overview' : (provider.selectedProject?.name ?? 'Select Project');
     return Container(
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.8),
@@ -3129,11 +3137,50 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                 child: SingleChildScrollView(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
-                    children: projects.map((p) {
-                      final selected = p.id == provider.selectedProject?.id;
+                    children: [
+                      InkWell(
+                        onTap: () {
+                          setState(() { _isGlobalView = true; });
+                          Navigator.pop(context);
+                        },
+                        borderRadius: BorderRadius.circular(12),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          decoration: BoxDecoration(
+                            color: _isGlobalView ? AppColors.primary.withOpacity(0.08) : Colors.transparent,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: _isGlobalView ? AppColors.primary.withOpacity(0.3) : Colors.transparent,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.public, color: _isGlobalView ? AppColors.primary : Colors.black54, size: 20),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Text(
+                                  'Global Financial Overview (All Projects)',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: _isGlobalView ? FontWeight.w700 : FontWeight.w500,
+                                    color: _isGlobalView ? AppColors.primary : AppColors.textDark,
+                                  ),
+                                ),
+                              ),
+                              if (_isGlobalView)
+                                Icon(Icons.check_circle_rounded, color: AppColors.primary, size: 20)
+                              else
+                                const Icon(Icons.chevron_right, color: Colors.black26),
+                            ],
+                          ),
+                        ),
+                      ),
+                      ...projects.map((p) {
+                      final selected = !_isGlobalView && p.id == provider.selectedProject?.id;
                       return InkWell(
                         onTap: () {
-                          provider.selectProject(p);
+                          setState(() { _isGlobalView = false; }); provider.selectProject(p);
                           Navigator.pop(context);
                         },
                         borderRadius: BorderRadius.circular(12),
@@ -3183,6 +3230,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                         ),
                       );
                     }).toList(),
+                    ],
                   ),
                 ),
               ),
@@ -3982,7 +4030,7 @@ class _SupervisorDashboardState extends State<_SupervisorDashboard> {
             DateTime parse(dynamic tx) {
               final raw = tx['approvedAt'] ?? tx['date'] ?? tx['createdAt'];
               try {
-                return DateTime.parse(raw.toString());
+                return DateTime.parse(raw.toString()).toLocal();
               } catch (_) {
                 return DateTime.fromMillisecondsSinceEpoch(0);
               }
@@ -4165,7 +4213,7 @@ class _PendingTxCard extends StatelessWidget {
     final rawDate = tx['date'] ?? tx['createdAt'];
     if (rawDate != null) {
       try {
-        final d = DateTime.parse(rawDate.toString());
+        final d = DateTime.parse(rawDate.toString()).toLocal();
         const months = [
           'Jan',
           'Feb',
@@ -4334,7 +4382,7 @@ class _HistoryTxCard extends StatelessWidget {
     final rawDate = tx['approvedAt'] ?? tx['date'] ?? tx['createdAt'];
     if (rawDate != null) {
       try {
-        final d = DateTime.parse(rawDate.toString());
+        final d = DateTime.parse(rawDate.toString()).toLocal();
         const months = [
           'Jan',
           'Feb',
@@ -5063,7 +5111,7 @@ class _TeamApprovalHistoryWidgetState
                   tx['date'] ??
                   tx['createdAt'];
               try {
-                return DateTime.parse(raw.toString());
+                return DateTime.parse(raw.toString()).toLocal();
               } catch (_) {
                 return DateTime.fromMillisecondsSinceEpoch(0);
               }
@@ -5339,3 +5387,6 @@ class _TeamApprovalHistoryWidgetState
     );
   }
 }
+
+
+

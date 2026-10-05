@@ -377,9 +377,7 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
           .where((a) => a.isSelected)
           .map((a) => a.key)
           .toList();
-      final finalFloors = _selectedFloorChips.isEmpty
-          ? <String>['Ground']
-          : List<String>.from(_selectedFloorChips);
+      final finalFloors = List<String>.from(_selectedFloorChips);
       final locationStr = _mapAddressCtrl.text.trim().isNotEmpty
           ? _mapAddressCtrl.text.trim()
           : _cityCtrl.text.trim();
@@ -2836,3 +2834,5 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
     );
   }
 }
+
+

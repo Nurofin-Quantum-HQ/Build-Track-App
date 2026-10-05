@@ -131,7 +131,7 @@ class _InventoryScreenContentState extends State<_InventoryScreenContent> {
           final val = tx[key];
           if (val is String && val.isNotEmpty) {
             try {
-              date = DateTime.parse(val);
+              date = DateTime.parse(val).toLocal();
               break;
             } catch (_) {}
           }

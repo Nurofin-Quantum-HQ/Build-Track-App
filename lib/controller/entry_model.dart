@@ -57,10 +57,10 @@ class Entry {
       ),
       approvedBy: map['approvedBy'] as String?,
       approvedAt: map['approvedAt'] != null
-          ? DateTime.parse(map['approvedAt'] as String)
+          ? DateTime.parse(map['approvedAt'] as String).toLocal()
           : null,
       createdAt: map['createdAt'] != null
-          ? DateTime.parse(map['createdAt'] as String)
+          ? DateTime.parse(map['createdAt'] as String).toLocal()
           : null,
     );
   }

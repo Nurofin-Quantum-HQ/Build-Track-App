@@ -267,7 +267,7 @@ class ProjectProvider extends ChangeNotifier {
         }
       }
       final paymentDateRaw = json['paymentDate'] != null
-          ? DateTime.tryParse(json['paymentDate'].toString())
+          ? DateTime.tryParse(json['paymentDate'].toString())?.toLocal()
           : null;
       return EntryModel(
         id: json['_id']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString(),
@@ -275,10 +275,10 @@ class ProjectProvider extends ChangeNotifier {
         type: parsedType,
         amount: amount,
         createdAt: json['createdAt'] != null
-            ? DateTime.tryParse(json['createdAt'].toString()) ?? DateTime.now()
+            ? DateTime.tryParse(json['createdAt'].toString())?.toLocal() ?? DateTime.now()
             : DateTime.now(),
         date: json['date'] != null
-            ? DateTime.tryParse(json['date'].toString()) ?? DateTime.now()
+            ? DateTime.tryParse(json['date'].toString())?.toLocal() ?? DateTime.now()
             : DateTime.now(),
         description:
             json['materialName'] ??
@@ -462,9 +462,7 @@ class ProjectProvider extends ChangeNotifier {
               }).toList();
               return phase.copyWith(activities: mergedActivities);
             }).toList();
-        final floors = (p.floors == null || p.floors!.isEmpty)
-            ? ['Ground']
-            : p.floors!;
+        final floors = p.floors ?? [];
         final totalActs = effectivePhases.fold<int>(
           0,
           (s, ph) => s + ph.totalCount,
@@ -608,9 +606,6 @@ class ProjectProvider extends ChangeNotifier {
       _projects = _filterForCurrentUser(fetched);
       _projects = _projects.map((p) {
         final floors = p.floors;
-        if (floors == null || floors.isEmpty) {
-          return p.copyWith(floors: ['Ground']);
-        }
         return p;
       }).toList();
       if (_projects.isNotEmpty && _selectedProject == null) {
@@ -635,11 +630,7 @@ class ProjectProvider extends ChangeNotifier {
     DateTime? expectedEndDate,
     List<String>? floors,
   }) async {
-    final finalFloors = (floors == null || floors.isEmpty)
-        ? (project.floors == null || project.floors!.isEmpty
-              ? ['Ground']
-              : project.floors!)
-        : floors;
+    final finalFloors = floors ?? project.floors ?? [];
     final updatedProject = project.copyWith(
       clientName: clientName,
       projectType: projectType,
@@ -1174,3 +1165,5 @@ class ProjectProvider extends ChangeNotifier {
     notifyListeners();
   }
 }
+
+

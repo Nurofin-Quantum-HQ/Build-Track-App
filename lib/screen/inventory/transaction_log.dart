@@ -139,7 +139,7 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
   String _formatDate(dynamic dateStr) {
     if (dateStr == null) return '';
     try {
-      final dt = DateTime.parse(dateStr.toString());
+      final dt = DateTime.parse(dateStr.toString()).toLocal();
       final months = [
         'Jan',
         'Feb',
@@ -181,7 +181,7 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
       final y = int.tryParse(parts[2]);
       if (m != null && d != null && y != null) return DateTime(y, m, d);
     }
-    return DateTime.tryParse(s);
+    return DateTime.tryParse(s)?.toLocal();
   }
   String _smartLabel(String dateStr) {
     if (dateStr.isEmpty) return 'Older';

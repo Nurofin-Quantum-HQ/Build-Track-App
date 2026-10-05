@@ -307,19 +307,8 @@ class _AddEquipmentScreenState extends State<AddEquipmentScreen> {
         : projectProvider.projects.cast<ProjectModel?>().firstWhere(
             (p) => p?.id == projectId,
             orElse: () => null,
-          );
-    const List<String> defaultFloors = [
-      'Basement',
-      'Ground Floor',
-      '1st Floor',
-      '2nd Floor',
-      '3rd Floor',
-      'Terrace',
-    ];
-    if (project != null) {
-      _floors = (project.floors?.isNotEmpty == true)
-          ? List<String>.from(project.floors!)
-          : defaultFloors;
+          );    if (project != null && project.floors != null) {
+      _floors = List<String>.from(project.floors!);
     } else {
       _floors = [];
     }
@@ -500,9 +489,10 @@ class _AddEquipmentScreenState extends State<AddEquipmentScreen> {
       _notesCtrl.text = _safeString(argsData['notes']);
       if (argsData['date'] != null) {
         try {
-          _selectedDate = DateTime.parse(argsData['date'].toString());
+          _selectedDate = DateTime.parse(argsData['date'].toString()).toLocal();
         } catch (_) {}
       }
+      
       final double gstVal = _parseDouble(
         argsData['gst'] ?? argsData['gstPercentage'],
       );
@@ -591,9 +581,10 @@ class _AddEquipmentScreenState extends State<AddEquipmentScreen> {
     _notesCtrl.text = _safeString(latest['notes']);
     if (latest['date'] != null) {
       try {
-        _selectedDate = DateTime.parse(latest['date'].toString());
+        _selectedDate = DateTime.parse(latest['date'].toString()).toLocal();
       } catch (_) {}
     }
+    
     final double freshGst = _parseDouble(
       latest['gst'] ?? latest['gstPercentage'],
     );
@@ -689,6 +680,7 @@ class _AddEquipmentScreenState extends State<AddEquipmentScreen> {
         argsData['supplier'] ?? argsData['operator'],
       );
       _notesCtrl.text = _safeString(argsData['notes']);
+      
       final double rateVal = _parseDouble(
         argsData['rate'] ?? argsData['hourlyRate'] ?? argsData['dailyWage'],
       );
@@ -776,11 +768,8 @@ class _AddEquipmentScreenState extends State<AddEquipmentScreen> {
     );
     _operatorCtrl.text = _safeString(latest['supplier'] ?? latest['operator']);
     _notesCtrl.text = _safeString(latest['notes']);
-    if (latest['date'] != null) {
-      try {
-        _selectedDate = DateTime.parse(latest['date'].toString());
-      } catch (_) {}
-    }
+    
+    
     final double freshGst = _parseDouble(
       latest['gst'] ?? latest['gstPercentage'],
     );
@@ -1304,7 +1293,7 @@ class _AddEquipmentScreenState extends State<AddEquipmentScreen> {
       } else if (UserSession.hasPermission('view_inventory')) {
         Navigator.pushNamedAndRemoveUntil(
           context,
-          '/inventory',
+          '/reports',
           (route) => route.settings.name == '/' || route.isFirst,
         );
       } else {
@@ -1456,7 +1445,7 @@ class _AddEquipmentScreenState extends State<AddEquipmentScreen> {
                         final rawDate = tx['date'] ?? tx['createdAt'];
                         if (rawDate != null) {
                           try {
-                            final d = DateTime.parse(rawDate.toString());
+                            final d = DateTime.parse(rawDate.toString()).toLocal();
                             dateStr =
                                 '${d.day} ${_monthName(d.month)} ${d.year}';
                           } catch (_) {}
@@ -1791,7 +1780,7 @@ class _AddEquipmentScreenState extends State<AddEquipmentScreen> {
     DateTime payDate = DateTime.now();
     if (payment['date'] != null) {
       try {
-        payDate = DateTime.parse(payment['date'].toString());
+        payDate = DateTime.parse(payment['date'].toString()).toLocal();
       } catch (_) {}
     } else if (payment['paymentDate'] != null) {
       try {
@@ -2067,6 +2056,51 @@ class _AddEquipmentScreenState extends State<AddEquipmentScreen> {
       ],
     );
   }
+  void _showDeleteDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Delete Entry?', style: TextStyle(fontWeight: FontWeight.w800)),
+        content: const Text('Are you sure you want to permanently delete this entry?'),
+        actionsPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(color: Colors.black54, fontWeight: FontWeight.w600)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              elevation: 0,
+            ),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              if (_editingTransactionId != null) {
+                final success = await ApiService.deleteTransaction(_editingTransactionId!);
+                if (success && context.mounted) {
+                  if (_selectedProjectId != null) {
+                    context.read<InventoryProvider>().loadInventory(_selectedProjectId!);
+                  }
+                  context.read<ProjectProvider>().load();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Entry deleted successfully'), backgroundColor: Colors.red),
+                  );
+                  Navigator.pop(context); // Pop edit screen
+                } else if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Failed to delete entry'), backgroundColor: Colors.red),
+                  );
+                }
+              }
+            },
+            child: const Text('Delete', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+  }
   @override
   Widget build(BuildContext context) {
     context.watch<ProjectProvider>().projects;
@@ -2086,6 +2120,25 @@ class _AddEquipmentScreenState extends State<AddEquipmentScreen> {
               isSubScreen: true,
               leftIcon: Icons.arrow_back,
               onLeftTap: () => Navigator.maybePop(context),
+              rightWidget: _isEditing ? GestureDetector(
+                onTap: () => _showDeleteDialog(context),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.red.withOpacity(0.2)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.delete_outline_rounded, color: Colors.red, size: 16),
+                      const SizedBox(width: 4),
+                      const Text('Delete', style: TextStyle(color: Colors.red, fontSize: 13, fontWeight: FontWeight.w700)),
+                    ],
+                  ),
+                ),
+              ) : null,
             ),
             Expanded(
               child: SingleChildScrollView(
@@ -2892,3 +2945,5 @@ class _AddEquipmentScreenState extends State<AddEquipmentScreen> {
     );
   }
 }
+
+

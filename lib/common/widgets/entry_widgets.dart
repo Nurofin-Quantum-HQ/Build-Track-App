@@ -773,19 +773,10 @@ class ExecutionContextCard extends StatelessWidget {
             : projects.cast<ProjectModel?>().firstWhere(
                 (p) => p?.id == selectedProjectId,
                 orElse: () => null,
-              );
-        const List<String> defaultFloors = [
-          'Basement',
-          'Ground Floor',
-          '1st Floor',
-          '2nd Floor',
-          '3rd Floor',
-          'Terrace',
-        ];
-        final List<String> floors = (selProject?.floors?.isNotEmpty == true)
+              );        final List<String> floors = (selProject?.floors?.isNotEmpty == true)
             ? List<String>.from(selProject!.floors!)
-            : (selProject != null ? defaultFloors : <String>[]);
-        if (selectedFloor != null && !floors.contains(selectedFloor)) {
+            : <String>[];
+        if (selectedFloor != null && selectedFloor!.isNotEmpty && !floors.contains(selectedFloor)) {
           floors.insert(0, selectedFloor!);
         }
         String? selPhaseName;
@@ -892,36 +883,38 @@ class ExecutionContextCard extends StatelessWidget {
               ),
               if (projectError != null) EntryErrorText(projectError!),
               const SizedBox(height: 18),
-              const EntryFieldLabel('Floor / Zone', required: true),
-              const SizedBox(height: 8),
-              EntryDropdownField<String>(
-                value: selectedFloor,
-                hint: selectedProjectId == null
-                    ? 'Select project first'
-                    : 'Select floor',
-                enabled: selectedProjectId != null,
-                items: floors
-                    .map(
-                      (f) => DropdownMenuItem<String>(value: f, child: Text(f)),
-                    )
-                    .toList(),
-                onChanged: onFloorChanged,
-                error: floorError,
-              ),
-              if (floorError != null) EntryErrorText(floorError!),
-              const SizedBox(height: 18),
+              if (floors.isNotEmpty) ...[
+                const EntryFieldLabel('Floor / Zone', required: true),
+                const SizedBox(height: 8),
+                EntryDropdownField<String>(
+                  value: selectedFloor,
+                  hint: selectedProjectId == null
+                      ? 'Select project first'
+                      : 'Select floor',
+                  enabled: selectedProjectId != null,
+                  items: floors
+                      .map(
+                        (f) => DropdownMenuItem<String>(value: f, child: Text(f)),
+                      )
+                      .toList(),
+                  onChanged: onFloorChanged,
+                  error: floorError,
+                ),
+                if (floorError != null) EntryErrorText(floorError!),
+                const SizedBox(height: 18),
+              ],
               const EntryFieldLabel('Phase', required: true),
               const SizedBox(height: 8),
               EntryDropdownField<String>(
                 value: visiblePhaseNames.contains(selPhaseName)
                     ? selPhaseName
                     : null,
-                hint: selectedFloor == null
+                hint: (floors.isNotEmpty && selectedFloor == null)
                     ? 'Select floor first'
                     : visiblePhaseNames.isEmpty
                     ? 'No phases configured for this project'
                     : 'Select phase',
-                enabled: selectedFloor != null && visiblePhaseNames.isNotEmpty,
+                enabled: (floors.isEmpty || selectedFloor != null) && visiblePhaseNames.isNotEmpty,
                 items: visiblePhaseNames
                     .map(
                       (n) => DropdownMenuItem<String>(value: n, child: Text(n)),
@@ -2948,3 +2941,6 @@ class PaymentReceiptCard extends StatelessWidget {
     );
   }
 }
+
+
+

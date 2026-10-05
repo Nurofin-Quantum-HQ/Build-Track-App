@@ -23,7 +23,15 @@ class EntryPermissions {
     required String createdBy,
     required String projectId,
   }) {
-    return canEdit(status: status, createdBy: createdBy, projectId: projectId);
+    if (UserSession.isAdmin) return true;
+    if (status == 'approved') return false;
+    if (UserSession.isSupervisor) {
+      return UserSession.hasProjectAccess(projectId);
+    }
+    if (UserSession.isMason) {
+      return createdBy == UserSession.userId;
+    }
+    return false;
   }
   static bool canApprove() {
     return RoleManager.canApproveEntries;

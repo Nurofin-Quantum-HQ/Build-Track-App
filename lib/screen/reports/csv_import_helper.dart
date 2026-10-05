@@ -194,7 +194,7 @@ class CsvImportHelper {
                  if (dateIdxPay != -1 && dateIdxPay < row.length) {
                      final dRaw = parseString(row[dateIdxPay]);
                      if (dRaw.isNotEmpty) {
-                         final dp = DateTime.tryParse(dRaw);
+                         final dp = DateTime.tryParse(dRaw)?.toLocal();
                          if (dp != null) {
                              payDate = DateTime.utc(dp.year, dp.month, dp.day, 12, 0, 0);
                          } else {
@@ -227,7 +227,7 @@ class CsvImportHelper {
             : '';
         DateTime date = DateTime.now();
         if (dateStr.isNotEmpty) {
-          final parsed = DateTime.tryParse(dateStr);
+          final parsed = DateTime.tryParse(dateStr)?.toLocal();
           if (parsed != null) {
             date = parsed;
           } else {

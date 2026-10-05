@@ -537,7 +537,7 @@ class _TxCard extends StatelessWidget {
     final rawDate = tx['date'] ?? tx['createdAt'];
     if (rawDate != null) {
       try {
-        final d = DateTime.parse(rawDate.toString());
+        final d = DateTime.parse(rawDate.toString()).toLocal();
         const months = [
           'Jan',
           'Feb',

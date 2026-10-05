@@ -945,7 +945,11 @@ class _FulfillmentPaymentScreenState extends State<FulfillmentPaymentScreen> {
                           ),
                         );
                         if (picked != null) {
-                          setState(() => _selectedPaymentDate = picked);
+                          final now = DateTime.now();
+                          setState(() => _selectedPaymentDate = DateTime(
+                            picked.year, picked.month, picked.day,
+                            now.hour, now.minute, now.second,
+                          ));
                         }
                       },
                       child: Container(

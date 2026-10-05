@@ -479,7 +479,7 @@ class _AddEntryScreenContentState extends State<_AddEntryScreenContent> {
               ? parseString(row[dateIdx])
               : '';
           final date = dateStr.isNotEmpty
-              ? (DateTime.tryParse(dateStr) ?? DateTime.now())
+              ? (DateTime.tryParse(dateStr)?.toLocal() ?? DateTime.now())
               : DateTime.now();
           final notes = notesIdx != -1 && notesIdx < row.length
               ? parseString(row[notesIdx])

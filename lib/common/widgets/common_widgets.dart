@@ -113,7 +113,7 @@ class AppBottomNav extends StatelessWidget {
                   description: 'Click here to add daily entries.',
                   child: _entryButton(context, nav),
                 ),
-              if (nav.isRouteEnabled('/inventory'))
+              /* if (nav.isRouteEnabled('/inventory'))
                 Showcase(
                   key: ShowcaseKeys.inventoryTab,
                   description: 'Manage your materials, tools, and inventory here.',
@@ -128,7 +128,7 @@ class AppBottomNav extends StatelessWidget {
                     Icons.inventory_2_outlined,
                     'INVENTORY',
                   ),
-                ),
+                ), */
               if (nav.isRouteEnabled('/reports'))
                 Showcase(
                   key: ShowcaseKeys.reports,

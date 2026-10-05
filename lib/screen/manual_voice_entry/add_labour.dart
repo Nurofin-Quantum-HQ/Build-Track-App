@@ -236,19 +236,8 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
         : projectProvider.projects.cast<ProjectModel?>().firstWhere(
             (p) => p?.id == projectId,
             orElse: () => null,
-          );
-    const List<String> defaultFloors = [
-      'Basement',
-      'Ground Floor',
-      '1st Floor',
-      '2nd Floor',
-      '3rd Floor',
-      'Terrace',
-    ];
-    if (project != null) {
-      _floors = (project.floors?.isNotEmpty == true)
-          ? List<String>.from(project.floors!)
-          : defaultFloors;
+          );    if (project != null && project.floors != null) {
+      _floors = List<String>.from(project.floors!);
     } else {
       _floors = [];
     }
@@ -423,6 +412,11 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
         argsData['workType'] ?? argsData['remarks'],
       );
       _notesCtrl.text = _safeString(argsData['notes']);
+      if (argsData['date'] != null) {
+        try {
+          _selectedDate = DateTime.parse(argsData['date'].toString()).toLocal();
+        } catch (_) {}
+      }
       double overtimeVal = _parseDouble(argsData['overtime']);
       if (overtimeVal == 0) {
         final double totalAmt = _parseDouble(
@@ -437,11 +431,7 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
                 ? overtimeVal.toInt().toString()
                 : overtimeVal.toString())
           : '';
-      if (argsData['date'] != null) {
-        try {
-          _selectedDate = DateTime.parse(argsData['date'].toString());
-        } catch (_) {}
-      }
+      
       final pStatus =
           argsData['paymentStatus']?.toString().toLowerCase() ??
           argsData['status']?.toString().toLowerCase();
@@ -514,6 +504,11 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
     _categoryCtrl.text = catVal;
     _workTypeCtrl.text = _safeString(latest['workType'] ?? latest['remarks']);
     _notesCtrl.text = _safeString(latest['notes']);
+    if (latest['date'] != null) {
+      try {
+        _selectedDate = DateTime.parse(latest['date'].toString()).toLocal();
+      } catch (_) {}
+    }
     double freshOvertime = _parseDouble(latest['overtime']);
     if (freshOvertime == 0) {
       final double totalAmount = _parseDouble(
@@ -529,11 +524,7 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
               ? freshOvertime.toInt().toString()
               : freshOvertime.toString())
         : '';
-    if (latest['date'] != null) {
-      try {
-        _selectedDate = DateTime.parse(latest['date'].toString());
-      } catch (_) {}
-    }
+    
     final freshPStatus =
         latest['paymentStatus']?.toString().toLowerCase() ??
         latest['status']?.toString().toLowerCase();
@@ -615,6 +606,7 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
         argsData['workType'] ?? argsData['remarks'],
       );
       _notesCtrl.text = _safeString(argsData['notes']);
+      
       double overtimeVal = _parseDouble(argsData['overtime']);
       final double qtyVal = _parseDouble(argsData['quantity']);
       final double rateVal = _parseDouble(
@@ -706,6 +698,7 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
     _categoryCtrl.text = catVal;
     _workTypeCtrl.text = _safeString(latest['workType'] ?? latest['remarks']);
     _notesCtrl.text = _safeString(latest['notes']);
+    
     double freshOvertime = _parseDouble(latest['overtime']);
     if (freshOvertime == 0) {
       final double totalAmount = _parseDouble(
@@ -721,11 +714,7 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
               ? freshOvertime.toInt().toString()
               : freshOvertime.toString())
         : '';
-    if (latest['date'] != null) {
-      try {
-        _selectedDate = DateTime.parse(latest['date'].toString());
-      } catch (_) {}
-    }
+    
     if (latest['paymentHistory'] != null && latest['paymentHistory'] is List) {
       _paymentHistory = List<Map<String, dynamic>>.from(
         (latest['paymentHistory'] as List).map((x) => Map<String, dynamic>.from(x))
@@ -1228,7 +1217,7 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
       } else if (UserSession.hasPermission('view_inventory')) {
         Navigator.pushNamedAndRemoveUntil(
           context,
-          '/inventory',
+          '/reports',
           (route) => route.settings.name == '/' || route.isFirst,
         );
       } else {
@@ -1416,7 +1405,7 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
     DateTime payDate = DateTime.now();
     if (payment['date'] != null) {
       try {
-        payDate = DateTime.parse(payment['date'].toString());
+        payDate = DateTime.parse(payment['date'].toString()).toLocal();
       } catch (_) {}
     } else if (payment['paymentDate'] != null) {
       try {
@@ -1788,7 +1777,7 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
                         final rawDate = tx['date'] ?? tx['createdAt'];
                         if (rawDate != null) {
                           try {
-                            final d = DateTime.parse(rawDate.toString());
+                            final d = DateTime.parse(rawDate.toString()).toLocal();
                             dateStr =
                                 '${d.day} ${_monthName(d.month)} ${d.year}';
                           } catch (_) {}
@@ -1978,6 +1967,51 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
     }
     return '';
   }
+  void _showDeleteDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Delete Entry?', style: TextStyle(fontWeight: FontWeight.w800)),
+        content: const Text('Are you sure you want to permanently delete this entry?'),
+        actionsPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(color: Colors.black54, fontWeight: FontWeight.w600)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              elevation: 0,
+            ),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              if (_editingTransactionId != null) {
+                final success = await ApiService.deleteTransaction(_editingTransactionId!);
+                if (success && context.mounted) {
+                  if (_selectedProjectId != null) {
+                    context.read<InventoryProvider>().loadInventory(_selectedProjectId!);
+                  }
+                  context.read<ProjectProvider>().load();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Entry deleted successfully'), backgroundColor: Colors.red),
+                  );
+                  Navigator.pop(context); // Pop edit screen
+                } else if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Failed to delete entry'), backgroundColor: Colors.red),
+                  );
+                }
+              }
+            },
+            child: const Text('Delete', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+  }
   @override
   Widget build(BuildContext context) {
     context.watch<ProjectProvider>().projects;
@@ -1997,6 +2031,25 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
               isSubScreen: true,
               leftIcon: Icons.arrow_back,
               onLeftTap: () => Navigator.maybePop(context),
+              rightWidget: _isEditing ? GestureDetector(
+                onTap: () => _showDeleteDialog(context),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.red.withOpacity(0.2)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.delete_outline_rounded, color: Colors.red, size: 16),
+                      const SizedBox(width: 4),
+                      const Text('Delete', style: TextStyle(color: Colors.red, fontSize: 13, fontWeight: FontWeight.w700)),
+                    ],
+                  ),
+                ),
+              ) : null,
             ),
             Expanded(
               child: SingleChildScrollView(
@@ -2573,3 +2626,5 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
     );
   }
 }
+
+

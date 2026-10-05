@@ -557,9 +557,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
             ? '$_mainBuildingType → $effectiveSubType'
             : _mainBuildingType;
       }
-      final finalFloors = _selectedFloorChips.isEmpty
-          ? <String>['Ground']
-          : List<String>.from(_selectedFloorChips);
+      final finalFloors = List<String>.from(_selectedFloorChips);
       final selectedPhaseNamesList = _phases
           .where((ph) => ph.isSelected)
           .map((ph) => ph.name)
@@ -2983,3 +2981,5 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
     );
   }
 }
+
+

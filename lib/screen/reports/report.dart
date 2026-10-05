@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:buildtrack_mobile/common/themes/app_colors.dart';
 import 'package:buildtrack_mobile/common/widgets/common_widgets.dart';
 import 'package:buildtrack_mobile/controller/project_provider.dart';
+import 'package:buildtrack_mobile/controller/entry_permissions.dart';
 import 'package:buildtrack_mobile/controller/report_provider.dart';
 import 'package:buildtrack_mobile/models/project_model.dart';
 import 'package:buildtrack_mobile/screen/reports/report_export_helper.dart';
@@ -541,8 +542,7 @@ class _ReportsViewState extends State<_ReportsView> {
   }
 
   String _formatDateLong(DateTime dt) {
-    final utcDt = dt.toUtc();
-    final isMidnightUTC = utcDt.hour == 0 && utcDt.minute == 0 && utcDt.second == 0;
+    final isMidnightLocal = dt.hour == 0 && dt.minute == 0 && dt.second == 0;
 
     final months = [
       'Jan',
@@ -559,16 +559,14 @@ class _ReportsViewState extends State<_ReportsView> {
       'Dec',
     ];
 
-    if (isMidnightUTC) {
-      final day = utcDt.day.toString().padLeft(2, '0');
-      final month = months[utcDt.month - 1];
-      final year = utcDt.year;
-      return '$day $month $year';
-    }
-
     final day = dt.day.toString().padLeft(2, '0');
     final month = months[dt.month - 1];
     final year = dt.year;
+
+    if (isMidnightLocal) {
+      return '$day $month $year';
+    }
+
     final hour24 = dt.hour;
     final ampm = hour24 >= 12 ? 'PM' : 'AM';
     var hour12 = hour24 % 12;
@@ -3149,9 +3147,22 @@ class _ReportsViewState extends State<_ReportsView> {
                           color: AppColors.primary,
                         ),
                       ),
-                      IconButton(
-                        icon: Icon(Icons.close, size: 20),
-                        onPressed: () => Navigator.of(dialogContext).pop(),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (EntryPermissions.canDelete(status: entry.approvalStatus.toLowerCase(), createdBy: entry.createdBy ?? '', projectId: entry.projectId))
+                            IconButton(
+                              icon: Icon(Icons.delete_outline, size: 20, color: Colors.red),
+                              onPressed: () {
+                                Navigator.of(dialogContext).pop();
+                                _ReportActions.deleteEntry(context, entry);
+                              },
+                            ),
+                          IconButton(
+                            icon: Icon(Icons.close, size: 20),
+                            onPressed: () => Navigator.of(dialogContext).pop(),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -3754,9 +3765,8 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
     String projectName,
   ) {
     String formatDateLong(DateTime dt) {
-      final utcDt = dt.toUtc();
-      final isMidnightUTC = utcDt.hour == 0 && utcDt.minute == 0 && utcDt.second == 0;
-      
+      final isMidnightLocal = dt.hour == 0 && dt.minute == 0 && dt.second == 0;
+
       final months = [
         'Jan',
         'Feb',
@@ -3772,16 +3782,14 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
         'Dec',
       ];
 
-      if (isMidnightUTC) {
-        final day = utcDt.day.toString().padLeft(2, '0');
-        final month = months[utcDt.month - 1];
-        final year = utcDt.year;
-        return '$day $month $year';
-      }
-
       final day = dt.day.toString().padLeft(2, '0');
       final month = months[dt.month - 1];
       final year = dt.year;
+
+      if (isMidnightLocal) {
+        return '$day $month $year';
+      }
+
       final hour24 = dt.hour;
       final ampm = hour24 >= 12 ? 'PM' : 'AM';
       var hour12 = hour24 % 12;
@@ -3849,9 +3857,22 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
                           color: AppColors.primary,
                         ),
                       ),
-                      IconButton(
-                        icon: Icon(Icons.close, size: 20),
-                        onPressed: () => Navigator.of(dialogContext).pop(),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (EntryPermissions.canDelete(status: entry.approvalStatus.toLowerCase(), createdBy: entry.createdBy ?? '', projectId: entry.projectId))
+                            IconButton(
+                              icon: Icon(Icons.delete_outline, size: 20, color: Colors.red),
+                              onPressed: () {
+                                Navigator.of(dialogContext).pop();
+                                _ReportActions.deleteEntry(context, entry);
+                              },
+                            ),
+                          IconButton(
+                            icon: Icon(Icons.close, size: 20),
+                            onPressed: () => Navigator.of(dialogContext).pop(),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -4419,6 +4440,53 @@ class _ReportActions {
     });
   }
 
+  static Future<void> deleteEntry(BuildContext context, EntryModel entry) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Delete Entry?', style: TextStyle(fontWeight: FontWeight.w800)),
+        content: Text('Are you sure you want to permanently delete this entry?'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text('Cancel', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: Text('Delete', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      if (!context.mounted) return;
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => Center(child: CircularProgressIndicator()),
+      );
+      
+      final success = await ApiService.deleteTransaction(entry.id);
+      
+      if (context.mounted) {
+        Navigator.of(context).pop(); // pop progress
+        if (success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Entry deleted successfully'), backgroundColor: Colors.red),
+          );
+          context.read<ProjectProvider>().load();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to delete entry'), backgroundColor: Colors.red),
+          );
+        }
+      }
+    }
+  }
+
   static Future<void> recordPayment(
     BuildContext context,
     EntryModel entry,
@@ -4652,7 +4720,7 @@ class _PaymentHistorySectionState extends State<_PaymentHistorySection> {
           final rawDate = item['date'] ?? item['paymentDate'];
           DateTime? dt;
           if (rawDate is String) {
-            dt = DateTime.tryParse(rawDate);
+            dt = DateTime.tryParse(rawDate)?.toLocal();
           } else if (rawDate is DateTime) {
             dt = rawDate;
           }
