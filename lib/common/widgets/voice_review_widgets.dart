@@ -302,7 +302,7 @@ class VoiceStatusHeader extends StatelessWidget {
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  const Icon(
+                                  Icon(
                                     Icons.timer_outlined,
                                     size: 10,
                                     color: AppColors.primary,
@@ -310,7 +310,7 @@ class VoiceStatusHeader extends StatelessWidget {
                                   const SizedBox(width: 3),
                                   Text(
                                     elapsedDisplay,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 10,
                                       fontWeight: FontWeight.w700,
                                       color: AppColors.primary,
@@ -653,7 +653,7 @@ class _ExtractedDataSummaryCardState extends State<ExtractedDataSummaryCard> {
               color: Color(0xFFF8F9FF),
               borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
             ),
-            child: const Row(
+            child: Row(
               children: [
                 Icon(
                   Icons.edit_note_rounded,
@@ -826,7 +826,7 @@ class _ExtractionProcessingCardState extends State<ExtractionProcessingCard> {
         children: [
           Row(
             children: [
-              const SizedBox(
+              SizedBox(
                 width: 18,
                 height: 18,
                 child: CircularProgressIndicator(
@@ -835,7 +835,7 @@ class _ExtractionProcessingCardState extends State<ExtractionProcessingCard> {
                 ),
               ),
               const SizedBox(width: 10),
-              const Text(
+              Text(
                 'Analyzing voice entry…',
                 style: TextStyle(
                   fontSize: 13,
@@ -935,13 +935,13 @@ class _ExpandableTranscriptState extends State<ExpandableTranscript>
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: Row(
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.format_align_left_rounded,
                     size: 15,
                     color: AppColors.primary,
                   ),
                   const SizedBox(width: 8),
-                  const Expanded(
+                  Expanded(
                     child: Text(
                       'Voice Transcript',
                       style: TextStyle(
@@ -963,7 +963,7 @@ class _ExpandableTranscriptState extends State<ExpandableTranscript>
                   AnimatedRotation(
                     turns: _expanded ? 0.5 : 0,
                     duration: const Duration(milliseconds: 240),
-                    child: const Icon(
+                    child: Icon(
                       Icons.keyboard_arrow_down_rounded,
                       size: 18,
                       color: AppColors.primary,
