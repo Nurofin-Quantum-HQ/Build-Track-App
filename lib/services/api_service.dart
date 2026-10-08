@@ -275,6 +275,21 @@ class ApiService {
       return null;
     }
   }
+  /// Project insights analytics (GET /projects/:id/insights).
+  /// Throws an Exception with the server's message on failure.
+  static Future<Map<String, dynamic>> fetchProjectInsights(String projectId) async {
+    final response = await get('/projects/$projectId/insights');
+    if (response.statusCode == 200) {
+      return json.decode(response.body) as Map<String, dynamic>;
+    }
+    String message = 'Could not load project insights (${response.statusCode})';
+    try {
+      final body = json.decode(response.body);
+      if (body is Map && body['message'] != null) message = '${body['message']}';
+    } catch (_) {}
+    throw Exception(message);
+  }
+
   static Future<ProjectModel?> fetchProjectById(String id) async {
     try {
       final response = await get('/projects/$id');

@@ -80,7 +80,7 @@ class VoiceConfirmationSheet extends StatefulWidget {
 }
 class _VoiceConfirmationSheetState extends State<VoiceConfirmationSheet>
     with TickerProviderStateMixin {
-  static _blue = AppColors.primaryBlue;
+  static final Color _blue = AppColors.primaryBlue;
   static const _bgColor = Color(0xFFF4F6FC);
   static const _cardBg = Colors.white;
   static const _textDark = Color(0xFF0F1724);
@@ -637,7 +637,7 @@ class _VoiceConfirmationSheetState extends State<VoiceConfirmationSheet>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'BuildTrack AI',
                   style: TextStyle(
                     fontSize: 13,
@@ -694,7 +694,7 @@ class _VoiceConfirmationSheetState extends State<VoiceConfirmationSheet>
             Container(
               width: 44,
               height: 44,
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: AppGradients.primaryButton,
               ),
@@ -727,7 +727,7 @@ class _VoiceConfirmationSheetState extends State<VoiceConfirmationSheet>
               ),
               Text(
                 _stepLabel,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 11.5,
                   fontWeight: FontWeight.w700,
                   color: _blue,
@@ -742,7 +742,7 @@ class _VoiceConfirmationSheetState extends State<VoiceConfirmationSheet>
               value: progress,
               minHeight: 4,
               backgroundColor: const Color(0xFFE4E7F8),
-              valueColor: const AlwaysStoppedAnimation<Color>(_blue),
+              valueColor: AlwaysStoppedAnimation<Color>(_blue),
             ),
           ),
         ],
@@ -1757,7 +1757,7 @@ class _VoiceConfirmationSheetState extends State<VoiceConfirmationSheet>
               ),
             ),
             if (isSelected)
-              const Icon(Icons.check_circle_rounded, color: _blue, size: 20),
+              Icon(Icons.check_circle_rounded, color: _blue, size: 20),
           ],
         ),
       ),
@@ -1833,7 +1833,7 @@ class _VoiceConfirmationSheetState extends State<VoiceConfirmationSheet>
               vertical: 14,
             ),
             suffixIcon: IconButton(
-              icon: const Icon(Icons.send_rounded, color: _blue, size: 20),
+              icon: Icon(Icons.send_rounded, color: _blue, size: 20),
               onPressed: () => onSubmit(ctrl.text),
             ),
           ),
@@ -1970,7 +1970,7 @@ class _VoiceConfirmationSheetState extends State<VoiceConfirmationSheet>
               const SizedBox(width: 8),
               Text(
                 label,
-                style: const TextStyle(
+                style: TextStyle(
                   color: _blue,
                   fontSize: 15,
                   fontWeight: FontWeight.w800,
