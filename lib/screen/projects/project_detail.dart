@@ -14,6 +14,7 @@ import 'dart:convert';
 import 'package:buildtrack_mobile/common/widgets/entry_widgets.dart';
 import 'package:buildtrack_mobile/services/api_service.dart';
 import 'package:buildtrack_mobile/screen/projects/edit_project.dart';
+import 'package:buildtrack_mobile/screen/project_insights/project_insights_screen.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:csv/csv.dart';
 import 'package:buildtrack_mobile/screen/reports/save_helper_stub.dart'
@@ -114,6 +115,10 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                       totalCount: trackerTotal,
                     ),
                     const SizedBox(height: 14),
+                    if (RoleManager.canViewReports) ...[
+                      _InsightsEntryCard(project: project),
+                      const SizedBox(height: 14),
+                    ],
                     const AppSectionHeader(title: 'Project Information'),
                     _ProjectInfoCard(project: project),
                     const SizedBox(height: 14),
@@ -3014,6 +3019,68 @@ class _EntryTile extends StatelessWidget {
     );
   }
 }
+/// Entry point to the project insights screen (budgets, forecast, spend, cash).
+class _InsightsEntryCard extends StatelessWidget {
+  const _InsightsEntryCard({required this.project});
+  final ProjectModel project;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ProjectInsightsScreen(projectId: project.id, projectName: project.name),
+          ),
+        ),
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 72),
+          padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF4F46E5),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.insights_rounded, color: Colors.white),
+              ),
+              const SizedBox(width: 14),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Project insights',
+                      style: TextStyle(color: Color(0xFF0F172A), fontSize: 16, fontWeight: FontWeight.w700),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Phase budgets, forecast, spend & cash',
+                      style: TextStyle(color: Color(0xFF64748B), fontSize: 12.5),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right_rounded, color: Color(0xFF64748B)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _ActionButtons extends StatelessWidget {
   const _ActionButtons({required this.project});
   final ProjectModel project;
