@@ -15,12 +15,24 @@ class VerdictCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final h = Ins.health(data.healthStatus);
-    final b = data.bridge;
-    final forecast = b?.forecast ?? data.eac;
-    final delta = forecast == null ? null : forecast - data.budgetTotal;
-    final deltaPct = delta == null || data.budgetTotal <= 0 ? null : delta / data.budgetTotal * 100;
+    final forecast = data.eac;
+    final budget = data.budgetTotal;
+    // Without activity budgets there is nothing to project from: state spend vs budget.
+    final useSpend = data.forecastMethod == 'project';
+    final ref = useSpend ? data.actual : forecast;
+    final delta = ref == null || budget <= 0 ? null : ref - budget;
+    final deltaPct = delta == null ? null : delta / budget * 100;
+    final basis = switch (data.forecastMethod) {
+      'budget' => 'Assumes each unfinished phase uses its full budget.',
+      'efficiency' => 'Based on cost per activity completed so far.',
+      _ => null,
+    };
 
-    final headline = forecast == null
+    final headline = useSpend
+        ? (budget > 0
+              ? '${inrCompact(data.actual)} spent of the ${inrCompact(budget)} budget — ${inrCompact((budget - data.actual).abs())} ${data.actual > budget ? 'over' : 'left'}.'
+              : '${inrCompact(data.actual)} spent so far. No budget set.')
+        : forecast == null
         ? 'Not enough approved spend yet to forecast the final cost.'
         : delta!.abs() < data.budgetTotal * 0.01
         ? 'Forecast to finish on budget at ${inrCompact(forecast)}.'
@@ -44,13 +56,20 @@ class VerdictCard extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           Text(headline, style: Ins.t(20, w: FontWeight.w600, h: 1.3, ls: -0.2)),
-          if (deltaPct != null && deltaPct.abs() >= 1) ...[
+          if (useSpend && budget > 0) ...[
             const SizedBox(height: 6),
             Text(
-              '${deltaPct > 0 ? '+' : ''}${deltaPct.toStringAsFixed(1)}% vs the ${inrCompact(data.budgetTotal)} budget',
+              '${(data.spentPct ?? 0).toStringAsFixed(1)}% of the budget used',
+              style: Ins.t(14, c: data.actual > budget ? Ins.bad : Ins.ink2, w: FontWeight.w500),
+            ),
+          ] else if (!useSpend && deltaPct != null && deltaPct.abs() >= 1) ...[
+            const SizedBox(height: 6),
+            Text(
+              '${deltaPct > 0 ? '+' : ''}${deltaPct.toStringAsFixed(1)}% vs the ${inrCompact(budget)} budget',
               style: Ins.t(14, c: delta! > 0 ? Ins.bad : Ins.good, w: FontWeight.w500),
             ),
           ],
+          if (basis != null) ...[const SizedBox(height: 4), Text(basis, style: Ins.t(12.5, c: Ins.ink3))],
           const SizedBox(height: 18),
           HealthMeter(score: data.healthScore),
           if (data.healthDrivers.isNotEmpty) ...[
@@ -178,14 +197,16 @@ class ProgressLineCard extends StatelessWidget {
     final spent = data.spentPct ?? 0;
     final work = data.workDonePct;
     final time = data.timeElapsedPct;
-    final gap = spent - work;
-    final note = gap > 3
+    final gap = work == null ? null : spent - work;
+    final note = gap == null
+        ? "Work done isn't recorded yet. Tick activities as done on the project page to compare work against money."
+        : gap > 3
         ? 'Money is ${gap.toStringAsFixed(0)} pts ahead of work — paying for work not yet delivered.'
         : gap < -3
         ? 'Work is ${(-gap).toStringAsFixed(0)} pts ahead of money — good cost control.'
         : 'Money and work are moving together.';
     final items = [
-      ('Work done', work, Ins.good),
+      if (work != null) ('Work done', work, Ins.good),
       ('Money spent', spent, Ins.primary),
       if (time != null) ('Time used', time, Ins.ink3),
     ];
@@ -227,16 +248,16 @@ class ProgressLineCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: gap > 3 ? Ins.warnSoft : Ins.muted,
+              color: (gap ?? 0) > 3 ? Ins.warnSoft : Ins.muted,
               borderRadius: BorderRadius.circular(Ins.rSm),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Icon(
-                  gap > 3 ? Icons.warning_amber_rounded : Icons.insights_rounded,
+                  (gap ?? 0) > 3 ? Icons.warning_amber_rounded : Icons.insights_rounded,
                   size: 18,
-                  color: gap > 3 ? Ins.warn : Ins.ink3,
+                  color: (gap ?? 0) > 3 ? Ins.warn : Ins.ink3,
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -302,16 +323,27 @@ class InsKpiGrid extends StatelessWidget {
         sub: '${pct(data.spentPct)} of ${inrCompact(data.budgetTotal)}',
         icon: Icons.payments_outlined,
       ),
-      _Kpi(
-        label: 'Value of work done',
-        value: inrCompact(data.earnedValue),
-        sub: '${pct(data.workDonePct)} earned',
-        icon: Icons.foundation_outlined,
-      ),
+      data.earnedValue != null
+          ? _Kpi(
+              label: 'Value of work done',
+              value: inrCompact(data.earnedValue!),
+              sub: '${pct(data.workDonePct)} earned',
+              icon: Icons.foundation_outlined,
+            )
+          : _Kpi(
+              label: 'Work done',
+              value: data.workDonePct == null ? '—' : pct(data.workDonePct),
+              sub: data.workDonePct == null
+                  ? 'Tick activities as done to track'
+                  : '${data.activitiesDone} of ${data.activitiesTotal} activities',
+              icon: Icons.foundation_outlined,
+            ),
       _Kpi(
         label: 'Cost efficiency',
         value: cpi == null ? '—' : '₹${cpi.toStringAsFixed(2)}',
-        sub: cpi == null ? 'Needs approved spend' : 'of work per ₹1 spent',
+        sub: cpi == null
+            ? (data.hasPhaseBudgets ? 'Tick activities as done to measure' : 'Needs activity budgets')
+            : 'of work per ₹1 spent',
         icon: Icons.speed_outlined,
         tone: cpi == null
             ? null
@@ -433,7 +465,13 @@ class BudgetBridgeCard extends StatelessWidget {
       run += delta;
     }
 
-    if (b.reserve.abs() >= 1) add('Unassigned reserve', b.reserve, hint: 'Budget not given to any phase');
+    if (b.reserve.abs() >= 1) {
+      if (b.reserve < 0) {
+        add('Unassigned reserve', b.reserve, hint: 'Budget not given to any phase');
+      } else {
+        add('Phases over project budget', b.reserve, hint: 'Phase budgets add up to more');
+      }
+    }
     final steps = [...b.steps]..sort((x, y) => y.delta.compareTo(x.delta));
     for (final s in steps) {
       add(s.name, s.delta, phaseId: s.phaseId);

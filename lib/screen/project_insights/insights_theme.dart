@@ -75,6 +75,7 @@ class Ins {
     'over' => (fg: bad, bg: badSoft, label: 'Over budget', icon: Icons.north_east_rounded),
     'watch' => (fg: warn, bg: warnSoft, label: 'Watch', icon: Icons.visibility_outlined),
     'not_started' => (fg: ink3, bg: muted, label: 'Not started', icon: Icons.schedule_rounded),
+    'unbudgeted' => (fg: ink3, bg: muted, label: 'No budget', icon: Icons.radio_button_unchecked_rounded),
     _ => (fg: good, bg: goodSoft, label: 'On plan', icon: Icons.check_rounded),
   };
 

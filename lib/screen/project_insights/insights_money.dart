@@ -91,14 +91,15 @@ class InsSpendCurveCard extends StatelessWidget {
                 ? 'Cumulative spend vs the planned S-curve'
                 : 'Spend is ${inrCompact(behind.abs())} ${behind >= 0 ? 'ahead of' : 'behind'} the plan to date',
           ),
-          const Wrap(
+          Wrap(
             spacing: 14,
             runSpacing: 6,
             children: [
               InsSwatch(color: Ins.primary, label: 'Actual', line: true),
-              InsSwatch(color: Ins.ink3, label: 'Planned', line: true, dashed: true),
-              InsSwatch(color: Ins.bad, label: 'Forecast', line: true, dashed: true),
-              InsSwatch(color: Color(0xFFD97706), label: 'Budget', line: true, dashed: true),
+              if (planned.isNotEmpty) const InsSwatch(color: Ins.ink3, label: 'Planned', line: true, dashed: true),
+              if (fc.length == 2) const InsSwatch(color: Ins.bad, label: 'Forecast', line: true, dashed: true),
+              if (data.budgetTotal > 0)
+                const InsSwatch(color: Color(0xFFD97706), label: 'Budget', line: true, dashed: true),
             ],
           ),
           const SizedBox(height: 14),
@@ -612,7 +613,14 @@ class InsCashCard extends StatelessWidget {
             sub: '${data.pendingCount} entries',
             icon: Icons.hourglass_empty_rounded,
           ),
-          row('Received from client', inrCompact(data.income), icon: Icons.south_west_rounded),
+          row(
+            'Received from client',
+            inrCompact(data.income),
+            sub: data.incomeReturned > 0
+                ? '${inrCompact(data.incomeReceived)} received · ${inrCompact(data.incomeReturned)} returned'
+                : null,
+            icon: Icons.south_west_rounded,
+          ),
           row(
             net >= 0 ? 'Cash in hand' : 'Funding gap',
             inrCompact(net.abs()),

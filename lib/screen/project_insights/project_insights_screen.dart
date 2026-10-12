@@ -131,7 +131,14 @@ class _ProjectInsightsScreenState extends State<ProjectInsightsScreen> {
       [
         VerdictCard(data: d),
         InsKpiGrid(data: d),
-        BudgetBridgeCard(data: d, onTapPhase: (id) => _openById(d, id)),
+        if (d.bridge != null)
+          BudgetBridgeCard(data: d, onTapPhase: (id) => _openById(d, id))
+        else if (d.phases.isNotEmpty)
+          const _SetupCard(
+            title: 'Budget bridge',
+            text:
+                'Shows how each phase moves the final cost away from the budget. It needs activity budgets: add them to the phases in project settings.',
+          ),
         ProgressLineCard(data: d),
         AttentionCard(alerts: d.alerts, onTapPhase: (id) => _openById(d, id)),
       ],
@@ -145,8 +152,16 @@ class _ProjectInsightsScreenState extends State<ProjectInsightsScreen> {
             ),
           )
         else ...[
-          PhaseMatrixCard(phases: d.phases, onOpen: _openPhase),
-          SpendVsWorkCard(phases: d.phases, onOpen: _openPhase),
+          PhaseMatrixCard(phases: d.phases, onOpen: _openPhase, hasBudgets: d.hasPhaseBudgets),
+          if (d.hasPhaseBudgets && d.tracksCompletion)
+            SpendVsWorkCard(phases: d.phases, onOpen: _openPhase)
+          else
+            _SetupCard(
+              title: 'Spend vs work, by phase',
+              text: d.hasPhaseBudgets
+                  ? 'Compares money spent with work delivered in each phase. Tick activities as done on the project page to turn it on.'
+                  : 'Compares money spent with work delivered in each phase. It needs activity budgets and activities ticked as done.',
+            ),
         ],
       ],
       // Money
@@ -241,6 +256,22 @@ class _AppBar extends StatelessWidget implements PreferredSizeWidget {
       ),
     );
   }
+}
+
+class _SetupCard extends StatelessWidget {
+  const _SetupCard({required this.title, required this.text});
+  final String title, text;
+  @override
+  Widget build(BuildContext context) => InsCard(
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: Ins.t(16, w: FontWeight.w600)),
+        const SizedBox(height: 6),
+        Text(text, style: Ins.t(13.5, c: Ins.ink3)),
+      ],
+    ),
+  );
 }
 
 class _Skeleton extends StatelessWidget {

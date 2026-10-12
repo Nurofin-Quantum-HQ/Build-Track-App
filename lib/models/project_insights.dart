@@ -139,13 +139,15 @@ class ProjectInsights {
   final int? totalDays, elapsedDays, daysLeft;
   final double? timeElapsedPct;
   final int activitiesDone, activitiesTotal;
-  final double workDonePct;
+  final double? workDonePct; // null = work done not recorded
   final double budgetTotal;
   final Map<CostCategory, ({double planned, double actual})> byCategory;
-  final double actual, remaining, pendingApproval, paid, outstanding, income, dailyBurn;
+  final double actual, remaining, pendingApproval, paid, outstanding, income, incomeReceived, incomeReturned, dailyBurn;
   final double? spentPct;
   final int pendingCount;
-  final double earnedValue;
+  final double? earnedValue;
+  final bool hasPhaseBudgets, tracksCompletion;
+  final String forecastMethod; // efficiency | budget | project
   final double? plannedValue, cpi, spi, eac, vac;
   final int healthScore;
   final String healthStatus;
@@ -183,10 +185,15 @@ class ProjectInsights {
     required this.paid,
     required this.outstanding,
     required this.income,
+    required this.incomeReceived,
+    required this.incomeReturned,
     required this.dailyBurn,
     required this.spentPct,
     required this.pendingCount,
     required this.earnedValue,
+    required this.hasPhaseBudgets,
+    required this.tracksCompletion,
+    required this.forecastMethod,
     required this.plannedValue,
     required this.cpi,
     required this.spi,
@@ -231,7 +238,7 @@ class ProjectInsights {
       timeElapsedPct: _dn(s['timeElapsedPct']),
       activitiesDone: _d(pr['activitiesDone']).toInt(),
       activitiesTotal: _d(pr['activitiesTotal']).toInt(),
-      workDonePct: _d(pr['workDonePct']),
+      workDonePct: _dn(pr['workDonePct']),
       budgetTotal: _d(b['total']),
       byCategory: {
         for (final c in CostCategory.values)
@@ -243,10 +250,15 @@ class ProjectInsights {
       paid: _d(sp['paid']),
       outstanding: _d(sp['outstanding']),
       income: _d(sp['income']),
+      incomeReceived: _d(sp['incomeReceived'] ?? sp['income']),
+      incomeReturned: _d(sp['incomeReturned']),
       dailyBurn: _d(sp['dailyBurn']),
       spentPct: _dn(sp['spentPct']),
       pendingCount: _d(sp['pendingCount']).toInt(),
-      earnedValue: _d(pf['earnedValue']),
+      earnedValue: _dn(pf['earnedValue']),
+      hasPhaseBudgets: _m(j['capabilities'])['phaseBudgets'] as bool? ?? true,
+      tracksCompletion: _m(j['capabilities'])['completionTracking'] as bool? ?? true,
+      forecastMethod: '${_m(j['capabilities'])['forecastMethod'] ?? 'efficiency'}',
       plannedValue: _dn(pf['plannedValue']),
       cpi: _dn(pf['cpi']),
       spi: _dn(pf['spi']),

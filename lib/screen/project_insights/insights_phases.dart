@@ -13,9 +13,10 @@ double? _varPct(double planned, double? forecast) =>
 // ═════════════════════════════════════════════════════════════════════════════
 
 class PhaseMatrixCard extends StatelessWidget {
-  const PhaseMatrixCard({super.key, required this.phases, required this.onOpen});
+  const PhaseMatrixCard({super.key, required this.phases, required this.onOpen, this.hasBudgets = true});
   final List<InsightPhase> phases;
   final void Function(InsightPhase) onOpen;
+  final bool hasBudgets;
 
   @override
   Widget build(BuildContext context) {
@@ -24,9 +25,11 @@ class PhaseMatrixCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const InsCardHeader(
-            title: 'Phase budgets',
-            description: 'Number = % of the phase budget already spent. Colour = where it is heading at completion.',
+          InsCardHeader(
+            title: hasBudgets ? 'Phase budgets' : 'Spend by phase',
+            description: hasBudgets
+                ? 'Number = % of the phase budget already spent. Colour = where it is heading at completion.'
+                : 'No activity budgets yet, so each cell shows the amount spent. Add budgets in project settings to compare against plan.',
           ),
           // header
           Padding(
