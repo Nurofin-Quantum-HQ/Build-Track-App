@@ -82,6 +82,13 @@ class EntryModel {
     this.rejectionReason,
     this.paidAmount = 0.0,
     this.paymentHistory = const [],
+    this.category,
+    this.supplier,
+    this.contractor,
+    this.workerName,
+    this.notes,
+    this.remarks,
+    this.rawJson,
   });
   final String id;
   final String projectId;
@@ -109,6 +116,13 @@ class EntryModel {
   final String? rejectionReason;
   final double paidAmount;
   final List<Map<String, dynamic>> paymentHistory;
+  final String? category;
+  final String? supplier;
+  final String? contractor;
+  final String? workerName;
+  final String? notes;
+  final String? remarks;
+  final Map<String, dynamic>? rawJson;
   double get remainingAmount =>
       (amount - paidAmount).clamp(0.0, double.infinity);
   Map<String, dynamic> toJson() => {
@@ -119,6 +133,7 @@ class EntryModel {
     'date': date.toIso8601String(),
     'description': description,
     'brand': brand,
+    'quantity': quantity,
     'ratePerUnit': ratePerUnit,
     'floor': floor,
     'phase': phase,
@@ -136,6 +151,12 @@ class EntryModel {
     'rejectionReason': rejectionReason,
     'paidAmount': paidAmount,
     'paymentHistory': paymentHistory,
+    'category': category,
+    'supplier': supplier,
+    'contractor': contractor,
+    'workerName': workerName,
+    'notes': notes,
+    'remarks': remarks,
   };
   factory EntryModel.fromJson(Map<String, dynamic> j) {
     String? createdBy;
@@ -148,15 +169,30 @@ class EntryModel {
     String desc = j['title']?.toString() ?? j['materialName']?.toString() ?? j['description']?.toString() ?? j['name']?.toString() ?? '';
     
     final typeStr = (j['type']?.toString() ?? '').toLowerCase();
-    if ((typeStr == 'labour' || typeStr == 'wages') && j['worker'] != null && j['worker'] is Map) {
-      final workerName = j['worker']['name']?.toString() ?? '';
-      if (workerName.isNotEmpty) {
+    String? workerName;
+    if (j['worker'] != null && j['worker'] is Map) {
+      workerName = j['worker']['name']?.toString();
+      if (workerName != null && workerName.isNotEmpty) {
         desc = workerName + (desc.isNotEmpty ? ' - $desc' : '');
       }
-    } else if (j['supplier'] != null) {
-      final supplier = j['supplier']?.toString() ?? '';
-      if (supplier.isNotEmpty) {
+    } else if (j['workerName'] != null) {
+      workerName = j['workerName']?.toString();
+    }
+    
+    final category = j['category']?.toString();
+    final supplier = j['supplier']?.toString();
+    if (supplier != null && supplier.isNotEmpty) {
+      if (typeStr != 'labour' && typeStr != 'wages' && !desc.contains(supplier)) {
         desc = supplier + (desc.isNotEmpty ? ' - $desc' : '');
+      }
+    }
+    
+    String? contractor = j['contractor']?.toString() ?? j['contractorName']?.toString();
+    if (contractor == null || contractor.isEmpty) {
+      if (typeStr == 'labour' || typeStr == 'wages') {
+        contractor = (category != null && category.isNotEmpty) ? category : supplier;
+      } else {
+        contractor = supplier;
       }
     }
 
@@ -226,6 +262,13 @@ class EntryModel {
       rejectionReason: j['rejectionReason']?.toString(),
       paidAmount: (j['paidAmount'] as num?)?.toDouble() ?? 0.0,
       paymentHistory: paymentHistory,
+      category: category,
+      supplier: supplier,
+      contractor: contractor,
+      workerName: workerName,
+      notes: j['notes']?.toString(),
+      remarks: j['remarks']?.toString(),
+      rawJson: j,
     );
   }
   static String encodeList(List<EntryModel> list) =>

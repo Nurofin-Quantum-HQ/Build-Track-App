@@ -58,6 +58,54 @@ class ReportsScreen extends StatelessWidget {
   }
 }
 
+class ReportFilterState {
+  static String selectedProjectId = 'all';
+  static String? selectedFloor;
+  static String? selectedPhaseId;
+  static String? selectedActivityName;
+  static String searchQuery = '';
+  static String? selectedItemName;
+  static bool reportGenerated = true;
+  static Set<EntryType> selectedTypes = {
+    EntryType.material,
+    EntryType.labour,
+    EntryType.equipment,
+  };
+  static String selectedStatus = 'All';
+  static DateTime? startDate;
+  static DateTime? endDate;
+  static String datePreset = 'All Time';
+  static String sortColumn = 'date';
+  static bool sortAscending = false;
+  static int currentPage = 1;
+  static String? lastKnownProjectProviderId;
+  static bool hasSavedFilters = false;
+
+  static void reset() {
+    selectedProjectId = 'all';
+    selectedFloor = null;
+    selectedPhaseId = null;
+    selectedActivityName = null;
+    searchQuery = '';
+    selectedItemName = null;
+    reportGenerated = true;
+    selectedTypes = {
+      EntryType.material,
+      EntryType.labour,
+      EntryType.equipment,
+    };
+    selectedStatus = 'All';
+    startDate = null;
+    endDate = null;
+    datePreset = 'All Time';
+    sortColumn = 'date';
+    sortAscending = false;
+    currentPage = 1;
+    lastKnownProjectProviderId = null;
+    hasSavedFilters = false;
+  }
+}
+
 class _ReportsView extends StatefulWidget {
   _ReportsView();
   @override
@@ -69,28 +117,25 @@ class _ReportsViewState extends State<_ReportsView> {
   final ScrollController _scrollController = ScrollController();
 
   bool _linked = false;
-  String _selectedProjectId = 'all';
-  String? _selectedFloor;
-  String? _selectedPhaseId;
-  String? _selectedActivityName;
-  String _searchQuery = '';
-  String? _selectedItemName;
-  bool _reportGenerated = false;
+  String _selectedProjectId = ReportFilterState.selectedProjectId;
+  String? _selectedFloor = ReportFilterState.selectedFloor;
+  String? _selectedPhaseId = ReportFilterState.selectedPhaseId;
+  String? _selectedActivityName = ReportFilterState.selectedActivityName;
+  String _searchQuery = ReportFilterState.searchQuery;
+  String? _selectedItemName = ReportFilterState.selectedItemName;
+  bool _reportGenerated = ReportFilterState.reportGenerated;
   bool _showSuggestions = false;
-  final TextEditingController _searchController = TextEditingController();
-  final Set<EntryType> _selectedTypes = {
-    EntryType.material,
-    EntryType.labour,
-    EntryType.equipment,
-  };
-  String _selectedStatus = 'All';
-  DateTime? _startDate;
-  DateTime? _endDate;
-  String _datePreset = 'All Time';
+  late final TextEditingController _searchController =
+      TextEditingController(text: ReportFilterState.searchQuery);
+  Set<EntryType> _selectedTypes = Set.from(ReportFilterState.selectedTypes);
+  String _selectedStatus = ReportFilterState.selectedStatus;
+  DateTime? _startDate = ReportFilterState.startDate;
+  DateTime? _endDate = ReportFilterState.endDate;
+  String _datePreset = ReportFilterState.datePreset;
   bool _isImportingCsv = false;
-  String _sortColumn = 'date';
-  bool _sortAscending = false;
-  int _currentPage = 1;
+  String _sortColumn = ReportFilterState.sortColumn;
+  bool _sortAscending = ReportFilterState.sortAscending;
+  int _currentPage = ReportFilterState.currentPage;
   int _rowsPerPage = 10;
   List<String> _activeColumnsAll = [
     'Purchased Date',
@@ -206,14 +251,50 @@ class _ReportsViewState extends State<_ReportsView> {
       final projectProvider = context.read<ProjectProvider>();
       final reportProvider = context.read<ReportProvider>();
       reportProvider.linkProjectProvider(projectProvider);
-      final initialId = projectProvider.selectedProject?.id ?? 'all';
-      _selectedProjectId = initialId;
+      
+      final currentGlobalProjId = projectProvider.selectedProject?.id;
+      if (!ReportFilterState.hasSavedFilters) {
+        if (currentGlobalProjId != null) {
+          ReportFilterState.selectedProjectId = currentGlobalProjId;
+          ReportFilterState.selectedFloor = projectProvider.selectedFloor;
+          ReportFilterState.selectedPhaseId = projectProvider.selectedPhaseId;
+          ReportFilterState.selectedActivityName = projectProvider.selectedActivity;
+          ReportFilterState.lastKnownProjectProviderId = currentGlobalProjId;
+        }
+      } else if (currentGlobalProjId != null &&
+          ReportFilterState.lastKnownProjectProviderId != null &&
+          currentGlobalProjId != ReportFilterState.lastKnownProjectProviderId) {
+        ReportFilterState.selectedProjectId = currentGlobalProjId;
+        ReportFilterState.selectedFloor = projectProvider.selectedFloor;
+        ReportFilterState.selectedPhaseId = projectProvider.selectedPhaseId;
+        ReportFilterState.selectedActivityName = projectProvider.selectedActivity;
+        ReportFilterState.lastKnownProjectProviderId = currentGlobalProjId;
+      }
+
+      _selectedProjectId = ReportFilterState.selectedProjectId;
+      _selectedFloor = ReportFilterState.selectedFloor;
+      _selectedPhaseId = ReportFilterState.selectedPhaseId;
+      _selectedActivityName = ReportFilterState.selectedActivityName;
+      _searchQuery = ReportFilterState.searchQuery;
+      if (_searchController.text != ReportFilterState.searchQuery) {
+        _searchController.text = ReportFilterState.searchQuery;
+      }
+      _selectedItemName = ReportFilterState.selectedItemName;
+      _reportGenerated = ReportFilterState.reportGenerated;
+      _selectedTypes = Set.from(ReportFilterState.selectedTypes);
+      _selectedStatus = ReportFilterState.selectedStatus;
+      _startDate = ReportFilterState.startDate;
+      _endDate = ReportFilterState.endDate;
+      _datePreset = ReportFilterState.datePreset;
+      _sortColumn = ReportFilterState.sortColumn;
+      _sortAscending = ReportFilterState.sortAscending;
+      _currentPage = ReportFilterState.currentPage;
+
+      final loadId = _selectedProjectId == 'all' ? null : _selectedProjectId;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
-          reportProvider.selectProject(initialId);
-          projectProvider.loadEntriesForProject(
-            initialId == 'all' ? null : initialId,
-          );
+          reportProvider.selectProject(_selectedProjectId);
+          projectProvider.loadEntriesForProject(loadId);
         }
       });
     }
@@ -637,6 +718,11 @@ class _ReportsViewState extends State<_ReportsView> {
         case 'Custom':
           break;
       }
+      ReportFilterState.datePreset = _datePreset;
+      ReportFilterState.startDate = _startDate;
+      ReportFilterState.endDate = _endDate;
+      ReportFilterState.currentPage = 1;
+      ReportFilterState.hasSavedFilters = true;
     });
   }
 
@@ -652,6 +738,10 @@ class _ReportsViewState extends State<_ReportsView> {
         _startDate = picked;
         _datePreset = 'Custom';
         _currentPage = 1;
+        ReportFilterState.startDate = picked;
+        ReportFilterState.datePreset = 'Custom';
+        ReportFilterState.currentPage = 1;
+        ReportFilterState.hasSavedFilters = true;
       });
     }
   }
@@ -668,6 +758,10 @@ class _ReportsViewState extends State<_ReportsView> {
         _endDate = picked;
         _datePreset = 'Custom';
         _currentPage = 1;
+        ReportFilterState.endDate = picked;
+        ReportFilterState.datePreset = 'Custom';
+        ReportFilterState.currentPage = 1;
+        ReportFilterState.hasSavedFilters = true;
       });
     }
   }
@@ -1170,76 +1264,110 @@ class _ReportsViewState extends State<_ReportsView> {
       if (!_selectedTypes.contains(entry.type)) {
         return false;
       }
-      if (quickCategoryTab != 'All') {
-        if (_searchQuery.isNotEmpty) {
-          final query = _searchQuery.toLowerCase();
-          final projectName = getProjectName(entry.projectId).toLowerCase();
-          final descMatch = entry.description.toLowerCase().contains(query);
-          final brandMatch = (entry.brand ?? '').toLowerCase().contains(query);
-          final projectMatch = projectName.contains(query);
-          final floorMatch = (entry.floor ?? '').toLowerCase().contains(query);
-          final phaseMatch = (entry.phase ?? '').toLowerCase().contains(query);
-          final activityMatch = (entry.activity ?? '').toLowerCase().contains(
-            query,
-          );
-          final amountMatch = entry.amount.toString().contains(query);
-          final statusMatch = _getPaymentStatusLabel(
-            entry.paymentStatus,
-            amount: entry.amount,
-            paidAmount: entry.paidAmount,
-          ).toLowerCase().contains(query);
-          if (!descMatch &&
-              !brandMatch &&
-              !projectMatch &&
-              !floorMatch &&
-              !phaseMatch &&
-              !activityMatch &&
-              !amountMatch &&
-              !statusMatch) {
-            return false;
-          }
-        }
-        if (_selectedItemName != null && _selectedItemName != 'All') {
-          if (entry.description != _selectedItemName) return false;
-        }
-      }
-      if (quickCategoryTab == 'All' && _searchQuery.isNotEmpty) {
-        final query = _searchQuery.toLowerCase();
+      if (_searchQuery.isNotEmpty) {
+        final query = _searchQuery.toLowerCase().trim();
+        final cleanNumeric = query
+            .replaceAll(RegExp(r'^(rs\.?|₹)\s*', caseSensitive: false), '')
+            .replaceAll(',', '')
+            .trim();
         final projectName = getProjectName(entry.projectId).toLowerCase();
         final descMatch = entry.description.toLowerCase().contains(query);
         final brandMatch = (entry.brand ?? '').toLowerCase().contains(query);
+        final contractorMatch =
+            (entry.contractor ?? '').toLowerCase().contains(query);
+        final supplierMatch =
+            (entry.supplier ?? '').toLowerCase().contains(query);
+        final categoryMatch =
+            (entry.category ?? '').toLowerCase().contains(query);
+        final workerMatch =
+            (entry.workerName ?? '').toLowerCase().contains(query);
+        final notesMatch = (entry.notes ?? '').toLowerCase().contains(query);
+        final remarksMatch =
+            (entry.remarks ?? '').toLowerCase().contains(query);
         final projectMatch = projectName.contains(query);
         final floorMatch = (entry.floor ?? '').toLowerCase().contains(query);
         final phaseMatch = (entry.phase ?? '').toLowerCase().contains(query);
-        final activityMatch = (entry.activity ?? '').toLowerCase().contains(
-          query,
-        );
-        final amountMatch = entry.amount.toString().contains(query);
+        final activityMatch =
+            (entry.activity ?? '').toLowerCase().contains(query);
+        final unitMatch = (entry.unit ?? '').toLowerCase().contains(query);
         final typeMatch = entry.type.name.toLowerCase().contains(query);
         final statusMatch = _getPaymentStatusLabel(
           entry.paymentStatus,
           amount: entry.amount,
           paidAmount: entry.paidAmount,
         ).toLowerCase().contains(query);
-        final dateMatch = _formatDateShort(
-          entry.date,
-        ).toLowerCase().contains(query);
+        final dateMatch =
+            _formatDateShort(entry.date).toLowerCase().contains(query);
         final payDateMatch = entry.paymentDate != null
             ? _formatDateShort(entry.paymentDate!).toLowerCase().contains(query)
             : false;
+
+        bool amountMatch = false;
+        if (cleanNumeric.isNotEmpty) {
+          amountMatch = entry.amount.toString().contains(cleanNumeric) ||
+              entry.amount.toInt().toString().contains(cleanNumeric) ||
+              entry.amount.toStringAsFixed(2).contains(cleanNumeric) ||
+              (entry.ratePerUnit ?? 0).toString().contains(cleanNumeric) ||
+              (entry.ratePerUnit ?? 0).toInt().toString().contains(cleanNumeric) ||
+              (entry.ratePerUnit ?? 0).toStringAsFixed(2).contains(cleanNumeric) ||
+              entry.paidAmount.toString().contains(cleanNumeric) ||
+              entry.paidAmount.toInt().toString().contains(cleanNumeric) ||
+              entry.remainingAmount.toString().contains(cleanNumeric) ||
+              entry.remainingAmount.toInt().toString().contains(cleanNumeric) ||
+              (entry.quantity ?? 0).toString().contains(cleanNumeric);
+        }
+        if (!amountMatch) {
+          amountMatch =
+              _formatIndianCurrency(entry.amount).toLowerCase().contains(query) ||
+              _formatIndianCurrency(entry.ratePerUnit ?? 0).toLowerCase().contains(query) ||
+              _formatIndianCurrency(entry.paidAmount).toLowerCase().contains(query) ||
+              _formatIndianCurrency(entry.remainingAmount).toLowerCase().contains(query);
+        }
+
+        bool rawJsonMatch = false;
+        if (entry.rawJson != null) {
+          for (final val in entry.rawJson!.values) {
+            if (val != null &&
+                val is String &&
+                val.toLowerCase().contains(query)) {
+              rawJsonMatch = true;
+              break;
+            }
+          }
+        }
+
         if (!descMatch &&
             !brandMatch &&
+            !contractorMatch &&
+            !supplierMatch &&
+            !categoryMatch &&
+            !workerMatch &&
+            !notesMatch &&
+            !remarksMatch &&
             !projectMatch &&
             !floorMatch &&
             !phaseMatch &&
             !activityMatch &&
+            !unitMatch &&
             !amountMatch &&
             !typeMatch &&
             !statusMatch &&
             !dateMatch &&
-            !payDateMatch) {
+            !payDateMatch &&
+            !rawJsonMatch) {
           return false;
         }
+      }
+      if (quickCategoryTab != 'All' &&
+          _selectedItemName != null &&
+          _selectedItemName != 'All') {
+        final matchesItem = entry.description == _selectedItemName ||
+            entry.brand == _selectedItemName ||
+            entry.contractor == _selectedItemName ||
+            entry.category == _selectedItemName ||
+            entry.supplier == _selectedItemName ||
+            entry.workerName == _selectedItemName;
+        if (!matchesItem) return false;
       }
       if (_selectedStatus != 'All') {
         final computedLabel = _getPaymentStatusLabel(
@@ -1345,6 +1473,8 @@ class _ReportsViewState extends State<_ReportsView> {
             setState(() {
               _sortColumn = 'date';
               _sortAscending = ascending;
+              ReportFilterState.sortColumn = 'date';
+              ReportFilterState.sortAscending = ascending;
             });
           },
         );
@@ -1358,6 +1488,8 @@ class _ReportsViewState extends State<_ReportsView> {
             setState(() {
               _sortColumn = 'project';
               _sortAscending = ascending;
+              ReportFilterState.sortColumn = 'project';
+              ReportFilterState.sortAscending = ascending;
             });
           },
         );
@@ -1372,6 +1504,8 @@ class _ReportsViewState extends State<_ReportsView> {
             setState(() {
               _sortColumn = 'amount';
               _sortAscending = ascending;
+              ReportFilterState.sortColumn = 'amount';
+              ReportFilterState.sortAscending = ascending;
             });
           },
         );
@@ -1569,10 +1703,8 @@ class _ReportsViewState extends State<_ReportsView> {
                         onTabChanged: (newTab) {
                           setState(() {
                             _currentPage = 1;
-                            _searchQuery = '';
                             _selectedItemName = null;
                             _reportGenerated = true;
-                            _searchController.clear();
                             _showSuggestions = false;
                             if (newTab == 'All') {
                               _selectedTypes.addAll({
@@ -1590,6 +1722,12 @@ class _ReportsViewState extends State<_ReportsView> {
                               _selectedTypes.clear();
                               _selectedTypes.add(EntryType.equipment);
                             }
+                            ReportFilterState.selectedTypes =
+                                Set.from(_selectedTypes);
+                            ReportFilterState.currentPage = 1;
+                            ReportFilterState.selectedItemName = null;
+                            ReportFilterState.reportGenerated = true;
+                            ReportFilterState.hasSavedFilters = true;
                           });
                         },
                       ),
@@ -2085,6 +2223,7 @@ class _ReportsViewState extends State<_ReportsView> {
                                                     setState(() {
                                                       _currentPage =
                                                           safeCurrentPage - 1;
+                                                      ReportFilterState.currentPage = _currentPage;
                                                     });
                                                   }
                                                 : null,
@@ -2107,6 +2246,7 @@ class _ReportsViewState extends State<_ReportsView> {
                                                     setState(() {
                                                       _currentPage =
                                                           safeCurrentPage + 1;
+                                                      ReportFilterState.currentPage = _currentPage;
                                                     });
                                                   }
                                                 : null,
@@ -2344,7 +2484,22 @@ class _ReportsViewState extends State<_ReportsView> {
                               _selectedPhaseId = null;
                               _selectedActivityName = null;
                               _currentPage = 1;
+                              ReportFilterState.selectedProjectId = val;
+                              ReportFilterState.selectedFloor = null;
+                              ReportFilterState.selectedPhaseId = null;
+                              ReportFilterState.selectedActivityName = null;
+                              ReportFilterState.currentPage = 1;
+                              ReportFilterState.lastKnownProjectProviderId =
+                                  val == 'all' ? null : val;
+                              ReportFilterState.hasSavedFilters = true;
                             });
+                            if (val != 'all') {
+                              try {
+                                final matchedProj = projectProvider.projects
+                                    .firstWhere((p) => p.id == val);
+                                projectProvider.setSelectedProject(matchedProj);
+                              } catch (_) {}
+                            }
                             context
                                 .read<ProjectProvider>()
                                 .loadEntriesForProject(
@@ -2372,12 +2527,17 @@ class _ReportsViewState extends State<_ReportsView> {
                           ),
                         ],
                         onSelected: (val) {
+                          final floorVal = (val == 'Select Floor') ? null : val;
                           setState(() {
-                            _selectedFloor = (val == 'Select Floor')
-                                ? null
-                                : val;
+                            _selectedFloor = floorVal;
                             _currentPage = 1;
+                            ReportFilterState.selectedFloor = floorVal;
+                            ReportFilterState.currentPage = 1;
+                            ReportFilterState.hasSavedFilters = true;
                           });
+                          if (floorVal != null) {
+                            projectProvider.setSelectedFloor(floorVal);
+                          }
                         },
                       ),
                     ),
@@ -2407,13 +2567,25 @@ class _ReportsViewState extends State<_ReportsView> {
                               []),
                         ],
                         onSelected: (val) {
+                          final phaseVal = (val == 'Select Phase') ? null : val;
                           setState(() {
-                            _selectedPhaseId = (val == 'Select Phase')
-                                ? null
-                                : val;
+                            _selectedPhaseId = phaseVal;
                             _selectedActivityName = null;
                             _currentPage = 1;
+                            ReportFilterState.selectedPhaseId = phaseVal;
+                            ReportFilterState.selectedActivityName = null;
+                            ReportFilterState.currentPage = 1;
+                            ReportFilterState.hasSavedFilters = true;
                           });
+                          if (phaseVal != null) {
+                            try {
+                              final matchedPhase = proj?.selectedPhases
+                                  ?.firstWhere((ph) => ph.id == phaseVal);
+                              if (matchedPhase != null) {
+                                projectProvider.setSelectedPhase(matchedPhase);
+                              }
+                            } catch (_) {}
+                          }
                         },
                       ),
                     ),
@@ -2437,12 +2609,18 @@ class _ReportsViewState extends State<_ReportsView> {
                           ),
                         ],
                         onSelected: (val) {
+                          final actVal =
+                              (val == 'Select Activity') ? null : val;
                           setState(() {
-                            _selectedActivityName = (val == 'Select Activity')
-                                ? null
-                                : val;
+                            _selectedActivityName = actVal;
                             _currentPage = 1;
+                            ReportFilterState.selectedActivityName = actVal;
+                            ReportFilterState.currentPage = 1;
+                            ReportFilterState.hasSavedFilters = true;
                           });
+                          if (actVal != null) {
+                            projectProvider.setSelectedActivity(actVal);
+                          }
                         },
                       ),
                     ),
@@ -2517,6 +2695,9 @@ class _ReportsViewState extends State<_ReportsView> {
                             setState(() {
                               _selectedStatus = val;
                               _currentPage = 1;
+                              ReportFilterState.selectedStatus = val;
+                              ReportFilterState.currentPage = 1;
+                              ReportFilterState.hasSavedFilters = true;
                             });
                           }
                         },
@@ -2740,12 +2921,16 @@ class _ReportsViewState extends State<_ReportsView> {
             onChanged: (val) {
               setState(() {
                 _searchQuery = val.trim();
+                _reportGenerated = true;
+                ReportFilterState.searchQuery = _searchQuery;
+                ReportFilterState.reportGenerated = true;
+                ReportFilterState.hasSavedFilters = true;
               });
             },
             style: TextStyle(fontSize: 13, color: AppColors.textPrimary),
             decoration: InputDecoration(
               hintText:
-                  'Search by description, brand, project, phase, activity...',
+                  'Search by description, brand, contractor, supplier, price...',
               hintStyle: TextStyle(
                 fontSize: 13,
                 color: AppColors.textSecondary,
@@ -2766,6 +2951,8 @@ class _ReportsViewState extends State<_ReportsView> {
                         setState(() {
                           _searchController.clear();
                           _searchQuery = '';
+                          ReportFilterState.searchQuery = '';
+                          ReportFilterState.hasSavedFilters = true;
                         });
                       },
                     )
@@ -2802,30 +2989,41 @@ class _ReportsViewState extends State<_ReportsView> {
     final String dropdownLabel;
     final EntryType targetType;
     if (tabName == 'Materials') {
-      searchPlaceholder = 'Search Materials...';
+      searchPlaceholder = 'Search Materials, Brands, Suppliers, Prices...';
       dropdownLabel = 'Material Name';
       targetType = EntryType.material;
     } else if (tabName == 'Labour') {
-      searchPlaceholder = 'Search Labour...';
+      searchPlaceholder = 'Search Labour, Contractors, Workers, Rates...';
       dropdownLabel = 'Worker Type';
       targetType = EntryType.labour;
     } else {
-      searchPlaceholder = 'Search Equipment...';
+      searchPlaceholder = 'Search Equipment, Vendors, Rates...';
       dropdownLabel = 'Equipment Name';
       targetType = EntryType.equipment;
     }
-    final uniqueNames = allEntries
-        .where(
-          (e) =>
-              e.type == targetType &&
-              (_selectedProjectId == 'all' ||
-                  e.projectId.trim() == _selectedProjectId.trim()),
-        )
+    final matchingCategoryEntries = allEntries.where(
+      (e) =>
+          e.type == targetType &&
+          (_selectedProjectId == 'all' ||
+              e.projectId.trim() == _selectedProjectId.trim()),
+    );
+    final uniqueNames = matchingCategoryEntries
         .map((e) => e.description)
         .where((name) => name.isNotEmpty)
         .toSet()
         .toList();
-    final suggestions = uniqueNames
+
+    final allSuggestionCandidates = <String>{};
+    for (final e in matchingCategoryEntries) {
+      if (e.description.isNotEmpty) allSuggestionCandidates.add(e.description);
+      if ((e.brand ?? '').isNotEmpty) allSuggestionCandidates.add(e.brand!);
+      if ((e.contractor ?? '').isNotEmpty) allSuggestionCandidates.add(e.contractor!);
+      if ((e.supplier ?? '').isNotEmpty) allSuggestionCandidates.add(e.supplier!);
+      if ((e.workerName ?? '').isNotEmpty) allSuggestionCandidates.add(e.workerName!);
+      if ((e.category ?? '').isNotEmpty) allSuggestionCandidates.add(e.category!);
+    }
+
+    final suggestions = allSuggestionCandidates
         .where(
           (name) => name.toLowerCase().contains(_searchQuery.toLowerCase()),
         )
@@ -2865,10 +3063,15 @@ class _ReportsViewState extends State<_ReportsView> {
                 setState(() {
                   _searchQuery = val.trim();
                   _showSuggestions = true;
+                  _reportGenerated = true;
                   if (_selectedItemName != null &&
                       _selectedItemName != _searchQuery) {
                     _selectedItemName = null;
                   }
+                  ReportFilterState.searchQuery = _searchQuery;
+                  ReportFilterState.selectedItemName = _selectedItemName;
+                  ReportFilterState.reportGenerated = true;
+                  ReportFilterState.hasSavedFilters = true;
                 });
               },
               style: TextStyle(
@@ -2886,6 +3089,26 @@ class _ReportsViewState extends State<_ReportsView> {
                   color: AppColors.textSecondary,
                   size: 20,
                 ),
+                suffixIcon: _searchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: Icon(
+                          Icons.clear,
+                          color: AppColors.textSecondary,
+                          size: 18,
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _searchController.clear();
+                            _searchQuery = '';
+                            _selectedItemName = null;
+                            _showSuggestions = false;
+                            ReportFilterState.searchQuery = '';
+                            ReportFilterState.selectedItemName = null;
+                            ReportFilterState.hasSavedFilters = true;
+                          });
+                        },
+                      )
+                    : null,
                 contentPadding: EdgeInsets.symmetric(
                   horizontal: 14,
                   vertical: 10,
@@ -2935,6 +3158,11 @@ class _ReportsViewState extends State<_ReportsView> {
                           _searchQuery = name;
                           _selectedItemName = name;
                           _showSuggestions = false;
+                          _reportGenerated = true;
+                          ReportFilterState.searchQuery = name;
+                          ReportFilterState.selectedItemName = name;
+                          ReportFilterState.reportGenerated = true;
+                          ReportFilterState.hasSavedFilters = true;
                         });
                       },
                       child: Padding(
@@ -2990,6 +3218,11 @@ class _ReportsViewState extends State<_ReportsView> {
                         _searchController.text = selectedVal;
                         _searchQuery = selectedVal;
                         _showSuggestions = false;
+                        _reportGenerated = true;
+                        ReportFilterState.selectedItemName = _selectedItemName;
+                        ReportFilterState.searchQuery = selectedVal;
+                        ReportFilterState.reportGenerated = true;
+                        ReportFilterState.hasSavedFilters = true;
                       });
                     },
                   ),
@@ -4411,6 +4644,10 @@ class _ReportActions {
     }
     Navigator.pushNamed(context, route, arguments: dupArgs).then((val) {
       if (context.mounted) {
+        final loadId = ReportFilterState.selectedProjectId == 'all'
+            ? null
+            : ReportFilterState.selectedProjectId;
+        context.read<ProjectProvider>().loadEntriesForProject(loadId);
         context.read<ProjectProvider>().load();
       }
     });
@@ -4421,6 +4658,7 @@ class _ReportActions {
     editArgs['isEditing'] = true;
     editArgs['id'] = entry.id;
     editArgs['projectId'] = entry.projectId;
+    editArgs['fromReport'] = true;
     String route;
     switch (entry.type) {
       case EntryType.labour:
@@ -4435,6 +4673,10 @@ class _ReportActions {
     }
     Navigator.pushNamed(context, route, arguments: editArgs).then((val) {
       if (context.mounted) {
+        final loadId = ReportFilterState.selectedProjectId == 'all'
+            ? null
+            : ReportFilterState.selectedProjectId;
+        context.read<ProjectProvider>().loadEntriesForProject(loadId);
         context.read<ProjectProvider>().load();
       }
     });

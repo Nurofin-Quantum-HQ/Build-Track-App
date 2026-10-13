@@ -1208,7 +1208,9 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
             ? 'Labour entry updated successfully!'
             : 'Labour entry saved successfully!',
       );
-      if (_fromReport) {
+      if (_fromReport && Navigator.canPop(context)) {
+        Navigator.pop(context, true);
+      } else if (_fromReport) {
         Navigator.pushNamedAndRemoveUntil(
           context,
           '/reports',

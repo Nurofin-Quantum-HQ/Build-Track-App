@@ -1284,7 +1284,9 @@ class _AddEquipmentScreenState extends State<AddEquipmentScreen> {
             ? 'Equipment entry updated successfully!'
             : 'Equipment entry saved successfully!',
       );
-      if (_fromReport) {
+      if (_fromReport && Navigator.canPop(context)) {
+        Navigator.pop(context, true);
+      } else if (_fromReport) {
         Navigator.pushNamedAndRemoveUntil(
           context,
           '/reports',

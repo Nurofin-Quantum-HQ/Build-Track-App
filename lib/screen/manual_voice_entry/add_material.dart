@@ -1233,7 +1233,9 @@ class _AddMaterialScreenState extends State<AddMaterialScreen> {
             ? 'Material entry updated successfully!'
             : 'Material entry saved successfully!',
       );
-      if (_fromReport) {
+      if (_fromReport && Navigator.canPop(context)) {
+        Navigator.pop(context, true);
+      } else if (_fromReport) {
         Navigator.pushNamedAndRemoveUntil(
           context,
           '/reports',

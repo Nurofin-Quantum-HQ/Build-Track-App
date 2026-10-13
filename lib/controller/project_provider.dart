@@ -269,6 +269,25 @@ class ProjectProvider extends ChangeNotifier {
       final paymentDateRaw = json['paymentDate'] != null
           ? DateTime.tryParse(json['paymentDate'].toString())?.toLocal()
           : null;
+      String? workerName;
+      if (json['worker'] is Map) {
+        workerName = json['worker']['name']?.toString();
+      } else if (json['workerName'] != null) {
+        workerName = json['workerName']?.toString();
+      }
+      final category = json['category']?.toString();
+      final supplier = json['supplier']?.toString();
+      String? contractor = json['contractor']?.toString() ?? json['contractorName']?.toString();
+      if (contractor == null || contractor.isEmpty) {
+        if (parsedType == EntryType.labour) {
+          contractor = (category != null && category.isNotEmpty) ? category : supplier;
+        } else {
+          contractor = supplier;
+        }
+      }
+      final notes = json['notes']?.toString();
+      final remarks = json['remarks']?.toString();
+      final quantity = (json['quantity'] is num) ? (json['quantity'] as num).toDouble() : null;
       return EntryModel(
         id: json['_id']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString(),
         projectId: entryProjectId,
@@ -290,6 +309,7 @@ class ProjectProvider extends ChangeNotifier {
         ratePerUnit: (json['rate'] is num)
             ? (json['rate'] as num).toDouble()
             : 0,
+        quantity: quantity,
         floor: json['floor']?.toString(),
         phase: json['phase']?.toString(),
         phaseId: json['phaseId']?.toString(),
@@ -302,6 +322,13 @@ class ProjectProvider extends ChangeNotifier {
         paymentDate: paymentDateRaw,
         paidAmount: parsedPaidAmount,
         paymentHistory: parsedPaymentHistory,
+        category: category,
+        supplier: supplier,
+        contractor: contractor,
+        workerName: workerName,
+        notes: notes,
+        remarks: remarks,
+        rawJson: json,
       );
     }).toList();
   }
@@ -605,7 +632,6 @@ class ProjectProvider extends ChangeNotifier {
       final fetched = await ApiService.fetchProjects();
       _projects = _filterForCurrentUser(fetched);
       _projects = _projects.map((p) {
-        final floors = p.floors;
         return p;
       }).toList();
       if (_projects.isNotEmpty && _selectedProject == null) {
@@ -763,6 +789,17 @@ class ProjectProvider extends ChangeNotifier {
     _saveContextPrefs();
     notifyListeners();
   }
+  void setSelectedProject(ProjectModel? project) {
+    if (project != null) {
+      selectProject(project);
+    } else {
+      _selectedProject = null;
+      notifyListeners();
+    }
+  }
+  void setSelectedFloor(String? floor) => selectFloor(floor);
+  void setSelectedPhase(ProjectPhase? phase) => selectPhase(phase?.phaseName, phase?.id);
+  void setSelectedActivity(String? activity, [String? activityId]) => selectActivity(activity, activityId);
   Future<bool> updateProjectProgress(String id, double progress) async {
     debugPrint('[DEBUG] updateProjectProgress: id=$id, progress=$progress');
     final idx = _projects.indexWhere((p) => p.id == id);
