@@ -776,7 +776,10 @@ class ExecutionContextCard extends StatelessWidget {
               );        final List<String> floors = (selProject?.floors?.isNotEmpty == true)
             ? List<String>.from(selProject!.floors!)
             : <String>[];
-        if (selectedFloor != null && selectedFloor!.isNotEmpty && !floors.contains(selectedFloor)) {
+        if (floors.isNotEmpty &&
+            selectedFloor != null &&
+            selectedFloor!.isNotEmpty &&
+            !floors.contains(selectedFloor)) {
           floors.insert(0, selectedFloor!);
         }
         String? selPhaseName;
@@ -883,26 +886,34 @@ class ExecutionContextCard extends StatelessWidget {
               ),
               if (projectError != null) EntryErrorText(projectError!),
               const SizedBox(height: 18),
-              if (floors.isNotEmpty) ...[
-                const EntryFieldLabel('Floor / Zone', required: true),
-                const SizedBox(height: 8),
-                EntryDropdownField<String>(
-                  value: selectedFloor,
-                  hint: selectedProjectId == null
-                      ? 'Select project first'
-                      : 'Select floor',
-                  enabled: selectedProjectId != null,
-                  items: floors
-                      .map(
-                        (f) => DropdownMenuItem<String>(value: f, child: Text(f)),
-                      )
-                      .toList(),
-                  onChanged: onFloorChanged,
-                  error: floorError,
-                ),
-                if (floorError != null) EntryErrorText(floorError!),
-                const SizedBox(height: 18),
-              ],
+              const EntryFieldLabel('Floor / Zone', required: false),
+              const SizedBox(height: 8),
+              EntryDropdownField<String>(
+                value: floors.isEmpty ? null : selectedFloor,
+                hint: floors.isEmpty
+                    ? ''
+                    : (selectedProjectId == null
+                        ? 'Select project first'
+                        : 'Select floor'),
+                enabled: selectedProjectId != null && floors.isNotEmpty,
+                items: floors.isEmpty
+                    ? const []
+                    : floors
+                        .map(
+                          (f) => DropdownMenuItem<String>(
+                            value: f,
+                            child: Text(f),
+                          ),
+                        )
+                        .toList(),
+                onChanged: (selectedProjectId == null || floors.isEmpty)
+                    ? null
+                    : onFloorChanged,
+                error: floors.isEmpty ? null : floorError,
+              ),
+              if (floors.isNotEmpty && floorError != null)
+                EntryErrorText(floorError!),
+              const SizedBox(height: 18),
               const EntryFieldLabel('Phase', required: true),
               const SizedBox(height: 8),
               EntryDropdownField<String>(

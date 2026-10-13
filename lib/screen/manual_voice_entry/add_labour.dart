@@ -818,20 +818,26 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
       resolvedFloor = floorId;
     }
     if (resolvedFloor != null) {
-      final floorFound = _floors.any((f) => f.toString() == resolvedFloor);
-      if (!floorFound) {
-        _floors.insert(0, resolvedFloor);
-        _floorWarning =
-            '⚠ Previously selected floor "$resolvedFloor" no longer exists.\nPlease select another floor.';
-        debugPrint(
-          'FLOOR WARNING: "$resolvedFloor" not found — inserted at index 0',
-        );
+      if (_floors.isNotEmpty) {
+        final floorFound = _floors.any((f) => f.toString() == resolvedFloor);
+        if (!floorFound) {
+          _floors.insert(0, resolvedFloor);
+          _floorWarning =
+              '⚠ Previously selected floor "$resolvedFloor" no longer exists.\nPlease select another floor.';
+          debugPrint(
+            'FLOOR WARNING: "$resolvedFloor" not found — inserted at index 0',
+          );
+        } else {
+          debugPrint('FLOOR "$resolvedFloor" found in project floors');
+        }
+        _selectedFloor = resolvedFloor;
+        _selectedFloorId = floorId.isNotEmpty ? floorId : null;
+        debugPrint('FLOOR => $_selectedFloor  FLOOR_ID => $_selectedFloorId');
       } else {
-        debugPrint('FLOOR "$resolvedFloor" found in project floors');
+        _selectedFloor = null;
+        _selectedFloorId = null;
+        debugPrint('FLOOR => Project has no floors, cleared floor selection');
       }
-      _selectedFloor = resolvedFloor;
-      _selectedFloorId = floorId.isNotEmpty ? floorId : null;
-      debugPrint('FLOOR => $_selectedFloor  FLOOR_ID => $_selectedFloorId');
     } else {
       debugPrint('FLOOR => NO DATA (both name and ID empty)');
     }
@@ -1021,7 +1027,7 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
       _projectError = _selectedProjectId == null
           ? 'Please select a Project.'
           : null;
-      _floorError = _selectedFloor == null
+      _floorError = (_floors.isNotEmpty && _selectedFloor == null)
           ? 'Please select a Floor / Zone.'
           : null;
       _phaseError = _selectedPhase == null ? 'Please select a Phase.' : null;
@@ -2087,6 +2093,9 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
                             _activityWarning = null;
                           });
                           await _loadFloors(v);
+                          if (_floors.isEmpty) {
+                            await _loadPhases(null);
+                          }
                           setState(() {});
                         },
                         onFloorChanged: (v) async {

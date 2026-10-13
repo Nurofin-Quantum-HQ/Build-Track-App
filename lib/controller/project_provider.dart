@@ -428,7 +428,13 @@ class ProjectProvider extends ChangeNotifier {
         UserSession.projectId = _selectedProject!.id;
         final cachedProjId = prefs.getString('buildtrack_selected_project_id');
         if (cachedProjId == _selectedProject?.id) {
-          _selectedFloor = prefs.getString('buildtrack_selected_floor');
+          final savedFloor = prefs.getString('buildtrack_selected_floor');
+          final projFloors = _selectedProject?.floors ?? [];
+          if (savedFloor != null && projFloors.contains(savedFloor)) {
+            _selectedFloor = savedFloor;
+          } else {
+            _selectedFloor = null;
+          }
           _selectedPhase = prefs.getString('buildtrack_selected_phase');
           _selectedPhaseId = prefs.getString('buildtrack_selected_phase_id');
           _selectedActivity = prefs.getString('buildtrack_selected_activity');
@@ -574,7 +580,13 @@ class ProjectProvider extends ChangeNotifier {
       }).toList();
       final cachedProjId = prefs.getString('buildtrack_selected_project_id');
       if (cachedProjId == _selectedProject?.id) {
-        _selectedFloor = prefs.getString('buildtrack_selected_floor');
+        final savedFloor = prefs.getString('buildtrack_selected_floor');
+        final projFloors = _selectedProject?.floors ?? [];
+        if (savedFloor != null && projFloors.contains(savedFloor)) {
+          _selectedFloor = savedFloor;
+        } else {
+          _selectedFloor = null;
+        }
         _selectedPhase = prefs.getString('buildtrack_selected_phase');
         _selectedPhaseId = prefs.getString('buildtrack_selected_phase_id');
         _selectedActivity = prefs.getString('buildtrack_selected_activity');

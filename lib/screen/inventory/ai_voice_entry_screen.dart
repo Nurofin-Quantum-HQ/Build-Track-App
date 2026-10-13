@@ -253,6 +253,17 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
     );
     return projects;
   }
+  ProjectModel? get _selectedProject {
+    final projId = _data.projectId;
+    if (projId != null && projId.isNotEmpty) {
+      final p = _projects.cast<ProjectModel?>().firstWhere(
+        (p) => p?.id == projId,
+        orElse: () => null,
+      );
+      if (p != null) return p;
+    }
+    return Provider.of<ProjectProvider>(context, listen: false).selectedProject;
+  }
   int _processingStage = 0;
   Timer? _processingTimer;
   Timer? _answerTimeoutTimer;
@@ -1120,14 +1131,11 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
       case 'Project':
         return _projects.take(5).map((p) => p.name).toList();
       case 'Floor':
-        return [
-          'Ground Floor',
-          '1st Floor',
-          '2nd Floor',
-          '3rd Floor',
-          'Basement',
-          'Terrace',
-        ];
+        final activeProj = _selectedProject;
+        if (activeProj?.floors != null && activeProj!.floors!.isNotEmpty) {
+          return activeProj.floors!;
+        }
+        return <String>[];
       case 'Phase':
         return [
           'Foundation Work',
@@ -2048,7 +2056,10 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
   }
   bool get _isProjectContextSelected {
     final hasProj = _data.projectId != null && _data.projectId!.isNotEmpty;
-    final hasFloor = _data.floor != null && _data.floor!.trim().isNotEmpty;
+    final proj = _selectedProject;
+    final projHasFloors = proj?.floors != null && proj!.floors!.isNotEmpty;
+    final hasFloor =
+        !projHasFloors || (_data.floor != null && _data.floor!.trim().isNotEmpty);
     final hasPhase = _data.phase != null && _data.phase!.trim().isNotEmpty;
     final hasAct = _data.activity != null && _data.activity!.trim().isNotEmpty;
     return hasProj && hasFloor && hasPhase && hasAct;

@@ -99,7 +99,13 @@ class _ExecutionContextScreenState extends State<ExecutionContextScreen> {
         _projectError = 'Please select a project';
         valid = false;
       }
-      if (_selectedFloor == null || _selectedFloor!.isEmpty) {
+      final provider = Provider.of<ProjectProvider>(context, listen: false);
+      final project = provider.projects.cast<ProjectModel?>().firstWhere(
+        (p) => p?.id == _selectedProjectId,
+        orElse: () => null,
+      );
+      final hasFloors = project?.floors != null && project!.floors!.isNotEmpty;
+      if (hasFloors && (_selectedFloor == null || _selectedFloor!.isEmpty)) {
         _floorError = 'Please select a floor';
         valid = false;
       }
@@ -123,7 +129,11 @@ class _ExecutionContextScreenState extends State<ExecutionContextScreen> {
       );
       provider.selectProject(project);
     }
-    provider.selectFloor(_selectedFloor);
+    final effectiveFloor = (_selectedFloor != null &&
+            (provider.selectedProject?.floors?.contains(_selectedFloor) ?? false))
+        ? _selectedFloor
+        : null;
+    provider.selectFloor(effectiveFloor);
     provider.selectPhase(_selectedPhase, phaseId);
     provider.selectActivity(_selectedActivity, activityId);
     Navigator.pushNamed(
@@ -132,8 +142,10 @@ class _ExecutionContextScreenState extends State<ExecutionContextScreen> {
       arguments: {
         'type': _entryType,
         'projectId': _selectedProjectId,
-        'floor': _selectedFloor,
-        'floorId': _selectedFloorId ?? _selectedFloor,
+        'floor': effectiveFloor,
+        'floorId': effectiveFloor != null
+            ? (_selectedFloorId ?? effectiveFloor)
+            : null,
         'phase': _selectedPhase,
         'phaseId': phaseId ?? '',
         'activity': _selectedActivity,

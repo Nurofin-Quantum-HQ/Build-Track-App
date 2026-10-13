@@ -150,10 +150,18 @@ class _VoiceConfirmationSheetState extends State<VoiceConfirmationSheet>
     super.dispose();
   }
   List<_StepId> get _allSteps {
+    final provider = Provider.of<ProjectProvider>(context, listen: false);
+    final project = provider.projects.firstWhere(
+      (p) => p.id == _entry.projectId,
+      orElse: () => provider.projects.isNotEmpty
+          ? provider.projects.first
+          : _placeholderProject(),
+    );
+    final hasFloors = project.floors != null && project.floors!.isNotEmpty;
     return [
       _StepId.entryType,
       _StepId.project,
-      _StepId.floor,
+      if (hasFloors) _StepId.floor,
       _StepId.phase,
       _StepId.activity,
       _StepId.itemName,
@@ -241,7 +249,19 @@ class _VoiceConfirmationSheetState extends State<VoiceConfirmationSheet>
           _currentStep = _StepId.project;
           break;
         case _StepId.project:
-          _currentStep = _StepId.floor;
+          final provider = Provider.of<ProjectProvider>(context, listen: false);
+          final project = provider.projects.firstWhere(
+            (p) => p.id == _entry.projectId,
+            orElse: () => provider.projects.isNotEmpty
+                ? provider.projects.first
+                : _placeholderProject(),
+          );
+          if (project.floors != null && project.floors!.isNotEmpty) {
+            _currentStep = _StepId.floor;
+          } else {
+            _entry.floor = null;
+            _currentStep = _StepId.phase;
+          }
           break;
         case _StepId.floor:
           _currentStep = _StepId.phase;
@@ -954,7 +974,7 @@ class _VoiceConfirmationSheetState extends State<VoiceConfirmationSheet>
           ? provider.projects.first
           : _placeholderProject(),
     );
-    final floors = project.floors ?? ['Ground'];
+    final floors = project.floors ?? <String>[];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

@@ -297,10 +297,12 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
         _selectedPhaseName = phaseName;
         _selectedActivityName = activityName;
         _prefillActivityId = activityId;
-        if (floor != null && floor.isNotEmpty) {
+        if (floor != null && floor.isNotEmpty && (floors == null || floors.contains(floor))) {
           _selectedFloor = floor;
         } else if (floors != null && floors.isNotEmpty) {
           _selectedFloor = floors.first;
+        } else {
+          _selectedFloor = null;
         }
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted) return;
@@ -451,14 +453,9 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
                         );
                   final floors = (selProject?.floors?.isNotEmpty ?? false)
                       ? List<String>.from(selProject!.floors!)
-                      : [
-                          'Basement',
-                          'Ground Floor',
-                          '1st Floor',
-                          '2nd Floor',
-                          'Terrace',
-                        ];
-                  if (_selectedFloor != null &&
+                      : <String>[];
+                  if (floors.isNotEmpty &&
+                      _selectedFloor != null &&
                       !floors.contains(_selectedFloor)) {
                     floors.add(_selectedFloor!);
                   }
@@ -482,7 +479,7 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
                         ),
                         const SizedBox(height: 20),
                         if (_selectedPhaseName != null &&
-                            _selectedFloor != null) ...[
+                            (floors.isEmpty || _selectedFloor != null)) ...[
                           _buildStageSummaryCard(),
                           const SizedBox(height: 20),
                         ],
@@ -653,15 +650,17 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
           const SizedBox(height: 16),
           _sectionLabel('Floor / Zone'),
           _dropdownCard<String>(
-            value: _selectedFloor,
+            value: floors.isEmpty ? null : _selectedFloor,
             hint: _selectedProjectId == null
                 ? 'Select project first'
-                : 'Select floor or zone',
-            enabled: _selectedProjectId != null,
-            items: floors
-                .map((f) => DropdownMenuItem<String>(value: f, child: Text(f)))
-                .toList(),
-            onChanged: _selectedProjectId == null
+                : (floors.isEmpty ? '' : 'Select floor or zone'),
+            enabled: _selectedProjectId != null && floors.isNotEmpty,
+            items: floors.isEmpty
+                ? <DropdownMenuItem<String>>[]
+                : floors
+                    .map((f) => DropdownMenuItem<String>(value: f, child: Text(f)))
+                    .toList(),
+            onChanged: (_selectedProjectId == null || floors.isEmpty)
                 ? null
                 : (val) => setState(() {
                     _selectedFloor = val;
@@ -677,17 +676,21 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
               ? _lockedField(_selectedPhaseName ?? 'Phase')
               : _dropdownCard<String>(
                   value: _selectedPhaseName,
-                  hint: _selectedFloor == null
-                      ? 'Select floor first'
-                      : 'Select phase',
-                  enabled: _selectedFloor != null,
+                  hint: _selectedProjectId == null
+                      ? 'Select project first'
+                      : (floors.isNotEmpty && _selectedFloor == null
+                          ? 'Select floor first'
+                          : 'Select phase'),
+                  enabled: _selectedProjectId != null &&
+                      (floors.isEmpty || _selectedFloor != null),
                   items: phaseNames
                       .map(
                         (n) =>
                             DropdownMenuItem<String>(value: n, child: Text(n)),
                       )
                       .toList(),
-                  onChanged: _selectedFloor == null
+                  onChanged: (_selectedProjectId == null ||
+                          (floors.isNotEmpty && _selectedFloor == null))
                       ? null
                       : (val) => setState(() {
                           _selectedPhaseName = val;
@@ -1335,13 +1338,20 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
     ProjectProvider provider,
   ) {
     List<EntryModel> materials = [];
-    if (_selectedProjectId != null && _selectedFloor != null) {
+    final selProject = _selectedProjectId == null
+        ? null
+        : provider.projects.cast<ProjectModel?>().firstWhere(
+            (p) => p?.id == _selectedProjectId,
+            orElse: () => null,
+          );
+    final hasFloors = selProject?.floors?.isNotEmpty ?? false;
+    if (_selectedProjectId != null && (!hasFloors || _selectedFloor != null)) {
       materials = provider.entries
           .where(
             (e) =>
                 e.type == EntryType.material &&
                 e.projectId == _selectedProjectId &&
-                e.floor == _selectedFloor,
+                (!hasFloors || e.floor == _selectedFloor),
           )
           .toList();
     }

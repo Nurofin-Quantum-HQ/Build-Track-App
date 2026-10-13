@@ -2514,19 +2514,24 @@ class _ReportsViewState extends State<_ReportsView> {
                     Expanded(
                       child: _buildProjectContextDropdown(
                         label: 'Floor',
-                        selectedLabel: _selectedFloor ?? 'Select Floor',
+                        selectedLabel: floors.isEmpty
+                            ? ''
+                            : (_selectedFloor ?? 'Select Floor'),
                         enabled:
                             _selectedProjectId != 'all' && floors.isNotEmpty,
-                        items: [
-                          PopupMenuItem(
-                            value: 'Select Floor',
-                            child: Text('Select Floor (All)'),
-                          ),
-                          ...floors.map(
-                            (f) => PopupMenuItem(value: f, child: Text(f)),
-                          ),
-                        ],
+                        items: floors.isEmpty
+                            ? []
+                            : [
+                                PopupMenuItem(
+                                  value: 'Select Floor',
+                                  child: Text('Select Floor (All)'),
+                                ),
+                                ...floors.map(
+                                  (f) => PopupMenuItem(value: f, child: Text(f)),
+                                ),
+                              ],
                         onSelected: (val) {
+                          if (floors.isEmpty) return;
                           final floorVal = (val == 'Select Floor') ? null : val;
                           setState(() {
                             _selectedFloor = floorVal;
