@@ -1,9 +1,9 @@
 import 'package:buildtrack_mobile/common/themes/app_colors.dart';
-import 'package:buildtrack_mobile/common/widgets/common_widgets.dart';
 import 'package:buildtrack_mobile/common/widgets/entry_widgets.dart';
 import 'package:buildtrack_mobile/controller/project_provider.dart';
 import 'package:buildtrack_mobile/models/project_model.dart';
 import 'package:flutter/material.dart';
+import 'package:buildtrack_mobile/design/design.dart';
 import 'package:provider/provider.dart';
 class ExecutionContextScreen extends StatefulWidget {
   const ExecutionContextScreen({super.key});
@@ -166,84 +166,28 @@ class _ExecutionContextScreenState extends State<ExecutionContextScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.gradientStart,
+      backgroundColor: Bt.ground,
+      appBar: BtNavBar(title: '$_entryTypeLabel entry'),
       body: SafeArea(
+        top: false,
         bottom: false,
         child: Column(
           children: [
-            AppTopBar(
-              title: 'Execution Context',
-              isSubScreen: true,
-              leftIcon: Icons.arrow_back,
-              onLeftTap: () => Navigator.maybePop(context),
-            ),
             Expanded(
               child: SingleChildScrollView(
                 physics: const ClampingScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: AppColors.primary.withValues(alpha: 0.18),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            _entryType == 'material'
-                                ? Icons.category_outlined
-                                : _entryType == 'labour'
-                                ? Icons.people_outline
-                                : Icons.precision_manufacturing_outlined,
-                            size: 14,
-                            color: AppColors.primary,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            '$_entryTypeLabel Entry',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.primary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    const Text(
-                      'Where is this\nwork happening?',
-                      style: TextStyle(
-                        fontSize: 26,
-                        fontWeight: FontWeight.w900,
-                        color: AppColors.textDark,
-                        height: 1.2,
-                        letterSpacing: -0.4,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    const Text(
-                      'Select the project context once — it applies to both voice and manual entry.',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: AppColors.textLight,
-                        height: 1.5,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
+                    Text('Where is this work happening?', style: BtText.title(context, size: 24)),
+                    const SizedBox(height: 4),
+                    Text('Select the project context once — it applies to both voice and manual entry.', style: BtText.subhead(context)),
+                    const SizedBox(height: 20),
                     _buildStepIndicator(),
                     const SizedBox(height: 24),
                     ExecutionContextCard(
+                      showHeader: false,
                       selectedProjectId: _selectedProjectId,
                       selectedFloor: _selectedFloor,
                       selectedPhase: _selectedPhase,
@@ -352,10 +296,10 @@ class _ExecutionContextScreenState extends State<ExecutionContextScreen> {
     bool active = false,
   }) {
     final Color bg = done
-        ? const Color(0xFF22C55E)
+        ? const Color(0xFF067647)
         : active
         ? AppColors.primary
-        : const Color(0xFFE5E7EB);
+        : const Color(0xFFE4E7EC);
     final Color textColor = (done || active)
         ? Colors.white
         : AppColors.textLight;
@@ -372,8 +316,8 @@ class _ExecutionContextScreenState extends State<ExecutionContextScreen> {
                 : Text(
                     '$step',
                     style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
                       color: textColor,
                     ),
                   ),
@@ -383,12 +327,12 @@ class _ExecutionContextScreenState extends State<ExecutionContextScreen> {
         Text(
           label,
           style: TextStyle(
-            fontSize: 9.5,
+            fontSize: 12,
             fontWeight: FontWeight.w600,
             color: active
                 ? AppColors.primary
                 : done
-                ? const Color(0xFF22C55E)
+                ? const Color(0xFF067647)
                 : AppColors.textLight,
           ),
         ),
@@ -401,109 +345,24 @@ class _ExecutionContextScreenState extends State<ExecutionContextScreen> {
         height: 2,
         margin: const EdgeInsets.only(bottom: 14),
         decoration: BoxDecoration(
-          color: done ? const Color(0xFF22C55E) : const Color(0xFFE5E7EB),
+          color: done ? const Color(0xFF067647) : const Color(0xFFE4E7EC),
           borderRadius: BorderRadius.circular(2),
         ),
       ),
     );
   }
   Widget _buildBottomBar() {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(
-          top: BorderSide(color: const Color(0xFFEEEBF8), width: 1),
+    return BtCtaBar(vertical: true, children: [
+      if (_canContinue)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+            const Icon(Icons.check_circle_outline, color: Bt.green, size: 16),
+            const SizedBox(width: 6),
+            Text('Context selected — ready to continue', style: BtText.caption(context, color: Bt.green, weight: FontWeight.w600)),
+          ]),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 12,
-            offset: const Offset(0, -4),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        top: false,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (_canContinue)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(
-                      Icons.check_circle_outline,
-                      color: Color(0xFF22C55E),
-                      size: 14,
-                    ),
-                    const SizedBox(width: 6),
-                    const Text(
-                      'Context selected — ready to continue',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF22C55E),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            SizedBox(
-              width: double.infinity,
-              height: 52,
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                decoration: BoxDecoration(
-                  gradient: _canContinue
-                      ? const LinearGradient(
-                          colors: [Color(0xFF173EEA), Color(0xFF6C3AFF)],
-                          begin: Alignment.centerLeft,
-                          end: Alignment.centerRight,
-                        )
-                      : null,
-                  color: _canContinue ? null : const Color(0xFFE5E7EB),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Material(
-                  color: Colors.transparent,
-                  borderRadius: BorderRadius.circular(14),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(14),
-                    onTap: _canContinue ? _onContinue : null,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          'Continue',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                            color: _canContinue
-                                ? Colors.white
-                                : AppColors.textLight,
-                            letterSpacing: 0.2,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Icon(
-                          Icons.arrow_forward_rounded,
-                          size: 18,
-                          color: _canContinue
-                              ? Colors.white
-                              : AppColors.textLight,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+      BtButton(label: 'Continue', onPressed: _canContinue ? _onContinue : null),
+    ]);
   }
 }

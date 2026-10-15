@@ -1,3 +1,4 @@
+import 'package:buildtrack_mobile/design/design.dart';
 import 'package:buildtrack_mobile/common/themes/app_colors.dart';
 import 'package:buildtrack_mobile/common/widgets/common_widgets.dart';
 import 'package:flutter/material.dart';
@@ -39,7 +40,7 @@ class _CementHistoryScreenState extends State<CementHistoryScreen> {
                     const SizedBox(height: 14),
                     _movementItem(
                       icon: Icons.local_shipping_outlined,
-                      iconBg: const Color(0xFFEEF0FF),
+                      iconBg: const Color(0xFFE8F1FC),
                       iconColor: primaryBlue,
                       name: 'Portland Type II',
                       subtitle: 'Stock Replenishment • #INV-9921',
@@ -51,31 +52,31 @@ class _CementHistoryScreenState extends State<CementHistoryScreen> {
                     const SizedBox(height: 12),
                     _movementItem(
                       icon: Icons.home_work_outlined,
-                      iconBg: const Color(0xFFF0EEFF),
+                      iconBg: const Color(0xFFE8F1FC),
                       iconColor: purple,
                       name: 'Portland Type II',
                       subtitle: 'Slab Pouring - Block B • #INV-9884',
                       qty: '-120',
                       date: 'OCT 22,\n2023',
                       isPositive: false,
-                      accent: const Color(0xFFE040FB),
+                      accent: const Color(0xFF0B63CE),
                     ),
                     const SizedBox(height: 12),
                     _movementItem(
                       icon: Icons.architecture,
-                      iconBg: const Color(0xFFF0EEFF),
+                      iconBg: const Color(0xFFE8F1FC),
                       iconColor: purple,
                       name: 'Quick-Set Specialty',
                       subtitle: 'Column Reinforcement • #INV-9851',
                       qty: '-45',
                       date: 'OCT 20,\n2023',
                       isPositive: false,
-                      accent: const Color(0xFFE040FB),
+                      accent: const Color(0xFF0B63CE),
                     ),
                     const SizedBox(height: 12),
                     _movementItem(
                       icon: Icons.local_shipping_outlined,
-                      iconBg: const Color(0xFFEEF0FF),
+                      iconBg: const Color(0xFFE8F1FC),
                       iconColor: primaryBlue,
                       name: 'Portland Type II',
                       subtitle: 'Stock Replenishment • #INV-9820',
@@ -87,14 +88,14 @@ class _CementHistoryScreenState extends State<CementHistoryScreen> {
                     const SizedBox(height: 12),
                     _movementItem(
                       icon: Icons.construction_outlined,
-                      iconBg: const Color(0xFFF0EEFF),
+                      iconBg: const Color(0xFFE8F1FC),
                       iconColor: purple,
                       name: 'Portland Type II',
                       subtitle: 'Foundation Work • #INV-9799',
                       qty: '-85',
                       date: 'OCT 15,\n2023',
                       isPositive: false,
-                      accent: const Color(0xFFE040FB),
+                      accent: const Color(0xFF0B63CE),
                     ),
                   ],
                 ),
@@ -111,21 +112,21 @@ class _CementHistoryScreenState extends State<CementHistoryScreen> {
       padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 24),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFFEEEFFF), Color(0xFFF5F0FF)],
+          colors: [Color(0xFFE8F1FC), Color(0xFFF5F0FF)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(Bt.rCard),
         border: Border.all(color: const Color(0xFFCDD0FF), width: 2),
       ),
       child: Column(
         children: [
           Text(
-            'TOTAL CURRENT STOCK',
+            'Total current stock',
             style: TextStyle(
-              fontSize: 12,
+              fontSize: 13,
               color: textGray,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w700,
               letterSpacing: 1.1,
             ),
           ),
@@ -137,7 +138,7 @@ class _CementHistoryScreenState extends State<CementHistoryScreen> {
                   text: '1,248',
                   style: TextStyle(
                     fontSize: 56,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                     color: AppColors.primaryPurple,
                     letterSpacing: -2,
                     height: 1,
@@ -147,7 +148,7 @@ class _CementHistoryScreenState extends State<CementHistoryScreen> {
                   text: '  Units',
                   style: TextStyle(
                     fontSize: 20,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                     color: textGray,
                   ),
                 ),
@@ -176,8 +177,8 @@ class _CementHistoryScreenState extends State<CementHistoryScreen> {
           label,
           style: TextStyle(
             color: purple,
-            fontWeight: FontWeight.w800,
-            fontSize: 12.5,
+            fontWeight: FontWeight.w700,
+            fontSize: 13,
             letterSpacing: 0.3,
           ),
         ),
@@ -196,14 +197,14 @@ class _CementHistoryScreenState extends State<CementHistoryScreen> {
               'Movement Logs',
               style: TextStyle(
                 fontSize: 22,
-                fontWeight: FontWeight.w900,
+                fontWeight: FontWeight.w700,
                 color: textDark,
               ),
             ),
             const SizedBox(height: 3),
             Text(
               'Tracking historical distribution',
-              style: TextStyle(color: textGray, fontSize: 12.5),
+              style: TextStyle(color: textGray, fontSize: 13),
             ),
           ],
         ),
@@ -212,7 +213,7 @@ class _CementHistoryScreenState extends State<CementHistoryScreen> {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFDDE0F0)),
+            border: Border.all(color: Bt.line),
           ),
           child: Row(
             children: [
@@ -220,7 +221,7 @@ class _CementHistoryScreenState extends State<CementHistoryScreen> {
                 'Filter',
                 style: TextStyle(
                   color: primaryBlue,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w700,
                   fontSize: 13,
                 ),
               ),
@@ -249,9 +250,6 @@ class _CementHistoryScreenState extends State<CementHistoryScreen> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
         border: Border(left: BorderSide(color: accent, width: 3.5)),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8),
-        ],
       ),
       child: Row(
         children: [
@@ -272,7 +270,7 @@ class _CementHistoryScreenState extends State<CementHistoryScreen> {
                 Text(
                   name,
                   style: TextStyle(
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                     fontSize: 14.5,
                     color: textDark,
                   ),
@@ -280,7 +278,7 @@ class _CementHistoryScreenState extends State<CementHistoryScreen> {
                 const SizedBox(height: 3),
                 Text(
                   subtitle,
-                  style: TextStyle(color: textGray, fontSize: 11.5),
+                  style: TextStyle(color: textGray, fontSize: 13),
                 ),
               ],
             ),
@@ -291,8 +289,8 @@ class _CementHistoryScreenState extends State<CementHistoryScreen> {
               Text(
                 qty,
                 style: TextStyle(
-                  color: isPositive ? primaryBlue : const Color(0xFFE040FB),
-                  fontWeight: FontWeight.w800,
+                  color: isPositive ? primaryBlue : const Color(0xFF0B63CE),
+                  fontWeight: FontWeight.w700,
                   fontSize: 19,
                 ),
               ),
@@ -300,7 +298,7 @@ class _CementHistoryScreenState extends State<CementHistoryScreen> {
               Text(
                 date,
                 textAlign: TextAlign.right,
-                style: TextStyle(color: textGray, fontSize: 10, height: 1.3),
+                style: TextStyle(color: textGray, fontSize: 12, height: 1.3),
               ),
             ],
           ),

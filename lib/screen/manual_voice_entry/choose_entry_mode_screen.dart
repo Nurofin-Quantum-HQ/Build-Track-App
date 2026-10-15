@@ -1,6 +1,6 @@
 import 'package:buildtrack_mobile/common/themes/app_colors.dart';
-import 'package:buildtrack_mobile/common/widgets/common_widgets.dart';
 import 'package:flutter/material.dart';
+import 'package:buildtrack_mobile/design/design.dart';
 import 'package:provider/provider.dart';
 import 'package:buildtrack_mobile/controller/project_provider.dart';
 import 'package:buildtrack_mobile/controller/user_session.dart';
@@ -129,96 +129,61 @@ class _ChooseEntryModeScreenState extends State<ChooseEntryModeScreen>
           _startTour(context);
         });
         return Scaffold(
-      backgroundColor: AppColors.gradientStart,
-      body: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            AppTopBar(
-              title: 'How to Add',
-              isSubScreen: true,
-              leftIcon: Icons.arrow_back,
-              onLeftTap: () => Navigator.maybePop(context),
-            ),
-            Expanded(
-              child: SingleChildScrollView(
-                physics: const ClampingScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(16, 20, 16, 40),
-                child: FadeTransition(
-                  opacity: _fadeAnim,
-                  child: SlideTransition(
-                    position: _slideAnim,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildStepIndicator(),
-                        const SizedBox(height: 24),
-                        const Text(
-                          'How do you want\nto add?',
-                          style: TextStyle(
-                            fontSize: 26,
-                            fontWeight: FontWeight.w900,
-                            color: AppColors.textDark,
-                            height: 1.2,
-                            letterSpacing: -0.4,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          'Adding $_entryTypeLabel entry',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: AppColors.textLight,
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-                        _buildContextBanner(),
-                        const SizedBox(height: 28),
-                        Showcase(
-                          key: ShowcaseKeys.addEntryVoiceTab,
-                          description: 'Use voice to automatically log entries.',
-                          tooltipBackgroundColor: const Color(0xFF1E1E2C),
-                          textColor: Colors.white,
-                          tooltipBorderRadius: BorderRadius.circular(16),
-                          tooltipPadding: const EdgeInsets.all(16),
-                          child: _InteractiveModeCard(
-                            icon: Icons.mic_rounded,
-                            iconColor: AppColors.primary,
-                            iconBg: AppColors.primary.withValues(alpha: 0.1),
-                            title: 'Use Voice',
-                            subtitle:
-                                'Speak naturally and let AI capture the details.',
-                            onTap: _goVoice,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Showcase(
-                          key: ShowcaseKeys.addEntryManualTab,
-                          description: 'Manually input entry details.',
-                          tooltipBackgroundColor: const Color(0xFF1E1E2C),
-                          textColor: Colors.white,
-                          tooltipBorderRadius: BorderRadius.circular(16),
-                          tooltipPadding: const EdgeInsets.all(16),
-                          child: _InteractiveModeCard(
-                            icon: Icons.edit_outlined,
-                            iconColor: const Color(0xFF7C3AED),
-                            iconBg: const Color(0xFFF3EEFF),
-                            title: 'Enter Manually',
-                            subtitle: 'Fill the form manually.',
-                            onTap: _goManual,
-                          ),
-                        ),
-                      ],
+          backgroundColor: Bt.ground,
+          appBar: BtNavBar(title: '$_entryTypeLabel entry'),
+          body: SingleChildScrollView(
+            physics: const ClampingScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
+            child: FadeTransition(
+              opacity: _fadeAnim,
+              child: SlideTransition(
+                position: _slideAnim,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _buildStepIndicator(),
+                    const SizedBox(height: 24),
+                    Text('How do you want to add?', style: BtText.title(context, size: 24)),
+                    const SizedBox(height: 4),
+                    Text('Adding $_entryTypeLabel entry', style: BtText.subhead(context)),
+                    const SizedBox(height: 20),
+                    Showcase(
+                      key: ShowcaseKeys.addEntryVoiceTab,
+                      description: 'Use voice to automatically log entries.',
+                      tooltipBackgroundColor: Bt.ink,
+                      textColor: Colors.white,
+                      tooltipBorderRadius: BorderRadius.circular(16),
+                      tooltipPadding: const EdgeInsets.all(16),
+                      child: _VoiceChoice(onTap: _goVoice),
                     ),
-                  ),
+                    const SizedBox(height: 12),
+                    Showcase(
+                      key: ShowcaseKeys.addEntryManualTab,
+                      description: 'Manually input entry details.',
+                      tooltipBackgroundColor: Bt.ink,
+                      textColor: Colors.white,
+                      tooltipBorderRadius: BorderRadius.circular(16),
+                      tooltipPadding: const EdgeInsets.all(16),
+                      child: BtGroup(children: [
+                        BtRow(
+                          leading: const BtTile(icon: Icons.edit_outlined),
+                          title: 'Enter Manually',
+                          subtitle: 'Fill the form manually.',
+                          showChevron: true,
+                          minHeight: 64,
+                          onTap: _goManual,
+                        ),
+                      ]),
+                    ),
+                    const SizedBox(height: 28),
+                    _buildContextBanner(),
+                  ],
                 ),
               ),
             ),
-          ],
-        ),
-      ),
-    );
-    },
+          ),
+        );
+      },
     );
   }
   Widget _buildStepIndicator() {
@@ -241,10 +206,10 @@ class _ChooseEntryModeScreenState extends State<ChooseEntryModeScreen>
     bool active = false,
   }) {
     final Color bg = done
-        ? const Color(0xFF22C55E)
+        ? const Color(0xFF067647)
         : active
         ? AppColors.primary
-        : const Color(0xFFE5E7EB);
+        : const Color(0xFFE4E7EC);
     final Color textColor = (done || active)
         ? Colors.white
         : AppColors.textLight;
@@ -261,8 +226,8 @@ class _ChooseEntryModeScreenState extends State<ChooseEntryModeScreen>
                 : Text(
                     '$step',
                     style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
                       color: textColor,
                     ),
                   ),
@@ -272,12 +237,12 @@ class _ChooseEntryModeScreenState extends State<ChooseEntryModeScreen>
         Text(
           label,
           style: TextStyle(
-            fontSize: 9.5,
+            fontSize: 12,
             fontWeight: FontWeight.w600,
             color: active
                 ? AppColors.primary
                 : done
-                ? const Color(0xFF22C55E)
+                ? const Color(0xFF067647)
                 : AppColors.textLight,
           ),
         ),
@@ -290,99 +255,74 @@ class _ChooseEntryModeScreenState extends State<ChooseEntryModeScreen>
         height: 2,
         margin: const EdgeInsets.only(bottom: 14),
         decoration: BoxDecoration(
-          color: done ? const Color(0xFF22C55E) : const Color(0xFFE5E7EB),
+          color: done ? const Color(0xFF067647) : const Color(0xFFE4E7EC),
           borderRadius: BorderRadius.circular(2),
         ),
       ),
     );
   }
   Widget _buildContextBanner() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFDCFCE7), width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF22C55E).withValues(alpha: 0.06),
-            blurRadius: 12,
-            offset: const Offset(0, 3),
-          ),
-        ],
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Padding(
+        padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+        child: Row(children: [
+          const Icon(Icons.check_circle_outline, color: Bt.green, size: 16),
+          const SizedBox(width: 6),
+          Text('Execution Context Selected', style: BtText.caption(context, color: Bt.green, weight: FontWeight.w600)),
+        ]),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 30,
-                height: 30,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFDCFCE7),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(
-                  Icons.check_circle_outline,
-                  color: Color(0xFF16A34A),
-                  size: 17,
-                ),
-              ),
-              const SizedBox(width: 10),
-              const Text(
-                'Execution Context Selected',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF15803D),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          const Divider(color: Color(0xFFF0FDF4), height: 1),
-          const SizedBox(height: 12),
-          _contextRow(Icons.business_outlined, 'Project', _projectName),
-          const SizedBox(height: 8),
-          _contextRow(Icons.layers_outlined, 'Floor', _floor),
-          const SizedBox(height: 8),
-          _contextRow(Icons.account_tree_outlined, 'Phase', _phase),
-          const SizedBox(height: 8),
-          _contextRow(Icons.task_alt_outlined, 'Activity', _activity),
-        ],
-      ),
-    );
+      BtGroup(insetDividers: false, children: [
+        BtValueRow(label: 'Project', value: _projectName),
+        BtValueRow(label: 'Floor', value: _floor),
+        BtValueRow(label: 'Phase', value: _phase),
+        BtValueRow(label: 'Activity', value: _activity),
+      ]),
+    ]);
   }
-  Widget _contextRow(IconData icon, String label, String value) {
-    return Row(
-      children: [
-        Icon(icon, size: 14, color: AppColors.textLight),
-        const SizedBox(width: 8),
-        Text(
-          '$label: ',
-          style: const TextStyle(
-            fontSize: 12,
-            color: AppColors.textLight,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        Expanded(
-          child: Text(
-            value,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontSize: 12,
-              color: AppColors.textDark,
-              fontWeight: FontWeight.w700,
+}
+
+class _VoiceChoice extends StatelessWidget {
+  const _VoiceChoice({required this.onTap});
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) {
+    final bt = context.bt;
+    return Semantics(
+      button: true,
+      label: 'Use Voice',
+      child: Container(
+        decoration: BoxDecoration(gradient: bt.signature, borderRadius: BorderRadius.circular(Bt.rCard)),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(Bt.rCard),
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(color: Colors.white.withValues(alpha: .18), shape: BoxShape.circle),
+                  child: Icon(Icons.mic_rounded, color: bt.onAccent, size: 26),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text('Use Voice', style: BtText.headline(context).copyWith(color: bt.onAccent)),
+                    Text('Speak naturally and let AI capture the details.', style: BtText.subhead(context, color: bt.onAccent.withValues(alpha: .85))),
+                  ]),
+                ),
+                Icon(Icons.arrow_forward_rounded, color: bt.onAccent),
+              ]),
             ),
           ),
         ),
-      ],
+      ),
     );
   }
 }
+
 class _InteractiveModeCard extends StatefulWidget {
   const _InteractiveModeCard({
     required this.icon,
@@ -428,11 +368,6 @@ class _InteractiveModeCardState extends State<_InteractiveModeCard>
         ? AppColors.primary
         : const Color(0xFFE8EBF5);
     final borderWidth = _isHovered ? 2.0 : 1.0;
-    final shadowColor = _isHovered
-        ? AppColors.primary.withValues(alpha: 0.08)
-        : Colors.black.withValues(alpha: 0.04);
-    final shadowBlur = _isHovered ? 14.0 : 10.0;
-    final shadowOffset = _isHovered ? const Offset(0, 4) : const Offset(0, 3);
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovered = true),
       onExit: (_) => setState(() => _isHovered = false),
@@ -443,21 +378,14 @@ class _InteractiveModeCardState extends State<_InteractiveModeCard>
           height: 96,
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(Bt.rCard),
             border: Border.all(color: borderColor, width: borderWidth),
-            boxShadow: [
-              BoxShadow(
-                color: shadowColor,
-                blurRadius: shadowBlur,
-                offset: shadowOffset,
-              ),
-            ],
           ),
           child: Material(
             color: Colors.transparent,
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(Bt.rCard),
             child: InkWell(
-              borderRadius: BorderRadius.circular(18),
+              borderRadius: BorderRadius.circular(Bt.rCard),
               onTapDown: (_) => _animationController.forward(),
               onTapUp: (_) => _animationController.reverse(),
               onTapCancel: () => _animationController.reverse(),
@@ -492,7 +420,7 @@ class _InteractiveModeCardState extends State<_InteractiveModeCard>
                             style: const TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w700,
-                              color: Color(0xFF1E1E2E),
+                              color: Color(0xFF101828),
                               letterSpacing: -0.3,
                             ),
                           ),
@@ -518,13 +446,6 @@ class _InteractiveModeCardState extends State<_InteractiveModeCard>
                       decoration: BoxDecoration(
                         color: Colors.white,
                         shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.05),
-                            blurRadius: 4,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
                       ),
                       child: Center(
                         child: Icon(

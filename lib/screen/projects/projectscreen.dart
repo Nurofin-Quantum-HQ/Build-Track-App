@@ -1,6 +1,6 @@
+import 'package:buildtrack_mobile/design/design.dart';
 import 'package:buildtrack_mobile/common/themes/app_colors.dart';
 import 'package:buildtrack_mobile/controller/nav_controller.dart';
-import 'package:buildtrack_mobile/common/widgets/app_widgets.dart';
 import 'package:buildtrack_mobile/common/widgets/common_widgets.dart';
 import 'package:buildtrack_mobile/controller/project_provider.dart';
 import 'package:buildtrack_mobile/controller/role_manager.dart';
@@ -47,46 +47,18 @@ enum _ProjectStatus {
         return 'Cancelled';
     }
   }
-  Color get bg {
+  BtTone get tone {
     switch (this) {
       case _ProjectStatus.planning:
-        return const Color(0xFFFFF8E1);
+        return BtTone.neutral;
       case _ProjectStatus.inProgress:
-        return const Color(0xFFE8F0FE);
+        return BtTone.brand;
       case _ProjectStatus.onHold:
-        return const Color(0xFFFFF3E0);
+        return BtTone.amber;
       case _ProjectStatus.completed:
-        return const Color(0xFFE8F5E9);
+        return BtTone.green;
       case _ProjectStatus.cancelled:
-        return const Color(0xFFFFEBEE);
-    }
-  }
-  Color get border {
-    switch (this) {
-      case _ProjectStatus.planning:
-        return const Color(0xFFFFC107);
-      case _ProjectStatus.inProgress:
-        return const Color(0xFF4A6CF7);
-      case _ProjectStatus.onHold:
-        return const Color(0xFFFF9800);
-      case _ProjectStatus.completed:
-        return const Color(0xFF43A047);
-      case _ProjectStatus.cancelled:
-        return const Color(0xFFE53935);
-    }
-  }
-  Color get text {
-    switch (this) {
-      case _ProjectStatus.planning:
-        return const Color(0xFFF57F17);
-      case _ProjectStatus.inProgress:
-        return const Color(0xFF3D5AFE);
-      case _ProjectStatus.onHold:
-        return const Color(0xFFE65100);
-      case _ProjectStatus.completed:
-        return const Color(0xFF2E7D32);
-      case _ProjectStatus.cancelled:
-        return const Color(0xFFC62828);
+        return BtTone.red;
     }
   }
 }
@@ -96,30 +68,7 @@ class ProjectStatusChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final status = _ProjectStatus.fromString(statusRaw);
-    return Container(
-      constraints: const BoxConstraints(maxWidth: 120),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-      decoration: BoxDecoration(
-        color: status.bg,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: status.border.withValues(alpha: 0.6),
-          width: 1.0,
-        ),
-      ),
-      child: Text(
-        status.label,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: TextStyle(
-          color: status.text,
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.3,
-          height: 1.2,
-        ),
-      ),
-    );
+    return BtBadge(label: status.label, tone: status.tone);
   }
 }
 class ProjectsScreen extends StatelessWidget {
@@ -143,7 +92,7 @@ class ProjectsScreen extends StatelessWidget {
         TooltipActionButton(
           type: TooltipDefaultActionType.next, 
           backgroundColor: AppColors.primary, 
-          textStyle: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)
+          textStyle: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)
         )
       ], 
       enableAutoScroll: true,
@@ -170,26 +119,27 @@ class _ProjectsScreenContent extends StatefulWidget {
 }
 
 class _ProjectsScreenContentState extends State<_ProjectsScreenContent> {
-  static var primaryBlue = AppColors.primary;
-  static const bgColor = AppColors.gradientStart;
-  static const textDark = AppColors.textDark;
-  static const textGray = AppColors.textLight;
-
   final GlobalKey _fabKey = GlobalKey();
+
+  List<GlobalKey> _tourKeys() {
+    final projProvider = Provider.of<ProjectProvider>(context, listen: false);
+    final keys = <GlobalKey>[];
+    if (RoleManager.canAssignTasks) keys.add(ShowcaseKeys.projectsAssignRoleBtn);
+    if (projProvider.projects.isEmpty) {
+      if (RoleManager.canCreateProject) keys.add(_fabKey);
+    } else {
+      keys.add(ShowcaseKeys.projectsCard);
+    }
+    return keys;
+  }
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final _projProvider = Provider.of<ProjectProvider>(context, listen: false);
-      if (_projProvider.projectsLoaded && !UserSession.hasSkippedTour && !UserSession.visitedModules.contains('ProjectsScreen')) {
-        final keys = <GlobalKey>[];
-        if (RoleManager.canAssignTasks) keys.add(ShowcaseKeys.projectsAssignRoleBtn);
-        if (_projProvider.projects.isEmpty) {
-          keys.add(_fabKey);
-        } else {
-          keys.add(ShowcaseKeys.projectsCard);
-        }
+      final projProvider = Provider.of<ProjectProvider>(context, listen: false);
+      if (projProvider.projectsLoaded && !UserSession.hasSkippedTour && !UserSession.visitedModules.contains('ProjectsScreen')) {
+        final keys = _tourKeys();
         if (keys.isNotEmpty) {
           ShowCaseWidget.of(context).startShowCase(keys);
         }
@@ -201,90 +151,73 @@ class _ProjectsScreenContentState extends State<_ProjectsScreenContent> {
   Widget build(BuildContext context) {
     final provider = context.watch<ProjectProvider>();
     final canCreate = RoleManager.canCreateProject;
+    context.read<NavController>().markCurrent('/projects');
     return Scaffold(
-      backgroundColor: bgColor,
+      backgroundColor: Bt.ground,
       floatingActionButton: canCreate
           ? Showcase(
               key: _fabKey,
               title: 'Add Project',
               description: 'Tap here to create a new project.',
-              child: FloatingActionButton(
+              child: FloatingActionButton.extended(
+                heroTag: 'add-project',
                 onPressed: () => Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const AddProjectScreen()),
                 ),
-                backgroundColor: primaryBlue,
-                shape: const CircleBorder(),
-                elevation: 4,
-                child: const Icon(Icons.add, color: Colors.white, size: 30),
+                backgroundColor: context.bt.brand,
+                foregroundColor: context.bt.onAccent,
+                elevation: 2,
+                icon: const Icon(Icons.add_rounded),
+                label: Text('New project', style: BtText.button(context, size: 15, color: context.bt.onAccent)),
               ),
             )
           : null,
       body: SafeArea(
         bottom: false,
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            AppTopBar(
-              title: 'BuildTrack',
-              rightWidget: Row(
+            BtLargeHeader(
+              title: 'Projects',
+              caption: provider.hasProjects ? '${provider.projects.length} ${provider.projects.length == 1 ? 'site' : 'sites'}' : null,
+              trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   if (RoleManager.canAssignTasks)
                     Showcase(
                       key: ShowcaseKeys.projectsAssignRoleBtn,
                       description: 'Click here to assign work/tasks to this project',
-                      tooltipBackgroundColor: const Color(0xFF1E1E2C),
+                      tooltipBackgroundColor: Bt.ink,
                       textColor: Colors.white,
                       tooltipBorderRadius: BorderRadius.circular(16),
                       tooltipPadding: const EdgeInsets.all(16),
-                      child: GestureDetector(
+                      child: BtIconButton(
+                        icon: Icons.assignment_outlined,
+                        semantic: 'Assign task',
+                        color: Bt.ink2,
                         onTap: () => Navigator.pushNamed(context, '/assign-task'),
-                        child: Container(
-                          margin: const EdgeInsets.only(right: 8),
-                          padding: const EdgeInsets.all(7),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withValues(alpha: 0.1),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            Icons.assignment_outlined,
-                            color: AppColors.primary,
-                            size: 19,
-                          ),
-                        ),
                       ),
                     ),
-                  GestureDetector(
+                  BtIconButton(
+                    icon: Icons.help_outline_rounded,
+                    semantic: 'App guidelines',
+                    color: Bt.ink2,
                     onTap: () {
-                      final _projProvider = Provider.of<ProjectProvider>(context, listen: false);
-                      final keys = <GlobalKey>[];
-                      if (RoleManager.canAssignTasks) keys.add(ShowcaseKeys.projectsAssignRoleBtn);
-                      if (_projProvider.projects.isEmpty) {
-                        keys.add(_fabKey);
-                      } else {
-                        keys.add(ShowcaseKeys.projectsCard);
-                      }
+                      final keys = _tourKeys();
                       if (keys.isNotEmpty) {
                         ShowCaseWidget.of(context).startShowCase(keys);
                       }
                     },
-                    child: Container(
-                      padding: const EdgeInsets.all(7),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.1),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        Icons.help_outline,
-                        color: AppColors.primary,
-                        size: 19,
-                      ),
-                    ),
                   ),
-                  const SizedBox(width: 8),
-                  GestureDetector(
-                    onTap: () => Navigator.pushNamed(context, '/profile'),
-                    child: const ProfileAvatar(radius: 18),
+                  Semantics(
+                    button: true,
+                    label: 'Account',
+                    child: InkWell(
+                      customBorder: const CircleBorder(),
+                      onTap: () => Navigator.pushNamed(context, '/profile'),
+                      child: const Padding(padding: EdgeInsets.all(4), child: ProfileAvatar(radius: 18)),
+                    ),
                   ),
                 ],
               ),
@@ -296,249 +229,135 @@ class _ProjectsScreenContentState extends State<_ProjectsScreenContent> {
       bottomNavigationBar: AppBottomNav(),
     );
   }
+
   Widget _buildBody(BuildContext context, ProjectProvider provider) {
     if (provider.isLoading) {
-      return Center(
-        child: CircularProgressIndicator(color: AppColors.primary),
+      return const Padding(
+        padding: EdgeInsets.symmetric(horizontal: Bt.gutter),
+        child: BtSkeletonList(count: 3),
       );
     }
     if (provider.error.isNotEmpty) {
-      return AppEmptyState(
-        icon: Icons.cloud_off_outlined,
-        message: provider.error,
-        actionLabel: 'Retry',
-        onAction: provider.load,
+      return Padding(
+        padding: const EdgeInsets.all(Bt.gutter),
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: BtErrorCard(message: provider.error, onRetry: provider.load),
+        ),
       );
     }
     if (!provider.hasProjects) {
-      return const AppEmptyState(
+      return BtEmpty(
         icon: Icons.folder_open_outlined,
-        message: 'No projects yet.\nTap + to create your first project.',
+        title: 'No projects yet',
+        message: RoleManager.canCreateProject ? 'Tap New project to create your first project.' : null,
       );
     }
     return RefreshIndicator(
-      color: AppColors.primary,
+      color: context.bt.brand,
       onRefresh: provider.load,
-      child: SingleChildScrollView(
+      child: ListView.separated(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
+        padding: const EdgeInsets.fromLTRB(Bt.gutter, 4, Bt.gutter, 100),
+        itemCount: provider.projects.length,
+        separatorBuilder: (_, _) => const SizedBox(height: 12),
+        itemBuilder: (context, i) {
+          final p = provider.projects[i];
+          final card = _projectCard(context, p, provider);
+          if (i != 0) return card;
+          return Showcase(
+            key: ShowcaseKeys.projectsCard,
+            description: 'Tap on any project card to view detailed analytics and logs',
+            tooltipBackgroundColor: Bt.ink,
+            textColor: Colors.white,
+            tooltipBorderRadius: BorderRadius.circular(16),
+            tooltipPadding: const EdgeInsets.all(16),
+            child: card,
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _projectCard(
+    BuildContext context,
+    ProjectModel p,
+    ProjectProvider provider,
+  ) {
+    final bt = context.bt;
+    void open() {
+      provider.selectProject(p);
+      Navigator.pushNamed(context, '/project-detail');
+    }
+
+    final pct = (p.progress * 100).toStringAsFixed(0);
+    return Semantics(
+      button: true,
+      label: '${p.name}, $pct percent done. View details',
+      child: BtCard(
+        onTap: open,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-              decoration: BoxDecoration(
-                color: primaryBlue.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                'LIVE PIPELINE',
-                style: TextStyle(
-                  color: primaryBlue,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 1.3,
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Active Builds',
-                  style: TextStyle(
-                    fontSize: 30,
-                    fontWeight: FontWeight.w900,
-                    color: textDark,
-                    letterSpacing: -0.5,
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 7,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFEEF0FF),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
+                Expanded(
                   child: Text(
-                    '${provider.projects.length} Sites',
-                    style: TextStyle(
-                      color: primaryBlue,
-                      fontWeight: FontWeight.w800,
-                      fontSize: 13,
-                    ),
+                    p.name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: BtText.headline(context),
                   ),
                 ),
+                const SizedBox(width: 8),
+                ProjectStatusChip(statusRaw: p.projectStatus),
               ],
             ),
-            const SizedBox(height: 20),
-            ...provider.projects.asMap().entries.map(
-              (entry) {
-                final isFirst = entry.key == 0;
-                final p = entry.value;
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: isFirst
-                      ? Showcase(
-                          key: ShowcaseKeys.projectsCard,
-                          description: 'Tap on any project card to view detailed analytics and logs',
-                          tooltipBackgroundColor: const Color(0xFF1E1E2C),
-                          textColor: Colors.white,
-                          tooltipBorderRadius: BorderRadius.circular(16),
-                          tooltipPadding: const EdgeInsets.all(16),
-                          child: _projectCard(context, p, provider),
-                        )
-                      : _projectCard(context, p, provider),
-                );
-              },
+            if (p.location.isNotEmpty) ...[
+              const SizedBox(height: 2),
+              Row(children: [
+                const Icon(Icons.place_outlined, size: 14, color: Bt.ink3),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(p.location, maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.caption(context)),
+                ),
+              ]),
+            ],
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Text('Overall progress', style: BtText.subhead(context)),
+                const Spacer(),
+                Text('$pct%', style: BtText.num(BtText.subhead(context, weight: FontWeight.w600, color: Bt.ink))),
+              ],
+            ),
+            const SizedBox(height: 6),
+            BtProgress(value: p.progress.clamp(0.0, 1.0).toDouble(), work: true),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                if (UserSession.isAdmin)
+                  Expanded(
+                    child: Text.rich(
+                      TextSpan(children: [
+                        TextSpan(text: p.formattedSpent, style: BtText.num(BtText.subhead(context, weight: FontWeight.w600, color: Bt.ink))),
+                        TextSpan(text: ' of ${p.formattedBudget}', style: BtText.num(BtText.subhead(context))),
+                      ]),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  )
+                else
+                  const Spacer(),
+                Text('View details', style: BtText.subhead(context, weight: FontWeight.w600, color: bt.brand)),
+                const SizedBox(width: 2),
+                Icon(Icons.chevron_right_rounded, size: 18, color: bt.brand),
+              ],
             ),
           ],
         ),
       ),
     );
   }
-  Widget _projectCard(
-    BuildContext context,
-    ProjectModel p,
-    ProjectProvider provider,
-  ) {
-    return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(20),
-      child: InkWell(
-        onTap: () {
-          provider.selectProject(p);
-          Navigator.pushNamed(context, '/project-detail');
-        },
-        borderRadius: BorderRadius.circular(20),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
-                blurRadius: 12,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Text(
-                      p.name,
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w900,
-                        color: textDark,
-                        height: 1.2,
-                        letterSpacing: -0.3,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  ProjectStatusChip(statusRaw: p.projectStatus),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Text(
-                p.location,
-                style: const TextStyle(
-                  color: textGray,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              if (UserSession.isAdmin) ...[
-                const SizedBox(height: 4),
-                Text(
-                  '${p.formattedSpent} of ${p.formattedBudget}',
-                  style: TextStyle(
-                    color: primaryBlue,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-              const SizedBox(height: 14),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Overall Progress',
-                    style: TextStyle(
-                      color: textDark,
-                      fontWeight: FontWeight.w800,
-                      fontSize: 13,
-                    ),
-                  ),
-                  Text(
-                    '${(p.progress * 100).toStringAsFixed(0)}%',
-                    style: TextStyle(
-                      color: primaryBlue,
-                      fontWeight: FontWeight.w800,
-                      fontSize: 13,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: LinearProgressIndicator(
-                  value: p.progress,
-                  backgroundColor: const Color(0xFFE8ECF8),
-                  valueColor: AlwaysStoppedAnimation<Color>(primaryBlue),
-                  minHeight: 7,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Align(
-                alignment: Alignment.centerRight,
-                child: InkWell(
-                  onTap: () {
-                    provider.selectProject(p);
-                    Navigator.pushNamed(context, '/project-detail');
-                  },
-                  borderRadius: BorderRadius.circular(8),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 4,
-                      vertical: 2,
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          'View Details',
-                          style: TextStyle(
-                            color: primaryBlue,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 14,
-                          ),
-                        ),
-                        SizedBox(width: 4),
-                        Icon(Icons.arrow_forward, color: primaryBlue, size: 16),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }
-

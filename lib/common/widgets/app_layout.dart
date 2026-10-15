@@ -37,7 +37,7 @@ class AppLayout extends StatelessWidget {
               leading: leading,
               actions: actions,
               elevation: 0,
-              backgroundColor: AppColors.cardBg,
+              backgroundColor: AppColors.bgBase1,
               foregroundColor: AppColors.textDark,
             )
           : null,
@@ -82,7 +82,7 @@ class AppScrollLayout extends StatelessWidget {
               leading: leading,
               actions: actions,
               elevation: 0,
-              backgroundColor: AppColors.cardBg,
+              backgroundColor: AppColors.bgBase1,
               foregroundColor: AppColors.textDark,
             )
           : null,
@@ -141,7 +141,7 @@ class AppSubScreenLayout extends StatelessWidget {
       appBar: AppBar(
         title: Text(title),
         centerTitle: true,
-        backgroundColor: AppColors.cardBg,
+        backgroundColor: AppColors.bgBase1,
         foregroundColor: AppColors.textDark,
         elevation: 0,
         leading: IconButton(
@@ -215,7 +215,7 @@ class AppTabLayout extends StatelessWidget {
         title: Text(title),
         centerTitle: true,
         elevation: 0,
-        backgroundColor: AppColors.cardBg,
+        backgroundColor: AppColors.bgBase1,
         foregroundColor: AppColors.textDark,
         actions: actions,
       ),
@@ -253,13 +253,6 @@ class _AppBottomNav extends StatelessWidget {
       decoration: const BoxDecoration(
         color: AppTheme.surface,
         border: Border(top: BorderSide(color: AppTheme.divider, width: 1)),
-        boxShadow: [
-          BoxShadow(
-            color: Color(0x14000000),
-            blurRadius: 16,
-            offset: Offset(0, -4),
-          ),
-        ],
       ),
       child: SafeArea(
         child: SizedBox(
@@ -288,7 +281,7 @@ class _AppBottomNav extends StatelessWidget {
                         Text(
                           tab.label,
                           style: TextStyle(
-                            fontSize: 10,
+                            fontSize: 12,
                             fontWeight: selected
                                 ? FontWeight.w700
                                 : FontWeight.w400,

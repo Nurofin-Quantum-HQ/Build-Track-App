@@ -1,3 +1,4 @@
+import 'package:buildtrack_mobile/design/design.dart';
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:provider/provider.dart';
@@ -46,9 +47,6 @@ class MetricCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8),
-        ],
         border: Border.all(color: const Color(0xFFF0F1F5)),
       ),
       child: Column(
@@ -69,13 +67,13 @@ class MetricCard extends StatelessWidget {
             label,
             style: AppTheme.label.copyWith(
               color: AppColors.textLight,
-              fontSize: 10,
+              fontSize: 12,
             ),
           ),
           const SizedBox(height: 2),
           Text(
             value,
-            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -90,7 +88,7 @@ class MetricCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   maxLines: 1,
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: 13,
                     color: subColor,
                     fontWeight: FontWeight.w600,
                   ),
@@ -288,7 +286,7 @@ class ChartSection extends StatelessWidget {
           children: [
             Text(
               'Spend vs Budget by Category',
-              style: AppTheme.heading3.copyWith(fontWeight: FontWeight.w800),
+              style: AppTheme.heading3.copyWith(fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 4),
             Text(
@@ -296,7 +294,7 @@ class ChartSection extends StatelessWidget {
                   ? '⚠ Budget exceeded in one or more categories'
                   : '✓ All categories within budget',
               style: TextStyle(
-                fontSize: 12,
+                fontSize: 13,
                 color: isExceeded ? AppColors.error : AppColors.success,
                 fontWeight: FontWeight.w600,
               ),
@@ -364,7 +362,7 @@ class ChartSection extends StatelessWidget {
                                   formatY(value),
                                   style: TextStyle(
                                     fontSize: isLandscape ? 9 : 10,
-                                    color: Colors.grey,
+                                    color: const Color(0xFF667085),
                                   ),
                                   maxLines: 1,
                                   overflow: TextOverflow.visible,
@@ -396,7 +394,7 @@ class ChartSection extends StatelessWidget {
                           spots: targetSpots,
                           isCurved: false,
                           barWidth: 2,
-                          color: Colors.red,
+                          color: const Color(0xFFC01048),
                           dashArray: [6, 4],
                           dotData: const FlDotData(show: false),
                         ),
@@ -411,11 +409,11 @@ class ChartSection extends StatelessWidget {
               children: [
                 _dot(AppColors.primary),
                 const SizedBox(width: 6),
-                const Text('Actual Paid', style: TextStyle(fontSize: 12)),
+                const Text('Actual Paid', style: TextStyle(fontSize: 13)),
                 const SizedBox(width: 16),
-                _dot(Colors.red),
+                _dot(const Color(0xFFC01048)),
                 const SizedBox(width: 6),
-                const Text('Target Budget', style: TextStyle(fontSize: 12)),
+                const Text('Target Budget', style: TextStyle(fontSize: 13)),
               ],
             ),
           ],
@@ -638,7 +636,7 @@ class CategoryBudgetSection extends StatelessWidget {
                         item['label'].toString(),
                         style: AppTheme.label.copyWith(
                           color: AppColors.textDark,
-                          fontSize: 12,
+                          fontSize: 13,
                           letterSpacing: 0.4,
                         ),
                       ),
@@ -657,8 +655,8 @@ class CategoryBudgetSection extends StatelessWidget {
                             Text(
                               'of ₹${target.toStringAsFixed(0)} budget',
                               style: const TextStyle(
-                                fontSize: 11,
-                                color: Colors.grey,
+                                fontSize: 13,
+                                color: Color(0xFF667085),
                               ),
                             ),
                         ],
@@ -674,7 +672,7 @@ class CategoryBudgetSection extends StatelessWidget {
                           child: LinearProgressIndicator(
                             value: barValue,
                             minHeight: 8,
-                            backgroundColor: const Color(0xFFEEF0F8),
+                            backgroundColor: const Color(0xFFEEF1F5),
                             valueColor: AlwaysStoppedAnimation(color),
                           ),
                         ),
@@ -684,7 +682,7 @@ class CategoryBudgetSection extends StatelessWidget {
                         Text(
                           '${(rawPercent * 100).toStringAsFixed(0)}%',
                           style: TextStyle(
-                            fontSize: 12,
+                            fontSize: 13,
                             fontWeight: FontWeight.w700,
                             color: color,
                           ),
@@ -700,7 +698,7 @@ class CategoryBudgetSection extends StatelessWidget {
                             ? 'Exceeded by ₹${(actual - target).toStringAsFixed(0)}'
                             : 'Remaining: ₹${remaining.toStringAsFixed(0)}',
                         style: TextStyle(
-                          fontSize: 11,
+                          fontSize: 13,
                           color: isOver ? AppColors.error : AppColors.textLight,
                           fontWeight: FontWeight.w500,
                         ),
@@ -725,88 +723,34 @@ class EfficiencyBanner extends StatelessWidget {
   final bool isExceeded;
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: isExceeded
-              ? [AppColors.error, AppColors.error.withValues(alpha: 0.7)]
-              : [AppColors.primary, AppColors.primary.withValues(alpha: 0.7)],
+    void open() {
+      final selectedProjectName = context
+          .read<ReportProvider>()
+          .selectedProjectName;
+      Navigator.pushNamed(
+        context,
+        '/report-insights',
+        arguments: {'projectName': selectedProjectName},
+      );
+    }
+
+    return BtGroup(
+      children: [
+        BtRow(
+          leading: BtTile(
+            icon: Icons.bar_chart,
+            bg: isExceeded ? Bt.redSoft : null,
+            fg: isExceeded ? Bt.red : null,
+          ),
+          title: 'Efficiency Report',
+          subtitle: note,
+          subtitleMaxLines: 3,
+          titleWeight: FontWeight.w600,
+          minHeight: 64,
+          onTap: open,
+          showChevron: true,
         ),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.20),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: const Icon(
-                  Icons.bar_chart,
-                  color: Colors.white,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Text(
-                'Efficiency Report',
-                style: AppTheme.heading3.copyWith(color: Colors.white),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            note,
-            style: AppTheme.body.copyWith(color: Colors.white70, height: 1.4),
-          ),
-          const SizedBox(height: 12),
-          InkWell(
-            onTap: () {
-              final selectedProjectName = context
-                  .read<ReportProvider>()
-                  .selectedProjectName;
-              Navigator.pushNamed(
-                context,
-                '/report-insights',
-                arguments: {'projectName': selectedProjectName},
-              );
-            },
-            borderRadius: BorderRadius.circular(4),
-            splashColor: Colors.white24,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 6),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'View Details',
-                    style: AppTheme.body.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
-                      decoration: TextDecoration.underline,
-                      decorationColor: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  const Icon(
-                    Icons.arrow_forward,
-                    size: 16,
-                    color: Colors.white,
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
+      ],
     );
   }
 }

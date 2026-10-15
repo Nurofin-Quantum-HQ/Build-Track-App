@@ -1,5 +1,4 @@
 import 'package:buildtrack_mobile/common/themes/app_colors.dart';
-import 'package:buildtrack_mobile/common/themes/app_gradients.dart';
 import 'package:buildtrack_mobile/common/themes/app_theme.dart';
 import 'package:flutter/material.dart';
 class AppCard extends StatelessWidget {
@@ -26,13 +25,6 @@ class AppCard extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(borderRadius),
         border: Border.all(color: AppColors.cardBorder),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 12,
-            offset: const Offset(0, 3),
-          ),
-        ],
       ),
       child: Padding(padding: padding, child: child),
     );
@@ -73,37 +65,23 @@ class AppButton extends StatelessWidget {
         child: DecoratedBox(
           decoration: BoxDecoration(
             color: isPrimary
-                ? null
+                ? AppColors.primary
                 : (variant == AppButtonVariant.outline
-                      ? Colors.transparent
+                      ? Colors.white
                       : bg),
-            gradient: (isPrimary && enabled)
-                ? AppGradients.primaryButton
-                : (isPrimary && !enabled
-                      ? LinearGradient(colors: [bg, bg])
-                      : null),
-            borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+            borderRadius: BorderRadius.circular(14),
             border: variant == AppButtonVariant.outline
-                ? Border.all(color: border, width: 1.5)
-                : null,
-            boxShadow: (isPrimary && enabled)
-                ? [
-                    BoxShadow(
-                      color: AppColors.primaryBlue.withValues(alpha: 0.25),
-                      blurRadius: 16,
-                      offset: const Offset(0, 6),
-                    ),
-                  ]
+                ? Border.all(color: AppColors.cardBorder, width: 1)
                 : null,
           ),
           child: Material(
             color: Colors.transparent,
-            borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+            borderRadius: BorderRadius.circular(14),
             child: InkWell(
-              borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+              borderRadius: BorderRadius.circular(14),
               onTap: (enabled && !isLoading) ? onPressed : null,
               child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 14),
+                padding: const EdgeInsets.symmetric(vertical: 15),
                 child: Center(
                   child: isLoading
                       ? SizedBox(
@@ -144,14 +122,14 @@ class AppButton extends StatelessWidget {
       case AppButtonVariant.primary:
         return (AppTheme.primary, Colors.white, AppTheme.primary);
       case AppButtonVariant.secondary:
-        return (AppTheme.secondary, Colors.white, AppTheme.secondary);
+        return (AppColors.primary, Colors.white, AppColors.primary);
       case AppButtonVariant.outline:
-        return (Colors.transparent, AppTheme.primary, AppTheme.primary);
+        return (Colors.white, AppTheme.textDark, AppColors.cardBorder);
       case AppButtonVariant.danger:
         return (
-          const Color(0xFFFEE2E2),
+          Colors.white,
           AppTheme.error,
-          const Color(0xFFFEE2E2),
+          AppColors.cardBorder,
         );
     }
   }
@@ -287,7 +265,7 @@ class AppStatusBadge extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: fg),
+        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: fg),
       ),
     );
   }
@@ -308,7 +286,7 @@ class AppStatusBadge extends StatelessWidget {
       case AppStatus.notStarted:
         return ('Not Started', AppColors.badgeInfoBg, AppColors.badgeInfoText);
       case AppStatus.delayed:
-        return ('Delayed', const Color(0xFFFEE2E2), AppTheme.error);
+        return ('Delayed', const Color(0xFFFDECEF), AppTheme.error);
       case AppStatus.issue:
         return ('Issue', AppColors.badgePendingBg, AppColors.badgePendingText);
     }
@@ -394,7 +372,7 @@ class AppProgressBar extends StatelessWidget {
             children: [
               Container(
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE5E0F5),
+                  color: const Color(0xFFEEF1F5),
                   borderRadius: BorderRadius.circular(3),
                 ),
               ),
@@ -402,7 +380,7 @@ class AppProgressBar extends StatelessWidget {
                 widthFactor: percent.clamp(0.0, 1.0),
                 child: Container(
                   decoration: BoxDecoration(
-                    gradient: AppGradients.progressBar,
+                    color: color ?? AppColors.primary,
                     borderRadius: BorderRadius.circular(3),
                   ),
                 ),
@@ -434,9 +412,14 @@ class AppEmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 52, color: AppTheme.textLight),
-            const SizedBox(height: AppTheme.spacingMd),
-            Text(message, style: AppTheme.body, textAlign: TextAlign.center),
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(color: const Color(0xFFEEF1F5), borderRadius: BorderRadius.circular(14)),
+              child: Icon(icon, size: 28, color: AppTheme.textMedium),
+            ),
+            const SizedBox(height: 14),
+            Text(message, style: AppTheme.heading3.copyWith(fontWeight: FontWeight.w500), textAlign: TextAlign.center),
             if (actionLabel != null) ...[
               const SizedBox(height: AppTheme.spacingMd),
               AppButton(
@@ -469,7 +452,7 @@ class StatusBadge extends StatelessWidget {
       case 'approved':
         return AppColors.badgeSuccessBg;
       case 'rejected':
-        return const Color(0xFFFFEBEE);
+        return const Color(0xFFFDECEF);
       default:
         return AppColors.badgeWarningBg;
     }
@@ -487,11 +470,11 @@ class StatusBadge extends StatelessWidget {
   String get _label {
     switch (status) {
       case 'approved':
-        return 'APPROVED';
+        return 'Approved';
       case 'rejected':
-        return 'REJECTED';
+        return 'Rejected';
       default:
-        return 'PENDING';
+        return 'Pending';
     }
   }
   @override
@@ -511,9 +494,8 @@ class StatusBadge extends StatelessWidget {
             _label,
             style: TextStyle(
               color: _color,
-              fontSize: 10,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0.8,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ],

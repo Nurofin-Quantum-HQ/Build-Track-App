@@ -1,7 +1,5 @@
-import 'package:buildtrack_mobile/common/themes/app_colors.dart';
-import 'package:buildtrack_mobile/common/themes/app_theme.dart';
-import 'package:buildtrack_mobile/common/widgets/app_layout.dart';
-import 'package:buildtrack_mobile/common/widgets/app_widgets.dart';
+import 'package:buildtrack_mobile/common/widgets/entry_widgets.dart';
+import 'package:buildtrack_mobile/design/design.dart';
 import 'package:flutter/material.dart';
 import 'package:buildtrack_mobile/services/api_service.dart';
 class ForgotPasswordScreen extends StatefulWidget {
@@ -25,99 +23,90 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   }
   @override
   Widget build(BuildContext context) {
-    final screenHeight = MediaQuery.of(context).size.height;
-    final availableHeight = screenHeight - 160;
-    return AppSubScreenLayout(
-      title: 'Reset Password',
-      scrollable: true,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(minHeight: availableHeight),
-        child: Center(
-          child: AppCard(
-            padding: const EdgeInsets.fromLTRB(28, 40, 28, 40),
-            margin: EdgeInsets.zero,
-            borderRadius: 28,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _buildHeader(),
-                const SizedBox(height: AppTheme.spacingXl),
-                _step2 ? _buildStep2Form() : _buildStep1Form(),
-                const SizedBox(height: AppTheme.spacingLg),
-                _buildActions(),
-              ],
-            ),
-          ),
-        ),
+    return Scaffold(
+      backgroundColor: Bt.ground,
+      appBar: BtNavBar(
+        title: _step2 ? 'Set new password' : 'Reset password',
+        onBack: () {
+          if (_step2) {
+            setState(() => _step2 = false);
+          } else {
+            Navigator.pop(context);
+          }
+        },
+      ),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+        children: [
+          _buildHeader(),
+          const SizedBox(height: 28),
+          _step2 ? _buildStep2Form() : _buildStep1Form(),
+          const SizedBox(height: 28),
+          _buildActions(),
+        ],
       ),
     );
   }
   Widget _buildHeader() {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          width: 64,
-          height: 64,
-          decoration: BoxDecoration(
-            color: AppColors.primary.withValues(alpha: 0.1),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(
-            Icons.lock_reset_outlined,
-            color: AppColors.primary,
-            size: 30,
-          ),
-        ),
-        const SizedBox(height: AppTheme.spacingLg),
+        BtTile(icon: _step2 ? Icons.key_outlined : Icons.lock_reset_outlined, size: 48),
+        const SizedBox(height: 16),
         Text(
-          _step2 ? 'Enter Reset Token' : 'Reset Password',
-          style: AppTheme.heading2.copyWith(fontSize: 26, letterSpacing: -0.5),
+          _step2 ? 'Enter reset token' : 'Forgot your password?',
+          style: BtText.largeTitle(context),
         ),
-        const SizedBox(height: AppTheme.spacingSm),
+        const SizedBox(height: 6),
         Text(
           _step2
               ? 'Copy the token from the reset link in your email and enter it below.'
               : 'Enter your email to receive a reset link.',
-          textAlign: TextAlign.center,
-          style: AppTheme.body.copyWith(
-            color: AppColors.textLight,
-            height: 1.4,
-          ),
+          style: BtText.body(context, color: Bt.ink2),
         ),
       ],
     );
   }
   Widget _buildStep1Form() {
-    return AppTextField(
-      label: 'Email Address',
-      controller: _emailCtrl,
-      hint: 'name@company.com',
-      prefixIcon: Icons.mail_outline,
-      keyboardType: TextInputType.emailAddress,
+    return EntryLabeled(
+      label: 'Email address',
+      child: TextField(
+        controller: _emailCtrl,
+        keyboardType: TextInputType.emailAddress,
+        autofillHints: const [AutofillHints.email],
+        style: BtText.body(context),
+        decoration: btInput(context, hint: 'name@company.com'),
+      ),
     );
   }
   Widget _buildStep2Form() {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        AppTextField(
-          label: 'Reset Token',
-          controller: _tokenCtrl,
-          hint: 'Paste token from email link',
-          prefixIcon: Icons.key_outlined,
+        EntryLabeled(
+          label: 'Reset token',
+          child: TextField(
+            controller: _tokenCtrl,
+            style: BtText.body(context),
+            decoration: btInput(context, hint: 'Paste token from email link'),
+          ),
         ),
-        AppTextField(
-          label: 'New Password',
-          controller: _newPassCtrl,
-          hint: 'At least 6 characters',
-          prefixIcon: Icons.lock_outline,
-          obscureText: _obscurePass,
-          suffixIcon: IconButton(
-            icon: Icon(
-              _obscurePass
-                  ? Icons.visibility_off_outlined
-                  : Icons.visibility_outlined,
+        const SizedBox(height: 20),
+        EntryLabeled(
+          label: 'New password',
+          child: TextField(
+            controller: _newPassCtrl,
+            obscureText: _obscurePass,
+            style: BtText.body(context),
+            decoration: btInput(
+              context,
+              hint: 'At least 6 characters',
+              suffix: IconButton(
+                tooltip: _obscurePass ? 'Show password' : 'Hide password',
+                icon: Icon(_obscurePass ? Icons.visibility_outlined : Icons.visibility_off_outlined, color: Bt.ink3),
+                onPressed: () => setState(() => _obscurePass = !_obscurePass),
+              ),
             ),
-            onPressed: () => setState(() => _obscurePass = !_obscurePass),
           ),
         ),
       ],
@@ -125,39 +114,24 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   }
   Widget _buildActions() {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _isLoading
-            ? Padding(
-                padding: EdgeInsets.symmetric(vertical: 12.0),
-                child: CircularProgressIndicator(color: AppColors.primary),
-              )
-            : AppButton(
-                label: _step2 ? 'Set New Password' : 'Send Reset Link',
-                onPressed: _step2 ? _onSetPassword : _onSendLink,
-              ),
-        const SizedBox(height: AppTheme.spacingLg),
-        GestureDetector(
-          onTap: () {
+        BtButton(
+          label: _step2 ? 'Set New Password' : 'Send Reset Link',
+          loading: _isLoading,
+          onPressed: _isLoading ? null : (_step2 ? _onSetPassword : _onSendLink),
+        ),
+        const SizedBox(height: 8),
+        BtButton(
+          label: _step2 ? 'Back' : 'Back to login',
+          variant: BtButtonVariant.quiet,
+          onPressed: () {
             if (_step2) {
               setState(() => _step2 = false);
             } else {
               Navigator.pop(context);
             }
           },
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.arrow_back, color: AppColors.textDark, size: 16),
-              const SizedBox(width: 6),
-              Text(
-                _step2 ? 'Back' : 'Back to login',
-                style: AppTheme.body.copyWith(
-                  color: AppColors.textDark.withValues(alpha: 0.8),
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
         ),
       ],
     );
@@ -216,7 +190,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(msg),
-        backgroundColor: isError ? Colors.red : Colors.green,
+        backgroundColor: isError ? const Color(0xFFC01048) : const Color(0xFF067647),
         behavior: SnackBarBehavior.floating,
       ),
     );

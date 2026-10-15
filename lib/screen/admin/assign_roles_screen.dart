@@ -1,9 +1,8 @@
+import 'package:buildtrack_mobile/common/widgets/entry_widgets.dart';
+import 'package:buildtrack_mobile/design/design.dart';
 import 'dart:convert';
 import 'package:buildtrack_mobile/common/themes/app_colors.dart';
-import 'package:buildtrack_mobile/common/themes/app_gradients.dart';
 import 'package:buildtrack_mobile/common/themes/app_theme.dart';
-import 'package:buildtrack_mobile/common/widgets/app_widgets.dart';
-import 'package:buildtrack_mobile/common/widgets/common_widgets.dart';
 import 'package:buildtrack_mobile/controller/role_manager.dart';
 import 'package:buildtrack_mobile/services/api_service.dart';
 import 'package:flutter/material.dart';
@@ -367,7 +366,7 @@ class _AssignRolesScreenState extends State<AssignRolesScreen> {
           final body = json.decode(response.body);
           final msg = body['message']?.toString() ?? 'Failed to update user.';
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(msg), backgroundColor: Colors.red),
+            SnackBar(content: Text(msg), backgroundColor: const Color(0xFFC01048)),
           );
         }
       } else {
@@ -402,7 +401,7 @@ class _AssignRolesScreenState extends State<AssignRolesScreen> {
           final body = json.decode(response.body);
           final msg = body['message']?.toString() ?? 'Failed to assign role.';
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(msg), backgroundColor: Colors.red),
+            SnackBar(content: Text(msg), backgroundColor: const Color(0xFFC01048)),
           );
         }
       }
@@ -410,7 +409,7 @@ class _AssignRolesScreenState extends State<AssignRolesScreen> {
       if (!mounted) return;
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        SnackBar(content: Text('Error: $e'), backgroundColor: const Color(0xFFC01048)),
       );
     }
   }
@@ -423,87 +422,30 @@ class _AssignRolesScreenState extends State<AssignRolesScreen> {
       globalTooltipActions: [TooltipActionButton(type: TooltipDefaultActionType.skip, backgroundColor: Colors.transparent, textStyle: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold)), TooltipActionButton(type: TooltipDefaultActionType.next, backgroundColor: AppColors.primary, textStyle: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))], 
       enableAutoScroll: true,
       builder: (context) => Scaffold(
-          backgroundColor: AppColors.gradientStart,
-          body: SafeArea(
-            bottom: false,
-            child: Column(
+        backgroundColor: Bt.ground,
+        appBar: BtNavBar(
+          title: _isEditMode ? 'Edit user' : 'Add team member',
+          trailing: BtIconButton(
+            icon: Icons.help_outline_rounded,
+            semantic: 'Help',
+            color: Bt.ink2,
+            onTap: () => ShowCaseWidget.of(context).startShowCase([
+              ShowcaseKeys.assignRoleUserDetails,
+              ShowcaseKeys.assignRoleRoleDropdown,
+              ShowcaseKeys.assignRolePermissions,
+              ShowcaseKeys.assignRoleProjectDropdown,
+            ]),
+          ),
+        ),
+        body: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
           children: [
-            AppTopBar(
-              title: _isEditMode ? 'Edit User' : 'Assign Role',
-              isSubScreen: true,
-              leftIcon: Icons.arrow_back,
-              onLeftTap: () => Navigator.maybePop(context),
-              rightWidget: GestureDetector(
-                onTap: () => ShowCaseWidget.of(context).startShowCase([
-                  ShowcaseKeys.assignRoleUserDetails,
-                  ShowcaseKeys.assignRoleRoleDropdown,
-                  ShowcaseKeys.assignRolePermissions,
-                  ShowcaseKeys.assignRoleProjectDropdown,
-                ]),
-                child: Container(
-                  padding: const EdgeInsets.all(7),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.help_outline,
-                    color: AppColors.primary,
-                    size: 22,
-                  ),
-                ),
-              ),
-            ),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _adminBadge(),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Only Admins can assign roles and manage team access.',
-                      style: AppTheme.body.copyWith(color: AppColors.textLight),
-                    ),
-                    const SizedBox(height: 12),
-                    _subscriptionWarning(plan),
-                    const SizedBox(height: 20),
-                    _formCard(isAdmin),
-                    const SizedBox(height: 12),
-                    if (isAdmin) _assignButton(),
-                    const SizedBox(height: 24),
-                  ],
-                ),
-              ),
-            ),
+            _subscriptionWarning(plan),
+            const SizedBox(height: 16),
+            _formCard(isAdmin),
           ],
         ),
-      ),
-    ));
-  }
-  Widget _adminBadge() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: AppColors.primarySurface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.lock_outline, color: AppColors.primary, size: 13),
-          const SizedBox(width: 6),
-          Text(
-            'Admin Access Only',
-            style: AppTheme.caption.copyWith(
-              color: AppColors.primary,
-              fontWeight: FontWeight.w700,
-              fontSize: 12,
-            ),
-          ),
-        ],
+        bottomNavigationBar: isAdmin ? EntryBottomBar(child: _assignButton()) : null,
       ),
     );
   }
@@ -511,195 +453,189 @@ class _AssignRolesScreenState extends State<AssignRolesScreen> {
     final limitStr = plan == SubscriptionPlan.enterprise
         ? 'Unlimited'
         : '${plan.maxUsers} Users';
+    final bt = context.bt;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: AppColors.primary.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
-      ),
+      padding: const EdgeInsets.fromLTRB(14, 4, 4, 4),
+      decoration: BoxDecoration(color: bt.brandSoft, borderRadius: BorderRadius.circular(Bt.rTile)),
       child: Row(
         children: [
-          Icon(Icons.info_outline, color: AppColors.primary, size: 20),
-          const SizedBox(width: 8),
+          Icon(Icons.lock_outline_rounded, color: bt.brand, size: 18),
+          const SizedBox(width: 10),
           Expanded(
             child: Text(
-              '${plan.label} Plan: $limitStr limit.',
-              style: AppTheme.body.copyWith(
-                fontSize: 12,
-                color: AppColors.textDark,
-              ),
+              'Admins only · ${plan.label} plan: $limitStr limit.',
+              style: BtText.subhead(context, color: Bt.ink),
             ),
           ),
-          const SizedBox(width: 8),
-          GestureDetector(
-            onTap: () => Navigator.pushNamed(context, '/subscription'),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: AppColors.primary,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Text(
-                'Upgrade',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
+          TextButton(
+            onPressed: () => Navigator.pushNamed(context, '/subscription'),
+            style: TextButton.styleFrom(foregroundColor: bt.brand, minimumSize: const Size(44, 40)),
+            child: const Text('Upgrade', style: TextStyle(fontWeight: FontWeight.w600)),
           ),
         ],
       ),
     );
   }
-  Widget _formCard(bool isAdmin) {
-    return AppCard(
-      padding: const EdgeInsets.all(20),
-      margin: EdgeInsets.zero,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Showcase(
-            key: ShowcaseKeys.assignRoleUserDetails,
-            description: 'Enter the user\'s full name and email address here.',
-            tooltipBackgroundColor: const Color(0xFF1E1E2C),
-            textColor: Colors.white,
-            tooltipBorderRadius: BorderRadius.circular(16),
-            tooltipPadding: const EdgeInsets.all(16),
+  Widget _inlineField(String label, TextEditingController c, String hint, {TextInputType? type, bool obscure = false, Widget? suffix}) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 52),
+      child: Padding(
+        padding: const EdgeInsets.only(left: 16, right: 4),
+        child: Row(children: [
+          SizedBox(width: 100, child: Text(label, style: BtText.subhead(context))),
+          Expanded(
+            child: TextField(
+              controller: c,
+              keyboardType: type,
+              obscureText: obscure,
+              style: BtText.body(context),
+              decoration: InputDecoration(
+                hintText: hint,
+                hintStyle: BtText.body(context, color: Bt.placeholder),
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                filled: false,
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+            ),
+          ),
+          if (suffix != null) suffix else const SizedBox(width: 12),
+        ]),
+      ),
+    );
+  }
+  Widget _roleCard(String value, String title, String desc, bool isAdmin) {
+    final bt = context.bt;
+    final selected = _selectedRole == value;
+    return Semantics(
+      selected: selected,
+      button: true,
+      child: Material(
+        color: selected ? bt.brandSoft : Bt.card,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(Bt.rCard),
+          side: BorderSide(color: selected ? bt.brand : Bt.line, width: selected ? 1.5 : 1),
+        ),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(Bt.rCard),
+          onTap: isAdmin ? () => _applyDefaultPermissionsForRole(value) : null,
+          child: Padding(
+            padding: const EdgeInsets.all(14),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                AppTextField(
-                  label: 'Full Name',
-                  controller: _nameCtrl,
-                  hint: 'Enter full name',
-                  prefixIcon: Icons.person_outline,
-                  enabled: true,
-                ),
-                AppTextField(
-                  label: 'Email Address',
-                  controller: _emailCtrl,
-                  hint: 'Enter email address',
-                  prefixIcon: Icons.email_outlined,
-                  keyboardType: TextInputType.emailAddress,
-                  enabled: true,
-                ),
+                Text(title, style: BtText.headline(context)),
+                const SizedBox(height: 2),
+                Text(desc, style: BtText.caption(context)),
               ],
             ),
           ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        ),
+      ),
+    );
+  }
+  Widget _formCard(bool isAdmin) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Showcase(
+          key: ShowcaseKeys.assignRoleUserDetails,
+          description: 'Enter the user\'s full name and email address here.',
+          tooltipBackgroundColor: Bt.ink,
+          textColor: Colors.white,
+          tooltipBorderRadius: BorderRadius.circular(16),
+          tooltipPadding: const EdgeInsets.all(16),
+          child: BtGroup(
             children: [
-              Text(
-                _isEditMode ? 'New Password (optional)' : 'Temporary Password',
-                style: AppTheme.label.copyWith(color: AppTheme.textMedium),
-              ),
-              const SizedBox(height: 6),
-              TextFormField(
-                controller: _passCtrl,
-                obscureText: _obscurePass,
-                enabled: true,
-                style: AppTheme.bodyLarge.copyWith(color: AppTheme.textDark),
-                decoration: InputDecoration(
-                  hintText: 'Enter temporary password',
-                  prefixIcon: const Icon(
-                    Icons.lock_outline,
-                    color: AppColors.textLight,
-                    size: 20,
-                  ),
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      _obscurePass
-                          ? Icons.visibility_off_outlined
-                          : Icons.visibility_outlined,
-                      color: AppColors.textLight,
-                      size: 20,
-                    ),
-                    onPressed: () =>
-                        setState(() => _obscurePass = !_obscurePass),
-                  ),
-                  filled: true,
-                  fillColor: AppTheme.surface,
+              _inlineField('Full name', _nameCtrl, 'Enter full name'),
+              _inlineField('Email', _emailCtrl, 'Enter email address', type: TextInputType.emailAddress),
+              _inlineField(
+                _isEditMode ? 'New password' : 'Temp password',
+                _passCtrl,
+                _isEditMode ? 'Optional' : 'Enter temporary password',
+                obscure: _obscurePass,
+                suffix: IconButton(
+                  tooltip: _obscurePass ? 'Show password' : 'Hide password',
+                  icon: Icon(_obscurePass ? Icons.visibility_outlined : Icons.visibility_off_outlined, color: Bt.ink3, size: 20),
+                  onPressed: () => setState(() => _obscurePass = !_obscurePass),
                 ),
               ),
-              const SizedBox(height: AppTheme.spacingMd),
             ],
           ),
-          Showcase(
-            key: ShowcaseKeys.assignRoleRoleDropdown,
-            description: 'Select a standard role like Supervisor or Mason, or create a Custom Role.',
-            tooltipBackgroundColor: const Color(0xFF1E1E2C),
-            textColor: Colors.white,
-            tooltipBorderRadius: BorderRadius.circular(16),
-            tooltipPadding: const EdgeInsets.all(16),
-            child: AppDropdownField<String>(
-              label: 'Role',
-              value: _selectedRole,
-              hint: 'Select role',
-              items: _roles
-                  .map(
-                    (r) => DropdownMenuItem<String>(
-                      value: r,
-                      child: Text(r == _customRoleValue ? 'Custom Role' : r),
-                    ),
-                  )
-                  .toList(),
-              onChanged: isAdmin
-                  ? (v) => _applyDefaultPermissionsForRole(v)
-                  : (_) {},
-            ),
+        ),
+        const SizedBox(height: 24),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+          child: Text('Role · sets sensible permissions', style: BtText.caption(context)),
+        ),
+        Showcase(
+          key: ShowcaseKeys.assignRoleRoleDropdown,
+          description: 'Select a standard role like Supervisor or Mason, or create a Custom Role.',
+          tooltipBackgroundColor: Bt.ink,
+          textColor: Colors.white,
+          tooltipBorderRadius: BorderRadius.circular(16),
+          tooltipPadding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(child: _roleCard('Supervisor', 'Supervisor', 'Approve updates, view reports, manage expenses', isAdmin)),
+                    const SizedBox(width: 12),
+                    Expanded(child: _roleCard('Mason', 'Mason', 'Submit updates, upload photos, report issues', isAdmin)),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              _roleCard(_customRoleValue, 'Custom role…', 'Pick a name and configure permissions manually', isAdmin),
+            ],
           ),
-          if (_isCustomRoleSelected) ...[
-            const SizedBox(height: AppTheme.spacingMd),
-            AppTextField(
-              label: 'Custom Role Name',
+        ),
+        if (_isCustomRoleSelected) ...[
+          const SizedBox(height: 16),
+          EntryLabeled(
+            label: 'Custom role name',
+            child: TextField(
               controller: _customRoleCtrl,
-              hint: 'Type new role name',
-              prefixIcon: Icons.badge_outlined,
               enabled: isAdmin,
+              style: BtText.body(context),
+              decoration: btInput(context, hint: 'Type new role name'),
             ),
-          ],
-          if (_selectedRole == 'Supervisor' || _isCustomRoleSelected) ...[
-            const SizedBox(height: AppTheme.spacingMd),
-            _buildOverseesRolesSelector(),
-          ],
-          _roleHints(),
-          const SizedBox(height: AppTheme.spacingMd),
-          Text(
-            'Permissions',
-            style: AppTheme.heading3.copyWith(
-              color: AppColors.textDark,
-              fontSize: 15,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Configure what this user can see and do.',
-            style: AppTheme.caption.copyWith(color: AppColors.textLight),
-          ),
-          const SizedBox(height: 14),
-          Showcase(
-            key: ShowcaseKeys.assignRolePermissions,
-            description: 'Configure exact permissions for what this user can see or modify in the app.',
-            tooltipBackgroundColor: const Color(0xFF1E1E2C),
-            textColor: Colors.white,
-            tooltipBorderRadius: BorderRadius.circular(16),
-            tooltipPadding: const EdgeInsets.all(16),
-            child: _buildPermissionsTable(isAdmin),
-          ),
-          const SizedBox(height: AppTheme.spacingMd),
-          Showcase(
-            key: ShowcaseKeys.assignRoleProjectDropdown,
-            description: 'Select one or more projects this role can access. Leave empty for all.',
-            tooltipBackgroundColor: const Color(0xFF1E1E2C),
-            textColor: Colors.white,
-            tooltipBorderRadius: BorderRadius.circular(16),
-            tooltipPadding: const EdgeInsets.all(16),
-            child: _buildProjectMultiSelect(isAdmin),
           ),
         ],
-      ),
+        if (_selectedRole == 'Supervisor' || _isCustomRoleSelected) ...[
+          const SizedBox(height: 16),
+          _buildOverseesRolesSelector(),
+        ],
+        const SizedBox(height: 28),
+        Text('Permissions', style: BtText.headline(context)),
+        const SizedBox(height: 2),
+        Text('Configure what this user can see and do.', style: BtText.caption(context)),
+        const SizedBox(height: 12),
+        Showcase(
+          key: ShowcaseKeys.assignRolePermissions,
+          description: 'Configure exact permissions for what this user can see or modify in the app.',
+          tooltipBackgroundColor: Bt.ink,
+          textColor: Colors.white,
+          tooltipBorderRadius: BorderRadius.circular(16),
+          tooltipPadding: const EdgeInsets.all(16),
+          child: _buildPermissionsTable(isAdmin),
+        ),
+        const SizedBox(height: 28),
+        Showcase(
+          key: ShowcaseKeys.assignRoleProjectDropdown,
+          description: 'Select one or more projects this role can access. Leave empty for all.',
+          tooltipBackgroundColor: Bt.ink,
+          textColor: Colors.white,
+          tooltipBorderRadius: BorderRadius.circular(16),
+          tooltipPadding: const EdgeInsets.all(16),
+          child: _buildProjectMultiSelect(isAdmin),
+        ),
+      ],
     );
   }
   Widget _buildPermissionsTable(bool isAdmin) {
@@ -707,10 +643,7 @@ class _AssignRolesScreenState extends State<AssignRolesScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE0E5FF)),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8),
-        ],
+        border: Border.all(color: Bt.line),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -730,8 +663,8 @@ class _AssignRolesScreenState extends State<AssignRolesScreen> {
                   child: Text(
                     'Feature',
                     style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
                       color: AppColors.textLight,
                       letterSpacing: 0.6,
                     ),
@@ -788,8 +721,8 @@ class _AssignRolesScreenState extends State<AssignRolesScreen> {
         label,
         textAlign: TextAlign.center,
         style: const TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.w800,
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
           color: AppColors.textLight,
           letterSpacing: 0.5,
         ),
@@ -800,12 +733,12 @@ class _AssignRolesScreenState extends State<AssignRolesScreen> {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(14, 10, 14, 4),
-      color: const Color(0xFFF8F9FF),
+      color: const Color(0xFFF6F7F9),
       child: Text(
         label.toUpperCase(),
         style: const TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.w800,
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
           color: AppColors.textLight,
           letterSpacing: 0.8,
         ),
@@ -845,7 +778,7 @@ class _AssignRolesScreenState extends State<AssignRolesScreen> {
                     Text(
                       desc,
                       style: const TextStyle(
-                        fontSize: 11.5,
+                        fontSize: 13,
                         color: AppColors.textLight,
                         height: 1.3,
                       ),
@@ -859,7 +792,7 @@ class _AssignRolesScreenState extends State<AssignRolesScreen> {
             ],
           ),
         ),
-        if (!isLast) const Divider(height: 1, color: Color(0xFFF0EEF8)),
+        if (!isLast) const Divider(height: 1, color: Color(0xFFEEF1F5)),
       ],
     );
   }
@@ -894,7 +827,7 @@ class _AssignRolesScreenState extends State<AssignRolesScreen> {
                     Text(
                       desc,
                       style: const TextStyle(
-                        fontSize: 11.5,
+                        fontSize: 13,
                         color: AppColors.textLight,
                         height: 1.3,
                       ),
@@ -913,7 +846,7 @@ class _AssignRolesScreenState extends State<AssignRolesScreen> {
             ],
           ),
         ),
-        if (!isLast) const Divider(height: 1, color: Color(0xFFF0EEF8)),
+        if (!isLast) const Divider(height: 1, color: Color(0xFFEEF1F5)),
       ],
     );
   }
@@ -1090,13 +1023,13 @@ class _AssignRolesScreenState extends State<AssignRolesScreen> {
                 ),
                 decoration: BoxDecoration(
                   color: AppColors.primary,
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(Bt.rCard),
                 ),
                 child: Text(
                   '${_selectedProjectIds.length} project${_selectedProjectIds.length > 1 ? 's' : ''} selected',
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 11,
+                    fontSize: 13,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -1108,7 +1041,7 @@ class _AssignRolesScreenState extends State<AssignRolesScreen> {
                   'Clear',
                   style: TextStyle(
                     color: AppColors.textLight,
-                    fontSize: 12,
+                    fontSize: 13,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -1120,115 +1053,19 @@ class _AssignRolesScreenState extends State<AssignRolesScreen> {
       ],
     );
   }
-  Widget _roleHints() {
-    return Container(
-      margin: const EdgeInsets.only(top: 2),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: AppColors.gradientStart,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _roleHintRow(
-            'Supervisor',
-            'Approve updates, view reports, manage expenses',
-          ),
-          const SizedBox(height: 4),
-          _roleHintRow('Mason', 'Submit updates, upload photos, report issues'),
-          const SizedBox(height: 4),
-          _roleHintRow(
-            'Custom Role',
-            'Pick a name and configure permissions manually',
-          ),
-        ],
-      ),
-    );
-  }
-  Widget _roleHintRow(String role, String desc) {
-    return RichText(
-      text: TextSpan(
-        style: const TextStyle(fontSize: 12.5, height: 1.4),
-        children: [
-          TextSpan(
-            text: '• ',
-            style: TextStyle(
-              color: AppColors.primary,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          TextSpan(
-            text: '$role: ',
-            style: const TextStyle(
-              color: AppColors.textDark,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          TextSpan(
-            text: desc,
-            style: const TextStyle(color: AppColors.textLight),
-          ),
-        ],
-      ),
-    );
-  }
   Widget _assignButton() {
-    return GestureDetector(
-      onTap: _isLoading ? null : _onAssignPressed,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        decoration: BoxDecoration(
-          gradient: AppGradients.primaryButton,
-          borderRadius: BorderRadius.circular(30),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.primaryPurple.withValues(alpha: 0.35),
-              blurRadius: 14,
-              offset: const Offset(0, 5),
-            ),
-          ],
-        ),
-        child: Center(
-          child: _isLoading
-              ? const SizedBox(
-                  width: 22,
-                  height: 22,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.5,
-                    color: Colors.white,
-                  ),
-                )
-              : Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.person_add_outlined,
-                      color: Colors.white,
-                      size: 19,
-                    ),
-                    const SizedBox(width: 9),
-                    Text(
-                      _isEditMode ? 'Update User' : 'Assign Role',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 15.5,
-                        letterSpacing: 0.3,
-                      ),
-                    ),
-                  ],
-                ),
-        ),
-      ),
+    return BtButton(
+      label: _isEditMode ? 'Update User' : 'Assign Role',
+      icon: Icons.person_add_outlined,
+      loading: _isLoading,
+      onPressed: _isLoading ? null : _onAssignPressed,
     );
   }
   void _showUpgradeDialog(BuildContext context, String title, String message) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Bt.rCard)),
         contentPadding: const EdgeInsets.all(24),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -1238,7 +1075,7 @@ class _AssignRolesScreenState extends State<AssignRolesScreen> {
               height: 60,
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                  colors: [Color(0xFF4A6CF7), Color(0xFF7C3AED)],
+                  colors: [Color(0xFF0B63CE), Color(0xFF0B63CE)],
                 ),
                 borderRadius: BorderRadius.circular(16),
               ),
@@ -1254,7 +1091,7 @@ class _AssignRolesScreenState extends State<AssignRolesScreen> {
               textAlign: TextAlign.center,
               style: const TextStyle(
                 fontSize: 17,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w700,
                 color: AppColors.textDark,
               ),
             ),

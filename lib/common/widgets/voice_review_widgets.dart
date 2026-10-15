@@ -1,3 +1,4 @@
+import 'package:buildtrack_mobile/design/design.dart';
 import 'dart:async';
 import 'dart:math';
 import 'package:buildtrack_mobile/common/controllers/voice_recording_controller.dart';
@@ -66,25 +67,20 @@ class _VoiceMicButtonState extends State<VoiceMicButton>
   LinearGradient _gradient(VoiceEngineState s) {
     if (s == VoiceEngineState.parsed) {
       return const LinearGradient(
-        colors: [Color(0xFF16A34A), Color(0xFF22C55E)],
+        colors: [Color(0xFF067647), Color(0xFF067647)],
       );
     }
     if (s == VoiceEngineState.error) {
       return const LinearGradient(
-        colors: [Color(0xFFDC2626), Color(0xFFEF4444)],
+        colors: [Color(0xFFC01048), Color(0xFFC01048)],
       );
     }
     if (s == VoiceEngineState.idle) {
       return const LinearGradient(
-        colors: [Color(0xFF94A3B8), Color(0xFFCBD5E1)],
+        colors: [Color(0xFF98A2B3), Color(0xFFD0D5DD)],
       );
     }
     return AppGradients.primaryButton;
-  }
-  Color _shadowColor(VoiceEngineState s) {
-    if (s == VoiceEngineState.parsed) return const Color(0xFF16A34A);
-    if (s == VoiceEngineState.error) return const Color(0xFFDC2626);
-    return AppColors.primary;
   }
   IconData _icon(VoiceEngineState s) {
     if (s == VoiceEngineState.parsed) return Icons.check_rounded;
@@ -121,13 +117,6 @@ class _VoiceMicButtonState extends State<VoiceMicButton>
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: _gradient(s),
-                boxShadow: [
-                  BoxShadow(
-                    color: _shadowColor(s).withValues(alpha: 0.30),
-                    blurRadius: 10,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
               ),
               child: s == VoiceEngineState.processing
                   ? AnimatedBuilder(
@@ -187,28 +176,28 @@ class VoiceStatusHeader extends StatelessWidget {
       case VoiceEngineState.parsed:
         return (
           'Parsed from Voice',
-          const Color(0xFF16A34A),
-          const Color(0xFFDCFCE7),
+          const Color(0xFF067647),
+          const Color(0xFFE7F6EE),
         );
       case VoiceEngineState.listening:
-        return ('Listening…', AppColors.primary, Color(0xFFEEF0FF));
+        return ('Listening…', AppColors.primary, Color(0xFFE8F1FC));
       case VoiceEngineState.processing:
         return (
           'Processing voice entry…',
           AppColors.primary,
-          const Color(0xFFEEF0FF),
+          const Color(0xFFE8F1FC),
         );
       case VoiceEngineState.error:
         return (
           'Parse Failed — Tap to Retry',
-          const Color(0xFFDC2626),
-          const Color(0xFFFEE2E2),
+          const Color(0xFFC01048),
+          const Color(0xFFFDECEF),
         );
       case VoiceEngineState.idle:
         return (
           'Tap Mic to Record',
           AppColors.textLight,
-          const Color(0xFFF1F5F9),
+          const Color(0xFFEEF1F5),
         );
     }
   }
@@ -222,22 +211,13 @@ class VoiceStatusHeader extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(Bt.rCard),
         border: Border.all(
           color: isActive
               ? AppColors.primary.withValues(alpha: 0.35)
-              : const Color(0xFFEEEBF8),
+              : const Color(0xFFEEF1F5),
           width: isActive ? 1.5 : 1.0,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: isActive
-                ? AppColors.primary.withValues(alpha: 0.08)
-                : Colors.black.withValues(alpha: 0.05),
-            blurRadius: isActive ? 18 : 12,
-            offset: const Offset(0, 3),
-          ),
-        ],
       ),
       child: Column(
         children: [
@@ -265,7 +245,7 @@ class VoiceStatusHeader extends StatelessWidget {
                             style: TextStyle(
                               color: textColor,
                               fontSize: 13,
-                              fontWeight: FontWeight.w800,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
                           Container(
@@ -278,11 +258,11 @@ class VoiceStatusHeader extends StatelessWidget {
                               borderRadius: BorderRadius.circular(10),
                             ),
                             child: Text(
-                              entryTypeLabel.toUpperCase(),
+                              entryTypeLabel,
                               style: TextStyle(
                                 color: textColor,
-                                fontSize: 9,
-                                fontWeight: FontWeight.w800,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
                                 letterSpacing: 0.8,
                               ),
                             ),
@@ -311,7 +291,7 @@ class VoiceStatusHeader extends StatelessWidget {
                                   Text(
                                     elapsedDisplay,
                                     style: TextStyle(
-                                      fontSize: 10,
+                                      fontSize: 12,
                                       fontWeight: FontWeight.w700,
                                       color: AppColors.primary,
                                     ),
@@ -337,7 +317,7 @@ class VoiceStatusHeader extends StatelessWidget {
                               '${confidence.toStringAsFixed(1)}% confidence',
                               style: const TextStyle(
                                 color: AppColors.textLight,
-                                fontSize: 11,
+                                fontSize: 13,
                               ),
                             ),
                             const SizedBox(width: 5),
@@ -350,7 +330,7 @@ class VoiceStatusHeader extends StatelessWidget {
                               ts,
                               style: const TextStyle(
                                 color: AppColors.textLight,
-                                fontSize: 11,
+                                fontSize: 13,
                               ),
                             ),
                           ],
@@ -359,7 +339,7 @@ class VoiceStatusHeader extends StatelessWidget {
                         const Text(
                           'Speak naturally — pauses are allowed',
                           style: TextStyle(
-                            fontSize: 11,
+                            fontSize: 13,
                             color: AppColors.textLight,
                           ),
                         ),
@@ -373,7 +353,7 @@ class VoiceStatusHeader extends StatelessWidget {
                     label: const Text(
                       'Re-record',
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 13,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -391,7 +371,7 @@ class VoiceStatusHeader extends StatelessWidget {
             ),
           ),
           if (isActive) ...[
-            const Divider(height: 1, color: Color(0xFFF0EEF8)),
+            const Divider(height: 1, color: Color(0xFFEEF1F5)),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
               child: Row(
@@ -403,7 +383,7 @@ class VoiceStatusHeader extends StatelessWidget {
                     height: 6,
                     decoration: const BoxDecoration(
                       shape: BoxShape.circle,
-                      color: Color(0xFFEF4444),
+                      color: Color(0xFFC01048),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -413,7 +393,7 @@ class VoiceStatusHeader extends StatelessWidget {
                           ? 'Waiting for speech…'
                           : partialTranscript,
                       style: TextStyle(
-                        fontSize: 12.5,
+                        fontSize: 13,
                         height: 1.55,
                         color: partialTranscript.isEmpty
                             ? AppColors.textLight
@@ -440,13 +420,13 @@ class VoiceStatusHeader extends StatelessWidget {
                       label: const Text(
                         'Cancel',
                         style: TextStyle(
-                          fontSize: 12,
+                          fontSize: 13,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppColors.textLight,
-                        side: const BorderSide(color: Color(0xFFDDD8F5)),
+                        side: const BorderSide(color: Color(0xFFE4E7EC)),
                         padding: const EdgeInsets.symmetric(vertical: 9),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10),
@@ -462,7 +442,7 @@ class VoiceStatusHeader extends StatelessWidget {
                       label: const Text(
                         'Done',
                         style: TextStyle(
-                          fontSize: 12,
+                          fontSize: 13,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -543,15 +523,8 @@ class _ExtractedDataSummaryCardState extends State<ExtractedDataSummaryCard> {
       margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFEEEBF8)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 14,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(Bt.rCard),
+        border: Border.all(color: Bt.line),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -564,7 +537,7 @@ class _ExtractedDataSummaryCardState extends State<ExtractedDataSummaryCard> {
                   padding: const EdgeInsets.all(7),
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
-                      colors: [Color(0xFF173EEA), Color(0xFFB137FF)],
+                      colors: [Color(0xFF0B63CE), Color(0xFF0B63CE)],
                     ),
                     borderRadius: BorderRadius.circular(9),
                   ),
@@ -583,14 +556,14 @@ class _ExtractedDataSummaryCardState extends State<ExtractedDataSummaryCard> {
                         'AI Extracted Fields',
                         style: TextStyle(
                           fontSize: 13,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w700,
                           color: AppColors.textDark,
                         ),
                       ),
                       Text(
                         widget.subtitle,
                         style: const TextStyle(
-                          fontSize: 11,
+                          fontSize: 13,
                           color: AppColors.textLight,
                         ),
                       ),
@@ -603,7 +576,7 @@ class _ExtractedDataSummaryCardState extends State<ExtractedDataSummaryCard> {
                     vertical: 3,
                   ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFDCFCE7),
+                    color: const Color(0xFFE7F6EE),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Row(
@@ -612,15 +585,15 @@ class _ExtractedDataSummaryCardState extends State<ExtractedDataSummaryCard> {
                       const Icon(
                         Icons.check_circle_outline,
                         size: 10,
-                        color: Color(0xFF16A34A),
+                        color: Color(0xFF067647),
                       ),
                       const SizedBox(width: 3),
                       Text(
                         '$detected/${widget.fields.length}',
                         style: const TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF16A34A),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF067647),
                         ),
                       ),
                     ],
@@ -629,7 +602,7 @@ class _ExtractedDataSummaryCardState extends State<ExtractedDataSummaryCard> {
               ],
             ),
           ),
-          const Divider(height: 1, color: Color(0xFFF0EEF8)),
+          const Divider(height: 1, color: Color(0xFFEEF1F5)),
           Padding(
             padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
             child: Column(
@@ -650,7 +623,7 @@ class _ExtractedDataSummaryCardState extends State<ExtractedDataSummaryCard> {
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
             decoration: const BoxDecoration(
-              color: Color(0xFFF8F9FF),
+              color: Color(0xFFF6F7F9),
               borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
             ),
             child: Row(
@@ -664,7 +637,7 @@ class _ExtractedDataSummaryCardState extends State<ExtractedDataSummaryCard> {
                 Expanded(
                   child: Text(
                     'Tap any field below to correct. AI extracted — please verify.',
-                    style: TextStyle(fontSize: 11, color: AppColors.textLight),
+                    style: TextStyle(fontSize: 13, color: AppColors.textLight),
                   ),
                 ),
               ],
@@ -680,9 +653,9 @@ class _FieldRow extends StatelessWidget {
   final ExtractedField field;
   final bool isLast;
   Color _confidenceColor(double c) {
-    if (c >= 0.85) return const Color(0xFF16A34A);
+    if (c >= 0.85) return const Color(0xFF067647);
     if (c >= 0.5) return const Color(0xFFF59E0B);
-    return const Color(0xFFEF4444);
+    return const Color(0xFFC01048);
   }
   @override
   Widget build(BuildContext context) {
@@ -696,7 +669,7 @@ class _FieldRow extends StatelessWidget {
             height: 28,
             decoration: BoxDecoration(
               color: empty
-                  ? const Color(0xFFF1F5F9)
+                  ? const Color(0xFFEEF1F5)
                   : field.isHighlight
                   ? AppColors.primary.withValues(alpha: 0.10)
                   : const Color(0xFFF4F3FE),
@@ -718,7 +691,7 @@ class _FieldRow extends StatelessWidget {
             child: Text(
               field.label,
               style: const TextStyle(
-                fontSize: 12,
+                fontSize: 13,
                 color: AppColors.textLight,
                 fontWeight: FontWeight.w500,
               ),
@@ -733,14 +706,14 @@ class _FieldRow extends StatelessWidget {
                       vertical: 2,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFEF3C7),
+                      color: const Color(0xFFFEF3E7),
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: const Text(
                       'Not detected',
                       style: TextStyle(
-                        fontSize: 11,
-                        color: Color(0xFFB45309),
+                        fontSize: 13,
+                        color: Color(0xFFB54708),
                         fontStyle: FontStyle.italic,
                       ),
                     ),
@@ -753,7 +726,7 @@ class _FieldRow extends StatelessWidget {
                           field.value,
                           textAlign: TextAlign.right,
                           style: TextStyle(
-                            fontSize: 12.5,
+                            fontSize: 13,
                             fontWeight: FontWeight.w700,
                             color: field.isHighlight
                                 ? AppColors.primary
@@ -811,15 +784,8 @@ class _ExtractionProcessingCardState extends State<ExtractionProcessingCard> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFEEEBF8)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 12,
-            offset: const Offset(0, 3),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(Bt.rCard),
+        border: Border.all(color: Bt.line),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -862,14 +828,14 @@ class _ExtractionProcessingCardState extends State<ExtractionProcessingCard> {
                           : Icons.radio_button_unchecked,
                       size: 15,
                       color: done
-                          ? const Color(0xFF16A34A)
+                          ? const Color(0xFF067647)
                           : AppColors.textLight,
                     ),
                     const SizedBox(width: 8),
                     Text(
                       widget.stages[i],
                       style: TextStyle(
-                        fontSize: 12,
+                        fontSize: 13,
                         color: done ? AppColors.textDark : AppColors.textLight,
                         fontWeight: done ? FontWeight.w600 : FontWeight.w400,
                       ),
@@ -924,7 +890,7 @@ class _ExpandableTranscriptState extends State<ExpandableTranscript>
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFEEEBF8)),
+        border: Border.all(color: Bt.line),
       ),
       child: Column(
         children: [
@@ -945,7 +911,7 @@ class _ExpandableTranscriptState extends State<ExpandableTranscript>
                     child: Text(
                       'Voice Transcript',
                       style: TextStyle(
-                        fontSize: 12.5,
+                        fontSize: 13,
                         fontWeight: FontWeight.w700,
                         color: AppColors.primary,
                       ),
@@ -954,7 +920,7 @@ class _ExpandableTranscriptState extends State<ExpandableTranscript>
                   Text(
                     _expanded ? 'Hide' : 'View',
                     style: const TextStyle(
-                      fontSize: 11.5,
+                      fontSize: 13,
                       color: AppColors.textLight,
                       fontWeight: FontWeight.w500,
                     ),
@@ -982,7 +948,7 @@ class _ExpandableTranscriptState extends State<ExpandableTranscript>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Divider(height: 1, color: Color(0xFFF0EEF8)),
+                        const Divider(height: 1, color: Color(0xFFEEF1F5)),
                         Padding(
                           padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
                           child: Text(

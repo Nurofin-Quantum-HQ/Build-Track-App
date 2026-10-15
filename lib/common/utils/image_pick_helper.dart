@@ -56,10 +56,10 @@ class PickedAttachment {
   }
   Color get iconColor {
     final ext = name.split('.').last.toLowerCase();
-    if (ext == 'pdf') return const Color(0xFFE53935);
+    if (ext == 'pdf') return const Color(0xFFC01048);
     if (ext == 'doc' || ext == 'docx') return const Color(0xFF1565C0);
-    if (ext == 'xls' || ext == 'xlsx') return const Color(0xFF2E7D32);
-    return const Color(0xFF6B7280);
+    if (ext == 'xls' || ext == 'xlsx') return const Color(0xFF067647);
+    return const Color(0xFF667085);
   }
   Color get iconBg => iconColor.withValues(alpha: 0.10);
   String get dataUri => 'data:$mimeType;base64,${_base64Encode(bytes)}';

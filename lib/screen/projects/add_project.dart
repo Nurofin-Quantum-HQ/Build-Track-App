@@ -1,3 +1,5 @@
+import 'package:buildtrack_mobile/common/widgets/entry_widgets.dart';
+import 'package:buildtrack_mobile/design/design.dart';
 import 'package:buildtrack_mobile/common/themes/app_colors.dart';
 import 'package:buildtrack_mobile/controller/project_provider.dart';
 import 'package:buildtrack_mobile/models/construction_models.dart';
@@ -19,11 +21,11 @@ class AddProjectScreen extends StatefulWidget {
 }
 class _AddProjectScreenState extends State<AddProjectScreen> {
   static var primaryBlue = AppColors.primary;
-  static const bgColor = AppColors.gradientStart;
   static const textDark = AppColors.textDark;
   static const textGray = AppColors.textLight;
   final _scrollController = ScrollController();
   final _formKey = GlobalKey<FormState>();
+  int _step = 0;
   final _nameCtrl = TextEditingController();
   final _cityCtrl = TextEditingController();
   final _mapAddressCtrl = TextEditingController();
@@ -250,7 +252,7 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
         context: context,
         builder: (ctx) => AlertDialog(
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(Bt.rCard),
           ),
           contentPadding: const EdgeInsets.all(24),
           content: Column(
@@ -261,7 +263,7 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
                 height: 60,
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
-                    colors: [Color(0xFF4A6CF7), Color(0xFF7C3AED)],
+                    colors: [Color(0xFF0B63CE), Color(0xFF0B63CE)],
                   ),
                   borderRadius: BorderRadius.circular(16),
                 ),
@@ -277,7 +279,7 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 17,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w700,
                   color: AppColors.primary,
                 ),
               ),
@@ -461,7 +463,7 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Project created!'),
-            backgroundColor: Colors.green,
+            backgroundColor: Color(0xFF067647),
           ),
         );
         Navigator.pop(context);
@@ -469,64 +471,72 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text('Error: $e'), backgroundColor: const Color(0xFFC01048)),
         );
       }
     } finally {
       if (mounted) setState(() => _saving = false);
     }
   }
+  static const _kSteps = ['Basics', 'Building', 'Dates & budget', 'Phases'];
+
+  void _goStep(int i) {
+    setState(() => _step = i);
+    if (_scrollController.hasClients) _scrollController.jumpTo(0);
+  }
+
+  void _next() {
+    if (_step == 0 && (_nameCtrl.text.trim().isEmpty || _cityCtrl.text.trim().isEmpty)) {
+      _formKey.currentState?.validate();
+      return;
+    }
+    if (_step == 1 && _mainBuildingType == null) {
+      btToast(context, 'Pick a building type to continue', error: true);
+      return;
+    }
+    _goStep(_step + 1);
+  }
+
+  /// Required fields live on earlier steps; jump back to them so errors are visible.
+  void _finish() {
+    if (_nameCtrl.text.trim().isEmpty || _cityCtrl.text.trim().isEmpty) {
+      _goStep(0);
+      WidgetsBinding.instance.addPostFrameCallback((_) => _formKey.currentState?.validate());
+      return;
+    }
+    _submit();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: bgColor,
+      backgroundColor: Bt.ground,
+      appBar: BtNavBar(title: 'New project', subtitle: 'Step ${_step + 1} of 4 · ${_kSteps[_step]}'),
       body: SafeArea(
         bottom: false,
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
               child: Row(
                 children: [
-                  GestureDetector(
-                    onTap: () => Navigator.pop(context),
-                    child: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.06),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.arrow_back_ios_new,
-                        color: textDark,
-                        size: 18,
+                  for (var i = 0; i < 4; i++) ...[
+                    if (i > 0) const SizedBox(width: 6),
+                    Expanded(
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: i <= _step ? context.bt.brand : Bt.line,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 16),
-                  const Text(
-                    'Project Setup',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w900,
-                      color: textDark,
-                      letterSpacing: -0.4,
-                    ),
-                  ),
+                  ],
                 ],
               ),
             ),
-            const SizedBox(height: 12),
-            _buildSubscriptionWarning(context),
-            const SizedBox(height: 16),
             Expanded(
               child: SingleChildScrollView(
                 key: const PageStorageKey<String>('add_project_scroll_key'),
@@ -538,6 +548,12 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      _buildSubscriptionWarning(context),
+                      Offstage(
+                        offstage: _step != 0,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
                       _buildSectionCard(
                         title: 'Project Setup',
                         icon: Icons.business_center_rounded,
@@ -601,7 +617,7 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
                                         Text(
                                           'Project Code',
                                           style: TextStyle(
-                                            fontSize: 11,
+                                            fontSize: 13,
                                             fontWeight: FontWeight.w700,
                                             color: textGray.withValues(
                                               alpha: 0.7,
@@ -612,7 +628,7 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
                                         Text(
                                           'Auto-generated',
                                           style: TextStyle(
-                                            fontSize: 10,
+                                            fontSize: 12,
                                             color: textGray.withValues(
                                               alpha: 0.5,
                                             ),
@@ -628,13 +644,13 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
                                     ),
                                     decoration: BoxDecoration(
                                       color: primaryBlue,
-                                      borderRadius: BorderRadius.circular(20),
+                                      borderRadius: BorderRadius.circular(Bt.rCard),
                                     ),
                                     child: Text(
                                       _projectCode,
                                       style: const TextStyle(
                                         fontSize: 13,
-                                        fontWeight: FontWeight.w900,
+                                        fontWeight: FontWeight.w700,
                                         color: Colors.white,
                                         letterSpacing: 0.5,
                                       ),
@@ -658,10 +674,10 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
                             _groupContainer(
                               icon: Icons.person_rounded,
                               title: 'Client Details',
-                              child: Row(
+                              child: Column(
+ crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
-                                  Expanded(
-                                    child: Column(
+                                  Padding(padding: EdgeInsets.zero, child: Column(
                                       crossAxisAlignment:
                                           CrossAxisAlignment.start,
                                       children: [
@@ -675,9 +691,8 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
                                       ],
                                     ),
                                   ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
+                                  const SizedBox(height: 16),
+                                  Padding(padding: EdgeInsets.zero, child: Column(
                                       crossAxisAlignment:
                                           CrossAxisAlignment.start,
                                       children: [
@@ -704,10 +719,10 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
                             _groupContainer(
                               icon: Icons.engineering_rounded,
                               title: 'Site Team',
-                              child: Row(
+                              child: Column(
+ crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
-                                  Expanded(
-                                    child: Column(
+                                  Padding(padding: EdgeInsets.zero, child: Column(
                                       crossAxisAlignment:
                                           CrossAxisAlignment.start,
                                       children: [
@@ -721,9 +736,8 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
                                       ],
                                     ),
                                   ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
+                                  const SizedBox(height: 16),
+                                  Padding(padding: EdgeInsets.zero, child: Column(
                                       crossAxisAlignment:
                                           CrossAxisAlignment.start,
                                       children: [
@@ -743,7 +757,14 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
                           ],
                         ),
                       ),
-                      const SizedBox(height: 16),
+                          ],
+                        ),
+                      ),
+                      Offstage(
+                        offstage: _step != 1,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
                       _buildAccordionCard(
                         title: 'Building Type',
                         isExpanded: _cfgBuildingTypeExpanded,
@@ -754,10 +775,10 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(
+                            Column(
+ crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
-                                Expanded(
-                                  child: Column(
+                                Padding(padding: EdgeInsets.zero, child: Column(
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
@@ -778,9 +799,8 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
                                     ],
                                   ),
                                 ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
+                                const SizedBox(height: 16),
+                                Padding(padding: EdgeInsets.zero, child: Column(
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
@@ -842,7 +862,7 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
                                     Text(
                                       _buildingTypeError!,
                                       style: TextStyle(
-                                        fontSize: 12,
+                                        fontSize: 13,
                                         fontWeight: FontWeight.w600,
                                         color: Colors.red.shade400,
                                       ),
@@ -952,7 +972,7 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _label('ROOM TYPES', uppercase: true),
+                            _label('Room types', uppercase: true),
                             const SizedBox(height: 16),
                             _buildCounterRow(
                               '1 BHK',
@@ -994,11 +1014,11 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
                             const Padding(
                               padding: EdgeInsets.symmetric(vertical: 24),
                               child: Divider(
-                                color: Color(0xFFEEF0F5),
+                                color: Color(0xFFEEF1F5),
                                 height: 1,
                               ),
                             ),
-                            _label('BATHROOM TYPES', uppercase: true),
+                            _label('Bathroom types', uppercase: true),
                             const SizedBox(height: 16),
                             _buildCounterRow(
                               'Western Toilet',
@@ -1124,14 +1144,21 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
                         ),
                         child: _buildConfigList(_terraceOptions),
                       ),
-                      const SizedBox(height: 16),
+                          ],
+                        ),
+                      ),
+                      Offstage(
+                        offstage: _step != 2,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
                       _buildSectionCard(
                         title: 'Dates, Budget & Status',
                         icon: Icons.calendar_today_rounded,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _label('PROJECT TIMELINE', uppercase: true),
+                            _label('Project timeline', uppercase: true),
                             const SizedBox(height: 16),
                             Row(
                               children: [
@@ -1180,11 +1207,11 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
                             const Padding(
                               padding: EdgeInsets.symmetric(vertical: 24),
                               child: Divider(
-                                color: Color(0xFFEEF0F5),
+                                color: Color(0xFFEEF1F5),
                                 height: 1,
                               ),
                             ),
-                            _label('BUDGET BREAKDOWN', uppercase: true),
+                            _label('Budget breakdown', uppercase: true),
                             const SizedBox(height: 16),
                             Row(
                               children: [
@@ -1296,11 +1323,11 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
                             const Padding(
                               padding: EdgeInsets.symmetric(vertical: 24),
                               child: Divider(
-                                color: Color(0xFFEEF0F5),
+                                color: Color(0xFFEEF1F5),
                                 height: 1,
                               ),
                             ),
-                            _label('PROJECT STATUS', uppercase: true),
+                            _label('Project status', uppercase: true),
                             const SizedBox(height: 16),
                             Wrap(
                               spacing: 8,
@@ -1319,12 +1346,12 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
                                     decoration: BoxDecoration(
                                       color: isSelected
                                           ? (isCancelled
-                                                ? const Color(0xFFFFF0F0)
+                                                ? const Color(0xFFFDECEF)
                                                 : primaryBlue.withValues(
                                                     alpha: 0.1,
                                                   ))
                                           : Colors.white,
-                                      borderRadius: BorderRadius.circular(20),
+                                      borderRadius: BorderRadius.circular(Bt.rCard),
                                       border: Border.all(
                                         color: isSelected
                                             ? (isCancelled
@@ -1332,7 +1359,7 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
                                                       alpha: 0.5,
                                                     )
                                                   : primaryBlue)
-                                            : const Color(0xFFEEF0F5),
+                                            : const Color(0xFFEEF1F5),
                                         width: 1.5,
                                       ),
                                     ),
@@ -1343,7 +1370,7 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
                                         fontWeight: FontWeight.w700,
                                         color: isSelected
                                             ? (isCancelled
-                                                  ? Colors.red
+                                                  ? const Color(0xFFC01048)
                                                   : primaryBlue)
                                             : textGray,
                                       ),
@@ -1355,10 +1382,21 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
                           ],
                         ),
                       ),
-                      const SizedBox(height: 16),
+                          ],
+                        ),
+                      ),
+                      Offstage(
+                        offstage: _step != 3,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
                       _buildCsvImportExportCard(),
                       const SizedBox(height: 16),
                       _buildConstructionPhasesCard(),
+                          ],
+                        ),
+                      ),
+
                     ],
                   ),
                 ),
@@ -1367,44 +1405,30 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
           ],
         ),
       ),
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-          child: SizedBox(
-            width: double.infinity,
-            height: 52,
-            child: ElevatedButton(
-              onPressed: (_saving || _mainBuildingType == null)
-                  ? null
-                  : _submit,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: primaryBlue,
-                disabledBackgroundColor: primaryBlue.withValues(alpha: 0.6),
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
+      bottomNavigationBar: EntryBottomBar(
+        child: Row(
+          children: [
+            if (_step > 0) ...[
+              Expanded(
+                child: BtButton(
+                  label: 'Back',
+                  variant: BtButtonVariant.secondary,
+                  onPressed: _saving ? null : () => _goStep(_step - 1),
                 ),
               ),
-              child: _saving
-                  ? const SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: CircularProgressIndicator(
-                        color: Colors.white,
-                        strokeWidth: 2.5,
-                      ),
-                    )
-                  : const Text(
-                      'Add Project',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.white,
-                        letterSpacing: 0.3,
-                      ),
+              const SizedBox(width: 12),
+            ],
+            Expanded(
+              flex: 2,
+              child: _step < 3
+                  ? BtButton(label: 'Next: ${_kSteps[_step + 1]}', onPressed: _next)
+                  : BtButton(
+                      label: 'Add Project',
+                      loading: _saving,
+                      onPressed: (_saving || _mainBuildingType == null) ? null : _finish,
                     ),
             ),
-          ),
+          ],
         ),
       ),
     );
@@ -1417,9 +1441,9 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8F9FF),
+        color: const Color(0xFFF6F7F9),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFEEF0F5), width: 1.5),
+        border: Border.all(color: Bt.line),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1431,8 +1455,8 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
               Text(
                 title,
                 style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
                   color: textDark,
                   letterSpacing: 0.3,
                 ),
@@ -1475,14 +1499,7 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFEEF0F5), width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        border: Border.all(color: Bt.line),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1499,7 +1516,7 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
                     title,
                     style: const TextStyle(
                       fontSize: 15,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w700,
                       color: textDark,
                     ),
                   ),
@@ -1520,7 +1537,7 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
             firstChild: const SizedBox(width: double.infinity, height: 0),
             secondChild: Column(
               children: [
-                const Divider(height: 1, color: Color(0xFFEEF0F5)),
+                const Divider(height: 1, color: Color(0xFFEEF1F5)),
                 Padding(padding: const EdgeInsets.all(16), child: child),
               ],
             ),
@@ -1542,14 +1559,7 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFEEF0F5), width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        border: Border.all(color: Bt.line),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1571,14 +1581,14 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
                   title,
                   style: const TextStyle(
                     fontSize: 16,
-                    fontWeight: FontWeight.w900,
+                    fontWeight: FontWeight.w700,
                     color: textDark,
                   ),
                 ),
               ],
             ),
           ),
-          const Divider(height: 1, color: Color(0xFFEEF0F5)),
+          const Divider(height: 1, color: Color(0xFFEEF1F5)),
           Padding(padding: const EdgeInsets.all(16), child: child),
         ],
       ),
@@ -1586,12 +1596,11 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
   }
   Widget _label(String text, {IconData? icon, bool uppercase = false}) {
     final tw = Text(
-      uppercase ? text.toUpperCase() : text,
+      text,
       style: TextStyle(
-        fontSize: uppercase ? 12 : 13,
-        fontWeight: FontWeight.w800,
-        color: uppercase ? textDark.withValues(alpha: 0.5) : textGray,
-        letterSpacing: uppercase ? 1.2 : 0.3,
+        fontSize: uppercase ? 15 : 14,
+        fontWeight: uppercase ? FontWeight.w600 : FontWeight.w500,
+        color: uppercase ? Bt.ink : Bt.ink2,
       ),
     );
     if (icon == null) return tw;
@@ -1640,7 +1649,7 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
         prefixIcon: icon != null ? Icon(icon, size: 18, color: textGray) : null,
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFFEEF0F5), width: 1.5),
+          borderSide: const BorderSide(color: Color(0xFFEEF1F5), width: 1.5),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
@@ -1670,7 +1679,7 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
       decoration: BoxDecoration(
         color: disabled ? const Color(0xFFF5F5F8) : Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFEEF0F5), width: 1.5),
+        border: Border.all(color: Bt.line),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
@@ -1717,7 +1726,7 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
           color: isSelected ? primaryBlue : Colors.white,
           borderRadius: BorderRadius.circular(24),
           border: Border.all(
-            color: isSelected ? primaryBlue : const Color(0xFFEEF0F5),
+            color: isSelected ? primaryBlue : const Color(0xFFEEF1F5),
             width: 1.5,
           ),
         ),
@@ -1752,7 +1761,7 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
         Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: const Color(0xFFEEF0F5), width: 1.5),
+            border: Border.all(color: Bt.line),
           ),
           child: Row(
             children: [
@@ -1770,14 +1779,14 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
                 alignment: Alignment.center,
                 decoration: const BoxDecoration(
                   border: Border.symmetric(
-                    vertical: BorderSide(color: Color(0xFFEEF0F5), width: 1.5),
+                    vertical: BorderSide(color: Color(0xFFEEF1F5), width: 1.5),
                   ),
                 ),
                 child: Text(
                   value.toString(),
                   style: const TextStyle(
                     fontSize: 14,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                     color: textDark,
                   ),
                 ),
@@ -1814,7 +1823,7 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(4),
             ),
-            side: const BorderSide(color: Color(0xFFDDE0E8), width: 1.5),
+            side: const BorderSide(color: Color(0xFFE4E7EC), width: 1.5),
           ),
         ),
         const SizedBox(width: 8),
@@ -1850,7 +1859,7 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
           border: Border.all(
             color: (isEmpty && required)
                 ? Colors.red.shade300
-                : const Color(0xFFEEF0F5),
+                : const Color(0xFFEEF1F5),
             width: 1.5,
           ),
         ),
@@ -1863,7 +1872,7 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
                     ? '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}'
                     : (hint ?? 'Select'),
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: 13,
                   fontWeight: FontWeight.w600,
                   color: date != null
                       ? textDark
@@ -1899,14 +1908,7 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFEEF0F5), width: 1.5),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.025),
-                blurRadius: 6,
-                offset: const Offset(0, 2),
-              ),
-            ],
+            border: Border.all(color: Bt.line),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1915,12 +1917,12 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
                 children: [
                   const Flexible(
                     child: Text(
-                      'CONSTRUCTION PHASES',
+                      'Construction phases',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: 13,
-                        fontWeight: FontWeight.w900,
+                        fontWeight: FontWeight.w700,
                         color: textDark,
                         letterSpacing: 0.5,
                       ),
@@ -1939,7 +1941,7 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
                     child: Text(
                       'Select All',
                       style: TextStyle(
-                        fontSize: 12,
+                        fontSize: 13,
                         fontWeight: FontWeight.w700,
                         color: primaryBlue,
                       ),
@@ -1949,7 +1951,7 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
                   Text(
                     '|',
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 13,
                       color: textGray.withValues(alpha: 0.4),
                     ),
                   ),
@@ -1966,7 +1968,7 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
                     child: Text(
                       'Clear',
                       style: TextStyle(
-                        fontSize: 12,
+                        fontSize: 13,
                         fontWeight: FontWeight.w700,
                         color: textGray.withValues(alpha: 0.7),
                       ),
@@ -1978,7 +1980,7 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
               Text(
                 'Select phases and activities required.',
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: 13,
                   color: textGray.withValues(alpha: 0.8),
                 ),
               ),
@@ -2026,14 +2028,7 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFEEF0F5), width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.025),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        border: Border.all(color: Bt.line),
       ),
       child: Column(
         children: [
@@ -2065,7 +2060,7 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
                         border: Border.all(
                           color: phase.isSelected
                               ? primaryBlue
-                              : const Color(0xFFCDD0DA),
+                              : const Color(0xFFD0D5DD),
                           width: 1.5,
                         ),
                       ),
@@ -2084,7 +2079,7 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
                       phase.name,
                       style: const TextStyle(
                         fontSize: 15,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                         color: textDark,
                       ),
                     ),
@@ -2107,7 +2102,7 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
             secondChild: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Divider(height: 1, color: Color(0xFFEEF0F5)),
+                const Divider(height: 1, color: Color(0xFFEEF1F5)),
                 ReorderableListView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
@@ -2120,13 +2115,6 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
                       child: DecoratedBox(
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.06),
-                              blurRadius: 18,
-                              offset: const Offset(0, 6),
-                            ),
-                          ],
                         ),
                         child: child,
                       ),
@@ -2170,7 +2158,7 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
                                 border: Border.all(
                                   color: act.isSelected
                                       ? primaryBlue
-                                      : const Color(0xFFCDD0DA),
+                                      : const Color(0xFFD0D5DD),
                                   width: 1.5,
                                 ),
                               ),
@@ -2193,7 +2181,7 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
                                       : FontWeight.w400,
                                   color: act.isSelected
                                       ? textDark
-                                      : const Color(0xFF6B7280),
+                                      : const Color(0xFF667085),
                                 ),
                               ),
                             ),
@@ -2202,7 +2190,7 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
                               child: const Icon(
                                 Icons.drag_indicator_rounded,
                                 size: 20,
-                                color: Color(0xFFDDE0E8),
+                                color: Color(0xFFE4E7EC),
                               ),
                             ),
                           ],
@@ -2221,7 +2209,7 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
                     ),
                     decoration: BoxDecoration(
                       color: primaryBlue.withValues(alpha: 0.06),
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: BorderRadius.circular(Bt.rCard),
                       border: Border.all(
                         color: primaryBlue.withValues(alpha: 0.2),
                         width: 1,
@@ -2259,7 +2247,7 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
           'Add Custom Phase',
           style: TextStyle(
             fontSize: 18,
-            fontWeight: FontWeight.w900,
+            fontWeight: FontWeight.w700,
             color: textDark,
           ),
         ),
@@ -2272,7 +2260,7 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
               borderSide: BorderSide(color: primaryBlue, width: 2),
             ),
             enabledBorder: UnderlineInputBorder(
-              borderSide: BorderSide(color: Color(0xFFDDE0E8)),
+              borderSide: BorderSide(color: Color(0xFFE4E7EC)),
             ),
           ),
         ),
@@ -2336,7 +2324,7 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
           'Add Custom Activity',
           style: TextStyle(
             fontSize: 18,
-            fontWeight: FontWeight.w900,
+            fontWeight: FontWeight.w700,
             color: textDark,
           ),
         ),
@@ -2350,7 +2338,7 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
               borderSide: BorderSide(color: primaryBlue, width: 2),
             ),
             enabledBorder: UnderlineInputBorder(
-              borderSide: BorderSide(color: Color(0xFFDDE0E8)),
+              borderSide: BorderSide(color: Color(0xFFE4E7EC)),
             ),
           ),
         ),
@@ -2416,53 +2404,24 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
       return const SizedBox.shrink();
     }
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      padding: const EdgeInsets.only(bottom: 16),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: Colors.red.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
-        ),
+        padding: const EdgeInsets.fromLTRB(14, 6, 6, 6),
+        decoration: BoxDecoration(color: Bt.amberSoft, borderRadius: BorderRadius.circular(Bt.rTile)),
         child: Row(
           children: [
-            Icon(
-              Icons.warning_amber_rounded,
-              color: Colors.red.shade400,
-              size: 20,
-            ),
-            const SizedBox(width: 8),
+            const Icon(Icons.info_outline_rounded, color: Bt.amber, size: 20),
+            const SizedBox(width: 10),
             Expanded(
               child: Text(
-                '${plan.label} Plan Limit Reached: You have $currentCount/$maxProjects projects.',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Colors.red.shade700,
-                  fontWeight: FontWeight.w600,
-                ),
+                '${plan.label} plan limit reached: $currentCount/$maxProjects projects.',
+                style: BtText.subhead(context, color: Bt.amber, weight: FontWeight.w500),
               ),
             ),
-            const SizedBox(width: 8),
-            GestureDetector(
-              onTap: () => Navigator.pushNamed(context, '/subscription'),
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.red.shade700,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Text(
-                  'Upgrade',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
+            TextButton(
+              onPressed: () => Navigator.pushNamed(context, '/subscription'),
+              style: TextButton.styleFrom(foregroundColor: Bt.amber, minimumSize: const Size(44, 40)),
+              child: const Text('Upgrade', style: TextStyle(fontWeight: FontWeight.w600)),
             ),
           ],
         ),
@@ -2519,7 +2478,7 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Template downloaded successfully!'),
-            backgroundColor: Colors.green,
+            backgroundColor: Color(0xFF067647),
           ),
         );
       }
@@ -2528,7 +2487,7 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to download template: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: const Color(0xFFC01048),
           ),
         );
       }
@@ -2698,7 +2657,7 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
             content: Text(
               'Successfully imported budget for $updatedCount activities!',
             ),
-            backgroundColor: Colors.green,
+            backgroundColor: const Color(0xFF067647),
           ),
         );
       }
@@ -2707,7 +2666,7 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Upload failed: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: const Color(0xFFC01048),
           ),
         );
       }
@@ -2721,13 +2680,6 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2738,12 +2690,12 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
                 width: 36,
                 height: 36,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                  color: const Color(0xFF067647).withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: const Icon(
                   Icons.table_chart_rounded,
-                  color: Color(0xFF10B981),
+                  color: Color(0xFF067647),
                   size: 18,
                 ),
               ),
@@ -2753,10 +2705,10 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'PHASES & BUDGET CONFIGURATION',
+                      'Phases & budget configuration',
                       style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
                         color: textGray,
                         letterSpacing: 0.5,
                       ),
@@ -2764,7 +2716,7 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
                     Text(
                       'Import/Export CSV budgets for all phases.',
                       style: TextStyle(
-                        fontSize: 12,
+                        fontSize: 13,
                         fontWeight: FontWeight.w600,
                         color: textDark,
                       ),
@@ -2785,7 +2737,7 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     side: const BorderSide(
-                      color: Color(0xFFEEF0F5),
+                      color: Color(0xFFEEF1F5),
                       width: 1.5,
                     ),
                     shape: RoundedRectangleBorder(
@@ -2793,7 +2745,7 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
                     ),
                     foregroundColor: primaryBlue,
                     textStyle: const TextStyle(
-                      fontSize: 12,
+                      fontSize: 13,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -2821,7 +2773,7 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
                             borderRadius: BorderRadius.circular(10),
                           ),
                           textStyle: const TextStyle(
-                            fontSize: 12,
+                            fontSize: 13,
                             fontWeight: FontWeight.w700,
                           ),
                         ),

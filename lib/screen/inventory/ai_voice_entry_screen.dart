@@ -1,3 +1,4 @@
+import 'package:buildtrack_mobile/design/design.dart';
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:buildtrack_mobile/common/controllers/voice_recording_controller.dart';
@@ -404,7 +405,7 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
             const SnackBar(
               content: Text('Microphone permission denied. Please allow microphone access in device Settings to use voice input.'),
               behavior: SnackBarBehavior.floating,
-              backgroundColor: Colors.redAccent,
+              backgroundColor: Color(0xFFC01048),
             ),
           );
         }
@@ -1810,8 +1811,8 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
           Text(
             label.toUpperCase(),
             style: const TextStyle(
-              fontSize: 9,
-              fontWeight: FontWeight.w800,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
               color: AppColors.textLight,
               letterSpacing: 0.5,
             ),
@@ -1904,7 +1905,7 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: const Color(0xFFFEF2F2),
+              color: const Color(0xFFFDECEF),
               borderRadius: BorderRadius.circular(8),
               border: Border.all(color: const Color(0xFFFCA5A5)),
             ),
@@ -1912,7 +1913,7 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
               children: [
                 const Icon(
                   Icons.error_outline,
-                  color: Color(0xFFEF4444),
+                  color: Color(0xFFC01048),
                   size: 14,
                 ),
                 const SizedBox(width: 8),
@@ -1920,8 +1921,8 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
                   child: Text(
                     _editError!,
                     style: const TextStyle(
-                      fontSize: 12,
-                      color: Color(0xFFDC2626),
+                      fontSize: 13,
+                      color: Color(0xFFC01048),
                     ),
                   ),
                 ),
@@ -2068,7 +2069,7 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
   Widget build(BuildContext context) {
     Provider.of<ProjectProvider>(context);
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6FC),
+      backgroundColor: const Color(0xFFF6F7F9),
       body: SafeArea(
         bottom: false,
         child: Column(
@@ -2131,96 +2132,36 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
         break;
     }
     final isListening = _voiceCtrl.engineState == VoiceEngineState.listening;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(bottom: BorderSide(color: Color(0xFFEEEBF8))),
-      ),
+    if (_response.status == VoiceStatus.listening || _response.status == VoiceStatus.idle) {
+      title = 'Speak an update';
+    }
+    return SizedBox(
+      height: 56,
       child: Row(
         children: [
-          GestureDetector(
+          const SizedBox(width: 4),
+          BtIconButton(
+            icon: Icons.close_rounded,
+            size: 24,
+            semantic: 'Close',
             onTap: () => Navigator.maybePop(context),
-            child: Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: const Color(0xFFF4F6FC),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(
-                Icons.arrow_back,
-                size: 18,
-                color: AppColors.textDark,
-              ),
-            ),
           ),
-          const SizedBox(width: 12),
           Expanded(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 14.5,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.primaryBlue,
-                    letterSpacing: 0.3,
-                  ),
-                ),
-                Text(
-                  subtitle,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: AppColors.textLight,
-                  ),
-                ),
+                Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.navTitle(context)),
+                Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.caption(context)),
               ],
             ),
           ),
-          _buildStatusBadge(isListening),
+          SizedBox(width: 92, child: Center(child: _buildStatusBadge(isListening))),
         ],
       ),
     );
   }
   Widget _buildStatusBadge(bool isListening) {
-    final statusText = isListening ? 'Listening' : 'Ready';
-    final color = isListening ? const Color(0xFFEF4444) : AppColors.textLight;
-    final bgColor = isListening
-        ? const Color(0xFFFEF2F2)
-        : const Color(0xFFF1F5F9);
-    final borderColor = isListening
-        ? const Color(0xFFFCA5A5)
-        : const Color(0xFFE2E8F0);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: borderColor),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 6,
-            height: 6,
-            decoration: BoxDecoration(shape: BoxShape.circle, color: color),
-          ),
-          const SizedBox(width: 5),
-          Text(
-            statusText,
-            style: TextStyle(
-              fontSize: 10.5,
-              fontWeight: FontWeight.w800,
-              color: color,
-              letterSpacing: 0.2,
-            ),
-          ),
-        ],
-      ),
-    );
+    return BtBadge(label: isListening ? '● Listening' : 'Ready', tone: isListening ? BtTone.red : BtTone.neutral);
   }
   Widget _buildMainBody() {
     Widget content;
@@ -2248,83 +2189,40 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
           children: [
             if (_saveError != null) _buildErrorCard(),
             _buildVoiceListeningCard(),
+            _buildExampleHintCard(),
+            _buildAiQuestionCard(),
             _buildAiUnderstandingPanel(curData),
             _buildMissingInformationPanel(curData),
-            _buildAiQuestionCard(),
-            _buildExampleHintCard(),
           ],
         );
         break;
     }
     return SingleChildScrollView(
       controller: _scrollCtrl,
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 160),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 220),
       child: content,
     );
   }
   Widget _buildVoiceListeningCard() {
     final isListening = _voiceCtrl.engineState == VoiceEngineState.listening;
-    if (!isListening) return const SizedBox.shrink();
     final hasContent = _partialAnswer.isNotEmpty || _rawTranscript.isNotEmpty;
+    if (!isListening && !hasContent) return const SizedBox.shrink();
     final displayText = hasContent
         ? (_partialAnswer.isNotEmpty ? _partialAnswer : _rawTranscript)
         : 'Listening for voice input...';
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFDDD8F5)),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.04),
-            blurRadius: 12,
-            offset: const Offset(0, 2),
-          ),
-        ],
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 24),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        if (isListening) ...[_buildLiveWaveform(), const SizedBox(height: 12)],
+        Text(
+        hasContent ? '"$displayText"' : displayText,
+        style: BtText.title(context, size: 24).copyWith(
+          color: hasContent ? Bt.ink : Bt.placeholder,
+          height: 1.3,
+          fontWeight: FontWeight.w600,
+        ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'LIVE TRANSCRIPT',
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w800,
-              color: AppColors.primary,
-              letterSpacing: 0.8,
-            ),
-          ),
-          const SizedBox(height: 12),
-          _buildLiveWaveform(),
-          const SizedBox(height: 14),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.03),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: AppColors.primary.withValues(alpha: 0.12),
-              ),
-            ),
-            child: Text(
-              displayText,
-              style: TextStyle(
-                fontSize: 13.5,
-                color: hasContent
-                    ? AppColors.textDark
-                    : AppColors.textLight.withValues(alpha: 0.7),
-                fontStyle: _partialAnswer.isNotEmpty
-                    ? FontStyle.italic
-                    : FontStyle.normal,
-                height: 1.45,
-              ),
-            ),
-          ),
-        ],
-      ),
+      ]),
     );
   }
   Widget _buildLiveWaveform() {
@@ -2355,7 +2253,7 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
                 height: finalHeight,
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
-                    colors: [Color(0xFF173EEA), Color(0xFFB137FF)],
+                    colors: [Color(0xFF0B63CE), Color(0xFF0B63CE)],
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                   ),
@@ -2375,123 +2273,36 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
     voiceFields.forEach((key, val) {
       if (_isVoiceFieldPresent(key, val)) completed++;
     });
-    final progress = total > 0 ? completed / total : 0.0;
     final isComplete = completed >= total;
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 14),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFEEEBF8)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 20),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'AI Understanding Entry',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textDark,
-                ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+            child: Row(children: [
+              Expanded(child: Text('Understood so far', style: BtText.caption(context))),
+              Text(
+                '$completed of $total',
+                style: BtText.caption(context, color: isComplete ? Bt.green : Bt.ink3, weight: FontWeight.w600),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 3.5,
-                ),
-                decoration: BoxDecoration(
-                  color: isComplete
-                      ? const Color(0xFFDCFCE7)
-                      : const Color(0xFFEFF6FF),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  '$completed / $total',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                    color: isComplete
-                        ? const Color(0xFF16A34A)
-                        : AppColors.primary,
-                  ),
-                ),
-              ),
-            ],
+            ]),
           ),
-          const SizedBox(height: 10),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value: progress,
-              minHeight: 4,
-              backgroundColor: const Color(0xFFF0EDFF),
-              valueColor: AlwaysStoppedAnimation<Color>(
-                isComplete ? Color(0xFF22C55E) : AppColors.primary,
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
+          BtGroup(
             children: voiceFields.entries.map((e) {
               final isPresent = _isVoiceFieldPresent(e.key, e.value);
               final displayVal = e.value is num
                   ? (e.value as num).toStringAsFixed(e.value % 1 == 0 ? 0 : 2)
                   : e.value?.toString() ?? '';
-              return Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: isPresent
-                      ? const Color(0xFFDCFCE7)
-                      : const Color(0xFFF1F5F9),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: isPresent
-                        ? const Color(0xFFBBF7D0)
-                        : const Color(0xFFE2E8F0),
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      isPresent
-                          ? Icons.check_circle_outline
-                          : Icons.radio_button_unchecked,
-                      color: isPresent
-                          ? const Color(0xFF16A34A)
-                          : AppColors.textLight,
-                      size: 13,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      isPresent ? '${e.key}: $displayVal' : e.key,
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: isPresent
-                            ? const Color(0xFF16A34A)
-                            : AppColors.textLight,
-                      ),
-                    ),
-                  ],
+              return BtValueRow(
+                label: e.key,
+                value: isPresent ? displayVal : 'Still needed',
+                valueColor: isPresent ? Bt.ink : Bt.placeholder,
+                trailing: Icon(
+                  isPresent ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+                  size: 18,
+                  color: isPresent ? Bt.green : Bt.inputBorder,
                 ),
               );
             }).toList(),
@@ -2500,108 +2311,8 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
       ),
     );
   }
-  Widget _buildMissingInformationPanel(_ExtractedData currentData) {
-    final voiceFields = _getVoiceFields(_entryType, currentData);
-    final missing = voiceFields.entries
-        .where((e) => !_isVoiceFieldPresent(e.key, e.value))
-        .map((e) => e.key)
-        .toList();
-    if (missing.isEmpty) return const SizedBox.shrink();
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 14),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFEEEBF8)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Text(
-                'Still Needed',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textDark,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFFBEB),
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: const Color(0xFFFDE68A)),
-                ),
-                child: Text(
-                  '${missing.length} field${missing.length == 1 ? '' : 's'}',
-                  style: const TextStyle(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFFB45309),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 7,
-            runSpacing: 7,
-            children: missing.map((field) {
-              return Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFFBEB),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFFEF3C7)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: const Color(0xFFD97706),
-                          width: 1.5,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      field,
-                      style: const TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFFB45309),
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }).toList(),
-          ),
-        ],
-      ),
-    );
-  }
+  /// Missing fields are shown inline in "Understood so far" (as "Still needed").
+  Widget _buildMissingInformationPanel(_ExtractedData currentData) => const SizedBox.shrink();
   Widget _buildExampleHintCard() {
     String example = "";
     if (_entryType == 'material') {
@@ -2611,47 +2322,20 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
     } else {
       example = '"JCB excavator worked 6 hours at 1200 rupees per hour"';
     }
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 14),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF9F8FF),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFEBE8FF)),
-      ),
+    final hasContent = _partialAnswer.isNotEmpty || _rawTranscript.isNotEmpty;
+    if (hasContent) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 20),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            Icons.lightbulb_outline_rounded,
-            color: AppColors.primary,
-            size: 18,
-          ),
-          const SizedBox(width: 10),
+          const Icon(Icons.lightbulb_outline_rounded, color: Bt.ink3, size: 18),
+          const SizedBox(width: 8),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Example Phrase:',
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.primary,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  example,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textDark,
-                    fontStyle: FontStyle.italic,
-                  ),
-                ),
-              ],
-            ),
+            child: Text.rich(TextSpan(children: [
+              TextSpan(text: 'Try saying ', style: BtText.subhead(context)),
+              TextSpan(text: example, style: BtText.subhead(context, color: Bt.ink, weight: FontWeight.w500)),
+            ])),
           ),
         ],
       ),
@@ -2676,18 +2360,11 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF173EEA), Color(0xFF7B3FE4)],
+          colors: [Color(0xFF0B63CE), Color(0xFF7B3FE4)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF173EEA).withValues(alpha: 0.2),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(Bt.rCard),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2700,7 +2377,7 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
                   'BuildTrack AI',
                   style: TextStyle(
                     fontSize: 13,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                     color: Colors.white,
                   ),
                 ),
@@ -2716,7 +2393,7 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
                   Text(
                     confirmed.length == 1 ? 'Great. I found:' : 'I have:',
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 13,
                       color: Colors.white.withValues(alpha: 0.7),
                       fontWeight: FontWeight.w500,
                     ),
@@ -2737,7 +2414,7 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
                             child: Text(
                               '${f.label}: ${f.value}',
                               style: TextStyle(
-                                fontSize: 12,
+                                fontSize: 13,
                                 fontWeight: FontWeight.w600,
                                 color: Colors.white.withValues(alpha: 0.9),
                               ),
@@ -2791,7 +2468,7 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
                   Text(
                     'Quick answers:',
                     style: TextStyle(
-                      fontSize: 10,
+                      fontSize: 12,
                       fontWeight: FontWeight.w700,
                       color: Colors.white.withValues(alpha: 0.6),
                       letterSpacing: 0.3,
@@ -2821,7 +2498,7 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
                 ),
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.18),
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(Bt.rCard),
                   border: Border.all(
                     color: Colors.white.withValues(alpha: 0.4),
                   ),
@@ -2829,7 +2506,7 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
                 child: Text(
                   opt,
                   style: const TextStyle(
-                    fontSize: 12,
+                    fontSize: 13,
                     fontWeight: FontWeight.w700,
                     color: Colors.white,
                   ),
@@ -2885,15 +2562,8 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: const Color(0xFFEEEBF8)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.02),
-                blurRadius: 10,
-                offset: const Offset(0, 2),
-              ),
-            ],
+            borderRadius: BorderRadius.circular(Bt.rCard),
+            border: Border.all(color: Bt.line),
           ),
           child: Row(
             children: [
@@ -2937,7 +2607,7 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
                           child: Text(
                             _entryType.toUpperCase(),
                             style: TextStyle(
-                              fontSize: 9,
+                              fontSize: 12,
                               fontWeight: FontWeight.bold,
                               color: AppColors.primary,
                             ),
@@ -2949,7 +2619,7 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
                     Text(
                       'Analyzing Entry...',
                       style: TextStyle(
-                        fontSize: 12,
+                        fontSize: 13,
                         color: AppColors.primary,
                         fontWeight: FontWeight.bold,
                       ),
@@ -2966,15 +2636,8 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: const Color(0xFFEEEBF8)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.02),
-                blurRadius: 10,
-                offset: const Offset(0, 2),
-              ),
-            ],
+            borderRadius: BorderRadius.circular(Bt.rCard),
+            border: Border.all(color: Bt.line),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -2999,7 +2662,7 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
                   if (states[i]) {
                     indicator = const Icon(
                       Icons.check_circle_rounded,
-                      color: Color(0xFF22C55E),
+                      color: Color(0xFF067647),
                       size: 18,
                     );
                     textColor = AppColors.textDark;
@@ -3086,7 +2749,7 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
                 child: Text(
                   'Tip: You can keep the app open. We\'ll notify you when ready.',
                   style: TextStyle(
-                    fontSize: 11.5,
+                    fontSize: 13,
                     color: AppColors.primary,
                     fontWeight: FontWeight.w600,
                   ),
@@ -3159,15 +2822,8 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFDDD8F5)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(Bt.rCard),
+        border: Border.all(color: Bt.line),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -3175,7 +2831,7 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
           Container(
             decoration: const BoxDecoration(
               gradient: LinearGradient(
-                colors: [Color(0xFF173EEA), Color(0xFF7B3FE4)],
+                colors: [Color(0xFF0B63CE), Color(0xFF7B3FE4)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -3201,10 +2857,10 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
                     ),
                     const SizedBox(width: 10),
                     const Text(
-                      'ENTRY SUMMARY',
+                      'Entry summary',
                       style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
                         color: Colors.white,
                         letterSpacing: 1.0,
                       ),
@@ -3217,7 +2873,7 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
                     '\u20b9 ${amount.toStringAsFixed(0)}',
                     style: const TextStyle(
                       fontSize: 26,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w700,
                       color: Colors.white,
                       letterSpacing: -0.5,
                     ),
@@ -3231,7 +2887,7 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
                             ? 'Equipment Entry'
                             : 'Material Entry'),
                     style: TextStyle(
-                      fontSize: 12.5,
+                      fontSize: 13,
                       color: Colors.white.withValues(alpha: 0.75),
                       fontWeight: FontWeight.w500,
                     ),
@@ -3240,7 +2896,7 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
               ],
             ),
           ),
-          const Divider(height: 1, color: Color(0xFFEEEBF8)),
+          const Divider(height: 1, color: Color(0xFFEEF1F5)),
           Padding(
             padding: const EdgeInsets.all(20),
             child: _isEditing
@@ -3257,8 +2913,8 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
                             Text(
                               item['label']!.toUpperCase(),
                               style: const TextStyle(
-                                fontSize: 9,
-                                fontWeight: FontWeight.w800,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
                                 color: AppColors.textLight,
                                 letterSpacing: 0.5,
                               ),
@@ -3308,7 +2964,7 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
                     child: Text(
                       'Tip: You can keep the app open. We\'ll notify you when ready.',
                       style: TextStyle(
-                        fontSize: 11.5,
+                        fontSize: 13,
                         color: AppColors.primary,
                         fontWeight: FontWeight.w600,
                       ),
@@ -3327,7 +2983,7 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
                         child: OutlinedButton(
                           onPressed: _cancelEdit,
                           style: OutlinedButton.styleFrom(
-                            foregroundColor: const Color(0xFFEF4444),
+                            foregroundColor: const Color(0xFFC01048),
                             side: const BorderSide(
                               color: Color(0xFFFCA5A5),
                               width: 1.5,
@@ -3378,7 +3034,7 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
                           style: OutlinedButton.styleFrom(
                             foregroundColor: AppColors.textDark,
                             side: const BorderSide(
-                              color: Color(0xFFDDD8F5),
+                              color: Color(0xFFE4E7EC),
                               width: 1.5,
                             ),
                             minimumSize: const Size(0, 48),
@@ -3456,14 +3112,7 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
       decoration: const BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        border: Border(top: BorderSide(color: Color(0xFFEEEBF8))),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black12,
-            blurRadius: 16,
-            offset: Offset(0, -4),
-          ),
-        ],
+        border: Border(top: BorderSide(color: Color(0xFFEEF1F5))),
       ),
       child: SafeArea(
         top: false,
@@ -3484,23 +3133,9 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
                     ],
                   ),
                 ] else ...[
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        flex: 3,
-                        child: _buildRecordingStatusLeft(isListening),
-                      ),
-                      Expanded(
-                        flex: 2,
-                        child: _buildLargeMicButtonRedesigned(isListening),
-                      ),
-                      Expanded(
-                        flex: 3,
-                        child: _buildStopAnalyzeButtonRight(isListening),
-                      ),
-                    ],
-                  ),
+                  _buildLargeMicButtonRedesigned(isListening),
+                  const SizedBox(height: 10),
+                  _buildRecordingStatusLeft(isListening),
                 ],
               ] else if (isAskingStep) ...[
                 if (isListening) ...[
@@ -3551,10 +3186,10 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
                         Expanded(
                           child: Container(
                             decoration: BoxDecoration(
-                              color: const Color(0xFFF4F6FC),
+                              color: const Color(0xFFF6F7F9),
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
-                                color: const Color(0xFFDDD8F5),
+                                color: const Color(0xFFE4E7EC),
                               ),
                             ),
                             child: TextField(
@@ -3585,7 +3220,7 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
                             height: 44,
                             decoration: BoxDecoration(
                               gradient: const LinearGradient(
-                                colors: [Color(0xFF173EEA), Color(0xFFB137FF)],
+                                colors: [Color(0xFF0B63CE), Color(0xFF0B63CE)],
                               ),
                               borderRadius: BorderRadius.circular(12),
                             ),
@@ -3611,10 +3246,10 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
                             width: 44,
                             height: 44,
                             decoration: BoxDecoration(
-                              color: const Color(0xFFF4F6FC),
+                              color: const Color(0xFFF6F7F9),
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
-                                color: const Color(0xFFDDD8F5),
+                                color: const Color(0xFFE4E7EC),
                               ),
                             ),
                             child: const Icon(
@@ -3640,13 +3275,13 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
   Widget _buildRecordingStatusLeft(bool isListening) {
     if (!_isProjectContextSelected) {
       return const Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
             'Recording Status',
             style: TextStyle(
-              fontSize: 10,
+              fontSize: 12,
               fontWeight: FontWeight.bold,
               color: AppColors.textLight,
             ),
@@ -3655,7 +3290,7 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
           Text(
             'Context Locked',
             style: TextStyle(
-              fontSize: 12,
+              fontSize: 13,
               fontWeight: FontWeight.bold,
               color: AppColors.textLight,
             ),
@@ -3664,74 +3299,43 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
       );
     }
     if (!isListening) {
-      return const Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            'Recording Status',
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.bold,
-              color: AppColors.textLight,
-            ),
-          ),
-          SizedBox(height: 4),
-          Row(
-            children: [
-              Icon(
-                Icons.check_circle_outline,
-                color: Color(0xFF16A34A),
-                size: 14,
-              ),
-              SizedBox(width: 4),
-              Text(
-                'Ready To Record',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF16A34A),
-                ),
-              ),
-            ],
-          ),
-        ],
-      );
+      return Text('Ready · tap the mic and speak', textAlign: TextAlign.center, style: BtText.subhead(context));
     }
     return AnimatedBuilder(
       animation: _waveCtrl,
       builder: (context, _) {
         final timer = _voiceCtrl.elapsedDisplay;
         return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
           mainAxisSize: MainAxisSize.min,
           children: [
             const Text(
               'Recording Status',
               style: TextStyle(
-                fontSize: 10,
+                fontSize: 12,
                 fontWeight: FontWeight.bold,
                 color: AppColors.textLight,
               ),
             ),
             const SizedBox(height: 4),
             Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
                   width: 8,
                   height: 8,
                   decoration: const BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Color(0xFFEF4444),
+                    color: Color(0xFFC01048),
                   ),
                 ),
                 const SizedBox(width: 6),
                 Text(
                   'Listening ($timer)',
                   style: const TextStyle(
-                    fontSize: 11,
+                    fontSize: 13,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFFEF4444),
+                    color: Color(0xFFC01048),
                   ),
                 ),
               ],
@@ -3743,64 +3347,35 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
   }
   Widget _buildLargeMicButtonRedesigned(bool isListening) {
     final isEnabled = _isProjectContextSelected;
+    final bt = context.bt;
     return Center(
-      child: GestureDetector(
-        onTap: isEnabled
-            ? (isListening ? _stopInitialRecording : _startInitialRecording)
-            : null,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          width: 56,
-          height: 56,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: !isEnabled
-                ? const Color(0xFFF1F5F9)
-                : (isListening ? Color(0xFFEF4444) : AppColors.primary),
-            border: Border.all(
-              color: !isEnabled
-                  ? const Color(0xFFCBD5E1)
-                  : (isListening
-                        ? const Color(0xFFFCA5A5)
-                        : AppColors.primary.withValues(alpha: 0.2)),
-              width: 2,
+      child: Semantics(
+        button: true,
+        label: isListening ? 'Stop recording' : 'Start recording',
+        child: GestureDetector(
+          onTap: isEnabled
+              ? (isListening ? _stopInitialRecording : _startInitialRecording)
+              : null,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            width: 96,
+            height: 96,
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: !isEnabled ? Bt.fill : (isListening ? Bt.redSoft : bt.brandSoft),
             ),
-          ),
-          child: Icon(
-            isListening ? Icons.stop_rounded : Icons.mic_rounded,
-            color: !isEnabled ? const Color(0xFF94A3B8) : Colors.white,
-            size: 28,
-          ),
-        ),
-      ),
-    );
-  }
-  Widget _buildStopAnalyzeButtonRight(bool isListening) {
-    final isEnabled = isListening;
-    return Align(
-      alignment: Alignment.centerRight,
-      child: SizedBox(
-        height: 40,
-        child: TextButton(
-          onPressed: isEnabled ? _stopAndAnalyze : null,
-          style: TextButton.styleFrom(
-            backgroundColor: isEnabled
-                ? AppColors.primary
-                : const Color(0xFFF1F5F9),
-            foregroundColor: isEnabled ? Colors.white : const Color(0xFF94A3B8),
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-              side: BorderSide(
-                color: isEnabled ? AppColors.primary : Color(0xFFE2E8F0),
-                width: 1.5,
+            child: Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: !isEnabled ? Bt.line : (isListening ? Bt.red : bt.brand),
+              ),
+              child: Icon(
+                isListening ? Icons.stop_rounded : Icons.mic_rounded,
+                color: !isEnabled ? Bt.placeholder : Colors.white,
+                size: 36,
               ),
             ),
-          ),
-          child: const Text(
-            'Stop & Analyze',
-            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-            textAlign: TextAlign.center,
           ),
         ),
       ),
@@ -3810,8 +3385,8 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
     return OutlinedButton(
       onPressed: _stopAndAnalyze,
       style: OutlinedButton.styleFrom(
-        foregroundColor: const Color(0xFFEF4444),
-        side: const BorderSide(color: Color(0xFFEF4444), width: 1.5),
+        foregroundColor: const Color(0xFFC01048),
+        side: const BorderSide(color: Color(0xFFC01048), width: 1.5),
         minimumSize: const Size(double.infinity, 48),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
@@ -3826,8 +3401,8 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
       onPressed: _cancelRecording,
       style: OutlinedButton.styleFrom(
         backgroundColor: Colors.white,
-        foregroundColor: const Color(0xFF6B7280),
-        side: const BorderSide(color: Color(0xFFD1D5DB), width: 1.5),
+        foregroundColor: const Color(0xFF667085),
+        side: const BorderSide(color: Color(0xFFD0D5DD), width: 1.5),
         minimumSize: const Size(double.infinity, 48),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
@@ -3855,17 +3430,10 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               gradient: const LinearGradient(
-                colors: [Color(0xFF173EEA), Color(0xFFB137FF)],
+                colors: [Color(0xFF0B63CE), Color(0xFF0B63CE)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFFB137FF).withValues(alpha: 0.3),
-                  blurRadius: 12,
-                  spreadRadius: 2,
-                ),
-              ],
             ),
             child: Icon(
               isListening ? Icons.stop : Icons.mic_rounded,
@@ -3954,14 +3522,7 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: const Color(0xFFDCFCE7)),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF16A34A).withValues(alpha: 0.05),
-                blurRadius: 16,
-                offset: const Offset(0, 4),
-              ),
-            ],
+            border: Border.all(color: const Color(0xFFE7F6EE)),
           ),
           child: Column(
             children: [
@@ -3971,7 +3532,7 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
                 decoration: const BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: LinearGradient(
-                    colors: [Color(0xFF22C55E), Color(0xFF10B981)],
+                    colors: [Color(0xFF067647), Color(0xFF067647)],
                   ),
                 ),
                 child: const Icon(
@@ -4003,7 +3564,7 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF0FDF4),
+                  color: const Color(0xFFE7F6EE),
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: const Color(0xFFBBF7D0)),
                 ),
@@ -4013,7 +3574,7 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
                       'Entry ID',
                       '#${_savedEntryId?.substring(math.max(0, (_savedEntryId?.length ?? 4) - 8)) ?? 'NEW'}',
                     ),
-                    const Divider(height: 12, color: Color(0xFFDCFCE7)),
+                    const Divider(height: 12, color: Color(0xFFE7F6EE)),
                     _successDetailRow('Date & Time', dateStr),
                   ],
                 ),
@@ -4062,18 +3623,18 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
       margin: const EdgeInsets.only(top: 14),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFFEF2F2),
+        color: const Color(0xFFFDECEF),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFFFCA5A5)),
       ),
       child: Row(
         children: [
-          const Icon(Icons.error_outline, color: Color(0xFFEF4444), size: 18),
+          const Icon(Icons.error_outline, color: Color(0xFFC01048), size: 18),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               _saveError ?? '',
-              style: const TextStyle(fontSize: 12, color: Color(0xFFDC2626)),
+              style: const TextStyle(fontSize: 13, color: Color(0xFFC01048)),
             ),
           ),
         ],
@@ -4087,7 +3648,7 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
         Text(
           label,
           style: const TextStyle(
-            fontSize: 11,
+            fontSize: 13,
             color: AppColors.textLight,
             fontWeight: FontWeight.w500,
           ),
@@ -4095,7 +3656,7 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
         Text(
           value,
           style: const TextStyle(
-            fontSize: 11,
+            fontSize: 13,
             fontWeight: FontWeight.bold,
             color: AppColors.textDark,
           ),

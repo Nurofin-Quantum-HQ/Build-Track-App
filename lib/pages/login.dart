@@ -1,9 +1,8 @@
+import 'package:buildtrack_mobile/common/widgets/entry_widgets.dart';
+import 'package:buildtrack_mobile/design/design.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:buildtrack_mobile/common/themes/app_colors.dart';
-import 'package:buildtrack_mobile/common/themes/app_theme.dart';
-import 'package:buildtrack_mobile/common/widgets/app_widgets.dart';
 import 'package:buildtrack_mobile/controller/project_provider.dart';
 import 'package:buildtrack_mobile/services/auth_service.dart';
 import 'package:buildtrack_mobile/services/push_notification_service.dart';
@@ -14,7 +13,6 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 class _LoginScreenState extends State<LoginScreen> {
-  static const _bgColor = Color(0xFFF0EEFF);
   final _formKey = GlobalKey<FormState>();
   final _emailCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
@@ -47,193 +45,221 @@ class _LoginScreenState extends State<LoginScreen> {
   }
   @override
   Widget build(BuildContext context) {
-    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    final bt = context.bt;
+    final media = MediaQuery.of(context);
+    final heroH = (media.size.height * 0.36).clamp(240.0, 340.0);
     return Scaffold(
-      backgroundColor: _bgColor,
-      resizeToAvoidBottomInset: false,
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: EdgeInsets.fromLTRB(20, 32, 20, 24 + bottomInset),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  AppCard(
-                    padding: const EdgeInsets.fromLTRB(24, 36, 24, 36),
-                    margin: EdgeInsets.zero,
-                    borderRadius: 28,
+      backgroundColor: Bt.card,
+      body: SingleChildScrollView(
+        padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: media.size.height),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Hero
+              Container(
+                height: heroH + 28,
+                decoration: const BoxDecoration(color: Bt.ink),
+                child: Stack(
+                  children: [
+                    Positioned.fill(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: RadialGradient(
+                            center: const Alignment(-0.9, -0.9),
+                            radius: 1.1,
+                            colors: [const Color(0xFFB7791F).withValues(alpha: 0.45), Colors.transparent],
+                          ),
+                        ),
+                      ),
+                    ),
+                    Positioned.fill(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: RadialGradient(
+                            center: const Alignment(1.0, 0.6),
+                            radius: 1.0,
+                            colors: [bt.brand.withValues(alpha: 0.55), Colors.transparent],
+                          ),
+                        ),
+                      ),
+                    ),
+                    SafeArea(
+                      bottom: false,
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(24, 32, 24, 48),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            _buildHeader(),
+                            const SizedBox(height: 20),
+                            Text.rich(
+                              TextSpan(children: [
+                                const TextSpan(text: 'Every bag, worker\nand rupee — '),
+                                TextSpan(text: 'on track.', style: TextStyle(color: Color.lerp(bt.brand, Colors.white, 0.45))),
+                              ]),
+                              style: BtText.title(context, size: 30).copyWith(color: Colors.white, height: 1.15),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Sheet
+              Transform.translate(
+                offset: const Offset(0, -28),
+                child: Container(
+                  decoration: const BoxDecoration(
+                    color: Bt.card,
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+                  ),
+                  padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
+                  child: Form(
+                    key: _formKey,
                     child: Column(
-                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        _buildHeader(),
-                        const SizedBox(height: AppTheme.spacingXl),
                         _buildForm(),
-                        const SizedBox(height: AppTheme.spacingLg),
+                        const SizedBox(height: 8),
                         _buildActions(),
                       ],
                     ),
                   ),
-                  const SizedBox(height: AppTheme.spacingLg),
-                  _buildFooter(),
-                ],
+                ),
               ),
-            ),
+              _buildFooter(),
+              SizedBox(height: media.padding.bottom + 16),
+            ],
           ),
         ),
       ),
     );
   }
   Widget _buildHeader() {
-    return Column(
+    return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: Image.asset(
+        ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: Container(
+            color: Colors.white,
+            padding: const EdgeInsets.all(4),
+            child: Image.asset(
+              'assets/images/buildtrack-logo.png',
+              width: 34,
+              height: 34,
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) => Image.network(
                 'assets/images/buildtrack-logo.png',
-                width: 38,
-                height: 38,
+                width: 34,
+                height: 34,
                 fit: BoxFit.contain,
-                errorBuilder: (context, error, stackTrace) => Image.network(
-                  'assets/images/buildtrack-logo.png',
-                  width: 38,
-                  height: 38,
-                  fit: BoxFit.contain,
-                ),
               ),
             ),
-            const SizedBox(width: 10),
-            Text('BuildTrack', style: AppTheme.heading1.copyWith(fontSize: 30)),
-          ],
+          ),
         ),
-        const SizedBox(height: 6),
-        Text(
-          'Manage your construction smarter',
-          style: AppTheme.body.copyWith(color: AppColors.textLight),
-        ),
+        const SizedBox(width: 12),
+        Text('BuildTrack', style: BtText.title(context, size: 24).copyWith(color: Colors.white)),
       ],
     );
   }
   Widget _buildForm() {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        AppTextField(
-          label: 'Email Address',
-          controller: _emailCtrl,
-          hint: 'name@company.com',
-          prefixIcon: Icons.mail_outline,
+        EntryLabeled(
+          label: 'Work email',
+          child: TextField(
+            controller: _emailCtrl,
+            keyboardType: TextInputType.emailAddress,
+            autofillHints: const [AutofillHints.email],
+            textInputAction: TextInputAction.next,
+            style: BtText.body(context),
+            decoration: btInput(context, hint: 'you@company.com'),
+          ),
         ),
-        AppTextField(
+        const SizedBox(height: 20),
+        EntryLabeled(
           label: 'Password',
-          controller: _passCtrl,
-          hint: 'Enter your password',
-          prefixIcon: Icons.lock_outline,
-          obscureText: _obscurePass,
-          suffixIcon: IconButton(
-            icon: Icon(
-              _obscurePass
-                  ? Icons.visibility_off_outlined
-                  : Icons.visibility_outlined,
+          child: TextField(
+            controller: _passCtrl,
+            obscureText: _obscurePass,
+            autofillHints: const [AutofillHints.password],
+            textInputAction: TextInputAction.done,
+            onSubmitted: (_) => _loading ? null : _login(),
+            style: BtText.body(context),
+            decoration: btInput(
+              context,
+              hint: 'Your password',
+              suffix: IconButton(
+                tooltip: _obscurePass ? 'Show password' : 'Hide password',
+                icon: Icon(_obscurePass ? Icons.visibility_outlined : Icons.visibility_off_outlined, color: Bt.ink3),
+                onPressed: () => setState(() => _obscurePass = !_obscurePass),
+              ),
             ),
-            onPressed: () => setState(() => _obscurePass = !_obscurePass),
           ),
         ),
       ],
     );
   }
   Widget _buildActions() {
+    final bt = context.bt;
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        AppButton(
-          label: _loading ? 'Signing in...' : 'Sign In',
-          onPressed: _loading ? null : _login,
-        ),
-        const SizedBox(height: 12),
         Align(
           alignment: Alignment.centerRight,
-          child: GestureDetector(
-            onTap: () => Navigator.pushNamed(context, '/forgot-password'),
-            child: Text(
-              'Forgot password?',
-              style: AppTheme.body.copyWith(
-                color: AppColors.primary,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+          child: TextButton(
+            onPressed: () => Navigator.pushNamed(context, '/forgot-password'),
+            style: TextButton.styleFrom(foregroundColor: bt.brand, minimumSize: const Size(44, 44), padding: EdgeInsets.zero),
+            child: Text('Forgot password?', style: BtText.subhead(context, weight: FontWeight.w600, color: bt.brand)),
           ),
+        ),
+        const SizedBox(height: 12),
+        BtButton(
+          label: _loading ? 'Signing in…' : 'Sign in',
+          loading: _loading,
+          onPressed: _loading ? null : _login,
         ),
         const SizedBox(height: 20),
         Wrap(
           alignment: WrapAlignment.center,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            Text(
-              "Don't have an account? ",
-              style: AppTheme.body.copyWith(color: AppColors.textLight),
-            ),
-            GestureDetector(
+            Text('New here? ', style: BtText.body(context, color: Bt.ink2)),
+            InkWell(
               onTap: () => Navigator.pushNamed(context, '/create-workspace'),
-              child: Text(
-                'Create account',
-                style: AppTheme.body.copyWith(
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.w700,
-                ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                child: Text('Create a workspace', style: BtText.body(context, weight: FontWeight.w600, color: bt.brand)),
               ),
             ),
           ],
         ),
-        const SizedBox(height: 22),
-        _buildPoweredByNurofin(),
       ],
     );
   }
   Widget _buildPoweredByNurofin() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Text(
-            'Powered by',
-            style: AppTheme.caption.copyWith(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textLight,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Image.asset(
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text('Powered by', style: BtText.caption(context)),
+        const SizedBox(width: 6),
+        Image.asset(
+          'assets/images/nurofin-logo.png',
+          height: 16,
+          fit: BoxFit.contain,
+          errorBuilder: (context, error, stackTrace) => Image.network(
             'assets/images/nurofin-logo.png',
-            height: 18,
+            height: 16,
             fit: BoxFit.contain,
-            errorBuilder: (context, error, stackTrace) => Image.network(
-              'assets/images/nurofin-logo.png',
-              height: 18,
-              fit: BoxFit.contain,
-            ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
   Future<void> _login() async {
@@ -269,6 +295,12 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
   Widget _buildFooter() {
-    return Text('Privacy Policy • Terms of Service', style: AppTheme.caption);
+    return Column(
+      children: [
+        _buildPoweredByNurofin(),
+        const SizedBox(height: 6),
+        Text('Privacy Policy · Terms of Service', style: BtText.caption(context)),
+      ],
+    );
   }
 }

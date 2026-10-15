@@ -58,7 +58,7 @@ class _NotificationsBellState extends State<NotificationsBell> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                 decoration: BoxDecoration(
-                  color: Colors.red,
+                  color: const Color(0xFFC01048),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 constraints: const BoxConstraints(minWidth: 16),
@@ -67,7 +67,7 @@ class _NotificationsBellState extends State<NotificationsBell> {
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 10,
+                    fontSize: 12,
                     fontWeight: FontWeight.bold,
                   ),
                 ),

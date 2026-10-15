@@ -1,9 +1,7 @@
+import 'package:buildtrack_mobile/design/design.dart';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:buildtrack_mobile/common/themes/app_colors.dart';
-import 'package:buildtrack_mobile/common/themes/app_theme.dart';
-import 'package:buildtrack_mobile/common/widgets/app_layout.dart';
-import 'package:buildtrack_mobile/common/widgets/app_widgets.dart';
 import 'package:buildtrack_mobile/controller/user_session.dart';
 import 'package:buildtrack_mobile/services/api_service.dart';
 import 'package:flutter/material.dart';
@@ -122,10 +120,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             ),
             if (hasPhoto)
               ListTile(
-                leading: const Icon(Icons.delete_outline, color: Colors.red),
+                leading: const Icon(Icons.delete_outline, color: Color(0xFFC01048)),
                 title: const Text(
                   'Remove Profile Photo',
-                  style: TextStyle(color: Colors.red),
+                  style: TextStyle(color: Color(0xFFC01048)),
                 ),
                 onTap: () {
                   Navigator.pop(ctx);
@@ -193,10 +191,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             ),
             if (hasLogo)
               ListTile(
-                leading: const Icon(Icons.delete_outline, color: Colors.red),
+                leading: const Icon(Icons.delete_outline, color: Color(0xFFC01048)),
                 title: const Text(
                   'Remove Company Logo',
-                  style: TextStyle(color: Colors.red),
+                  style: TextStyle(color: Color(0xFFC01048)),
                 ),
                 onTap: () {
                   Navigator.pop(ctx);
@@ -311,7 +309,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Profile updated successfully'),
-            backgroundColor: Colors.green,
+            backgroundColor: Color(0xFF067647),
             duration: Duration(seconds: 2),
           ),
         );
@@ -320,7 +318,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         final body = json.decode(response.body);
         final msg = body['message']?.toString() ?? 'Update failed';
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(msg), backgroundColor: Colors.red),
+          SnackBar(content: Text(msg), backgroundColor: const Color(0xFFC01048)),
         );
       }
     } catch (e) {
@@ -328,7 +326,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error: ${e.toString()}'),
-          backgroundColor: Colors.red,
+          backgroundColor: const Color(0xFFC01048),
         ),
       );
     } finally {
@@ -342,372 +340,215 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _companyCtrl.dispose();
     super.dispose();
   }
+  Widget _inlineField(String label, TextEditingController c, String hint, {TextInputType? type, Iterable<String>? autofill}) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 52),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Row(children: [
+          SizedBox(width: 96, child: Text(label, style: BtText.subhead(context))),
+          Expanded(
+            child: TextField(
+              controller: c,
+              keyboardType: type,
+              autofillHints: autofill,
+              onChanged: (_) => setState(() {}),
+              style: BtText.body(context),
+              decoration: InputDecoration(
+                hintText: hint,
+                hintStyle: BtText.body(context, color: Bt.placeholder),
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                filled: false,
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+            ),
+          ),
+        ]),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return AppSubScreenLayout(
-      title: 'Edit Profile',
-      scrollable: true,
-      child: _isLoadingInitial
-          ? Padding(
-              padding: EdgeInsets.symmetric(vertical: 60),
-              child: Center(
-                child: CircularProgressIndicator(color: AppColors.primary),
+    final bt = context.bt;
+    ImageProvider? photo;
+    if (_selectedImageBytes != null) {
+      photo = MemoryImage(_selectedImageBytes!);
+    } else if (_initialPhotoUrl != null && _initialPhotoUrl!.isNotEmpty) {
+      photo = getProfileImageProvider(_initialPhotoUrl);
+    }
+    ImageProvider? logo;
+    if (_selectedLogoBytes != null) {
+      logo = MemoryImage(_selectedLogoBytes!);
+    } else if (!_deleteLogo && _initialLogoUrl != null && _initialLogoUrl!.isNotEmpty) {
+      logo = getProfileImageProvider(_initialLogoUrl);
+    }
+    final company = _companyCtrl.text.isNotEmpty ? _companyCtrl.text : 'Your Company';
+    final initials = company.trim().split(RegExp(r'\s+')).where((w) => w.isNotEmpty).take(2).map((w) => w[0].toUpperCase()).join();
+    return Scaffold(
+      backgroundColor: Bt.ground,
+      appBar: BtNavBar(
+        title: 'Edit profile',
+        trailing: _isSaving
+            ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+            : TextButton(
+                onPressed: _isLoadingInitial ? null : _onSave,
+                style: TextButton.styleFrom(foregroundColor: bt.brand, minimumSize: const Size(44, 44), padding: EdgeInsets.zero),
+                child: Text('Save', style: BtText.headline(context).copyWith(color: bt.brand)),
               ),
-            )
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      ),
+      body: _isLoadingInitial
+          ? const Padding(padding: EdgeInsets.all(16), child: BtSkeletonList(count: 4))
+          : ListView(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
               children: [
-                const SizedBox(height: AppTheme.spacingLg),
                 Center(
-                  child: Stack(
-                    children: [
-                      GestureDetector(
-                        onTap: _showImageOptions,
-                        child: Builder(
-                          builder: (context) {
-                            ImageProvider? imageProvider;
-                            if (_selectedImageBytes != null) {
-                              imageProvider = MemoryImage(_selectedImageBytes!);
-                            } else if (_initialPhotoUrl != null &&
-                                _initialPhotoUrl!.isNotEmpty) {
-                              imageProvider = getProfileImageProvider(
-                                _initialPhotoUrl,
-                              );
-                            }
-                            return CircleAvatar(
-                              radius: 40,
-                              backgroundColor: Colors.white.withValues(
-                                alpha: 0.2,
-                              ),
-                              backgroundImage: imageProvider,
-                              child: imageProvider == null
-                                  ? const Icon(
-                                      Icons.person,
-                                      size: 40,
-                                      color: Colors.white,
-                                    )
-                                  : null,
-                            );
-                          },
-                        ),
+                  child: Semantics(
+                    button: true,
+                    label: 'Change profile photo',
+                    child: GestureDetector(
+                      onTap: _showImageOptions,
+                      child: CircleAvatar(
+                        radius: 44,
+                        backgroundColor: Bt.ink,
+                        backgroundImage: photo,
+                        child: photo == null
+                            ? Text(
+                                _nameCtrl.text.trim().isEmpty
+                                    ? '?'
+                                    : _nameCtrl.text.trim().split(RegExp(r'\s+')).take(2).map((w) => w[0].toUpperCase()).join(),
+                                style: BtText.title(context, size: 28).copyWith(color: Colors.white),
+                              )
+                            : null,
                       ),
-                      Positioned(
-                        bottom: 0,
-                        right: 0,
-                        child: GestureDetector(
-                          onTap: _showImageOptions,
-                          child: Container(
-                            width: 28,
-                            height: 28,
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              shape: BoxShape.circle,
-                              boxShadow: const [
-                                BoxShadow(color: Colors.black12, blurRadius: 6),
-                              ],
-                            ),
-                            child: Icon(
-                              Icons.edit,
-                              color: AppColors.primary,
-                              size: 14,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
-                const SizedBox(height: AppTheme.spacingXl),
-                AppTextField(
-                  label: 'Full Name',
-                  controller: _nameCtrl,
-                  hint: 'Enter your name',
-                  prefixIcon: Icons.person_outline,
-                ),
-                AppTextField(
-                  label: 'Email Address',
-                  controller: _emailCtrl,
-                  hint: 'name@company.com',
-                  prefixIcon: Icons.mail_outline,
-                  keyboardType: TextInputType.emailAddress,
-                ),
-                AppTextField(
-                  label: 'Phone Number',
-                  controller: _phoneCtrl,
-                  hint: 'Enter your phone number',
-                  prefixIcon: Icons.phone_outlined,
-                  keyboardType: TextInputType.phone,
-                ),
-                const SizedBox(height: AppTheme.spacingMd),
-                const Divider(),
-                const SizedBox(height: AppTheme.spacingMd),
-                Text(
-                  'Company Branding',
-                  style: AppTheme.heading3.copyWith(fontSize: 16),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Customize your company name and font style displayed across the app.',
-                  style: AppTheme.body.copyWith(
-                    color: AppColors.textLight,
-                    fontSize: 12,
+                Center(
+                  child: TextButton(
+                    onPressed: _showImageOptions,
+                    style: TextButton.styleFrom(foregroundColor: bt.brand, minimumSize: const Size(44, 44)),
+                    child: Text('Change photo', style: BtText.body(context, weight: FontWeight.w500, color: bt.brand)),
                   ),
                 ),
-                const SizedBox(height: AppTheme.spacingMd),
-                AppTextField(
-                  label: 'Company Name *',
-                  controller: _companyCtrl,
-                  hint: 'Enter your company name',
-                  prefixIcon: Icons.business_outlined,
+                const SizedBox(height: 12),
+                BtGroup(children: [
+                  _inlineField('Name', _nameCtrl, 'Enter your name', autofill: const [AutofillHints.name]),
+                  _inlineField('Phone', _phoneCtrl, 'Enter your phone number', type: TextInputType.phone, autofill: const [AutofillHints.telephoneNumber]),
+                  _inlineField('Email', _emailCtrl, 'name@company.com', type: TextInputType.emailAddress, autofill: const [AutofillHints.email]),
+                ]),
+                const SizedBox(height: 24),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+                  child: Text('Company · shown at the top of everyone\'s app', style: BtText.caption(context)),
                 ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Company Name Font Style',
-                      style: AppTheme.body.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textDark,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14),
-                      decoration: BoxDecoration(
-                        color: AppColors.cardBg,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: AppColors.inputBorder),
-                      ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          isExpanded: true,
-                          value: _selectedFontStyle,
-                          icon: Icon(Icons.keyboard_arrow_down, color: AppColors.primary),
-                          items: _fontOptions.map((font) {
-                            return DropdownMenuItem<String>(
-                              value: font,
-                              child: Text(
-                                font,
-                                style: _getFontPreviewStyle(font),
+                BtGroup(children: [
+                  _inlineField('Name', _companyCtrl, 'Enter your company name'),
+                  BtRow(
+                    leading: SizedBox(width: 80, child: Text('Logo', style: BtText.subhead(context))),
+                    title: logo == null ? 'Upload' : 'Change logo',
+                    titleColor: logo == null ? Bt.ink : bt.brand,
+                    onTap: logo == null ? _pickLogo : _showLogoOptions,
+                    trailing: logo == null
+                        ? const Icon(Icons.chevron_right_rounded, color: Bt.placeholder)
+                        : Row(mainAxisSize: MainAxisSize.min, children: [
+                            Container(
+                              width: 32,
+                              height: 32,
+                              decoration: BoxDecoration(
+                                color: Bt.card,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Bt.line),
+                                image: DecorationImage(image: logo, fit: BoxFit.contain),
                               ),
-                            );
-                          }).toList(),
-                          onChanged: (val) {
-                            if (val != null) setState(() => _selectedFontStyle = val);
-                          },
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: AppTheme.spacingMd),
-                  ],
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Text(
-                          'Company Logo',
-                          style: AppTheme.body.copyWith(
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textDark,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          '(Optional)',
-                          style: AppTheme.body.copyWith(
-                            color: AppColors.textLight,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Builder(
-                      builder: (context) {
-                        ImageProvider? logoProvider;
-                        if (_selectedLogoBytes != null) {
-                          logoProvider = MemoryImage(_selectedLogoBytes!);
-                        } else if (!_deleteLogo && _initialLogoUrl != null && _initialLogoUrl!.isNotEmpty) {
-                          logoProvider = getProfileImageProvider(_initialLogoUrl);
-                        }
-
-                        if (logoProvider != null) {
-                          return Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: AppColors.cardBg,
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
                             ),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 44,
-                                  height: 44,
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(10),
-                                    image: DecorationImage(
-                                      image: logoProvider,
-                                      fit: BoxFit.contain,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 14),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      const Text(
-                                        'Logo selected',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.w700,
-                                          fontSize: 13,
-                                          color: AppColors.textDark,
-                                        ),
-                                      ),
-                                      GestureDetector(
-                                        onTap: _showLogoOptions,
-                                        child: Text(
-                                          'Change logo',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: AppColors.primary,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                      ),
+                            BtIconButton(
+                              icon: Icons.delete_outline_rounded,
+                              semantic: 'Remove logo',
+                              color: Bt.red,
+                              onTap: () => setState(() {
+                                _selectedLogoBytes = null;
+                                _selectedLogoPath = null;
+                                _initialLogoUrl = null;
+                                _deleteLogo = true;
+                              }),
+                            ),
+                          ]),
+                  ),
+                  BtRow(
+                    leading: SizedBox(width: 80, child: Text('Name style', style: BtText.subhead(context))),
+                    title: _selectedFontStyle,
+                    showChevron: true,
+                    onTap: () async {
+                      final picked = await showBtSheet<String>(
+                        context,
+                        title: 'Name style',
+                        builder: (sheetCtx) => BtGroup(children: [
+                          for (final font in _fontOptions)
+                            InkWell(
+                              onTap: () => Navigator.pop(sheetCtx, font),
+                              child: ConstrainedBox(
+                                constraints: const BoxConstraints(minHeight: 56),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                  child: Row(children: [
+                                    Expanded(child: Text(company, maxLines: 1, overflow: TextOverflow.ellipsis, style: _getFontPreviewStyle(font).copyWith(fontSize: 18))),
+                                    Text(font, style: BtText.caption(sheetCtx)),
+                                    if (font == _selectedFontStyle) ...[
+                                      const SizedBox(width: 8),
+                                      Icon(Icons.check_rounded, color: bt.brand, size: 20),
                                     ],
-                                  ),
+                                  ]),
                                 ),
-                                IconButton(
-                                  icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
-                                  onPressed: () => setState(() {
-                                    _selectedLogoBytes = null;
-                                    _selectedLogoPath = null;
-                                    _initialLogoUrl = null;
-                                    _deleteLogo = true;
-                                  }),
-                                ),
-                              ],
-                            ),
-                          );
-                        }
-
-                        return InkWell(
-                          onTap: _pickLogo,
-                          borderRadius: BorderRadius.circular(16),
-                          child: Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-                            decoration: BoxDecoration(
-                              color: AppColors.primarySurface.withValues(alpha: 0.5),
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(
-                                color: AppColors.primary.withValues(alpha: 0.25),
                               ),
                             ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.add_photo_alternate_outlined, color: AppColors.primary, size: 20),
-                                const SizedBox(width: 10),
-                                Text(
-                                  'Upload Company Logo (Optional)',
-                                  style: AppTheme.body.copyWith(
-                                    color: AppColors.primary,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                    const SizedBox(height: AppTheme.spacingMd),
-                  ],
-                ),
-                // Live preview card
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1E1B4B),
-                    borderRadius: BorderRadius.circular(16),
+                        ]),
+                      );
+                      if (picked != null) setState(() => _selectedFontStyle = picked);
+                    },
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'LIVE BRANDING PREVIEW',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF818CF8),
-                          letterSpacing: 1.2,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Builder(
-                            builder: (context) {
-                              ImageProvider? previewLogo;
-                              if (_selectedLogoBytes != null) {
-                                previewLogo = MemoryImage(_selectedLogoBytes!);
-                              } else if (!_deleteLogo && _initialLogoUrl != null && _initialLogoUrl!.isNotEmpty) {
-                                previewLogo = getProfileImageProvider(_initialLogoUrl);
-                              }
-
-                              if (previewLogo != null) {
-                                return Container(
-                                  width: 36,
-                                  height: 36,
-                                  margin: const EdgeInsets.only(right: 10),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(8),
-                                    image: DecorationImage(
-                                      image: previewLogo,
-                                      fit: BoxFit.contain,
-                                    ),
-                                  ),
-                                );
-                              }
-                              return const SizedBox.shrink();
-                            },
-                          ),
-                          Expanded(
-                            child: Text(
-                              _companyCtrl.text.isNotEmpty ? _companyCtrl.text : 'Your Company',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: _getFontPreviewStyle(_selectedFontStyle).copyWith(
-                                color: Colors.white,
-                                fontSize: 18,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: AppTheme.spacingXl),
-                _isSaving
-                    ? Center(
-                        child: CircularProgressIndicator(
-                          color: AppColors.primary,
+                ]),
+                const SizedBox(height: 16),
+                BtCard(
+                  child: Row(children: [
+                    if (logo != null)
+                      Container(
+                        width: 40,
+                        height: 40,
+                        margin: const EdgeInsets.only(right: 12),
+                        decoration: BoxDecoration(
+                          color: Bt.card,
+                          borderRadius: BorderRadius.circular(Bt.rTile),
+                          border: Border.all(color: Bt.line),
+                          image: DecorationImage(image: logo, fit: BoxFit.contain),
                         ),
                       )
-                    : AppButton(
-                        label: 'Save Changes',
-                        icon: Icons.check_outlined,
-                        onPressed: _onSave,
+                    else
+                      Container(
+                        width: 40,
+                        height: 40,
+                        margin: const EdgeInsets.only(right: 12),
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(color: Bt.fill, borderRadius: BorderRadius.circular(Bt.rTile)),
+                        child: Text(initials, style: BtText.headline(context)),
                       ),
-                const SizedBox(height: AppTheme.spacingLg),
+                    Expanded(
+                      child: Text(
+                        company,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: _getFontPreviewStyle(_selectedFontStyle).copyWith(fontSize: 18, color: Bt.ink),
+                      ),
+                    ),
+                  ]),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
+                  child: Text('Preview', style: BtText.caption(context)),
+                ),
               ],
             ),
     );

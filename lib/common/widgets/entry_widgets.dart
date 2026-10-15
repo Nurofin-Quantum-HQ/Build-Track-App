@@ -1,10 +1,10 @@
 import 'package:buildtrack_mobile/common/themes/app_colors.dart';
-import 'package:buildtrack_mobile/common/themes/app_gradients.dart';
 import 'package:buildtrack_mobile/controller/project_provider.dart';
 import 'package:buildtrack_mobile/models/construction_models.dart';
 import 'package:buildtrack_mobile/models/project_model.dart';
 import 'package:buildtrack_mobile/models/phase_model.dart';
 import 'package:flutter/material.dart';
+import 'package:buildtrack_mobile/design/design.dart';
 import 'package:provider/provider.dart';
 import 'package:buildtrack_mobile/common/utils/currency_formatter.dart';
 import 'package:buildtrack_mobile/common/utils/image_pick_helper.dart';
@@ -103,13 +103,12 @@ String normalizeUnit(String raw) {
 var _kBlue = AppColors.primary;
 const _kGray = AppColors.textLight;
 const _kDark = AppColors.textDark;
-const _kRed = AppColors.error;
 class EntrySectionCard extends StatelessWidget {
   const EntrySectionCard({
     super.key,
     required this.child,
     this.margin = const EdgeInsets.only(bottom: 16),
-    this.padding = const EdgeInsets.all(20),
+    this.padding = const EdgeInsets.all(16),
   });
   final Widget child;
   final EdgeInsetsGeometry margin;
@@ -120,16 +119,9 @@ class EntrySectionCard extends StatelessWidget {
       margin: margin,
       padding: padding,
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFEEEBF8)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 14,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        color: Bt.card,
+        borderRadius: BorderRadius.circular(Bt.rCard),
+        border: Border.all(color: Bt.line),
       ),
       child: child,
     );
@@ -149,34 +141,14 @@ class EntryCardHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            color: _kBlue.withValues(alpha: 0.10),
-            borderRadius: BorderRadius.circular(13),
-          ),
-          child: Icon(icon, color: _kBlue, size: 22),
-        ),
-        const SizedBox(width: 14),
+        BtTile(icon: icon),
+        const SizedBox(width: 12),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w800,
-                  color: _kDark,
-                  letterSpacing: -0.2,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                subtitle,
-                style: const TextStyle(fontSize: 12, color: _kGray),
-              ),
+              Text(title, style: BtText.headline(context)),
+              if (subtitle.isNotEmpty) Text(subtitle, style: BtText.caption(context)),
             ],
           ),
         ),
@@ -190,24 +162,11 @@ class EntryFieldLabel extends StatelessWidget {
   final bool required;
   @override
   Widget build(BuildContext context) {
-    return RichText(
-      text: TextSpan(
+    return Text.rich(
+      TextSpan(
         text: label,
-        style: TextStyle(
-          color: _kBlue,
-          fontWeight: FontWeight.w700,
-          fontSize: 12.5,
-          letterSpacing: 0.4,
-          fontFamily: 'Roboto',
-        ),
-        children: required
-            ? [
-                const TextSpan(
-                  text: ' *',
-                  style: TextStyle(color: _kRed),
-                ),
-              ]
-            : [],
+        style: BtText.subhead(context, weight: FontWeight.w500),
+        children: required ? [const TextSpan(text: ' *', style: TextStyle(color: Bt.red))] : [],
       ),
     );
   }
@@ -236,68 +195,31 @@ class EntryUnderlineField extends StatelessWidget {
   final String? error;
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(color: error != null ? _kRed : _kBlue, width: 2),
-        ),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              if (prefix != null) ...[
-                Text(
-                  prefix!,
-                  style: const TextStyle(
-                    color: _kGray,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(width: 4),
-              ],
-              Expanded(
-                child: TextField(
-                  controller: controller,
-                  keyboardType: keyboardType,
-                  maxLines: maxLines,
-                  readOnly: readOnly,
-                  onChanged: onChanged,
-                  decoration: InputDecoration(
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    hintText: hint,
-                    hintStyle: const TextStyle(color: _kGray),
-                    contentPadding: const EdgeInsets.symmetric(vertical: 10),
-                    isDense: true,
-                  ),
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: _kDark,
-                  ),
-                ),
-              ),
-              if (suffix != null) ...[
-                const SizedBox(width: 4),
-                Text(
-                  suffix!,
-                  style: const TextStyle(
-                    color: _kGray,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ],
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        TextField(
+          controller: controller,
+          keyboardType: keyboardType,
+          maxLines: maxLines,
+          readOnly: readOnly,
+          onChanged: onChanged,
+          style: BtText.num(BtText.body(context, weight: FontWeight.w500)),
+          decoration: btInput(
+            context,
+            hint: hint,
+            prefixText: prefix != null ? '$prefix ' : null,
+            suffixText: suffix,
+          ).copyWith(
+            fillColor: readOnly ? Bt.fill : Bt.card,
+            enabledBorder: error != null
+                ? OutlineInputBorder(borderRadius: BorderRadius.circular(Bt.rInput), borderSide: const BorderSide(color: Bt.red))
+                : null,
           ),
-          if (error != null) EntryErrorText(error!),
-        ],
-      ),
+        ),
+        if (error != null) EntryErrorText(error!),
+      ],
     );
   }
 }
@@ -307,30 +229,11 @@ class EntryNotesField extends StatelessWidget {
   final String? hint;
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8F9FF),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFCCCFE8), width: 1.5),
-      ),
-      child: TextField(
-        controller: controller,
-        maxLines: 3,
-        decoration: InputDecoration(
-          border: InputBorder.none,
-          enabledBorder: InputBorder.none,
-          focusedBorder: InputBorder.none,
-          hintText: hint ?? 'Add any site notes or remarks...',
-          hintStyle: const TextStyle(color: _kGray, fontSize: 13.5),
-          contentPadding: const EdgeInsets.symmetric(vertical: 10),
-        ),
-        style: const TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w500,
-          color: _kDark,
-        ),
-      ),
+    return TextField(
+      controller: controller,
+      maxLines: 3,
+      style: BtText.body(context),
+      decoration: btInput(context, hint: hint ?? 'Add any site notes or remarks...'),
     );
   }
 }
@@ -354,45 +257,29 @@ class EntryDropdownField<T> extends StatelessWidget {
   Widget build(BuildContext context) {
     final bool hasValue = items.any((item) => item.value == value);
     final T? safeValue = hasValue ? value : null;
-    final borderColor = error != null
-        ? _kRed
-        : enabled
-        ? _kBlue
-        : _kGray;
+    final borderColor = error != null ? Bt.red : Bt.inputBorder;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Opacity(
-          opacity: enabled ? 1.0 : 0.45,
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            decoration: BoxDecoration(
-              border: Border(bottom: BorderSide(color: borderColor, width: 2)),
-            ),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<T>(
-                value: safeValue,
-                isExpanded: true,
-                icon: Icon(
-                  Icons.keyboard_arrow_down_rounded,
-                  color: enabled ? _kBlue : _kGray,
-                ),
-                hint: Text(
-                  hint,
-                  style: const TextStyle(
-                    color: _kGray,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w400,
-                  ),
-                ),
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: _kDark,
-                ),
-                items: enabled ? items : <DropdownMenuItem<T>>[],
-                onChanged: enabled ? onChanged : null,
-              ),
+        Container(
+          height: Bt.fieldH,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          decoration: BoxDecoration(
+            color: enabled ? Bt.card : Bt.fill,
+            borderRadius: BorderRadius.circular(Bt.rInput),
+            border: Border.all(color: borderColor),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<T>(
+              value: safeValue,
+              isExpanded: true,
+              borderRadius: BorderRadius.circular(14),
+              dropdownColor: Bt.card,
+              icon: Icon(Icons.expand_more_rounded, color: enabled ? Bt.ink2 : Bt.placeholder),
+              hint: Text(hint, maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.body(context, color: Bt.placeholder)),
+              style: BtText.body(context, weight: FontWeight.w500),
+              items: enabled ? items : <DropdownMenuItem<T>>[],
+              onChanged: enabled ? onChanged : null,
             ),
           ),
         ),
@@ -421,45 +308,28 @@ class UnitSelectorField extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        GestureDetector(
-          onTap: () => _showUnitSheet(context),
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 14),
-            decoration: BoxDecoration(
-              border: Border(
-                bottom: BorderSide(
-                  color: error != null ? _kRed : _kBlue,
-                  width: 2,
-                ),
+        Material(
+          color: Bt.card,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Bt.rInput), side: BorderSide(color: error != null ? Bt.red : Bt.inputBorder)),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(Bt.rInput),
+            onTap: () => _showUnitSheet(context),
+            child: SizedBox(
+              height: Bt.fieldH,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                child: Row(children: [
+                  Expanded(child: Text(hasValue ? value! : hint, maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.body(context, weight: hasValue ? FontWeight.w500 : FontWeight.w400, color: hasValue ? Bt.ink : Bt.placeholder))),
+                  if (hasValue)
+                    IconButton(
+                      tooltip: 'Clear unit',
+                      onPressed: () => onChanged(null),
+                      icon: const Icon(Icons.close_rounded, size: 18, color: Bt.ink3),
+                    )
+                  else
+                    const Icon(Icons.expand_more_rounded, color: Bt.ink2, size: 22),
+                ]),
               ),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    hasValue ? value! : hint,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: hasValue ? FontWeight.w600 : FontWeight.w400,
-                      color: hasValue ? _kDark : _kGray,
-                    ),
-                  ),
-                ),
-                if (hasValue)
-                  GestureDetector(
-                    onTap: () => onChanged(null),
-                    child: const Padding(
-                      padding: EdgeInsets.only(left: 8),
-                      child: Icon(Icons.close_rounded, size: 18, color: _kGray),
-                    ),
-                  )
-                else
-                  Icon(
-                    Icons.keyboard_arrow_down_rounded,
-                    color: _kBlue,
-                    size: 22,
-                  ),
-              ],
             ),
           ),
         ),
@@ -519,10 +389,10 @@ class _UnitPickerSheetState extends State<_UnitPickerSheet> {
     final confirmed = await showDialog<bool>(
       context: ctx,
       builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Bt.rCard)),
         title: const Text(
           'Add Custom Unit',
-          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
+          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17),
         ),
         content: TextField(
           controller: ctrl,
@@ -562,7 +432,7 @@ class _UnitPickerSheetState extends State<_UnitPickerSheet> {
     final botPad = MediaQuery.of(context).viewInsets.bottom;
     return Container(
       decoration: const BoxDecoration(
-        color: Color(0xFFF4F5FF),
+        color: Bt.card,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       padding: EdgeInsets.only(bottom: botPad),
@@ -577,7 +447,7 @@ class _UnitPickerSheetState extends State<_UnitPickerSheet> {
                 width: 38,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFBDBEE8),
+                  color: Bt.inputBorder,
                   borderRadius: BorderRadius.circular(16),
                 ),
               ),
@@ -592,7 +462,7 @@ class _UnitPickerSheetState extends State<_UnitPickerSheet> {
                       'Select Unit',
                       style: TextStyle(
                         fontSize: 16,
-                        fontWeight: FontWeight.w900,
+                        fontWeight: FontWeight.w700,
                         color: _kDark,
                         letterSpacing: -0.2,
                       ),
@@ -627,13 +497,17 @@ class _UnitPickerSheetState extends State<_UnitPickerSheet> {
                   hintStyle: const TextStyle(color: _kGray, fontSize: 14),
                   prefixIcon: const Icon(Icons.search, color: _kGray, size: 20),
                   filled: true,
-                  fillColor: Colors.white,
+                  fillColor: Bt.fill,
                   contentPadding: const EdgeInsets.symmetric(
                     vertical: 10,
                     horizontal: 16,
                   ),
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide.none,
                   ),
                 ),
@@ -679,12 +553,11 @@ class _UnitPickerSheetState extends State<_UnitPickerSheet> {
                           Padding(
                             padding: const EdgeInsets.only(top: 14, bottom: 6),
                             child: Text(
-                              entry.key.toUpperCase(),
+                              entry.key,
                               style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w800,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
                                 color: _kGray,
-                                letterSpacing: 1.1,
                               ),
                             ),
                           ),
@@ -707,7 +580,7 @@ class _UnitPickerSheetState extends State<_UnitPickerSheet> {
                                     border: Border.all(
                                       color: isSelected
                                           ? _kBlue
-                                          : const Color(0xFFDDE0F0),
+                                          : const Color(0xFFE4E7EC),
                                       width: 1.5,
                                     ),
                                   ),
@@ -749,7 +622,10 @@ class ExecutionContextCard extends StatelessWidget {
     this.floorError,
     this.phaseError,
     this.activityError,
+    this.showHeader = true,
   });
+  /// Hide the card's own title when the screen already asks "Where is this work happening?".
+  final bool showHeader;
   final String? selectedProjectId;
   final String? selectedFloor;
   final dynamic selectedPhase;
@@ -860,14 +736,14 @@ class ExecutionContextCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const EntryCardHeader(
-                icon: Icons.location_on_outlined,
-                title: 'Execution Context',
-                subtitle: 'Where is this work happening?',
-              ),
-              const SizedBox(height: 20),
-              const Divider(color: Color(0xFFF0EEF8), thickness: 1),
-              const SizedBox(height: 16),
+              if (showHeader) ...[
+                const EntryCardHeader(
+                  icon: Icons.location_on_outlined,
+                  title: 'Where',
+                  subtitle: 'Where is this work happening?',
+                ),
+                const SizedBox(height: 16),
+              ],
               const EntryFieldLabel('Project', required: true),
               const SizedBox(height: 8),
               EntryDropdownField<String>(
@@ -985,9 +861,7 @@ class CostSummaryCard extends StatelessWidget {
             title: 'Cost Summary',
             subtitle: 'Live calculated estimate',
           ),
-          const SizedBox(height: 16),
-          const Divider(color: Color(0xFFF0EEF8), thickness: 1),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
           ...subtotals.map(
             (entry) => Padding(
               padding: const EdgeInsets.only(bottom: 10),
@@ -1022,76 +896,13 @@ class CostSummaryCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 6),
-          const Divider(color: Color(0xFFF0EEF8), thickness: 1),
+          const Divider(height: 1),
           const SizedBox(height: 14),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  const Color(0xFF173EEA).withValues(alpha: 0.08),
-                  const Color(0xFFB137FF).withValues(alpha: 0.06),
-                ],
-              ),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: _kBlue.withValues(alpha: 0.15),
-                width: 1.5,
-              ),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        label.toUpperCase(),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: _kGray,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.8,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        formatCurrency(totalAmount),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: _kBlue,
-                          fontSize: 26,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: -0.5,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    color: _kBlue.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Icon(
-                    Icons.calculate_outlined,
-                    color: _kBlue,
-                    size: 22,
-                  ),
-                ),
-              ],
-            ),
-          ),
+          Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+            Expanded(child: Text(label, maxLines: 2, overflow: TextOverflow.ellipsis, style: BtText.subhead(context))),
+            const SizedBox(width: 12),
+            Text(formatInr(totalAmount), style: BtText.amount(context, size: 26)),
+          ]),
         ],
       ),
     );
@@ -1123,7 +934,7 @@ class VoiceParseCard extends StatelessWidget {
                 height: 44,
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
-                    colors: [Color(0xFF173EEA), Color(0xFFB137FF)],
+                    colors: [Color(0xFF0B63CE), Color(0xFF0B63CE)],
                   ),
                   borderRadius: BorderRadius.circular(13),
                 ),
@@ -1138,14 +949,14 @@ class VoiceParseCard extends StatelessWidget {
                       'Parsed from Voice',
                       style: TextStyle(
                         fontSize: 15,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                         color: _kBlue,
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Confidence: ${confidence.toStringAsFixed(1)}%  â€¢  $ts',
-                      style: const TextStyle(fontSize: 12, color: _kGray),
+                      'Confidence: ${confidence.toStringAsFixed(1)}% · $ts',
+                      style: const TextStyle(fontSize: 13, color: _kGray),
                     ),
                   ],
                 ),
@@ -1156,24 +967,24 @@ class VoiceParseCard extends StatelessWidget {
                   vertical: 5,
                 ),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE6F9F0),
-                  borderRadius: BorderRadius.circular(20),
+                  color: const Color(0xFFE7F6EE),
+                  borderRadius: BorderRadius.circular(Bt.rCard),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     const Icon(
                       Icons.check_circle_outline,
-                      color: Color(0xFF15803D),
+                      color: Color(0xFF067647),
                       size: 13,
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      entryTypeLabel.toUpperCase(),
+                      entryTypeLabel,
                       style: const TextStyle(
-                        color: Color(0xFF15803D),
-                        fontSize: 10,
-                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF067647),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
                         letterSpacing: 0.8,
                       ),
                     ),
@@ -1183,19 +994,18 @@ class VoiceParseCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
-          const Divider(color: Color(0xFFF0EEF8), thickness: 1),
+          const Divider(color: Color(0xFFEEF1F5), thickness: 1),
           const SizedBox(height: 14),
           Row(
             children: [
               Icon(Icons.format_align_left, color: _kBlue, size: 14),
               const SizedBox(width: 6),
               Text(
-                'VOICE TRANSCRIPT',
+                'Voice transcript',
                 style: TextStyle(
                   color: _kBlue,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 1.2,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ],
@@ -1204,9 +1014,9 @@ class VoiceParseCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: const Color(0xFFF8F9FF),
+              color: const Color(0xFFF6F7F9),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE0E5FF)),
+              border: Border.all(color: Bt.line),
             ),
             child: Text(
               '"$transcript"',
@@ -1226,7 +1036,7 @@ class VoiceParseCard extends StatelessWidget {
               const Expanded(
                 child: Text(
                   'Fields have been auto-filled from voice. Review and edit before confirming.',
-                  style: TextStyle(fontSize: 11.5, color: _kGray),
+                  style: TextStyle(fontSize: 13, color: _kGray),
                 ),
               ),
             ],
@@ -1250,54 +1060,7 @@ class EntrySubmitButton extends StatelessWidget {
   final VoidCallback? onTap;
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: isLoading ? null : onTap,
-      child: AnimatedOpacity(
-        opacity: isLoading ? 0.7 : 1.0,
-        duration: const Duration(milliseconds: 200),
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(vertical: 17),
-          decoration: BoxDecoration(
-            gradient: AppGradients.primaryButton,
-            borderRadius: BorderRadius.circular(50),
-            boxShadow: [
-              BoxShadow(
-                color: _kBlue.withValues(alpha: 0.4),
-                blurRadius: 14,
-                offset: const Offset(0, 5),
-              ),
-            ],
-          ),
-          child: isLoading
-              ? const Center(
-                  child: SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(
-                      color: Colors.white,
-                      strokeWidth: 2.5,
-                    ),
-                  ),
-                )
-              : Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      label,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Icon(icon, color: Colors.white, size: 20),
-                  ],
-                ),
-        ),
-      ),
-    );
+    return BtButton(label: label, icon: icon, loading: isLoading, onPressed: onTap);
   }
 }
 class EntryErrorText extends StatelessWidget {
@@ -1307,14 +1070,7 @@ class EntryErrorText extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(top: 4),
-      child: Text(
-        message,
-        style: const TextStyle(
-          color: _kRed,
-          fontSize: 11.5,
-          fontStyle: FontStyle.italic,
-        ),
-      ),
+      child: Text(message, style: BtText.caption(context, color: Bt.red)),
     );
   }
 }
@@ -1337,25 +1093,25 @@ class PaymentStatusChip extends StatelessWidget {
   Color get _fg {
     switch (status) {
       case PaymentStatus.paid:
-        return const Color(0xFF15803D);
+        return const Color(0xFF067647);
       case PaymentStatus.partial:
-        return const Color(0xFF1D4ED8);
+        return const Color(0xFF0B63CE);
       case PaymentStatus.pending:
-        return const Color(0xFFDC2626);
+        return const Color(0xFFB54708);
       case PaymentStatus.overdue:
-        return const Color(0xFFDC2626);
+        return const Color(0xFFC01048);
     }
   }
   Color get _bg {
     switch (status) {
       case PaymentStatus.paid:
-        return const Color(0xFFDCFCE7);
+        return const Color(0xFFE7F6EE);
       case PaymentStatus.partial:
-        return const Color(0xFFEFF6FF);
+        return const Color(0xFFE8F1FC);
       case PaymentStatus.pending:
-        return const Color(0xFFFEE2E2);
+        return const Color(0xFFFEF3E7);
       case PaymentStatus.overdue:
-        return const Color(0xFFFEE2E2);
+        return const Color(0xFFFDECEF);
     }
   }
   IconData get _icon {
@@ -1388,8 +1144,8 @@ class PaymentStatusChip extends StatelessWidget {
             _label,
             style: TextStyle(
               color: _fg,
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ],
@@ -1416,156 +1172,29 @@ class PaymentSummaryBanner extends StatelessWidget {
         ? (totalPaid / totalBilled).clamp(0.0, 1.0)
         : 0.0;
     final pctLabel = '${(paidRatio * 100).toStringAsFixed(0)}%';
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF173EEA), Color(0xFFB137FF)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF173EEA).withValues(alpha: 0.26),
-            blurRadius: 18,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'PAYMENT OVERVIEW',
-                      style: TextStyle(
-                        color: Colors.white60,
-                        fontSize: 9.5,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1.4,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      formatCurrency(totalPaid),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 28,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: -0.5,
-                        height: 1.1,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'of ${formatCurrency(totalBilled)} billed · $pctLabel settled',
-                      style: const TextStyle(
-                        color: Colors.white60,
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              GestureDetector(
-                onTap: onSettle,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 10,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.16),
-                    borderRadius: BorderRadius.circular(28),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.3),
-                    ),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.payment_outlined,
-                        color: Colors.white,
-                        size: 14,
-                      ),
-                      SizedBox(width: 6),
-                      Text(
-                        'Settle',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 12.5,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(5),
-            child: LinearProgressIndicator(
-              value: paidRatio,
-              minHeight: 6,
-              backgroundColor: Colors.white.withValues(alpha: 0.18),
-              valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: BtCard(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('Payment overview', style: BtText.subhead(context)),
+                Text(formatInr(totalPaid), style: BtText.amount(context, size: 28)),
+                Text('of ${formatInr(totalBilled)} billed · $pctLabel settled', style: BtText.num(BtText.caption(context))),
+              ]),
             ),
-          ),
+            BtButton(label: 'Settle', icon: Icons.payment_outlined, small: true, expand: false, onPressed: onSettle),
+          ]),
           const SizedBox(height: 12),
-          Row(
-            children: [
-              _chip(Icons.check_circle_outline, '$pctLabel paid'),
-              const SizedBox(width: 8),
-              _chip(
-                Icons.schedule_outlined,
-                '${formatCurrency(outstanding)} due',
-              ),
-              if (pendingCount > 0) ...[
-                const SizedBox(width: 8),
-                _chip(Icons.receipt_outlined, '$pendingCount pending'),
-              ],
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-  Widget _chip(IconData icon, String label) {
-    return Container(
-      height: 24,
-      padding: const EdgeInsets.symmetric(horizontal: 9),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: Colors.white, size: 10),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              height: 1,
-            ),
-          ),
-        ],
+          BtProgress(value: paidRatio.toDouble(), color: Bt.green),
+          const SizedBox(height: 12),
+          Wrap(spacing: 8, runSpacing: 8, children: [
+            BtBadge(label: '$pctLabel paid', tone: BtTone.green),
+            BtBadge(label: '${formatInr(outstanding)} due', tone: outstanding > 0 ? BtTone.amber : BtTone.neutral),
+            if (pendingCount > 0) BtBadge(label: '$pendingCount pending', tone: BtTone.amber),
+          ]),
+        ]),
       ),
     );
   }
@@ -1700,7 +1329,7 @@ Future<Map<String, dynamic>?> showPaymentSheet(
                           width: 38,
                           height: 4,
                           decoration: BoxDecoration(
-                            color: const Color(0xFFBDBEE8),
+                            color: Bt.inputBorder,
                             borderRadius: BorderRadius.circular(16),
                           ),
                         ),
@@ -1716,12 +1345,12 @@ Future<Map<String, dynamic>?> showPaymentSheet(
                                 width: 34,
                                 height: 34,
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFEEEFFF),
+                                  color: const Color(0xFFE8F1FC),
                                   borderRadius: BorderRadius.circular(10),
                                 ),
                                 child: const Icon(
                                   Icons.arrow_back_ios_new_rounded,
-                                  color: Color(0xFF173EEA),
+                                  color: Color(0xFF0B63CE),
                                   size: 15,
                                 ),
                               ),
@@ -1731,9 +1360,9 @@ Future<Map<String, dynamic>?> showPaymentSheet(
                               child: Text(
                                 'Fulfillment & Payment',
                                 style: TextStyle(
-                                  color: Color(0xFF1E1E2E),
+                                  color: Color(0xFF101828),
                                   fontSize: 14,
-                                  fontWeight: FontWeight.w800,
+                                  fontWeight: FontWeight.w700,
                                 ),
                               ),
                             ),
@@ -1746,7 +1375,7 @@ Future<Map<String, dynamic>?> showPaymentSheet(
                         padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
                         decoration: const BoxDecoration(
                           gradient: LinearGradient(
-                            colors: [Color(0xFF173EEA), Color(0xFF6B2FD9)],
+                            colors: [Color(0xFF0B63CE), Color(0xFF6B2FD9)],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                           ),
@@ -1760,11 +1389,11 @@ Future<Map<String, dynamic>?> showPaymentSheet(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   const Text(
-                                    'FULFILLMENT & PAYMENT',
+                                    'Fulfillment & payment',
                                     style: TextStyle(
                                       color: Colors.white54,
-                                      fontSize: 8.5,
-                                      fontWeight: FontWeight.w800,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
                                       letterSpacing: 1.3,
                                     ),
                                   ),
@@ -1776,7 +1405,7 @@ Future<Map<String, dynamic>?> showPaymentSheet(
                                     style: const TextStyle(
                                       color: Colors.white,
                                       fontSize: 15,
-                                      fontWeight: FontWeight.w900,
+                                      fontWeight: FontWeight.w700,
                                       letterSpacing: -0.3,
                                       height: 1.2,
                                     ),
@@ -1791,7 +1420,7 @@ Future<Map<String, dynamic>?> showPaymentSheet(
                                             .join(' · '),
                                         style: const TextStyle(
                                           color: Colors.white54,
-                                          fontSize: 10.5,
+                                          fontSize: 12,
                                           fontWeight: FontWeight.w500,
                                         ),
                                       ),
@@ -1804,11 +1433,11 @@ Future<Map<String, dynamic>?> showPaymentSheet(
                               crossAxisAlignment: CrossAxisAlignment.end,
                               children: [
                                 const Text(
-                                  'OUTSTANDING',
+                                  'Outstanding',
                                   style: TextStyle(
                                     color: Colors.white54,
-                                    fontSize: 8.5,
-                                    fontWeight: FontWeight.w800,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
                                     letterSpacing: 1.2,
                                   ),
                                 ),
@@ -1820,7 +1449,7 @@ Future<Map<String, dynamic>?> showPaymentSheet(
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 20,
-                                    fontWeight: FontWeight.w900,
+                                    fontWeight: FontWeight.w700,
                                     letterSpacing: -0.5,
                                   ),
                                 ),
@@ -1829,7 +1458,7 @@ Future<Map<String, dynamic>?> showPaymentSheet(
                                     '${formatCurrency(alreadyPaid)} paid',
                                     style: const TextStyle(
                                       color: Colors.white60,
-                                      fontSize: 10,
+                                      fontSize: 12,
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
@@ -1859,8 +1488,8 @@ Future<Map<String, dynamic>?> showPaymentSheet(
                                     selectedStatus,
                                     PaymentStatus.paid,
                                     'Fully Paid',
-                                    const Color(0xFF15803D),
-                                    const Color(0xFFDCFCE7),
+                                    const Color(0xFF067647),
+                                    const Color(0xFFE7F6EE),
                                     (v) => ss(() {
                                       selectedStatus = v;
                                       amountError = null;
@@ -1875,8 +1504,8 @@ Future<Map<String, dynamic>?> showPaymentSheet(
                                     selectedStatus,
                                     PaymentStatus.partial,
                                     'Partial',
-                                    const Color(0xFFB45309),
-                                    const Color(0xFFFEF3C7),
+                                    const Color(0xFFB54708),
+                                    const Color(0xFFFEF3E7),
                                     (v) => ss(() {
                                       selectedStatus = v;
                                       amountError = null;
@@ -1895,8 +1524,8 @@ Future<Map<String, dynamic>?> showPaymentSheet(
                                     selectedStatus,
                                     PaymentStatus.pending,
                                     'Not Paid',
-                                    const Color(0xFFDC2626),
-                                    const Color(0xFFFEE2E2),
+                                    const Color(0xFFC01048),
+                                    const Color(0xFFFDECEF),
                                     (v) => ss(() {
                                       selectedStatus = v;
                                       amountError = null;
@@ -1980,8 +1609,8 @@ Future<Map<String, dynamic>?> showPaymentSheet(
                                         borderRadius: BorderRadius.circular(12),
                                         borderSide: BorderSide(
                                           color: amountError != null
-                                              ? const Color(0xFFDC2626)
-                                              : const Color(0xFFE2E4F6),
+                                              ? const Color(0xFFC01048)
+                                              : const Color(0xFFE4E7EC),
                                           width: 1.0,
                                         ),
                                       ),
@@ -1989,15 +1618,15 @@ Future<Map<String, dynamic>?> showPaymentSheet(
                                         borderRadius: BorderRadius.circular(12),
                                         borderSide: BorderSide(
                                           color: amountError != null
-                                              ? const Color(0xFFDC2626)
-                                              : const Color(0xFF173EEA),
+                                              ? const Color(0xFFC01048)
+                                              : const Color(0xFF0B63CE),
                                           width: 1.5,
                                         ),
                                       ),
                                     ),
                                     style: const TextStyle(
                                       fontSize: 22,
-                                      fontWeight: FontWeight.w800,
+                                      fontWeight: FontWeight.w700,
                                       color: _kDark,
                                     ),
                                   ),
@@ -2009,9 +1638,9 @@ Future<Map<String, dynamic>?> showPaymentSheet(
                                   amountError ?? helperText,
                                   style: TextStyle(
                                     color: amountError != null
-                                        ? const Color(0xFFDC2626)
-                                        : const Color(0xFF6B7280),
-                                    fontSize: 11,
+                                        ? const Color(0xFFC01048)
+                                        : const Color(0xFF667085),
+                                    fontSize: 13,
                                     fontStyle: amountError != null
                                         ? FontStyle.italic
                                         : FontStyle.normal,
@@ -2066,7 +1695,7 @@ Future<Map<String, dynamic>?> showPaymentSheet(
                                   onChanged: (val) => ss(() => requestEsign = val ?? false),
                                   controlAffinity: ListTileControlAffinity.leading,
                                   contentPadding: EdgeInsets.zero,
-                                  activeColor: const Color(0xFF173EEA),
+                                  activeColor: const Color(0xFF0B63CE),
                                 ),
                                 if (requestEsign)
                                   Padding(
@@ -2083,11 +1712,11 @@ Future<Map<String, dynamic>?> showPaymentSheet(
                                         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                                         enabledBorder: OutlineInputBorder(
                                           borderRadius: BorderRadius.circular(12),
-                                          borderSide: const BorderSide(color: Color(0xFFE2E4F6)),
+                                          borderSide: const BorderSide(color: Color(0xFFE4E7EC)),
                                         ),
                                         focusedBorder: OutlineInputBorder(
                                           borderRadius: BorderRadius.circular(12),
-                                          borderSide: const BorderSide(color: Color(0xFF173EEA), width: 1.5),
+                                          borderSide: const BorderSide(color: Color(0xFF0B63CE), width: 1.5),
                                         ),
                                       ),
                                       style: const TextStyle(fontSize: 14, color: _kDark, fontWeight: FontWeight.w500),
@@ -2102,7 +1731,7 @@ Future<Map<String, dynamic>?> showPaymentSheet(
                                     ss(() => isEsignPolling = false);
                                   } : () => startEsignFlow(ss),
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: isEsignPolling ? Colors.red : const Color(0xFF173EEA),
+                                    backgroundColor: isEsignPolling ? const Color(0xFFC01048) : const Color(0xFF0B63CE),
                                     padding: const EdgeInsets.symmetric(vertical: 14),
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                   ),
@@ -2112,19 +1741,19 @@ Future<Map<String, dynamic>?> showPaymentSheet(
                               if (esignStatusText.isNotEmpty)
                                 Padding(
                                   padding: const EdgeInsets.only(top: 8),
-                                  child: Text(esignStatusText, style: TextStyle(color: isEsignPolling ? Colors.orange : (isEsignCompleted ? Colors.green : Colors.red), fontWeight: FontWeight.bold)),
+                                  child: Text(esignStatusText, style: TextStyle(color: isEsignPolling ? const Color(0xFFB54708) : (isEsignCompleted ? const Color(0xFF067647) : const Color(0xFFC01048)), fontWeight: FontWeight.bold)),
                                 )
                             ],
                             if (isEsignCompleted) ...[
                                const SizedBox(height: 8),
                                Container(
                                  padding: const EdgeInsets.all(12),
-                                 decoration: BoxDecoration(color: Colors.green.shade50, borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.green)),
+                                 decoration: BoxDecoration(color: Colors.green.shade50, borderRadius: BorderRadius.circular(8), border: Border.all(color: const Color(0xFF067647))),
                                  child: const Row(
                                    children: [
-                                     Icon(Icons.check_circle, color: Colors.green),
+                                     Icon(Icons.check_circle, color: Color(0xFF067647)),
                                      SizedBox(width: 8),
-                                     Text('Signature successfully captured!', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+                                     Text('Signature successfully captured!', style: TextStyle(color: Color(0xFF067647), fontWeight: FontWeight.bold)),
                                    ]
                                  )
                                )
@@ -2155,13 +1784,13 @@ Future<Map<String, dynamic>?> showPaymentSheet(
                                   ),
                                   decoration: BoxDecoration(
                                     color: uploadedReceipt != null
-                                        ? const Color(0xFFF0FDF4)
+                                        ? const Color(0xFFE7F6EE)
                                         : Colors.white,
                                     borderRadius: BorderRadius.circular(12),
                                     border: Border.all(
                                       color: uploadedReceipt != null
-                                          ? const Color(0xFF15803D)
-                                          : const Color(0xFFCCCFE8),
+                                          ? const Color(0xFF067647)
+                                          : const Color(0xFFD0D5DD),
                                       width: 1.5,
                                     ),
                                   ),
@@ -2170,7 +1799,7 @@ Future<Map<String, dynamic>?> showPaymentSheet(
                                           children: [
                                             const Icon(
                                               Icons.check_circle_outline,
-                                              color: Color(0xFF15803D),
+                                              color: Color(0xFF067647),
                                               size: 18,
                                             ),
                                             const SizedBox(width: 8),
@@ -2179,8 +1808,8 @@ Future<Map<String, dynamic>?> showPaymentSheet(
                                                 uploadedReceipt!,
                                                 overflow: TextOverflow.ellipsis,
                                                 style: const TextStyle(
-                                                  color: Color(0xFF15803D),
-                                                  fontSize: 12,
+                                                  color: Color(0xFF067647),
+                                                  fontSize: 13,
                                                   fontWeight: FontWeight.w700,
                                                 ),
                                               ),
@@ -2193,7 +1822,7 @@ Future<Map<String, dynamic>?> showPaymentSheet(
                                               }),
                                               child: const Icon(
                                                 Icons.close,
-                                                color: Color(0xFF6B7280),
+                                                color: Color(0xFF667085),
                                                 size: 15,
                                               ),
                                             ),
@@ -2207,13 +1836,13 @@ Future<Map<String, dynamic>?> showPaymentSheet(
                                               width: 34,
                                               height: 34,
                                               decoration: BoxDecoration(
-                                                color: const Color(0xFFEEEFFF),
+                                                color: const Color(0xFFE8F1FC),
                                                 borderRadius:
                                                     BorderRadius.circular(9),
                                               ),
                                               child: const Icon(
                                                 Icons.upload_outlined,
-                                                color: Color(0xFF173EEA),
+                                                color: Color(0xFF0B63CE),
                                                 size: 17,
                                               ),
                                             ),
@@ -2226,7 +1855,7 @@ Future<Map<String, dynamic>?> showPaymentSheet(
                                                   'Upload Payment Receipt',
                                                   style: TextStyle(
                                                     color: _kDark,
-                                                    fontSize: 12.5,
+                                                    fontSize: 13,
                                                     fontWeight: FontWeight.w700,
                                                   ),
                                                 ),
@@ -2235,7 +1864,7 @@ Future<Map<String, dynamic>?> showPaymentSheet(
                                                   'PNG, JPG, PDF — UPI / Bank / Cheque proof',
                                                   style: TextStyle(
                                                     color: _kGray,
-                                                    fontSize: 10.5,
+                                                    fontSize: 12,
                                                     fontWeight: FontWeight.w500,
                                                   ),
                                                 ),
@@ -2258,7 +1887,7 @@ Future<Map<String, dynamic>?> showPaymentSheet(
                                     builder: (c, child) => Theme(
                                       data: Theme.of(c).copyWith(
                                         colorScheme: const ColorScheme.light(
-                                          primary: Color(0xFF173EEA),
+                                          primary: Color(0xFF0B63CE),
                                           onPrimary: Colors.white,
                                           onSurface: _kDark,
                                         ),
@@ -2280,7 +1909,7 @@ Future<Map<String, dynamic>?> showPaymentSheet(
                                     color: Colors.white,
                                     borderRadius: BorderRadius.circular(12),
                                     border: Border.all(
-                                      color: const Color(0xFFCCCFE8),
+                                      color: const Color(0xFFD0D5DD),
                                       width: 1.5,
                                     ),
                                   ),
@@ -2288,7 +1917,7 @@ Future<Map<String, dynamic>?> showPaymentSheet(
                                     children: [
                                       const Icon(
                                         Icons.calendar_month_outlined,
-                                        color: Color(0xFF173EEA),
+                                        color: Color(0xFF0B63CE),
                                         size: 19,
                                       ),
                                       const SizedBox(width: 8),
@@ -2339,10 +1968,7 @@ Future<Map<String, dynamic>?> showPaymentSheet(
                                   decoration: BoxDecoration(
                                     color: Colors.white,
                                     borderRadius: BorderRadius.circular(11),
-                                    border: Border.all(
-                                      color: const Color(0xFFDDE0F0),
-                                      width: 1.5,
-                                    ),
+                                    border: Border.all(color: Bt.line),
                                   ),
                                   child: const Center(
                                     child: Text(
@@ -2412,20 +2038,11 @@ Future<Map<String, dynamic>?> showPaymentSheet(
                                   decoration: BoxDecoration(
                                     gradient: const LinearGradient(
                                       colors: [
-                                        Color(0xFF173EEA),
+                                        Color(0xFF0B63CE),
                                         Color(0xFF6B2FD9),
                                       ],
                                     ),
                                     borderRadius: BorderRadius.circular(11),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: const Color(
-                                          0xFF173EEA,
-                                        ).withValues(alpha: 0.25),
-                                        blurRadius: 8,
-                                        offset: const Offset(0, 3),
-                                      ),
-                                    ],
                                   ),
                                   child: const Row(
                                     mainAxisAlignment: MainAxisAlignment.center,
@@ -2442,8 +2059,8 @@ Future<Map<String, dynamic>?> showPaymentSheet(
                                           textAlign: TextAlign.center,
                                           style: TextStyle(
                                             color: Colors.white,
-                                            fontWeight: FontWeight.w800,
-                                            fontSize: 12,
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 13,
                                           ),
                                         ),
                                       ),
@@ -2473,9 +2090,9 @@ class _SheetSectionLabel extends StatelessWidget {
   Widget build(BuildContext context) => Text(
     label,
     style: const TextStyle(
-      color: Color(0xFF6B7280),
-      fontSize: 10,
-      fontWeight: FontWeight.w800,
+      color: Color(0xFF667085),
+      fontSize: 12,
+      fontWeight: FontWeight.w700,
       letterSpacing: 1.1,
     ),
   );
@@ -2500,7 +2117,7 @@ Widget _pStatusCard(
           color: sel ? bgColor : Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: sel ? dotColor : const Color(0xFFE2E4F6),
+            color: sel ? dotColor : const Color(0xFFE4E7EC),
             width: 1.5,
           ),
         ),
@@ -2519,9 +2136,9 @@ Widget _pStatusCard(
             Text(
               label,
               style: TextStyle(
-                fontSize: 10.5,
-                fontWeight: FontWeight.w800,
-                color: sel ? dotColor : const Color(0xFF374151),
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: sel ? dotColor : const Color(0xFF475467),
               ),
             ),
           ],
@@ -2545,16 +2162,16 @@ Widget _pMethodChip(
       width: width,
       height: height,
       decoration: BoxDecoration(
-        color: selected ? const Color(0xFF173EEA) : Colors.white,
+        color: selected ? const Color(0xFF0B63CE) : Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: selected ? const Color(0xFF173EEA) : const Color(0xFFE2E4F6),
+          color: selected ? const Color(0xFF0B63CE) : const Color(0xFFE4E7EC),
           width: 1.5,
         ),
         boxShadow: selected
             ? [
                 BoxShadow(
-                  color: const Color(0xFF173EEA).withValues(alpha: 0.18),
+                  color: const Color(0xFF0B63CE).withValues(alpha: 0.18),
                   blurRadius: 6,
                   offset: const Offset(0, 2),
                 ),
@@ -2566,16 +2183,16 @@ Widget _pMethodChip(
         children: [
           Icon(
             icon,
-            color: selected ? Colors.white : const Color(0xFF6B7280),
+            color: selected ? Colors.white : const Color(0xFF667085),
             size: 16,
           ),
           const SizedBox(width: 6),
           Text(
             label,
             style: TextStyle(
-              fontSize: 11,
+              fontSize: 13,
               fontWeight: FontWeight.w700,
-              color: selected ? Colors.white : const Color(0xFF374151),
+              color: selected ? Colors.white : const Color(0xFF475467),
             ),
           ),
         ],
@@ -2598,7 +2215,7 @@ class InvoiceAttachmentCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFE0E5FF), width: 1.5),
+          border: Border.all(color: Bt.line),
         ),
         child: Row(
           children: [
@@ -2606,7 +2223,7 @@ class InvoiceAttachmentCard extends StatelessWidget {
               width: 44,
               height: 44,
               decoration: BoxDecoration(
-                color: const Color(0xFFF0F2FF),
+                color: const Color(0xFFE8F1FC),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: const Icon(
@@ -2633,7 +2250,7 @@ class InvoiceAttachmentCard extends StatelessWidget {
                     'Upload invoice or bill to view',
                     style: TextStyle(
                       color: AppColors.textLight,
-                      fontSize: 12,
+                      fontSize: 13,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -2655,22 +2272,22 @@ class InvoiceAttachmentCard extends StatelessWidget {
     } else {
       if (lowerName.endsWith('.pdf')) {
         iconData = Icons.picture_as_pdf_outlined;
-        iconColor = const Color(0xFFE53935);
-        iconBg = const Color(0xFFFFEBEE);
+        iconColor = const Color(0xFFC01048);
+        iconBg = const Color(0xFFFDECEF);
       } else if (lowerName.endsWith('.jpg') ||
           lowerName.endsWith('.jpeg') ||
           lowerName.endsWith('.png')) {
         iconData = Icons.image_outlined;
-        iconColor = const Color(0xFF4A6CF7);
-        iconBg = const Color(0xFFEEF0FF);
+        iconColor = const Color(0xFF0B63CE);
+        iconBg = const Color(0xFFE8F1FC);
       } else if (lowerName.endsWith('.doc') || lowerName.endsWith('.docx')) {
         iconData = Icons.description_outlined;
         iconColor = const Color(0xFF1565C0);
         iconBg = const Color(0xFFE3F2FD);
       } else if (lowerName.endsWith('.xls') || lowerName.endsWith('.xlsx')) {
         iconData = Icons.table_chart_outlined;
-        iconColor = const Color(0xFF2E7D32);
-        iconBg = const Color(0xFFE8F5E9);
+        iconColor = const Color(0xFF067647);
+        iconBg = const Color(0xFFE7F6EE);
       }
     }
     return GestureDetector(
@@ -2692,14 +2309,7 @@ class InvoiceAttachmentCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFE0E5FF), width: 1.5),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.03),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
+          border: Border.all(color: Bt.line),
         ),
         child: Row(
           children: [
@@ -2758,7 +2368,7 @@ class InvoiceAttachmentCard extends StatelessWidget {
                         'Successfully attached',
                         style: TextStyle(
                           color: Colors.green.shade700,
-                          fontSize: 12,
+                          fontSize: 13,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -2777,8 +2387,8 @@ class InvoiceAttachmentCard extends StatelessWidget {
                 'View',
                 style: TextStyle(
                   color: AppColors.primary,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ),
@@ -2801,7 +2411,7 @@ class PaymentReceiptCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFE0E5FF), width: 1.5),
+          border: Border.all(color: Bt.line),
         ),
         child: Row(
           children: [
@@ -2814,7 +2424,7 @@ class PaymentReceiptCard extends StatelessWidget {
               ),
               child: const Icon(
                 Icons.receipt_long_outlined,
-                color: Color(0xFF6B7280),
+                color: Color(0xFF667085),
                 size: 22,
               ),
             ),
@@ -2833,10 +2443,10 @@ class PaymentReceiptCard extends StatelessWidget {
                   ),
                   SizedBox(height: 3),
                   Text(
-                    'Receipt uploads via Fulfillment & Payment',
+                    'Add one when you record a payment',
                     style: TextStyle(
                       color: AppColors.textLight,
-                      fontSize: 12,
+                      fontSize: 13,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -2849,18 +2459,18 @@ class PaymentReceiptCard extends StatelessWidget {
     }
     final lowerName = fileName!.toLowerCase();
     IconData iconData = Icons.receipt_long_outlined;
-    Color iconColor = const Color(0xFF15803D);
-    Color iconBg = const Color(0xFFDCFCE7);
+    Color iconColor = const Color(0xFF067647);
+    Color iconBg = const Color(0xFFE7F6EE);
     if (lowerName.endsWith('.pdf')) {
       iconData = Icons.picture_as_pdf_outlined;
-      iconColor = const Color(0xFFE53935);
-      iconBg = const Color(0xFFFFEBEE);
+      iconColor = const Color(0xFFC01048);
+      iconBg = const Color(0xFFFDECEF);
     } else if (lowerName.endsWith('.jpg') ||
         lowerName.endsWith('.jpeg') ||
         lowerName.endsWith('.png')) {
       iconData = Icons.image_outlined;
-      iconColor = const Color(0xFF15803D);
-      iconBg = const Color(0xFFDCFCE7);
+      iconColor = const Color(0xFF067647);
+      iconBg = const Color(0xFFE7F6EE);
     }
     return GestureDetector(
       onTap: () => Navigator.pushNamed(
@@ -2872,16 +2482,9 @@ class PaymentReceiptCard extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: const Color(0xFFF0FDF4),
+          color: const Color(0xFFE7F6EE),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: const Color(0xFF86EFAC), width: 1.5),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.03),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
         ),
         child: Row(
           children: [
@@ -2922,7 +2525,7 @@ class PaymentReceiptCard extends StatelessWidget {
                         'Payment proof attached',
                         style: TextStyle(
                           color: Colors.green.shade700,
-                          fontSize: 12,
+                          fontSize: 13,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -2934,15 +2537,15 @@ class PaymentReceiptCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: const Color(0xFFDCFCE7),
+                color: const Color(0xFFE7F6EE),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
                 'View',
                 style: TextStyle(
                   color: Colors.green.shade800,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ),
@@ -2955,3 +2558,230 @@ class PaymentReceiptCard extends StatelessWidget {
 
 
 
+
+// ───────────────────────────────────────── redesigned form building blocks (B08–B10)
+
+/// Read-only "Where" summary at the top of an entry form (project · floor · phase · activity).
+class EntryWhereSummary extends StatelessWidget {
+  const EntryWhereSummary({super.key, this.projectId, this.floor, this.phase, this.activity});
+  final String? projectId;
+  final String? floor;
+  final String? phase;
+  final String? activity;
+  @override
+  Widget build(BuildContext context) {
+    final projects = context.watch<ProjectProvider>().projects;
+    final project = projects.where((p) => p.id == projectId).firstOrNull;
+    final parts = [phase, activity, floor].where((v) => v != null && v.trim().isNotEmpty).cast<String>().toList();
+    if (project == null && parts.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 20),
+      child: BtGroup(children: [
+        BtRow(
+          leading: const BtTile(icon: Icons.place_outlined),
+          title: parts.isEmpty ? (project?.name ?? '') : parts.join(' · '),
+          subtitle: parts.isEmpty ? null : project?.name,
+          minHeight: 60,
+        ),
+      ]),
+    );
+  }
+}
+
+/// Amber inline notice (warnings that don't block saving).
+class EntryNotice extends StatelessWidget {
+  const EntryNotice(this.message, {super.key});
+  final String message;
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(color: Bt.amberSoft, borderRadius: BorderRadius.circular(Bt.rTile)),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Icon(Icons.warning_amber_rounded, color: Bt.amber, size: 20),
+          const SizedBox(width: 10),
+          Expanded(child: Text(message, style: BtText.subhead(context, color: Bt.amber, weight: FontWeight.w500))),
+        ]),
+      ),
+    );
+  }
+}
+
+/// Titled block of fields with consistent rhythm: title, 12px, children separated by 16px.
+class EntryFormSection extends StatelessWidget {
+  const EntryFormSection({super.key, this.title, this.caption, required this.children, this.trailing});
+  final String? title;
+  final String? caption;
+  final Widget? trailing;
+  final List<Widget> children;
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 28),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (title != null) ...[
+            Row(children: [
+              Expanded(
+                child: Text.rich(TextSpan(children: [
+                  TextSpan(text: title, style: BtText.headline(context)),
+                  if (caption != null) TextSpan(text: '  $caption', style: BtText.caption(context)),
+                ])),
+              ),
+              if (trailing != null) trailing!,
+            ]),
+            const SizedBox(height: 12),
+          ],
+          for (var i = 0; i < children.length; i++) ...[
+            if (i > 0) const SizedBox(height: 16),
+            children[i],
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Label above a field (with required star) — wraps any field widget.
+class EntryLabeled extends StatelessWidget {
+  const EntryLabeled({super.key, required this.label, required this.child, this.required = false});
+  final String label;
+  final bool required;
+  final Widget child;
+  @override
+  Widget build(BuildContext context) {
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
+      EntryFieldLabel(label, required: required),
+      const SizedBox(height: 8),
+      child,
+    ]);
+  }
+}
+
+/// Date picker field in the form style.
+class EntryDateField extends StatelessWidget {
+  const EntryDateField({super.key, required this.date, required this.onTap});
+  final DateTime date;
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) {
+    return BtPickerField(
+      text: formatDate(date),
+      icon: Icons.calendar_today_outlined,
+      onTap: onTap,
+    );
+  }
+}
+
+/// "Includes GST" switch + optional percentage field.
+class EntryGstToggle extends StatelessWidget {
+  const EntryGstToggle({super.key, required this.withGst, required this.onChanged, required this.gstCtrl, this.onPercentChanged});
+  final bool withGst;
+  final ValueChanged<bool> onChanged;
+  final TextEditingController gstCtrl;
+  final ValueChanged<String>? onPercentChanged;
+  @override
+  Widget build(BuildContext context) {
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
+      Semantics(
+        toggled: withGst,
+        label: 'Includes GST',
+        child: InkWell(
+          borderRadius: BorderRadius.circular(Bt.rTile),
+          onTap: () => onChanged(!withGst),
+          child: SizedBox(
+            height: Bt.touch,
+            child: Row(children: [
+              Expanded(child: Text('Includes GST', style: BtText.body(context))),
+              BtSwitch(value: withGst, onChanged: onChanged),
+            ]),
+          ),
+        ),
+      ),
+      if (withGst) ...[
+        const SizedBox(height: 8),
+        EntryLabeled(
+          label: 'GST percentage',
+          child: EntryUnderlineField(
+            controller: gstCtrl,
+            hint: 'e.g. 18',
+            suffix: '%',
+            keyboardType: TextInputType.number,
+            onChanged: onPercentChanged,
+          ),
+        ),
+      ],
+    ]);
+  }
+}
+
+/// Big total with the maths underneath (qty × rate, subtotal, GST).
+class EntryTotalCard extends StatelessWidget {
+  const EntryTotalCard({super.key, required this.total, required this.label, this.lines = const []});
+  final double total;
+  final String label;
+  final List<(String, String)> lines;
+  @override
+  Widget build(BuildContext context) {
+    return BtCard(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(label, style: BtText.subhead(context)),
+        const SizedBox(height: 2),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text(total > 0 ? formatInr(total) : '₹0', style: BtText.amount(context)),
+        ),
+        if (lines.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          const Divider(height: 1, color: Bt.line),
+          const SizedBox(height: 8),
+          for (final l in lines)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 3),
+              child: Row(children: [
+                Expanded(child: Text(l.$1, style: BtText.subhead(context))),
+                Text(l.$2, style: BtText.num(BtText.subhead(context, color: Bt.ink, weight: FontWeight.w500))),
+              ]),
+            ),
+        ],
+      ]),
+    );
+  }
+}
+
+/// Recent / repeat entries shortcut row.
+class EntryRecentRow extends StatelessWidget {
+  const EntryRecentRow({super.key, required this.count, required this.onTap});
+  final int count;
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) {
+    return BtGroup(children: [
+      BtRow(
+        leading: const BtTile(icon: Icons.history_rounded),
+        title: 'Recent entries',
+        subtitle: '$count similar entr${count == 1 ? "y" : "ies"} · tap to repeat one',
+        showChevron: true,
+        onTap: onTap,
+      ),
+    ]);
+  }
+}
+
+/// Sticky bottom action area for forms.
+class EntryBottomBar extends StatelessWidget {
+  const EntryBottomBar({super.key, required this.child});
+  final Widget child;
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(color: Bt.card, border: Border(top: BorderSide(color: Bt.line))),
+      padding: EdgeInsets.fromLTRB(16, 12, 16, 12 + MediaQuery.of(context).padding.bottom),
+      child: child,
+    );
+  }
+}

@@ -2,18 +2,13 @@ import 'package:buildtrack_mobile/common/themes/app_colors.dart';
 import 'package:buildtrack_mobile/models/task_model.dart';
 import 'package:buildtrack_mobile/services/task_service.dart';
 import 'package:buildtrack_mobile/controller/role_manager.dart';
-import 'package:buildtrack_mobile/common/themes/app_gradients.dart';
-import 'package:buildtrack_mobile/common/themes/app_theme.dart';
-import 'package:buildtrack_mobile/common/widgets/app_widgets.dart';
 import 'package:buildtrack_mobile/common/widgets/common_widgets.dart';
-import 'package:buildtrack_mobile/common/widgets/nurofin_scaffold.dart';
 import 'package:buildtrack_mobile/controller/project_provider.dart';
 import 'package:buildtrack_mobile/controller/user_session.dart';
-import 'package:buildtrack_mobile/controller/subscription_provider.dart';
 import 'package:buildtrack_mobile/common/utils/currency_formatter.dart';
 import 'package:buildtrack_mobile/common/utils/image_pick_helper.dart';
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:buildtrack_mobile/design/design.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:buildtrack_mobile/services/api_service.dart';
@@ -23,7 +18,6 @@ import 'package:flutter/foundation.dart';
 import 'package:showcaseview/showcaseview.dart';
 import 'package:buildtrack_mobile/controller/showcase_keys.dart';
 import 'package:buildtrack_mobile/controller/nav_controller.dart';
-import 'package:buildtrack_mobile/screen/dashboard/notifications_bell.dart';
 
 String relativeTimeLabel(DateTime date) {
   final now = DateTime.now();
@@ -109,7 +103,6 @@ class _HomeScreenContent extends StatefulWidget {
 class _HomeScreenContentState extends State<_HomeScreenContent> {
   List<GlobalKey> _getShowcaseKeys({bool isReplay = false}) {
     final keys = <GlobalKey>[];
-    keys.add(ShowcaseKeys.sidebarMenu);
     if (isReplay || !UserSession.hasCreatedProject) {
       keys.add(ShowcaseKeys.projects);
     }
@@ -198,324 +191,114 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
   void _showEntryOptions(BuildContext context, String type) {
     Navigator.pushNamed(context, '/add-entry');
   }
-  Widget _buildDrawer(BuildContext context) {
-    return Drawer(
-      backgroundColor: Colors.white,
-      clipBehavior: Clip.antiAlias,
-      child: MediaQuery.removePadding(
-        context: context,
-        removeTop: true,
-        child: ListView(
-          padding: EdgeInsets.zero,
-          children: [
-            Container(
-              padding: const EdgeInsets.only(
-                top: 60,
-                bottom: 20,
-                left: 20,
-                right: 20,
-              ),
-              decoration: BoxDecoration(color: AppColors.primary),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  UserSession.companyLogo != null && UserSession.companyLogo!.isNotEmpty
-                      ? Row(
-                          children: [
-                            Container(
-                              width: 42,
-                              height: 42,
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: Colors.white24),
-                                image: DecorationImage(
-                                  image: getProfileImageProvider(UserSession.companyLogo)!,
-                                  fit: BoxFit.contain,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                UserSession.companyName.isNotEmpty ? UserSession.companyName : 'BuildTrack',
-                                style: UserSession.getCompanyTextStyle(
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        )
-                      : Text(
-                          UserSession.companyName.isNotEmpty ? UserSession.companyName : 'BuildTrack',
-                          style: UserSession.getCompanyTextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Role: ${UserSession.roleLabel}',
-                    style: const TextStyle(color: Colors.white70, fontSize: 14),
-                  ),
-                ],
-              ),
-            ),
-            ListTile(
-              leading: const Icon(
-                Icons.supervisor_account_outlined,
-                color: AppColors.textDark,
-              ),
-              title: const Text(
-                'Team Overview',
-                style: TextStyle(color: AppColors.textDark),
-              ),
-              onTap: () => Navigator.pushNamed(context, '/admin-overview'),
-            ),
-            ListTile(
-              leading: const Icon(Icons.person, color: AppColors.textDark),
-              title: const Text(
-                'Profile',
-                style: TextStyle(color: AppColors.textDark),
-              ),
-              onTap: () => Navigator.pushNamed(context, '/profile'),
-            ),
-            ListTile(
-              leading: const Icon(Icons.help_outline, color: AppColors.textDark),
-              title: const Text(
-                'App Guidelines',
-                style: TextStyle(color: AppColors.textDark),
-              ),
-              onTap: () {
-                Navigator.pop(context); // Close drawer
-                final keysToShow = _getShowcaseKeys(isReplay: true);
-                if (keysToShow.isNotEmpty) {
-                  ShowcaseView.get().startShowCase(keysToShow);
-                }
-              },
-            ),
-            ListTile(
-              leading: Icon(Icons.language, color: AppColors.primary),
-              title: const Text('Web Portal', style: TextStyle(color: AppColors.textDark)),
-              onTap: () async {
-                Navigator.pop(context);
-                final url = Uri.parse('https://buildtrack.nurofin.com');
-                if (await canLaunchUrl(url)) {
-                  await launchUrl(url, mode: LaunchMode.externalApplication);
-                }
-              },
-            ),
-            ListTile(
-              leading: Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF4A6CF7), Color(0xFF7C3AED)],
-                  ),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: const Icon(
-                  Icons.auto_awesome_rounded,
-                  color: Colors.white,
-                  size: 14,
-                ),
-              ),
-              title: const Text(
-                'Upgrade Plan',
-                style: TextStyle(
-                  color: AppColors.textDark,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              subtitle: Consumer<SubscriptionProvider>(
-                builder: (context, sub, _) => Text(
-                  sub.currentPlan.label,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: AppColors.textLight,
-                  ),
-                ),
-              ),
-              onTap: () => Navigator.pushNamed(context, '/subscription'),
-            ),
-            if (UserSession.isAdmin) ...[
-              const Divider(),
-              const Padding(
-                padding: EdgeInsets.only(left: 16.0, top: 12.0, bottom: 8.0),
-                child: Text(
-                  'Admin Controls',
-                  style: TextStyle(
-                    color: AppColors.textLight,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              ListTile(
-                leading: const Icon(
-                  Icons.workspaces_outline,
-                  color: AppColors.textDark,
-                ),
-                title: const Text(
-                  'Create Workspace',
-                  style: TextStyle(color: AppColors.textDark),
-                ),
-                onTap: () => Navigator.pushNamed(context, '/create-workspace'),
-              ),
-              ListTile(
-                leading: const Icon(
-                  Icons.manage_accounts_outlined,
-                  color: AppColors.textDark,
-                ),
-                title: const Text(
-                  'Assign Roles',
-                  style: TextStyle(color: AppColors.textDark),
-                ),
-                onTap: () => Navigator.pushNamed(context, '/assign-role'),
-              ),
-              ListTile(
-                leading: const Icon(
-                  Icons.receipt_long_outlined,
-                  color: AppColors.textDark,
-                ),
-                title: const Text(
-                  'Transaction Logs',
-                  style: TextStyle(color: AppColors.textDark),
-                ),
-                onTap: () => Navigator.pushNamed(context, '/logs'),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
   @override
   Widget build(BuildContext context) {
     _checkTour(context.watch<ProjectProvider>());
-    return NurofinScaffold(
-      drawer: _buildDrawer(context),
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.read<NavController>().markCurrent('/home');
+    });
+    final company = UserSession.companyName.isNotEmpty ? UserSession.companyName : 'BuildTrack';
+    final hasLogo = UserSession.companyLogo != null && UserSession.companyLogo!.isNotEmpty;
+    return Scaffold(
+      backgroundColor: Bt.ground,
       body: SafeArea(
         bottom: false,
         child: Builder(
           builder: (ctx) => Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Showcase(
-                key: ShowcaseKeys.sidebarMenu,
-                description: 'Tap the menu icon to access Logs, Inventory, Subscriptions, and Roles.',
-                tooltipBackgroundColor: const Color(0xFF1E1E2C),
-                textColor: Colors.white,
-                tooltipBorderRadius: BorderRadius.circular(16),
-                tooltipPadding: const EdgeInsets.all(16),
-                child: AppTopBar(
-                  title: UserSession.companyName.isNotEmpty ? UserSession.companyName : 'BuildTrack',
-                  titleWidget: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (UserSession.companyLogo != null && UserSession.companyLogo!.isNotEmpty) ...[
-                        Container(
-                          width: 26,
-                          height: 26,
-                          margin: const EdgeInsets.only(right: 8),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(6),
-                            image: DecorationImage(
-                              image: getProfileImageProvider(UserSession.companyLogo)!,
-                              fit: BoxFit.contain,
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 24, 8, 4),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(children: [
+                            if (hasLogo) ...[
+                              Container(
+                                width: 22,
+                                height: 22,
+                                margin: const EdgeInsets.only(right: 8),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: Bt.line),
+                                  image: DecorationImage(image: getProfileImageProvider(UserSession.companyLogo)!, fit: BoxFit.contain),
+                                ),
+                              ),
+                            ],
+                            Flexible(
+                              child: Text(
+                                company,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: UserSession.getCompanyTextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Bt.ink2),
+                              ),
                             ),
-                          ),
-                        ),
-                      ],
-                      Flexible(
-                        child: Text(
-                          UserSession.companyName.isNotEmpty ? UserSession.companyName : 'BuildTrack',
-                          textAlign: TextAlign.center,
-                          overflow: TextOverflow.ellipsis,
-                          style: UserSession.getCompanyTextStyle(
-                            fontSize: 19,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.primary,
-                          ),
-                        ),
+                          ]),
+                          const SizedBox(height: 2),
+                          Text('Today', style: BtText.largeTitle(context)),
+                        ],
                       ),
-                    ],
-                  ),
-                  leftIcon: Icons.menu,
-                  onLeftTap: () => Scaffold.of(ctx).openDrawer(),
-                  rightWidget: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Showcase(
-                        key: ShowcaseKeys.helpButton,
-                        description: 'Tap here anytime to replay this tour and get help.',
-                        tooltipBackgroundColor: const Color(0xFF1E1E2C),
-                        textColor: Colors.white,
-                        tooltipBorderRadius: BorderRadius.circular(16),
-                        tooltipPadding: const EdgeInsets.all(16),
-                        child: GestureDetector(
-                          onTap: () {
-                            final keysToShow = _getShowcaseKeys(isReplay: true);
-                            if (keysToShow.isNotEmpty) {
-                              ShowcaseView.get().startShowCase(keysToShow);
-                            }
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.all(7),
-                            decoration: BoxDecoration(
-                              color: AppColors.primary.withValues(alpha: 0.1),
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(
-                              Icons.help_outline,
-                              color: AppColors.primary,
-                              size: 19,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      const NotificationsBell(),
-                      const SizedBox(width: 8),
-                      Showcase(
-                      key: ShowcaseKeys.profileIcon,
-                      description: 'Tap your profile icon to view your account details and settings.',
-                      tooltipBackgroundColor: const Color(0xFF1E1E2C),
+                    ),
+                    Showcase(
+                      key: ShowcaseKeys.helpButton,
+                      description: 'Tap here anytime to replay this tour and get help.',
+                      tooltipBackgroundColor: Bt.ink,
                       textColor: Colors.white,
                       tooltipBorderRadius: BorderRadius.circular(16),
                       tooltipPadding: const EdgeInsets.all(16),
-                      child: GestureDetector(
-                        onTap: () => Navigator.pushNamed(context, '/profile'),
-                        child: const ProfileAvatar(radius: 17),
+                      child: BtIconButton(
+                        icon: Icons.help_outline_rounded,
+                        semantic: 'App guidelines',
+                        color: Bt.ink2,
+                        onTap: () {
+                          final keysToShow = _getShowcaseKeys(isReplay: true);
+                          if (keysToShow.isNotEmpty) {
+                            ShowcaseView.get().startShowCase(keysToShow);
+                          }
+                        },
+                      ),
+                    ),
+                    Showcase(
+                      key: ShowcaseKeys.profileIcon,
+                      description: 'Tap your profile for your account, team, plan, logs and settings.',
+                      tooltipBackgroundColor: Bt.ink,
+                      textColor: Colors.white,
+                      tooltipBorderRadius: BorderRadius.circular(16),
+                      tooltipPadding: const EdgeInsets.all(16),
+                      child: Semantics(
+                        button: true,
+                        label: 'Account',
+                        child: InkWell(
+                          customBorder: const CircleBorder(),
+                          onTap: () => Navigator.pushNamed(context, '/profile'),
+                          child: const Padding(padding: EdgeInsets.all(4), child: ProfileAvatar(radius: 20)),
+                        ),
                       ),
                     ),
                   ],
                 ),
               ),
-            ),
-            Expanded(
+              Expanded(
                 child: SingleChildScrollView(
-                  physics: const ClampingScrollPhysics(),
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (UserSession.isAdmin)
-                        _AdminDashboard(onEntryTap: _showEntryOptions)
-                      else if (UserSession.isSupervisor)
-                        const _SupervisorDashboard()
-                      else
-                        _MasonDashboard(onEntryTap: _showEntryOptions),
-                    ],
+                    physics: const ClampingScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (UserSession.isAdmin)
+                          _AdminDashboard(onEntryTap: _showEntryOptions)
+                        else if (UserSession.isSupervisor)
+                          const _SupervisorDashboard()
+                        else
+                          _MasonDashboard(onEntryTap: _showEntryOptions),
+                      ],
+                    ),
                   ),
-                ),
               ),
             ],
           ),
@@ -531,122 +314,23 @@ class _TaskCard extends StatelessWidget {
   const _TaskCard({required this.task, this.onEdit});
   @override
   Widget build(BuildContext context) {
-    String displayStatus = task.status;
-    Color statusColor = AppColors.primary;
-    Color statusBg = AppColors.primary.withValues(alpha: 0.1);
-    try {
-      final projects = context.read<ProjectProvider>().projects;
-      final proj = projects.cast<dynamic>().firstWhere(
-        (p) => p.id == task.project,
-        orElse: () => null,
-      );
-      if (proj != null && task.activityName != null) {
-        final phases = proj.selectedPhases ?? [];
-        for (var phase in phases) {
-          for (var act in phase.activities) {
-              if (act.name == task.activityName) {
-                break;
-              }
-          }
-        }
-      }
-    } catch (e) {
-      debugPrint('Error calculating task status: $e');
-    }
-    if (displayStatus == 'Completed') {
-      statusColor = Colors.green;
-      statusBg = Colors.green.withValues(alpha: 0.1);
-    } else if (displayStatus == 'Work in Progress') {
-      statusColor = Colors.orange;
-      statusBg = Colors.orange.withValues(alpha: 0.1);
-    }
-    return GestureDetector(
-      onTap: displayStatus != 'Completed' ? onEdit : null,
-      child: AppCard(
-        margin: const EdgeInsets.only(bottom: 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Text(
-                    task.title,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 15,
-                      color: AppColors.textDark,
-                    ),
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: statusBg,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    displayStatus,
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: statusColor,
-                    ),
-                  ),
-                ),
-                if (displayStatus != 'Completed' && onEdit != null) ...[
-                  const SizedBox(width: 8),
-                  Icon(
-                    Icons.edit,
-                    size: 18,
-                    color: AppColors.primary,
-                  ),
-                ],
-              ],
-            ),
-            const SizedBox(height: 6),
-            if (task.description.isNotEmpty) ...[
-              Text(
-                task.description,
-                style: const TextStyle(fontSize: 13, color: AppColors.textLight),
-              ),
-              const SizedBox(height: 6),
-            ],
-            Row(
-              children: [
-                const Icon(
-                  Icons.person_outline,
-                  size: 14,
-                  color: AppColors.textLight,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  'Assigned to: ${task.assignee ?? "Unassigned"}',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textLight,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                const Icon(
-                  Icons.location_on_outlined,
-                  size: 14,
-                  color: AppColors.textLight,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  task.floorName ?? 'On Site',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textLight,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
+    final displayStatus = task.status;
+    final done = displayStatus == 'Completed';
+    final meta = <String>[
+      'Assigned to: ${task.assignee ?? "Unassigned"}',
+      task.floorName ?? 'On Site',
+    ].join(' · ');
+    return BtRow(
+      leading: BtAvatar(name: task.assignee ?? '?', size: 36),
+      title: task.title,
+      titleColor: done ? Bt.ink2 : Bt.ink,
+      subtitle: task.description.isNotEmpty ? '${task.description}\n$meta' : meta,
+      subtitleMaxLines: 3,
+      trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+        BtBadge(label: displayStatus, tone: done ? BtTone.green : (displayStatus == 'Work in Progress' ? BtTone.brand : BtTone.neutral)),
+        if (!done && onEdit != null) ...[const SizedBox(width: 4), Icon(Icons.edit_outlined, size: 18, color: context.bt.brand)],
+      ]),
+      onTap: !done ? onEdit : null,
     );
   }
 }
@@ -832,7 +516,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                       width: 40,
                       height: 4,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFDDE0F0),
+                        color: const Color(0xFFE4E7EC),
                         borderRadius: BorderRadius.circular(4),
                       ),
                     ),
@@ -848,7 +532,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                               : 'Record Revenue Outflow'),
                     style: const TextStyle(
                       fontSize: 18,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w700,
                       color: textDark,
                     ),
                   ),
@@ -866,13 +550,13 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                             padding: const EdgeInsets.symmetric(vertical: 12),
                             decoration: BoxDecoration(
                               color: isInflow
-                                  ? const Color(0xFFE8F5E9)
+                                  ? const Color(0xFFE7F6EE)
                                   : Colors.transparent,
                               borderRadius: BorderRadius.circular(8),
                               border: Border.all(
                                 color: isInflow
-                                    ? const Color(0xFF2E7D32)
-                                    : Colors.grey[300]!,
+                                    ? const Color(0xFF067647)
+                                    : const Color(0xFFE4E7EC),
                               ),
                             ),
                             alignment: Alignment.center,
@@ -882,8 +566,8 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                                 Icon(
                                   Icons.arrow_downward,
                                   color: isInflow
-                                      ? const Color(0xFF2E7D32)
-                                      : Colors.grey,
+                                      ? const Color(0xFF067647)
+                                      : const Color(0xFF667085),
                                   size: 18,
                                 ),
                                 const SizedBox(width: 6),
@@ -891,8 +575,8 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                                   'Money In',
                                   style: TextStyle(
                                     color: isInflow
-                                        ? const Color(0xFF2E7D32)
-                                        : Colors.grey,
+                                        ? const Color(0xFF067647)
+                                        : const Color(0xFF667085),
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
@@ -913,13 +597,13 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                             padding: const EdgeInsets.symmetric(vertical: 12),
                             decoration: BoxDecoration(
                               color: !isInflow
-                                  ? const Color(0xFFFFEBEE)
+                                  ? const Color(0xFFFDECEF)
                                   : Colors.transparent,
                               borderRadius: BorderRadius.circular(8),
                               border: Border.all(
                                 color: !isInflow
-                                    ? Colors.red
-                                    : Colors.grey[300]!,
+                                    ? const Color(0xFFC01048)
+                                    : const Color(0xFFE4E7EC),
                               ),
                             ),
                             alignment: Alignment.center,
@@ -928,14 +612,14 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                               children: [
                                 Icon(
                                   Icons.arrow_upward,
-                                  color: !isInflow ? Colors.red : Colors.grey,
+                                  color: !isInflow ? const Color(0xFFC01048) : const Color(0xFF667085),
                                   size: 18,
                                 ),
                                 const SizedBox(width: 6),
                                 Text(
                                   'Money Out',
                                   style: TextStyle(
-                                    color: !isInflow ? Colors.red : Colors.grey,
+                                    color: !isInflow ? const Color(0xFFC01048) : const Color(0xFF667085),
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
@@ -952,7 +636,6 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                     decoration: const InputDecoration(
                       labelText: 'Payment Title / Milestone',
                       hintText: 'e.g. Milestone 1 Payment, Advance Payment',
-                      border: UnderlineInputBorder(),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -964,7 +647,6 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                           ? 'Amount Received (₹)'
                           : 'Amount Sent (₹)',
                       hintText: 'e.g. 500000',
-                      border: const UnderlineInputBorder(),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -972,7 +654,6 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                     initialValue: selectedMode,
                     decoration: const InputDecoration(
                       labelText: 'Payment Mode',
-                      border: UnderlineInputBorder(),
                     ),
                     items: const [
                       DropdownMenuItem(value: 'UPI', child: Text('UPI')),
@@ -999,7 +680,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                       onChanged: (val) => setModalState(() => requestEsign = val ?? false),
                       controlAffinity: ListTileControlAffinity.leading,
                       contentPadding: EdgeInsets.zero,
-                      activeColor: const Color(0xFF173EEA),
+                      activeColor: const Color(0xFF0B63CE),
                     ),
                     if (requestEsign)
                       Padding(
@@ -1012,8 +693,8 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                             prefixIcon: const Icon(Icons.email_outlined),
                             filled: true,
                             fillColor: Colors.white,
-                            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade300)),
-                            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF173EEA))),
+                            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: const Color(0xFFE4E7EC))),
+                            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF0B63CE))),
                           ),
                         ),
                       ),
@@ -1026,7 +707,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                             setModalState(() => isEsignPolling = false);
                           } : () => startEsignFlow(setModalState),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: isEsignPolling ? Colors.red : const Color(0xFF173EEA),
+                            backgroundColor: isEsignPolling ? const Color(0xFFC01048) : const Color(0xFF0B63CE),
                             padding: const EdgeInsets.symmetric(vertical: 14),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           ),
@@ -1034,14 +715,14 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                         ),
                       ),
                       if (esignStatusText.isNotEmpty)
-                        Padding(padding: const EdgeInsets.only(top: 8), child: Text(esignStatusText, style: TextStyle(color: isEsignPolling ? Colors.orange : (isEsignCompleted ? Colors.green : Colors.red), fontWeight: FontWeight.bold)))
+                        Padding(padding: const EdgeInsets.only(top: 8), child: Text(esignStatusText, style: TextStyle(color: isEsignPolling ? const Color(0xFFB54708) : (isEsignCompleted ? const Color(0xFF067647) : const Color(0xFFC01048)), fontWeight: FontWeight.bold)))
                     ],
                     if (isEsignCompleted) ...[
                        const SizedBox(height: 8),
                        Container(
                          padding: const EdgeInsets.all(12),
-                         decoration: BoxDecoration(color: Colors.green.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.green)),
-                         child: const Row(children: [Icon(Icons.check_circle, color: Colors.green), SizedBox(width: 8), Text('Signature successfully captured!', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold))])
+                         decoration: BoxDecoration(color: Colors.green.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8), border: Border.all(color: const Color(0xFF067647))),
+                         child: const Row(children: [Icon(Icons.check_circle, color: Color(0xFF067647)), SizedBox(width: 8), Text('Signature successfully captured!', style: TextStyle(color: Color(0xFF067647), fontWeight: FontWeight.bold))])
                        )
                     ],
                   ],
@@ -1072,7 +753,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       decoration: const BoxDecoration(
                         border: Border(
-                          bottom: BorderSide(color: Colors.black26),
+                          bottom: BorderSide(color: Color(0xFFD0D5DD)),
                         ),
                       ),
                       child: Row(
@@ -1080,7 +761,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                         children: [
                           const Text(
                             'Date Received',
-                            style: TextStyle(color: Colors.black54),
+                            style: TextStyle(color: Color(0xFF475467)),
                           ),
                           Text(
                             '${selectedDate.day.toString().padLeft(2, '0')}/${selectedDate.month.toString().padLeft(2, '0')}/${selectedDate.year}',
@@ -1098,7 +779,6 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                       hintText: isInflow
                           ? 'e.g. Initial payment received for start of work'
                           : 'e.g. Refund sent for milestone delay',
-                      border: const UnderlineInputBorder(),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -1115,7 +795,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       decoration: const BoxDecoration(
                         border: Border(
-                          bottom: BorderSide(color: Colors.black26),
+                          bottom: BorderSide(color: Color(0xFFD0D5DD)),
                         ),
                       ),
                       child: Row(
@@ -1125,13 +805,13 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                             children: [
                               Icon(
                                 Icons.image_outlined,
-                                color: Colors.black54,
+                                color: Color(0xFF475467),
                                 size: 20,
                               ),
                               SizedBox(width: 8),
                               Text(
                                 'Upload Receipt Proof (Optional)',
-                                style: TextStyle(color: Colors.black54),
+                                style: TextStyle(color: Color(0xFF475467)),
                               ),
                             ],
                           ),
@@ -1141,7 +821,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                                 const Text(
                                   'Selected',
                                   style: TextStyle(
-                                    color: Color(0xFF2E7D32),
+                                    color: Color(0xFF067647),
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
@@ -1154,7 +834,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                                   },
                                   child: const Icon(
                                     Icons.cancel,
-                                    color: Colors.red,
+                                    color: Color(0xFFC01048),
                                     size: 20,
                                   ),
                                 ),
@@ -1179,7 +859,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                                   },
                                   child: const Icon(
                                     Icons.cancel,
-                                    color: Colors.red,
+                                    color: Color(0xFFC01048),
                                     size: 20,
                                   ),
                                 ),
@@ -1204,7 +884,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                                   },
                                   child: const Icon(
                                     Icons.cancel,
-                                    color: Colors.red,
+                                    color: Color(0xFFC01048),
                                     size: 20,
                                   ),
                                 ),
@@ -1213,7 +893,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                           else
                             const Icon(
                               Icons.chevron_right,
-                              color: Colors.black26,
+                              color: Color(0xFFD0D5DD),
                             ),
                         ],
                       ),
@@ -1228,7 +908,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                         width: 120,
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.grey[300]!),
+                          border: Border.all(color: Bt.line),
                         ),
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(8),
@@ -1260,7 +940,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                         width: 120,
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.grey[300]!),
+                          border: Border.all(color: Bt.line),
                         ),
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(8),
@@ -1271,7 +951,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                                 const Center(
                                   child: Icon(
                                     Icons.broken_image_outlined,
-                                    color: Colors.grey,
+                                    color: Color(0xFF667085),
                                   ),
                                 ),
                           ),
@@ -1287,7 +967,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                         width: 120,
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.grey[300]!),
+                          border: Border.all(color: Bt.line),
                         ),
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(8),
@@ -1310,7 +990,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                                 const Center(
                                   child: Icon(
                                     Icons.broken_image_outlined,
-                                    color: Colors.grey,
+                                    color: Color(0xFF667085),
                                   ),
                                 ),
                           ),
@@ -1480,90 +1160,27 @@ class _AdminDashboardState extends State<_AdminDashboard> {
   }
   Widget _buildRevenueHistory(BuildContext context) {
     if (_loadingRevenue) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 20),
-        child: Center(child: CircularProgressIndicator()),
-      );
+      return const BtSkeleton(height: 64, radius: 16);
     }
     final project = Provider.of<ProjectProvider>(
       context,
       listen: false,
     ).selectedProject;
     final projectName = project?.name ?? 'Project';
+    if (project == null) return const SizedBox.shrink();
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const AppSectionHeader(title: 'Revenue Inflow Timeline'),
-        const SizedBox(height: 8),
-        if (project != null)
-          Material(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(14),
-              onTap: () =>
-                  _showAllRevenueHistory(context, projectName, project.id),
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                  vertical: 18,
-                  horizontal: 16,
-                ),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: Colors.grey[100]!),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.02),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: const BoxDecoration(
-                            color: Color(0xFFE8F5E9),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.receipt_long,
-                            color: Color(0xFF2E7D32),
-                            size: 20,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        const Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'View Full Revenue Timeline',
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.bold,
-                                color: textDark,
-                              ),
-                            ),
-                            SizedBox(height: 2),
-                            Text(
-                              'Click to view all logged inflows',
-                              style: TextStyle(fontSize: 12, color: textGray),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                    const Icon(Icons.chevron_right, color: textGray, size: 20),
-                  ],
-                ),
-              ),
-            ),
+        const BtSectionHeader(title: 'Revenue inflow timeline'),
+        BtGroup(children: [
+          BtRow(
+            leading: const BtTile(icon: Icons.receipt_long_outlined, bg: Bt.greenSoft, fg: Bt.green),
+            title: 'View full revenue timeline',
+            subtitle: _revenueEntries.isEmpty ? 'Click to view all logged inflows' : '${_revenueEntries.length} payments · ${formatInr(_totalRevenueSum, compact: true)} received',
+            showChevron: true,
+            onTap: () => _showAllRevenueHistory(context, projectName, project.id),
           ),
+        ]),
       ],
     );
   }
@@ -1600,7 +1217,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                             width: 40,
                             height: 4,
                             decoration: BoxDecoration(
-                              color: Colors.grey[300],
+                              color: const Color(0xFFE4E7EC),
                               borderRadius: BorderRadius.circular(2),
                             ),
                           ),
@@ -1626,7 +1243,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                                   Text(
                                     projectName,
                                     style: const TextStyle(
-                                      fontSize: 12,
+                                      fontSize: 13,
                                       color: textGray,
                                     ),
                                   ),
@@ -1670,7 +1287,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                                           'Record Payment',
                                           style: TextStyle(
                                             color: Colors.white,
-                                            fontSize: 12,
+                                            fontSize: 13,
                                             fontWeight: FontWeight.bold,
                                           ),
                                         ),
@@ -1716,14 +1333,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                           decoration: BoxDecoration(
                             color: const Color(0xFFF8F9FA),
                             borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: Colors.grey[200]!),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.03),
-                                blurRadius: 10,
-                                offset: const Offset(0, -4),
-                              ),
-                            ],
+                            border: Border.all(color: Bt.line),
                           ),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1761,11 +1371,11 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                                           : '+${formatCurrency(_totalRevenueSum)}'),
                                 style: TextStyle(
                                   fontSize: 18,
-                                  fontWeight: FontWeight.w800,
+                                  fontWeight: FontWeight.w700,
                                   color: _totalRevenueSum > 0
-                                      ? const Color(0xFF2E7D32)
+                                      ? const Color(0xFF067647)
                                       : (_totalRevenueSum < 0
-                                            ? Colors.red
+                                            ? const Color(0xFFC01048)
                                             : textDark),
                                 ),
                               ),
@@ -1793,7 +1403,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
     final bool isOutflow = amount < 0;
     final absAmount = amount.abs();
     final formattedAmt = formatCurrency(absAmount);
-    final textColor = isOutflow ? Colors.red : const Color(0xFF2E7D32);
+    final textColor = isOutflow ? const Color(0xFFC01048) : const Color(0xFF067647);
     final paymentMode = tx['paymentMode']?.toString() ?? 'Cash';
     final paymentStatus = tx['paymentStatus']?.toString() ?? 'Paid';
     final rawId = tx['_id']?.toString() ?? tx['id']?.toString() ?? '';
@@ -1840,7 +1450,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                         width: 40,
                         height: 4,
                         decoration: BoxDecoration(
-                          color: Colors.grey[300],
+                          color: const Color(0xFFE4E7EC),
                           borderRadius: BorderRadius.circular(2),
                         ),
                       ),
@@ -1866,13 +1476,13 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: isOutflow
-                          ? const Color(0xFFFFEBEE)
-                          : const Color(0xFFE8F5E9),
+                          ? const Color(0xFFFDECEF)
+                          : const Color(0xFFE7F6EE),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
                       Icons.check_circle_rounded,
-                      color: isOutflow ? Colors.red : const Color(0xFF2E7D32),
+                      color: isOutflow ? const Color(0xFFC01048) : const Color(0xFF067647),
                       size: 52,
                     ),
                   ),
@@ -1881,7 +1491,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                     isOutflow ? 'Payment Sent' : 'Revenue Received',
                     style: const TextStyle(
                       fontSize: 18,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w700,
                       color: textDark,
                     ),
                   ),
@@ -1899,7 +1509,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                   Text(
                     isOutflow ? '-$formattedAmt' : '+$formattedAmt',
                     style: TextStyle(
-                      fontWeight: FontWeight.w900,
+                      fontWeight: FontWeight.w700,
                       fontSize: 32,
                       color: textColor,
                       letterSpacing: -0.5,
@@ -1914,7 +1524,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                           margin: const EdgeInsets.symmetric(horizontal: 2),
                           height: 1,
                           color: index % 2 == 0
-                              ? Colors.grey[300]
+                              ? const Color(0xFFE4E7EC)
                               : Colors.transparent,
                         ),
                       ),
@@ -1935,9 +1545,9 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Text(
-                          'STATUS',
+                          'Status',
                           style: TextStyle(
-                            fontSize: 12,
+                            fontSize: 13,
                             fontWeight: FontWeight.w600,
                             color: textGray,
                           ),
@@ -1949,18 +1559,18 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                           ),
                           decoration: BoxDecoration(
                             color: paymentStatus.toLowerCase() == 'paid'
-                                ? const Color(0xFFE8F5E9)
-                                : const Color(0xFFFFF3E0),
+                                ? const Color(0xFFE7F6EE)
+                                : const Color(0xFFFEF3E7),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
                             paymentStatus.toUpperCase(),
                             style: TextStyle(
                               color: paymentStatus.toLowerCase() == 'paid'
-                                  ? const Color(0xFF2E7D32)
-                                  : const Color(0xFFE65100),
+                                  ? const Color(0xFF067647)
+                                  : const Color(0xFFB54708),
                               fontWeight: FontWeight.bold,
-                              fontSize: 11,
+                              fontSize: 13,
                             ),
                           ),
                         ),
@@ -1976,16 +1586,16 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                       decoration: BoxDecoration(
                         color: const Color(0xFFF8F9FA),
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: Colors.grey[200]!),
+                        border: Border.all(color: Bt.line),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Text(
-                            'NOTES / REMARKS',
+                            'Notes / remarks',
                             style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w800,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
                               color: textGray,
                               letterSpacing: 0.5,
                             ),
@@ -2011,16 +1621,16 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                       decoration: BoxDecoration(
                         color: const Color(0xFFF8F9FA),
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: Colors.grey[200]!),
+                        border: Border.all(color: Bt.line),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Text(
-                            'PROOF OF PAYMENT',
+                            'Proof of payment',
                             style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w800,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
                               color: textGray,
                               letterSpacing: 0.5,
                             ),
@@ -2049,7 +1659,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                                     errorBuilder: (context, error, stackTrace) {
                                       return Container(
                                         height: 150,
-                                        color: Colors.grey[100],
+                                        color: const Color(0xFFF6F7F9),
                                         alignment: Alignment.center,
                                         child: const Column(
                                           mainAxisAlignment:
@@ -2057,15 +1667,15 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                                           children: [
                                             Icon(
                                               Icons.broken_image_outlined,
-                                              color: Colors.grey,
+                                              color: Color(0xFF667085),
                                               size: 32,
                                             ),
                                             SizedBox(height: 8),
                                             Text(
                                               'Error loading proof image',
                                               style: TextStyle(
-                                                color: Colors.grey,
-                                                fontSize: 12,
+                                                color: Color(0xFF667085),
+                                                fontSize: 13,
                                               ),
                                             ),
                                           ],
@@ -2079,7 +1689,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                                           }
                                           return Container(
                                             height: 150,
-                                            color: Colors.grey[100],
+                                            color: const Color(0xFFF6F7F9),
                                             alignment: Alignment.center,
                                             child:
                                                 const CircularProgressIndicator(
@@ -2112,7 +1722,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                                         'Tap to zoom',
                                         style: TextStyle(
                                           color: Colors.white,
-                                          fontSize: 10,
+                                          fontSize: 12,
                                           fontWeight: FontWeight.bold,
                                         ),
                                       ),
@@ -2168,17 +1778,17 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                           },
                           icon: const Icon(
                             Icons.delete_outline,
-                            color: Colors.red,
+                            color: Color(0xFFC01048),
                           ),
                           label: Text(
                             isOutflow ? 'Delete Outflow' : 'Delete Inflow',
                             style: const TextStyle(
-                              color: Colors.red,
+                              color: Color(0xFFC01048),
                               fontWeight: FontWeight.bold,
                             ),
                           ),
                           style: OutlinedButton.styleFrom(
-                            side: const BorderSide(color: Colors.red),
+                            side: const BorderSide(color: Color(0xFFC01048)),
                             padding: const EdgeInsets.symmetric(vertical: 14),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
@@ -2306,7 +1916,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+              child: const Text('Cancel', style: TextStyle(color: Color(0xFF667085))),
             ),
             TextButton(
               onPressed: () async {
@@ -2344,7 +1954,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
               child: const Text(
                 'Delete',
                 style: TextStyle(
-                  color: Colors.red,
+                  color: Color(0xFFC01048),
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -2364,7 +1974,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
           Text(
             label,
             style: const TextStyle(
-              fontSize: 12,
+              fontSize: 13,
               fontWeight: FontWeight.w600,
               color: textGray,
             ),
@@ -2423,7 +2033,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                             children: [
                               Icon(
                                 Icons.broken_image_outlined,
-                                color: Colors.red,
+                                color: Color(0xFFC01048),
                                 size: 40,
                               ),
                               SizedBox(height: 8),
@@ -2467,7 +2077,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
     final bool isOutflow = amount < 0;
     final absAmount = amount.abs();
     final formattedAmt = formatCurrency(absAmount);
-    final textColor = isOutflow ? Colors.red : const Color(0xFF2E7D32);
+    final textColor = isOutflow ? const Color(0xFFC01048) : const Color(0xFF067647);
     final paymentMode = tx['paymentMode']?.toString() ?? 'Cash';
     final List<dynamic> attachments = tx['attachments'] is List
         ? tx['attachments'] as List
@@ -2496,7 +2106,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
           height: 44,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.grey[200]!),
+            border: Border.all(color: Bt.line),
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(8),
@@ -2517,7 +2127,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                 return const Center(
                   child: Icon(
                     Icons.broken_image_outlined,
-                    color: Colors.grey,
+                    color: Color(0xFF667085),
                     size: 20,
                   ),
                 );
@@ -2533,12 +2143,12 @@ class _AdminDashboardState extends State<_AdminDashboard> {
         decoration: BoxDecoration(
           color: const Color(0xFFF8F9FA),
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Colors.grey[200]!),
+          border: Border.all(color: Bt.line),
         ),
         alignment: Alignment.center,
         child: Icon(
           Icons.image_not_supported_outlined,
-          color: Colors.grey[300],
+          color: const Color(0xFFE4E7EC),
           size: 20,
         ),
       );
@@ -2553,27 +2163,21 @@ class _AdminDashboardState extends State<_AdminDashboard> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(14),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.03),
-              blurRadius: 6,
-            ),
-          ],
         ),
         child: Row(
           children: [
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: const Color(0xFFE8F5E9),
+                color: const Color(0xFFE7F6EE),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
                 dateStr,
                 style: const TextStyle(
-                  color: Color(0xFF2E7D32),
-                  fontWeight: FontWeight.w800,
-                  fontSize: 12,
+                  color: Color(0xFF067647),
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
                 ),
               ),
             ),
@@ -2597,7 +2201,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                   const SizedBox(height: 2),
                   Text(
                     'via $paymentMode • $timeStr',
-                    style: const TextStyle(fontSize: 12, color: textGray),
+                    style: const TextStyle(fontSize: 13, color: textGray),
                   ),
                 ],
               ),
@@ -2605,7 +2209,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
             Text(
               isOutflow ? '-$formattedAmt' : '+$formattedAmt',
               style: TextStyle(
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w700,
                 fontSize: 15,
                 color: textColor,
               ),
@@ -2659,7 +2263,6 @@ class _AdminDashboardState extends State<_AdminDashboard> {
       }
       if (provider.projects.isNotEmpty) gProg /= provider.projects.length;
     }
-    bool globalIsLoss = (gRev - gSpent) < 0;
 
     if (project != null && project.id != _lastProjectId) {
       _lastProjectId = project.id;
@@ -2667,340 +2270,132 @@ class _AdminDashboardState extends State<_AdminDashboard> {
         _loadRevenue(project.id);
       });
     }
+
+    final spent = _isGlobalView ? gSpent : (project != null ? provider.totalSpentForProject(project.id) : 0.0);
+    final budget = _isGlobalView ? gBudget : (project?.totalBudget ?? 0.0);
+    final remaining = _isGlobalView ? (gBudget - gSpent) : (project?.remainingBudget ?? 0.0);
+    final revenue = _isGlobalView ? gRev : (project != null ? _totalRevenueSum : 0.0);
+    final netCash = revenue - spent;
+    final isLoss = netCash < 0;
+    final progress = _isGlobalView ? gProg : (project?.progress ?? 0.0);
+    final usedPct = budget > 0 ? (spent / budget) : 0.0;
+    final over = budget > 0 && spent > budget * 0.9;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildProjectSelector(context, provider),
         const SizedBox(height: 16),
         const ApprovalsAlertWidget(),
-        const SizedBox(height: 16),
+        // ── Money card: total cost, budget, revenue, net cash flow, planned ──
         Showcase(
-          key: ShowcaseKeys.progress,
-          description: 'Track your overall project completion here',
-          tooltipBackgroundColor: const Color(0xFF1E1E2C),
+          key: ShowcaseKeys.dashboardTotalCost,
+          description: 'Track your total funds spent across all categories for this project.',
+          tooltipBackgroundColor: Bt.ink,
           textColor: Colors.white,
           tooltipBorderRadius: BorderRadius.circular(16),
           tooltipPadding: const EdgeInsets.all(16),
-          child: Container(
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.95),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.6),
-              width: 1.5,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF6B7280).withValues(alpha: 0.06),
-                blurRadius: 20,
-                offset: const Offset(0, 6),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.trending_up_rounded,
-                          color: AppColors.primary,
-                          size: 14,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'OVERALL PROGRESS',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.primary,
-                            letterSpacing: 0.6,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (project != null)
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.location_on_outlined,
-                          color: textGray,
-                          size: 14,
-                        ),
-                        const SizedBox(width: 2),
-                        Text(
-                          '${project.city[0].toUpperCase()}${project.city.substring(1)}',
-                          style: const TextStyle(
-                            color: textGray,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                crossAxisAlignment: CrossAxisAlignment.baseline,
-                textBaseline: TextBaseline.alphabetic,
-                children: [
-                  Text(
-                    _isGlobalView ? '${(gProg * 100).toStringAsFixed(1)}%' : project != null ? '${(project.progress * 100).toStringAsFixed(1)}%' : '--',
-                    style: TextStyle(
-                      fontSize: 40,
-                      fontWeight: FontWeight.w900,
-                      color: textDark,
-                      letterSpacing: -1.0,
-                    ),
-                  ),
-                  Flexible(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          _isGlobalView ? 'Global Financial Overview' : project?.name ?? 'No project',
-                          textAlign: TextAlign.end,
-                          style: TextStyle(
-                            color: textDark,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 14,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Current Milestone',
-                          style: TextStyle(
-                            color: textGray.withValues(alpha: 0.8),
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SizedBox(
-                    height: 8,
-                    child: Stack(
-                      children: [
-                        Container(
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF1EEFA),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                        ),
-                        FractionallySizedBox(
-                          widthFactor: _isGlobalView ? gProg.clamp(0.0, 1.0) : (project?.progress ?? 0).clamp(0.0, 1.0),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              gradient: AppGradients.progressBar,
-                              borderRadius: BorderRadius.circular(4),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: AppColors.primaryPurple.withValues(
-                                    alpha: 0.3,
-                                  ),
-                                  blurRadius: 6,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Progress status',
-                        style: TextStyle(
-                          color: textGray.withValues(alpha: 0.7),
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      Text(
-                        _isGlobalView ? '${(gProg * 100).toStringAsFixed(0)}% Completed' : project != null ? '${(project.progress * 100).toStringAsFixed(0)}% Completed' : '--',
-                        style: const TextStyle(
-                          color: AppColors.primaryPurple,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ],
-          ),
-          ),
-        ),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(
-              child: Showcase(
-                key: ShowcaseKeys.dashboardTotalCost,
-                description: 'Track your total funds spent across all categories for this project.',
-                tooltipBackgroundColor: const Color(0xFF1E1E2C),
-                textColor: Colors.white,
-                tooltipBorderRadius: BorderRadius.circular(16),
-                tooltipPadding: const EdgeInsets.all(16),
-                child: _costCard(
-                  'TOTAL COST',
-                  _isGlobalView ? formatCurrency(gSpent) : project != null ? formatCurrency(context.read<ProjectProvider>().totalSpentForProject(project.id)) : '--',
-                  project != null
-                      ? () {
-                          final paid = context
-                              .read<ProjectProvider>()
-                              .totalSpentForProject(project.id);
-                          final budget = project.totalBudget;
-                          final pct = budget > 0
-                              ? (paid / budget * 100).toStringAsFixed(0)
-                              : '0';
-                          return '$pct% Used';
-                        }()
-                      : '—',
-                  _isGlobalView
-                      ? gSpent > gBudget * 0.9
-                      : project != null && context.read<ProjectProvider>().totalSpentForProject(project.id) > project.totalBudget * 0.9,
-                  indicatorIcon: Icons.trending_up,
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Showcase(
-                key: ShowcaseKeys.dashboardTotalBudget,
-                description: 'Track the total allocated budget and remaining balance for this project.',
-                tooltipBackgroundColor: const Color(0xFF1E1E2C),
-                textColor: Colors.white,
-                tooltipBorderRadius: BorderRadius.circular(16),
-                tooltipPadding: const EdgeInsets.all(16),
-                child: _costCard(
-                  'BUDGET',
-                  project?.formattedBudget ?? '₹—',
-                  'Remaining: ${project?.formattedRemaining ?? '—'}',
-                  project != null && project.remainingBudget < 0,
-                  isInvoice: true,
-                  indicatorIcon: (_isGlobalView ? (gBudget - gSpent < 0) : project != null && project.remainingBudget < 0)
-                      ? Icons.trending_down
-                      : Icons.trending_flat,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: Showcase(
-                key: ShowcaseKeys.dashboardTotalRevenue,
-                description: 'View the total revenue inflow recorded for this project.',
-                tooltipBackgroundColor: const Color(0xFF1E1E2C),
-                textColor: Colors.white,
-                tooltipBorderRadius: BorderRadius.circular(16),
-                tooltipPadding: const EdgeInsets.all(16),
-                child: _costCard(
-                  'TOTAL REVENUE',
-                  project != null ? formatCurrency(_totalRevenueSum) : '₹—',
-                  'Cash Inflow',
-                  false,
-                  indicatorIcon: Icons.trending_up,
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Builder(
-                builder: (_) {
-                  final netCash = _isGlobalView
-                      ? gRev - gSpent
-                      : project != null
-                          ? (_totalRevenueSum - context.read<ProjectProvider>().totalSpentForProject(project.id))
-                          : 0.0;
-                  final isLoss = netCash < 0;
-                  return Showcase(
-                    key: ShowcaseKeys.dashboardNetCashFlow,
-                    description: 'See your net profit or loss calculated instantly.',
-                    tooltipBackgroundColor: const Color(0xFF1E1E2C),
+          child: BtCard(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Expanded(child: Text('Total cost', style: BtText.subhead(context))),
+                if (budget > 0) Text('of ${formatInr(budget, compact: true)} budget', style: BtText.num(BtText.caption(context))),
+              ]),
+              const SizedBox(height: 2),
+              Text(_isGlobalView || project != null ? formatInr(spent, compact: true) : '—', style: BtText.amount(context)),
+              const SizedBox(height: 12),
+              BtProgress(value: usedPct.toDouble(), color: over ? Bt.red : null),
+              const SizedBox(height: 6),
+              Text(budget > 0 ? '${(usedPct * 100).toStringAsFixed(0)}% of budget used' : 'No budget set', style: BtText.caption(context, color: over ? Bt.red : Bt.ink3)),
+              const SizedBox(height: 14),
+              const Divider(height: 1),
+              const SizedBox(height: 12),
+              Row(children: [
+                Expanded(
+                  child: Showcase(
+                    key: ShowcaseKeys.dashboardTotalBudget,
+                    description: 'Track the total allocated budget and remaining balance for this project.',
+                    tooltipBackgroundColor: Bt.ink,
                     textColor: Colors.white,
                     tooltipBorderRadius: BorderRadius.circular(16),
                     tooltipPadding: const EdgeInsets.all(16),
-                    child: _costCard(
-                      'NET CASH FLOW',
-                      _isGlobalView || project != null ? formatCurrency(netCash) : '--',
-                      _isGlobalView || project != null ? (isLoss ? 'Net Loss' : 'Net Profit') : '--',
-                      isLoss,
-                      isInvoice: !isLoss,
-                      indicatorIcon: isLoss ? Icons.trending_down : Icons.trending_up,
+                    child: _stat(context, 'Budget left', budget > 0 ? formatInr(remaining, compact: true) : '—', color: remaining < 0 ? Bt.red : Bt.ink),
+                  ),
+                ),
+                Expanded(child: _stat(context, 'Upcoming / planned', budget > 0 ? formatInr(remaining < 0 ? 0 : remaining, compact: true) : '—')),
+              ]),
+              const SizedBox(height: 12),
+              Row(children: [
+                Expanded(
+                  child: Showcase(
+                    key: ShowcaseKeys.dashboardTotalRevenue,
+                    description: 'View the total revenue inflow recorded for this project.',
+                    tooltipBackgroundColor: Bt.ink,
+                    textColor: Colors.white,
+                    tooltipBorderRadius: BorderRadius.circular(16),
+                    tooltipPadding: const EdgeInsets.all(16),
+                    child: _stat(context, 'Total revenue', formatInr(revenue, compact: true), color: Bt.green),
+                  ),
+                ),
+                Expanded(
+                  child: Showcase(
+                    key: ShowcaseKeys.dashboardNetCashFlow,
+                    description: 'See your net profit or loss calculated instantly.',
+                    tooltipBackgroundColor: Bt.ink,
+                    textColor: Colors.white,
+                    tooltipBorderRadius: BorderRadius.circular(16),
+                    tooltipPadding: const EdgeInsets.all(16),
+                    child: _stat(context, isLoss ? 'Net cash flow · loss' : 'Net cash flow · profit', formatInr(netCash, compact: true), color: isLoss ? Bt.red : Bt.green),
+                  ),
+                ),
+              ]),
+            ]),
+          ),
+        ),
+        const SizedBox(height: 16),
+        // ── Overall progress ──
+        Showcase(
+          key: ShowcaseKeys.progress,
+          description: 'Track your overall project completion here',
+          tooltipBackgroundColor: Bt.ink,
+          textColor: Colors.white,
+          tooltipBorderRadius: BorderRadius.circular(16),
+          tooltipPadding: const EdgeInsets.all(16),
+          child: BtCard(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text('Overall progress', style: BtText.subhead(context)),
+                    const SizedBox(height: 2),
+                    Text(
+                      _isGlobalView ? 'All projects' : (project?.name ?? 'No project'),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: BtText.body(context, weight: FontWeight.w600),
                     ),
-                  );
-                },
-              ),
-            ),
-          ],
+                    if (project != null && project.city.isNotEmpty)
+                      Text('${project.city[0].toUpperCase()}${project.city.substring(1)}', style: BtText.caption(context)),
+                  ]),
+                ),
+                Text(_isGlobalView || project != null ? '${(progress * 100).toStringAsFixed(1)}%' : '--', style: BtText.amount(context, size: 28)),
+              ]),
+              const SizedBox(height: 12),
+              BtProgress(value: progress.toDouble(), work: true),
+            ]),
+          ),
         ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: _costCard(
-                'UPCOMING PAY / PLANNED',
-                _isGlobalView
-                    ? formatCurrency((gBudget - gSpent) < 0 ? 0 : (gBudget - gSpent))
-                    : project != null
-                        ? formatCurrency(project.remainingBudget < 0 ? 0 : project.remainingBudget)
-                        : '--',
-                'Planned to spend',
-                false,
-                isInvoice: true,
-                indicatorIcon: Icons.schedule,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(child: const SizedBox.shrink()),
-          ],
-        ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 16),
         if (project != null) ...[
           _buildRevenueHistory(context),
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
         ],
         _buildSpeakUpdate(context),
-        const SizedBox(height: 16),
+        const SizedBox(height: 24),
         Showcase(
           key: ShowcaseKeys.recentEntries,
           description: 'Quickly view or edit your most recently added entries',
-          tooltipBackgroundColor: const Color(0xFF1E1E2C),
+          tooltipBackgroundColor: Bt.ink,
           textColor: Colors.white,
           tooltipBorderRadius: BorderRadius.circular(16),
           tooltipPadding: const EdgeInsets.all(16),
@@ -3009,91 +2404,26 @@ class _AdminDashboardState extends State<_AdminDashboard> {
       ],
     );
   }
+
+  Widget _stat(BuildContext context, String label, String value, {Color color = Bt.ink}) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.caption(context)),
+        const SizedBox(height: 2),
+        Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.num(BtText.body(context, weight: FontWeight.w600, color: color))),
+      ]),
+    );
+  }
   Widget _buildProjectSelector(BuildContext context, ProjectProvider provider) {
     final selectedName = _isGlobalView ? 'Global Financial Overview' : (provider.selectedProject?.name ?? 'Select Project');
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.8),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.6),
-          width: 1.5,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF6B7280).withValues(alpha: 0.08),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: () => _showProjectPicker(context, provider),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(
-                      Icons.domain_rounded,
-                      color: AppColors.primary,
-                      size: 20,
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'ACTIVE PROJECT',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                            color: textGray.withValues(alpha: 0.7),
-                            letterSpacing: 0.8,
-                          ),
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          selectedName,
-                          style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 15,
-                            color: textDark,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.withValues(alpha: 0.05),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.unfold_more_rounded,
-                      color: textGray,
-                      size: 18,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: BtChip(
+        icon: Icons.apartment_outlined,
+        label: selectedName.length > 34 ? '${selectedName.substring(0, 32)}…' : selectedName,
+        trailingIcon: Icons.expand_more_rounded,
+        onTap: () => _showProjectPicker(context, provider),
       ),
     );
   }
@@ -3119,7 +2449,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                   height: 4,
                   margin: const EdgeInsets.only(bottom: 16),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFDDE0F0),
+                    color: const Color(0xFFE4E7EC),
                     borderRadius: BorderRadius.circular(4),
                   ),
                 ),
@@ -3156,7 +2486,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                           ),
                           child: Row(
                             children: [
-                              Icon(Icons.public, color: _isGlobalView ? AppColors.primary : Colors.black54, size: 20),
+                              Icon(Icons.public, color: _isGlobalView ? AppColors.primary : const Color(0xFF475467), size: 20),
                               const SizedBox(width: 14),
                               Expanded(
                                 child: Text(
@@ -3171,7 +2501,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                               if (_isGlobalView)
                                 Icon(Icons.check_circle_rounded, color: AppColors.primary, size: 20)
                               else
-                                const Icon(Icons.chevron_right, color: Colors.black26),
+                                const Icon(Icons.chevron_right, color: Color(0xFFD0D5DD)),
                             ],
                           ),
                         ),
@@ -3240,232 +2570,19 @@ class _AdminDashboardState extends State<_AdminDashboard> {
       ),
     );
   }
-  Widget _costCard(
-    String label,
-    String value,
-    String sub,
-    bool isOver, {
-    bool isInvoice = false,
-    IconData? icon,
-    IconData? indicatorIcon,
-  }) {
-    final cardColor = Colors.white.withValues(alpha: 0.95);
-    final accentColor = isOver
-        ? Colors.redAccent
-        : (isInvoice ? AppColors.primaryPurple : AppColors.primaryBlue);
-    final iconData = icon ??
-        (isInvoice
-            ? Icons.account_balance_wallet_outlined
-            : Icons.currency_rupee_rounded);
-    final pillIcon = indicatorIcon ??
-        (isInvoice
-            ? Icons.trending_flat
-            : (isOver ? Icons.trending_up : Icons.trending_down));
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.6),
-          width: 1.5,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF6B7280).withValues(alpha: 0.05),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 10,
-                  color: textGray.withValues(alpha: 0.7),
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.6,
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.all(7),
-                decoration: BoxDecoration(
-                  color: accentColor.withValues(alpha: 0.08),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(iconData, size: 14, color: accentColor),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: Text(
-              value,
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w900,
-                color: textDark,
-                letterSpacing: -0.5,
-              ),
-              maxLines: 1,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: accentColor.withValues(alpha: 0.06),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  pillIcon,
-                  size: 12,
-                  color: accentColor,
-                ),
-                const SizedBox(width: 4),
-                Flexible(
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      sub,
-                      style: TextStyle(
-                        fontSize: 10.5,
-                        color: accentColor,
-                        fontWeight: FontWeight.w700,
-                      ),
-                      maxLines: 1,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
   Widget _buildSpeakUpdate(BuildContext context) {
     return Showcase(
       key: ShowcaseKeys.quickAddEntry,
       description: 'Quickly add a new entry from here.',
-      tooltipBackgroundColor: const Color(0xFF1E1E2C),
+      tooltipBackgroundColor: Bt.ink,
       textColor: Colors.white,
       tooltipBorderRadius: BorderRadius.circular(16),
       tooltipPadding: const EdgeInsets.all(16),
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(24),
-          gradient: AppGradients.primaryButton,
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primaryBlue.withValues(alpha: 0.35),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-          BoxShadow(
-            color: AppColors.primaryPurple.withValues(alpha: 0.2),
-            blurRadius: 30,
-            offset: const Offset(0, 12),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(24),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: () => Navigator.pushNamed(context, '/add-entry'),
-            splashColor: Colors.white.withValues(alpha: 0.2),
-            highlightColor: Colors.white.withValues(alpha: 0.1),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 22, horizontal: 16),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.2),
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.3),
-                            width: 1.5,
-                          ),
-                        ),
-                        child: const Icon(
-                          Icons.mic_rounded,
-                          color: Colors.white,
-                          size: 24,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      const Text(
-                        'Speak Update',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 22,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: -0.5,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 6,
-                          height: 6,
-                          decoration: const BoxDecoration(
-                            color: Colors.greenAccent,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        const Text(
-                          'AI FOREMAN IS LISTENING',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            letterSpacing: 1.5,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          ),
-        ),
+      child: BtButton(
+        label: 'Speak Update',
+        icon: Icons.mic_rounded,
+        variant: BtButtonVariant.accent,
+        onPressed: () => Navigator.pushNamed(context, '/add-entry'),
       ),
     );
   }
@@ -3481,198 +2598,54 @@ class _AdminDashboardState extends State<_AdminDashboard> {
     allEntries.sort((a, b) => b.date.compareTo(a.date));
     final recent = allEntries.take(5).toList();
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        AppSectionHeader(
-          title: 'Recent Activity',
-          actionLabel: 'View All',
+        BtSectionHeader(
+          title: 'Recent activity',
+          action: 'View all',
           onAction: () => Navigator.pushNamed(
             context,
             '/logs',
             arguments: {'projectId': selectedProjectId},
           ),
         ),
-        const SizedBox(height: 10),
         _TeamApprovalHistoryWidget(projectId: selectedProjectId),
-        const SizedBox(height: 12),
-        const AppSectionHeader(title: 'Recent Entries'),
-        const SizedBox(height: 8),
+        const SizedBox(height: 20),
+        const BtSectionHeader(title: 'Recent entries'),
         if (recent.isEmpty)
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 16),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.7),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.5),
-                width: 1.5,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF6B7280).withValues(alpha: 0.03),
-                  blurRadius: 16,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: textGray.withValues(alpha: 0.06),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.history_toggle_off_rounded,
-                    size: 32,
-                    color: textGray.withValues(alpha: 0.6),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'No recent entries',
-                  style: TextStyle(
-                    color: textDark.withValues(alpha: 0.8),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Updates you speak or enter will appear here.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: textGray.withValues(alpha: 0.7),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w400,
-                  ),
-                ),
-              ],
-            ),
+          const BtCard(
+            child: BtEmpty(icon: Icons.history_toggle_off_rounded, title: 'No recent entries', message: 'Updates you speak or enter will appear here.'),
           )
         else
-          ...recent.map((entry) => _activityTile(context, entry)),
+          BtGroup(children: [for (final entry in recent) _activityTile(context, entry)]),
       ],
     );
   }
   Widget _activityTile(BuildContext context, EntryModel entry) {
-    final IconData icon;
-    final Color badgeBg;
-    final Color badgeColor;
     final String badgeLabel;
+    final BtTone tone;
     switch (entry.type) {
       case EntryType.labour:
-        icon = Icons.engineering_rounded;
-        badgeBg = const Color(0xFFE8F5E9);
-        badgeColor = const Color(0xFF2E7D32);
         badgeLabel = 'Labour';
+        tone = BtTone.green;
         break;
       case EntryType.equipment:
-        icon = Icons.construction_rounded;
-        badgeBg = const Color(0xFFFFF3E0);
-        badgeColor = Colors.orange;
         badgeLabel = 'Equipment';
+        tone = BtTone.amber;
         break;
       case EntryType.material:
-        icon = Icons.inventory_2_rounded;
-        badgeBg = const Color(0xFFEEF0FF);
-        badgeColor = primaryBlue;
         badgeLabel = 'Material';
+        tone = BtTone.brand;
         break;
     }
     final timeLabel = relativeTimeLabel(entry.createdAt.toLocal());
     final title = entry.description.isNotEmpty ? entry.description : badgeLabel;
-    final subtitle = '₹${entry.amount.toStringAsFixed(0)} • $timeLabel';
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.95),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.6),
-          width: 1.5,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF6B7280).withValues(alpha: 0.04),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: () => Navigator.pushNamed(context, '/logs'),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              child: Row(
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: badgeColor.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(icon, color: badgeColor, size: 20),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 14,
-                            color: textDark,
-                          ),
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          subtitle,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: textGray.withValues(alpha: 0.8),
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: badgeBg,
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                    child: Text(
-                      badgeLabel,
-                      style: TextStyle(
-                        color: badgeColor,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
+    return BtRow(
+      leading: BtTypeTile(type: badgeLabel),
+      title: title,
+      subtitle: '${formatInr(entry.amount)} · $timeLabel',
+      trailing: BtBadge(label: badgeLabel, tone: tone),
+      onTap: () => Navigator.pushNamed(context, '/logs'),
     );
   }
 }
@@ -3724,7 +2697,7 @@ class _SupervisorDashboardState extends State<_SupervisorDashboard> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Transaction approved'),
-          backgroundColor: Colors.green,
+          backgroundColor: Color(0xFF067647),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -3733,7 +2706,7 @@ class _SupervisorDashboardState extends State<_SupervisorDashboard> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Failed to approve'),
-          backgroundColor: Colors.red,
+          backgroundColor: Color(0xFFC01048),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -3746,12 +2719,16 @@ class _SupervisorDashboardState extends State<_SupervisorDashboard> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Transaction rejected'),
-          backgroundColor: Colors.red,
+          backgroundColor: Color(0xFFC01048),
           behavior: SnackBarBehavior.floating,
         ),
       );
       _loadAll();
     }
+  }
+  Future<void> _confirmReject(String id) async {
+    final ok = await btConfirm(context, title: 'Reject this entry?', message: 'The person who logged it will see it as rejected.', confirmLabel: 'Reject');
+    if (ok) _handleReject(id);
   }
   @override
   Widget build(BuildContext context) {
@@ -3763,162 +2740,44 @@ class _SupervisorDashboardState extends State<_SupervisorDashboard> {
         .where((t) => t['approvalStatus'] == 'Rejected')
         .length;
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          children: [
-            _summaryChip(
-              '$pendingCount',
-              'Pending',
-              AppTheme.warning,
-              isActive: _activeTab == 'pending',
-              onTap: () => setState(() => _activeTab = 'pending'),
-            ),
-            const SizedBox(width: 8),
-            _summaryChip(
-              '$approvedCount',
-              'Approved',
-              AppTheme.success,
-              isActive: _activeTab == 'approved',
-              onTap: () => setState(() => _activeTab = 'approved'),
-            ),
-            const SizedBox(width: 8),
-            _summaryChip(
-              '$rejectedCount',
-              'Rejected',
-              AppTheme.error,
-              isActive: _activeTab == 'rejected',
-              onTap: () => setState(() => _activeTab = 'rejected'),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        Align(
-          alignment: Alignment.centerRight,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (RoleManager.canAssignTasks) ...[
-                GestureDetector(
-                  onTap: () => Navigator.pushNamed(context, '/assign-task'),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.assignment_turned_in,
-                          size: 14,
-                          color: Colors.white,
-                        ),
-                        SizedBox(width: 4),
-                        Text(
-                          'Assign Task',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-              ],
-              GestureDetector(
-                onTap: _loadAll,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.primarySurface,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.refresh,
-                        size: 14,
-                        color: AppColors.primary,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Refresh',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 24),
-        const Text(
-          'Tasks Assigned',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: AppColors.textDark,
-          ),
+        BtSegmented<String>(
+          segments: {
+            'pending': 'Pending · $pendingCount',
+            'approved': 'Approved · $approvedCount',
+            'rejected': 'Rejected · $rejectedCount',
+          },
+          value: _activeTab,
+          onChanged: (v) => setState(() => _activeTab = v),
         ),
         const SizedBox(height: 12),
+        Row(children: [
+          if (RoleManager.canAssignTasks) ...[
+            Expanded(child: BtButton(label: 'Assign Task', icon: Icons.assignment_turned_in_outlined, small: true, onPressed: () => Navigator.pushNamed(context, '/assign-task'))),
+            const SizedBox(width: 8),
+          ],
+          Expanded(child: BtButton(label: 'Refresh', icon: Icons.refresh_rounded, small: true, variant: BtButtonVariant.secondary, onPressed: _loadAll)),
+        ]),
+        const SizedBox(height: 24),
+        const BtSectionHeader(title: 'Tasks assigned'),
         if (_tasks.isEmpty)
-          const AppEmptyState(
-            icon: Icons.task_alt,
-            message: 'No tasks currently active.',
-          )
+          const BtCard(child: BtEmpty(icon: Icons.task_alt, title: 'No tasks currently active.'))
         else
-          ..._tasks.map(
-            (task) => _TaskCard(
-              task: task,
-              onEdit: () => Navigator.pushNamed(context, '/update-progress', arguments: {'task': task}).then((_) {
-                if (context.mounted) _loadAll();
-              }),
-            ),
-          ),
+          BtGroup(children: [
+            for (final task in _tasks)
+              _TaskCard(
+                task: task,
+                onEdit: () => Navigator.pushNamed(context, '/update-progress', arguments: {'task': task}).then((_) {
+                  if (context.mounted) _loadAll();
+                }),
+              ),
+          ]),
         const SizedBox(height: 24),
         if (_isLoading)
-          Padding(
-            padding: EdgeInsets.symmetric(vertical: 40),
-            child: Center(
-              child: CircularProgressIndicator(color: AppColors.primary),
-            ),
-          )
+          const BtSkeletonList(count: 3)
         else if (_error != null)
-          Padding(
-            padding: const EdgeInsets.all(24),
-            child: Center(
-              child: Column(
-                children: [
-                  Text(
-                    _error!,
-                    style: const TextStyle(color: AppColors.textLight),
-                  ),
-                  const SizedBox(height: 12),
-                  ElevatedButton(
-                    onPressed: _loadAll,
-                    child: const Text('Retry'),
-                  ),
-                ],
-              ),
-            ),
-          )
+          BtErrorCard(message: _error!, onRetry: _loadAll)
         else
           _buildActiveTabContent(
             pendingCount: pendingCount,
@@ -3942,7 +2801,7 @@ class _SupervisorDashboardState extends State<_SupervisorDashboard> {
           items: approved,
           emptyMessage: 'No approved entries yet',
           emptyIcon: Icons.check_circle_outline,
-          emptyColor: AppTheme.success,
+          emptyColor: Bt.green,
         );
       case 'rejected':
         final rejected = _historyTransactions
@@ -3952,66 +2811,26 @@ class _SupervisorDashboardState extends State<_SupervisorDashboard> {
           items: rejected,
           emptyMessage: 'No rejected entries',
           emptyIcon: Icons.cancel_outlined,
-          emptyColor: AppTheme.error,
+          emptyColor: Bt.red,
         );
       default:
         return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             if (pendingCount == 0)
-              Container(
-                width: double.infinity,
-                margin: const EdgeInsets.only(top: 8),
-                padding: const EdgeInsets.symmetric(vertical: 40),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.04),
-                      blurRadius: 8,
-                    ),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    Icon(
-                      Icons.check_circle_outline,
-                      size: 48,
-                      color: AppColors.textLight.withValues(alpha: 0.5),
-                    ),
-                    const SizedBox(height: 12),
-                    const Text(
-                      'No pending approvals',
-                      style: TextStyle(
-                        color: AppColors.textLight,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    const Text(
-                      'Pull down to refresh',
-                      style: TextStyle(
-                        color: AppColors.textLight,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              )
+              const BtCard(child: BtEmpty(icon: Icons.check_circle_outline, title: 'No pending approvals', message: 'Pull down to refresh'))
             else ...[
-              const AppSectionHeader(title: 'Pending Approvals'),
-              const SizedBox(height: 8),
-              ..._pendingTransactions.map(
-                (tx) => _PendingTxCard(
-                  tx: tx as Map<String, dynamic>,
-                  onApprove: () => _handleApprove(tx['_id']?.toString() ?? ''),
-                  onReject: () => _handleReject(tx['_id']?.toString() ?? ''),
-                ),
-              ),
+              const BtSectionHeader(title: 'Pending approvals'),
+              BtGroup(children: [
+                for (final tx in _pendingTransactions)
+                  _PendingTxCard(
+                    tx: tx as Map<String, dynamic>,
+                    onApprove: () => _handleApprove(tx['_id']?.toString() ?? ''),
+                    onReject: () => _confirmReject(tx['_id']?.toString() ?? ''),
+                  ),
+              ]),
             ],
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
             _buildRecentHistorySection(),
           ],
         );
@@ -4039,45 +2858,13 @@ class _SupervisorDashboardState extends State<_SupervisorDashboard> {
           });
     final recent = combined.take(10).toList();
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const AppSectionHeader(title: 'Recent History'),
-        const SizedBox(height: 8),
+        const BtSectionHeader(title: 'Recent history'),
         if (recent.isEmpty)
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 32),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.04),
-                  blurRadius: 8,
-                ),
-              ],
-            ),
-            child: Column(
-              children: [
-                Icon(
-                  Icons.history,
-                  size: 40,
-                  color: AppColors.textLight.withValues(alpha: 0.4),
-                ),
-                const SizedBox(height: 10),
-                const Text(
-                  'No history yet',
-                  style: TextStyle(
-                    color: AppColors.textLight,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          )
+          const BtCard(child: BtEmpty(icon: Icons.history, title: 'No history yet'))
         else
-          ...recent.map((tx) => _HistoryTxCard(tx: tx as Map<String, dynamic>)),
+          BtGroup(children: [for (final tx in recent) _HistoryTxCard(tx: tx as Map<String, dynamic>)]),
       ],
     );
   }
@@ -4088,100 +2875,16 @@ class _SupervisorDashboardState extends State<_SupervisorDashboard> {
     required Color emptyColor,
   }) {
     if (items.isEmpty) {
-      return Container(
-        width: double.infinity,
-        margin: const EdgeInsets.only(top: 8),
-        padding: const EdgeInsets.symmetric(vertical: 40),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 8,
-            ),
-          ],
-        ),
-        child: Column(
-          children: [
-            Icon(emptyIcon, size: 48, color: emptyColor.withValues(alpha: 0.4)),
-            const SizedBox(height: 12),
-            Text(
-              emptyMessage,
-              style: const TextStyle(
-                color: AppColors.textLight,
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Total history loaded: ${_historyTransactions.length}',
-              style: const TextStyle(fontSize: 11, color: AppColors.textLight),
-            ),
-          ],
-        ),
+      return BtCard(
+        child: BtEmpty(icon: emptyIcon, title: emptyMessage, message: 'Total history loaded: ${_historyTransactions.length}'),
       );
     }
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        AppSectionHeader(
-          title: _activeTab == 'approved'
-              ? 'Recently Approved'
-              : 'Recently Rejected',
-        ),
-        const SizedBox(height: 8),
-        ...items.map((tx) => _HistoryTxCard(tx: tx as Map<String, dynamic>)),
+        BtSectionHeader(title: _activeTab == 'approved' ? 'Recently approved' : 'Recently rejected'),
+        BtGroup(children: [for (final tx in items) _HistoryTxCard(tx: tx as Map<String, dynamic>)]),
       ],
-    );
-  }
-  Widget _summaryChip(
-    String count,
-    String label,
-    Color color, {
-    bool isActive = false,
-    VoidCallback? onTap,
-  }) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            color: isActive
-                ? color.withValues(alpha: 0.18)
-                : color.withValues(alpha: 0.07),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: isActive ? color : color.withValues(alpha: 0.25),
-              width: isActive ? 2 : 1,
-            ),
-          ),
-          child: Column(
-            children: [
-              Text(
-                count,
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                  color: color,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: color,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }
@@ -4199,163 +2902,31 @@ class _PendingTxCard extends StatelessWidget {
     final title = tx['title']?.toString() ?? 'Entry';
     final amount = (tx['amount'] as num?)?.toDouble() ?? 0.0;
     final type = tx['type']?.toString() ?? '';
-    final createdByName =
-        (tx['createdBy'] is Map ? tx['createdBy']['name'] : null)?.toString() ??
-        'Unknown';
-    final createdByRole =
-        (tx['createdBy'] is Map ? tx['createdBy']['role'] : null)?.toString() ??
-        '';
-    final projectName =
-        (tx['project'] is Map ? tx['project']['projectName'] : null)
-            ?.toString() ??
-        'Unknown Project';
-    String dateStr = '';
-    final rawDate = tx['date'] ?? tx['createdAt'];
-    if (rawDate != null) {
-      try {
-        final d = DateTime.parse(rawDate.toString()).toLocal();
-        const months = [
-          'Jan',
-          'Feb',
-          'Mar',
-          'Apr',
-          'May',
-          'Jun',
-          'Jul',
-          'Aug',
-          'Sep',
-          'Oct',
-          'Nov',
-          'Dec',
-        ];
-        dateStr = '${d.day} ${months[d.month - 1]} ${d.year}';
-      } catch (_) {}
-    }
-    IconData typeIcon;
-    Color typeColor;
-    switch (type.toLowerCase()) {
-      case 'wages':
-        typeIcon = Icons.people_outlined;
-        typeColor = const Color(0xFF2E7D32);
-        break;
-      case 'expense':
-        typeIcon = Icons.precision_manufacturing_outlined;
-        typeColor = const Color(0xFFE65100);
-        break;
-      default:
-        typeIcon = Icons.category_outlined;
-        typeColor = AppColors.primary;
-    }
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: typeColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(11),
-                ),
-                child: Icon(typeIcon, color: typeColor, size: 20),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textDark,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    Text(
-                      '$createdByName${createdByRole.isNotEmpty ? ' · $createdByRole' : ''}',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textLight,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Text(
-                '₹${amount.toStringAsFixed(0)}',
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.primary,
-                ),
-              ),
-            ],
+    final role = _txRole(tx);
+    final dateStr = _txDate(tx['date'] ?? tx['createdAt']);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          BtTypeTile(type: _txTypeWord(type, title)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(title, maxLines: 2, overflow: TextOverflow.ellipsis, style: BtText.body(context, weight: FontWeight.w500)),
+              Text('${_txWho(tx)}${role.isNotEmpty ? ' · $role' : ''}', style: BtText.caption(context)),
+              Text([_txProject(tx), dateStr].where((x) => x.isNotEmpty).join(' · '), maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.caption(context)),
+            ]),
           ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              const Icon(
-                Icons.folder_outlined,
-                size: 13,
-                color: AppColors.textLight,
-              ),
-              const SizedBox(width: 4),
-              Expanded(
-                child: Text(
-                  projectName,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textLight,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              if (dateStr.isNotEmpty) ...[
-                const Icon(
-                  Icons.calendar_today_outlined,
-                  size: 12,
-                  color: AppColors.textLight,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  dateStr,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textLight,
-                  ),
-                ),
-              ],
-            ],
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: AppButton(
-                  label: 'Approve',
-                  icon: Icons.check_circle_outline,
-                  onPressed: onApprove,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: AppButton(
-                  label: 'Reject',
-                  icon: Icons.cancel_outlined,
-                  variant: AppButtonVariant.danger,
-                  onPressed: onReject,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
+          const SizedBox(width: 8),
+          Text(formatInr(amount), style: BtText.num(BtText.body(context, weight: FontWeight.w600))),
+        ]),
+        const SizedBox(height: 12),
+        Row(children: [
+          Expanded(child: BtButton(label: 'Reject', variant: BtButtonVariant.destructive, small: true, onPressed: onReject)),
+          const SizedBox(width: 10),
+          Expanded(child: BtButton(label: 'Approve', icon: Icons.check_rounded, small: true, onPressed: onApprove)),
+        ]),
+      ]),
     );
   }
 }
@@ -4368,241 +2939,27 @@ class _HistoryTxCard extends StatelessWidget {
     final amount = (tx['amount'] as num?)?.toDouble() ?? 0.0;
     final type = tx['type']?.toString() ?? '';
     final approvalStatus = tx['approvalStatus']?.toString() ?? '';
-    final createdByName =
-        (tx['createdBy'] is Map ? tx['createdBy']['name'] : null)?.toString() ??
-        'Unknown';
-    final projectName =
-        (tx['project'] is Map ? tx['project']['projectName'] : null)
-            ?.toString() ??
-        'Unknown Project';
     final approvedByName =
         (tx['approvedBy'] is Map ? tx['approvedBy']['name'] : null)?.toString();
     final rejectionReason = tx['rejectionReason']?.toString() ?? '';
-    String dateStr = '';
-    final rawDate = tx['approvedAt'] ?? tx['date'] ?? tx['createdAt'];
-    if (rawDate != null) {
-      try {
-        final d = DateTime.parse(rawDate.toString()).toLocal();
-        const months = [
-          'Jan',
-          'Feb',
-          'Mar',
-          'Apr',
-          'May',
-          'Jun',
-          'Jul',
-          'Aug',
-          'Sep',
-          'Oct',
-          'Nov',
-          'Dec',
-        ];
-        dateStr = '${d.day} ${months[d.month - 1]} ${d.year}';
-      } catch (_) {}
-    }
+    final dateStr = _txDate(tx['approvedAt'] ?? tx['date'] ?? tx['createdAt']);
     final bool isApproved = approvalStatus == 'Approved';
-    IconData typeIcon;
-    Color typeColor;
-    switch (type.toLowerCase()) {
-      case 'wages':
-        typeIcon = Icons.people_outlined;
-        typeColor = const Color(0xFF2E7D32);
-        break;
-      case 'expense':
-        typeIcon = Icons.precision_manufacturing_outlined;
-        typeColor = const Color(0xFFE65100);
-        break;
-      default:
-        typeIcon = Icons.category_outlined;
-        typeColor = AppColors.primary;
-    }
-    final statusColor = isApproved ? const Color(0xFF059669) : Colors.red;
-    final statusBg = isApproved
-        ? const Color(0xFFD1FAE5)
-        : const Color(0xFFFFEEEE);
-    final statusIcon = isApproved
-        ? Icons.check_circle_rounded
-        : Icons.cancel_rounded;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: statusColor.withValues(alpha: 0.2),
-            width: 1.2,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.03),
-              blurRadius: 6,
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 38,
-                  height: 38,
-                  decoration: BoxDecoration(
-                    color: typeColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(typeIcon, color: typeColor, size: 18),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textDark,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      Text(
-                        createdByName,
-                        style: const TextStyle(
-                          fontSize: 11.5,
-                          color: AppColors.textLight,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      '₹${amount.toStringAsFixed(0)}',
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.textDark,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: statusBg,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(statusIcon, size: 11, color: statusColor),
-                          const SizedBox(width: 3),
-                          Text(
-                            approvalStatus,
-                            style: TextStyle(
-                              color: statusColor,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                const Icon(
-                  Icons.folder_outlined,
-                  size: 12,
-                  color: AppColors.textLight,
-                ),
-                const SizedBox(width: 4),
-                Expanded(
-                  child: Text(
-                    projectName,
-                    style: const TextStyle(
-                      fontSize: 11.5,
-                      color: AppColors.textLight,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                if (dateStr.isNotEmpty) ...[
-                  const Icon(
-                    Icons.calendar_today_outlined,
-                    size: 11,
-                    color: AppColors.textLight,
-                  ),
-                  const SizedBox(width: 3),
-                  Text(
-                    dateStr,
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: AppColors.textLight,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-            if (approvedByName != null) ...[
-              const SizedBox(height: 4),
-              Row(
-                children: [
-                  Icon(statusIcon, size: 11, color: statusColor),
-                  const SizedBox(width: 4),
-                  Text(
-                    isApproved
-                        ? 'Approved by $approvedByName'
-                        : 'Rejected by $approvedByName',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: statusColor,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-            if (!isApproved && rejectionReason.isNotEmpty) ...[
-              const SizedBox(height: 6),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 7,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.red.withValues(alpha: 0.06),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.red.withValues(alpha: 0.15)),
-                ),
-                child: Text(
-                  'Reason: $rejectionReason',
-                  style: const TextStyle(
-                    fontSize: 11.5,
-                    color: Colors.red,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
+    final lines = <String>[
+      _txWho(tx),
+      [_txProject(tx), dateStr].where((x) => x.isNotEmpty).join(' · '),
+      if (approvedByName != null) isApproved ? 'Approved by $approvedByName' : 'Rejected by $approvedByName',
+      if (!isApproved && rejectionReason.isNotEmpty) 'Reason: $rejectionReason',
+    ];
+    return BtRow(
+      leading: BtTypeTile(type: _txTypeWord(type, title)),
+      title: title,
+      subtitle: lines.join('\n'),
+      subtitleMaxLines: 4,
+      trailing: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.end, children: [
+        Text(formatInr(amount), style: BtText.num(BtText.body(context, weight: FontWeight.w600))),
+        const SizedBox(height: 4),
+        BtBadge(label: approvalStatus, tone: isApproved ? BtTone.green : BtTone.red),
+      ]),
     );
   }
 }
@@ -4643,148 +3000,67 @@ class _MasonDashboardState extends State<_MasonDashboard> {
   @override
   Widget build(BuildContext context) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        AppCard(
-          child: Row(
-            children: [
-              CircleAvatar(
-                radius: 24,
-                backgroundColor: AppTheme.primary.withValues(alpha: 0.12),
-                child: Icon(
-                  Icons.person_outline,
-                  color: AppTheme.primary,
-                  size: 26,
-                ),
-              ),
-              const SizedBox(width: 14),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Good Morning, ${UserSession.roleLabel}',
-                    style: AppTheme.heading3,
-                  ),
-                  Text('Ready for today\'s work', style: AppTheme.caption),
-                ],
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 12),
-        AppButton(
-          label: 'Add Daily Update',
-          icon: Icons.add_circle_outline,
-          onPressed: () => Navigator.pushNamed(context, '/update-progress'),
-        ),
-        const SizedBox(height: 8),
-        AppButton(
-          label: 'Add Material Entry',
-          icon: Icons.category_outlined,
-          variant: AppButtonVariant.outline,
-          onPressed: () => widget.onEntryTap(context, 'material'),
-        ),
-        const SizedBox(height: 16),
-        const Text(
-          'Tasks Assigned',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: AppColors.textDark,
-          ),
-        ),
-        const SizedBox(height: 12),
-        if (_isLoadingTasks)
-          Padding(
-            padding: EdgeInsets.symmetric(vertical: 20),
-            child: Center(
-              child: CircularProgressIndicator(color: AppColors.primary),
+        BtCard(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Text('Good Morning, ${UserSession.roleLabel}', style: BtText.headline(context)),
+            Text('Ready for today\'s work', style: BtText.subhead(context)),
+            const SizedBox(height: 14),
+            BtButton(
+              label: 'Add Daily Update',
+              icon: Icons.add_task_rounded,
+              onPressed: () => Navigator.pushNamed(context, '/update-progress'),
             ),
-          )
-        else if (_tasks.isEmpty)
-          const AppEmptyState(
-            icon: Icons.task_alt,
-            message: 'No tasks currently active.',
-          )
-        else
-          ..._tasks.map(
-            (task) => _TaskCard(
-              task: task,
-              onEdit: task.status != 'Completed'
-                  ? () => Navigator.pushNamed(context, '/update-progress', arguments: {'task': task}).then((_) {
-                      if (context.mounted) _loadTasks();
-                    })
-                  : null,
+            const SizedBox(height: 10),
+            BtButton(
+              label: 'Add Material Entry',
+              icon: Icons.inventory_2_outlined,
+              variant: BtButtonVariant.secondary,
+              onPressed: () => widget.onEntryTap(context, 'material'),
             ),
-          ),
+          ]),
+        ),
         const SizedBox(height: 24),
-        AppSectionHeader(
-          title: 'Recent Entries',
-          actionLabel: 'View All',
+        const BtSectionHeader(title: 'Tasks assigned'),
+        if (_isLoadingTasks)
+          const BtSkeletonList(count: 2)
+        else if (_tasks.isEmpty)
+          const BtCard(child: BtEmpty(icon: Icons.task_alt, title: 'No tasks currently active.'))
+        else
+          BtGroup(children: [
+            for (final task in _tasks)
+              _TaskCard(
+                task: task,
+                onEdit: task.status != 'Completed'
+                    ? () => Navigator.pushNamed(context, '/update-progress', arguments: {'task': task}).then((_) {
+                        if (context.mounted) _loadTasks();
+                      })
+                    : null,
+              ),
+          ]),
+        const SizedBox(height: 24),
+        BtSectionHeader(
+          title: 'Recent entries',
+          action: 'View all',
           onAction: () => Navigator.pushNamed(context, '/logs'),
         ),
-        const SizedBox(height: 8),
         FutureBuilder<List<dynamic>>(
           future: _recentEntriesFuture,
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
-              return Padding(
-                padding: EdgeInsets.symmetric(vertical: 30),
-                child: Center(
-                  child: CircularProgressIndicator(color: AppTheme.primary),
-                ),
-              );
+              return const BtSkeletonList(count: 3);
             }
             if (snapshot.hasError) {
-              return Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Text(
-                  'Failed to load recent entries.',
-                  style: TextStyle(color: Colors.red),
-                ),
-              );
+              return const BtErrorCard(message: 'Failed to load recent entries.');
             }
             final entries = snapshot.data ?? [];
             if (entries.isEmpty) {
-              return Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 28),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(14),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.04),
-                      blurRadius: 8,
-                    ),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    Icon(
-                      Icons.inbox_outlined,
-                      size: 36,
-                      color: AppColors.textLight,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'No entries yet',
-                      style: TextStyle(
-                        color: AppColors.textLight,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              );
+              return const BtCard(child: BtEmpty(icon: Icons.inbox_outlined, title: 'No entries yet'));
             }
-            return Column(
-              children: entries
-                  .take(5)
-                  .map((e) => _recentEntryTile(e as Map<String, dynamic>))
-                  .toList(),
-            );
+            return BtGroup(children: [
+              for (final e in entries.take(5)) _recentEntryTile(e as Map<String, dynamic>),
+            ]);
           },
         ),
       ],
@@ -4806,119 +3082,12 @@ class _MasonDashboardState extends State<_MasonDashboard> {
         timeLabel = relativeTimeLabel(d);
       } catch (_) {}
     }
-    IconData icon;
-    Color iconColor;
-    Color iconBg;
-    switch (type.toLowerCase()) {
-      case 'wages':
-        icon = Icons.people_outlined;
-        iconColor = const Color(0xFF2E7D32);
-        iconBg = const Color(0xFFE8F5E9);
-        break;
-      case 'expense':
-        icon = Icons.precision_manufacturing_outlined;
-        iconColor = const Color(0xFFE65100);
-        iconBg = const Color(0xFFFFF3E0);
-        break;
-      default:
-        icon = Icons.category_outlined;
-        iconColor = AppColors.primary;
-        iconBg = const Color(0xFFEEF0FF);
-    }
-    Color statusColor;
-    Color statusBg;
-    switch (approvalStatus.toLowerCase()) {
-      case 'approved':
-        statusColor = const Color(0xFF059669);
-        statusBg = const Color(0xFFD1FAE5);
-        break;
-      case 'rejected':
-        statusColor = Colors.red;
-        statusBg = const Color(0xFFFFEEEE);
-        break;
-      default:
-        statusColor = const Color(0xFFD97706);
-        statusBg = const Color(0xFFFEF3C7);
-    }
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Material(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        child: InkWell(
-          onTap: () => Navigator.pushNamed(context, '/logs'),
-          borderRadius: BorderRadius.circular(14),
-          child: Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(14),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.04),
-                  blurRadius: 8,
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: iconBg,
-                    borderRadius: BorderRadius.circular(11),
-                  ),
-                  child: Icon(icon, color: iconColor, size: 20),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 13.5,
-                          color: AppColors.textDark,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '₹${amount.toStringAsFixed(0)}${timeLabel.isNotEmpty ? ' • $timeLabel' : ''}',
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          color: AppColors.textLight,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: statusBg,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    approvalStatus,
-                    style: TextStyle(
-                      color: statusColor,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
+    return BtRow(
+      leading: BtTypeTile(type: _txTypeWord(type, title)),
+      title: title,
+      subtitle: [formatInr(amount), timeLabel].where((x) => x.isNotEmpty).join(' · '),
+      trailing: BtBadge(label: approvalStatus, tone: BtBadge.toneFor(approvalStatus)),
+      onTap: () => Navigator.pushNamed(context, '/logs'),
     );
   }
 }
@@ -4949,94 +3118,26 @@ class _ApprovalsAlertWidgetState extends State<ApprovalsAlertWidget> {
   @override
   Widget build(BuildContext context) {
     if (_loaded && _pendingCount == 0) return const SizedBox.shrink();
-    return GestureDetector(
-      onTap: () => Navigator.pushNamed(context, '/approvals'),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFFE8E5FF), Color(0xFFF0EEFF)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: BtCard(
+        variant: BtCardVariant.attention,
+        onTap: () => Navigator.pushNamed(context, '/approvals'),
+        child: Row(children: [
+          BtTile(icon: Icons.inbox_outlined, bg: context.bt.brandSoft, fg: context.bt.brand, size: 44),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(
+                _loaded ? '$_pendingCount Approval${_pendingCount == 1 ? "" : "s"} Pending' : 'Checking Approvals…',
+                style: BtText.headline(context),
+              ),
+              const SizedBox(height: 2),
+              Text('Review pending project updates and expenses.', style: BtText.subhead(context)),
+            ]),
           ),
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.primary.withValues(alpha: 0.15),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-          border: Border.all(
-            color: AppColors.primary.withValues(alpha: 0.3),
-            width: 1.5,
-          ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.primary.withValues(alpha: 0.2),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Icon(
-                Icons.warning_amber_rounded,
-                color: AppColors.primary,
-                size: 24,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    _loaded
-                        ? '$_pendingCount Approval${_pendingCount == 1 ? "" : "s"} Pending'
-                        : 'Checking Approvals…',
-                    style: const TextStyle(
-                      color: AppColors.textDark,
-                      fontWeight: FontWeight.w800,
-                      fontSize: 16.5,
-                      letterSpacing: -0.2,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'Review pending project updates and expenses.',
-                    style: TextStyle(
-                      color: AppColors.textMedium,
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                color: AppColors.primary,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.chevron_right,
-                color: Colors.white,
-                size: 20,
-              ),
-            ),
-          ],
-        ),
+          const Icon(Icons.chevron_right_rounded, color: Bt.placeholder),
+        ]),
       ),
     );
   }
@@ -5150,120 +3251,37 @@ class _TeamApprovalHistoryWidgetState
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return Padding(
-        padding: EdgeInsets.symmetric(vertical: 12),
-        child: Center(
-          child: CircularProgressIndicator(
-            color: AppColors.primary,
-            strokeWidth: 2,
-          ),
-        ),
-      );
+      return const BtSkeleton(height: 120, radius: 16);
     }
     final shown = _expanded ? _history : _history.take(3).toList();
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.95),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.6),
-          width: 1.5,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF6B7280).withValues(alpha: 0.04),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(
-                    Icons.people_outline,
-                    color: AppColors.primary,
-                    size: 16,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                const Expanded(
-                  child: Text(
-                    'Team Approval History',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textDark,
-                    ),
-                  ),
-                ),
-                if (_history.isNotEmpty)
-                  GestureDetector(
-                    onTap: () => setState(() => _expanded = !_expanded),
-                    child: Text(
-                      _expanded ? 'Show Less' : 'Show All',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          const Divider(height: 1, color: Color(0xFFF0EEF8)),
-          if (_history.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-              child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.fact_check_outlined,
-                      size: 30,
-                      color: AppColors.textLight.withValues(alpha: 0.5),
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'No approval requests yet',
-                      style: TextStyle(
-                        color: AppColors.textLight,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
+    return BtGroup(
+      insetDividers: false,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 4, 8),
+          child: Row(children: [
+            const Icon(Icons.groups_outlined, size: 20, color: Bt.ink2),
+            const SizedBox(width: 10),
+            Expanded(child: Text('Team approval history', style: BtText.body(context, weight: FontWeight.w600))),
+            if (_history.isNotEmpty)
+              TextButton(
+                onPressed: () => setState(() => _expanded = !_expanded),
+                child: Text(_expanded ? 'Show less' : 'Show all', style: BtText.subhead(context, weight: FontWeight.w600, color: context.bt.brand)),
               ),
-            )
-          else
-            ...shown.map((tx) => _historyTile(tx as Map<String, dynamic>)),
-        ],
-      ),
+          ]),
+        ),
+        if (_history.isEmpty)
+          const BtEmpty(icon: Icons.fact_check_outlined, title: 'No approval requests yet')
+        else
+          for (final tx in shown) _historyTile(tx as Map<String, dynamic>),
+      ],
     );
   }
   Widget _historyTile(Map<String, dynamic> tx) {
     final title = tx['title']?.toString() ?? 'Entry';
     final amount = (tx['amount'] as num?)?.toDouble() ?? 0.0;
     final approvalStatus = tx['approvalStatus']?.toString() ?? '';
-    final createdByName =
-        (tx['createdBy'] is Map ? tx['createdBy']['name'] : null)?.toString() ??
-        'Unknown';
-    final createdByRole =
-        (tx['createdBy'] is Map ? tx['createdBy']['role'] : null)?.toString() ??
-        '';
+    final createdByRole = _txRole(tx);
     final approvedByName =
         (tx['approvedBy'] is Map ? tx['approvedBy']['name'] : null)?.toString();
     final type = tx['type']?.toString() ?? '';
@@ -5276,117 +3294,46 @@ class _TeamApprovalHistoryWidgetState
       } catch (_) {}
     }
     final isApproved = approvalStatus == 'Approved';
-    final statusColor = isApproved ? const Color(0xFF059669) : Colors.red;
-    final statusBg = isApproved
-        ? const Color(0xFFD1FAE5)
-        : const Color(0xFFFFEEEE);
-    IconData typeIcon;
-    Color typeColor;
-    switch (type.toLowerCase()) {
-      case 'wages':
-        typeIcon = Icons.people_outlined;
-        typeColor = const Color(0xFF2E7D32);
-        break;
-      case 'expense':
-        typeIcon = Icons.precision_manufacturing_outlined;
-        typeColor = const Color(0xFFE65100);
-        break;
-      default:
-        typeIcon = Icons.category_outlined;
-        typeColor = AppColors.primary;
-    }
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: typeColor.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(typeIcon, color: typeColor, size: 18),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13,
-                    color: AppColors.textDark,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'By $createdByName${createdByRole.isNotEmpty ? ' · $createdByRole' : ''}${dateStr.isNotEmpty ? ' · $dateStr' : ''}',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: AppColors.textLight,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                if (approvedByName != null) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    isApproved
-                        ? 'Approved by $approvedByName'
-                        : 'Rejected by $approvedByName',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: statusColor,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                '₹${amount.toStringAsFixed(0)}',
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textDark,
-                ),
-              ),
-              const SizedBox(height: 3),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: statusBg,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  approvalStatus,
-                  style: TextStyle(
-                    color: statusColor,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
+    final lines = <String>[
+      'By ${_txWho(tx)}${createdByRole.isNotEmpty ? ' · $createdByRole' : ''}${dateStr.isNotEmpty ? ' · $dateStr' : ''}',
+      if (approvedByName != null) isApproved ? 'Approved by $approvedByName' : 'Rejected by $approvedByName',
+    ];
+    return BtRow(
+      leading: BtTypeTile(type: _txTypeWord(type, title)),
+      title: title,
+      subtitle: lines.join('\n'),
+      subtitleMaxLines: 3,
+      trailing: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.end, children: [
+        Text(formatInr(amount), style: BtText.num(BtText.subhead(context, weight: FontWeight.w600, color: Bt.ink))),
+        const SizedBox(height: 4),
+        BtBadge(label: approvalStatus, tone: isApproved ? BtTone.green : BtTone.red),
+      ]),
     );
   }
 }
 
-
-
+// ───────── Redesign helpers for home cards ─────────
+String _txWho(Map<String, dynamic> tx) =>
+    (tx['createdBy'] is Map ? tx['createdBy']['name'] : null)?.toString() ?? 'Unknown';
+String _txRole(Map<String, dynamic> tx) =>
+    (tx['createdBy'] is Map ? tx['createdBy']['role'] : null)?.toString() ?? '';
+String _txProject(Map<String, dynamic> tx) =>
+    (tx['project'] is Map ? tx['project']['projectName'] : null)?.toString() ?? 'Unknown Project';
+String _txDate(dynamic raw) {
+  if (raw == null) return '';
+  try {
+    return formatDate(DateTime.parse(raw.toString()).toLocal());
+  } catch (_) {
+    return '';
+  }
+}
+String _txTypeWord(String type, String title) {
+  switch (type.toLowerCase()) {
+    case 'wages':
+      return 'labour';
+    case 'expense':
+      return 'equipment';
+    default:
+      return '$type $title';
+  }
+}

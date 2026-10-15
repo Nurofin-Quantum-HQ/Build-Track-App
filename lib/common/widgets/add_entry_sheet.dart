@@ -1,3 +1,4 @@
+import 'package:buildtrack_mobile/design/design.dart';
 import 'package:buildtrack_mobile/common/themes/app_colors.dart';
 import 'package:flutter/material.dart';
 class _EntryType {
@@ -25,7 +26,7 @@ const _entryTypes = [
     subtitle: 'Log concrete, steel, timber or any raw material used on site.',
     icon: Icons.inventory_2_outlined,
     iconColor: AppColors.primaryBlue,
-    iconBg: Color(0xFFEEF0FF),
+    iconBg: Color(0xFFE8F1FC),
     route: '/add-material',
   ),
   _EntryType(
@@ -33,8 +34,8 @@ const _entryTypes = [
     title: 'Labour',
     subtitle: 'Record worker hours, headcount and wages for the shift.',
     icon: Icons.people_outline,
-    iconColor: Color(0xFF2E7D32),
-    iconBg: Color(0xFFE8F5E9),
+    iconColor: Color(0xFF067647),
+    iconBg: Color(0xFFE7F6EE),
     route: '/add-labour',
   ),
   _EntryType(
@@ -42,8 +43,8 @@ const _entryTypes = [
     title: 'Equipment',
     subtitle: 'Track machinery usage, fuel consumption and operating costs.',
     icon: Icons.construction_outlined,
-    iconColor: Color(0xFFE65100),
-    iconBg: Color(0xFFFFF3E0),
+    iconColor: Color(0xFFB54708),
+    iconBg: Color(0xFFFEF3E7),
     route: '/add-equipment',
   ),
 ];
@@ -86,7 +87,7 @@ class _AddEntrySheetState extends State<_AddEntrySheet> {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFDDE0F0),
+                    color: const Color(0xFFE4E7EC),
                     borderRadius: BorderRadius.circular(16),
                   ),
                 ),
@@ -96,7 +97,7 @@ class _AddEntrySheetState extends State<_AddEntrySheet> {
                 'What are you adding?',
                 style: TextStyle(
                   fontSize: 22,
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.w700,
                   color: textDark,
                   letterSpacing: -0.3,
                 ),
@@ -152,10 +153,10 @@ class _EntryCard extends StatelessWidget {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
       decoration: BoxDecoration(
-        color: isSelected ? const Color(0xFFF0F2FF) : const Color(0xFFF8F9FF),
-        borderRadius: BorderRadius.circular(18),
+        color: isSelected ? const Color(0xFFE8F1FC) : const Color(0xFFF6F7F9),
+        borderRadius: BorderRadius.circular(Bt.rCard),
         border: Border.all(
-          color: isSelected ? primaryBlue : const Color(0xFFE0E5FF),
+          color: isSelected ? primaryBlue : const Color(0xFFE8F1FC),
           width: isSelected ? 2 : 1.5,
         ),
         boxShadow: isSelected
@@ -170,9 +171,9 @@ class _EntryCard extends StatelessWidget {
       ),
       child: Material(
         color: Colors.transparent,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(Bt.rCard),
         child: InkWell(
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(Bt.rCard),
           onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -199,7 +200,7 @@ class _EntryCard extends StatelessWidget {
                         type.title,
                         style: TextStyle(
                           fontSize: 16,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w700,
                           color: textDark,
                         ),
                       ),
@@ -207,7 +208,7 @@ class _EntryCard extends StatelessWidget {
                       Text(
                         type.subtitle,
                         style: TextStyle(
-                          fontSize: 12.5,
+                          fontSize: 13,
                           color: textGray,
                           height: 1.45,
                         ),

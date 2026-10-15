@@ -35,13 +35,6 @@ class PremiumCtaButton extends StatelessWidget {
       decoration = BoxDecoration(
         gradient: AppGradients.primaryButton,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.30),
-            blurRadius: 14,
-            offset: const Offset(0, 5),
-          ),
-        ],
       );
       textColor = Colors.white;
       spinnerColor = Colors.white;
@@ -61,13 +54,6 @@ class PremiumCtaButton extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: const Color(0xFFD0D5DD), width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF101828).withValues(alpha: 0.05),
-            blurRadius: 2,
-            offset: const Offset(0, 1),
-          ),
-        ],
       );
       textColor = const Color(0xFF344054);
       spinnerColor = AppColors.primary;

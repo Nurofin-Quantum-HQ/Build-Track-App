@@ -24,6 +24,7 @@ import 'package:buildtrack_mobile/screen/inventory/inventory.dart';
 import 'package:buildtrack_mobile/pages/login.dart';
 import 'package:buildtrack_mobile/screen/inventory/material_history.dart';
 import 'package:buildtrack_mobile/screen/dashboard/notification.dart';
+import 'package:buildtrack_mobile/screen/inbox/inbox_screen.dart';
 import 'package:buildtrack_mobile/screen/profile/profile.dart';
 import 'package:buildtrack_mobile/screen/projects/project_detail.dart';
 import 'package:buildtrack_mobile/screen/projects/projectscreen.dart';
@@ -137,7 +138,7 @@ class MyApp extends StatelessWidget {
       navigatorKey: globalNavigatorKey,
       title: 'BuildTrack',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.lightTheme,
+      theme: AppTheme.build(themeProvider.btTheme),
       initialRoute: isLoggedIn ? '/home' : '/',
       onGenerateInitialRoutes: (initialRouteName) {
         debugPrint('Navigation Started');
@@ -174,6 +175,7 @@ class MyApp extends StatelessWidget {
         '/assign-task': (_) => const AssignTaskScreen(),
         '/project-detail': (_) => const ProjectDetailScreen(),
         '/notifications': (_) => const NotificationsScreen(),
+        '/inbox': (_) => const InboxScreen(),
         '/approvals': (_) => const ApprovalsScreen(),
         '/admin-overview': (_) => const AdminOverviewScreen(),
         '/logs': (_) => const TransactionLogsScreen(),

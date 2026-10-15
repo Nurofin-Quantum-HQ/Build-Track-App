@@ -15,6 +15,8 @@ class NavController extends ChangeNotifier {
         return 3;
       case '/reports':
         return 4;
+      case '/inbox':
+        return 5;
       default:
         return 0;
     }
@@ -25,6 +27,8 @@ class NavController extends ChangeNotifier {
     if (route == '/add-entry') return RoleManager.canAddEntries;
     if (route == '/inventory') return RoleManager.canManageInventory;
     if (route == '/reports') return RoleManager.canViewReports;
+    if (route == '/inbox') return true;
+    if (route == '/logs') return RoleManager.canNavigate('/logs');
     return false;
   }
   void setRoute(String route, BuildContext context) {
@@ -38,9 +42,17 @@ class NavController extends ChangeNotifier {
     if (RoleManager.canViewProjects) items.add('/projects');
     if (RoleManager.canAddEntries) items.add('/add-entry');
     if (RoleManager.canManageInventory) items.add('/inventory');
+    items.add('/inbox');
     if (RoleManager.canViewReports) items.add('/reports');
     return items;
   }
+  /// Record the visible tab without navigating (screen opened directly).
+  void markCurrent(String route) {
+    if (_currentRoute == route) return;
+    _currentRoute = route;
+    notifyListeners();
+  }
+
   void setIndex(int newIndex, BuildContext context) {
     final routeMap = {
       0: '/home',

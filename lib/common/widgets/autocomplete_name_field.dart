@@ -1,3 +1,4 @@
+import 'package:buildtrack_mobile/design/design.dart';
 import 'package:buildtrack_mobile/common/themes/app_colors.dart';
 import 'package:flutter/material.dart';
 class AutocompleteNameField extends StatefulWidget {
@@ -149,13 +150,10 @@ class _AutocompleteNameFieldState extends State<AutocompleteNameField> {
       children: [
         Container(
           decoration: BoxDecoration(
-            border: Border(
-              bottom: BorderSide(
-                color: widget.errorText != null
-                    ? AppColors.error
-                    : AppColors.primary,
-                width: 2,
-              ),
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: widget.errorText != null ? AppColors.error : AppColors.inputBorder,
             ),
           ),
           child: TextField(
@@ -170,11 +168,12 @@ class _AutocompleteNameFieldState extends State<AutocompleteNameField> {
               focusedBorder: InputBorder.none,
               hintText: widget.hint,
               hintStyle: const TextStyle(color: AppColors.textLight),
-              contentPadding: const EdgeInsets.symmetric(vertical: 10),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 15),
               isDense: true,
+              filled: false,
               suffixIcon: widget.suggestions.isNotEmpty
                   ? Padding(
-                      padding: EdgeInsets.only(right: 2),
+                      padding: EdgeInsets.only(right: 12),
                       child: Icon(
                         Icons.auto_awesome,
                         size: 16,
@@ -189,7 +188,7 @@ class _AutocompleteNameFieldState extends State<AutocompleteNameField> {
             ),
             style: const TextStyle(
               fontSize: 16,
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w500,
               color: AppColors.textDark,
             ),
           ),
@@ -201,7 +200,7 @@ class _AutocompleteNameFieldState extends State<AutocompleteNameField> {
               widget.errorText!,
               style: const TextStyle(
                 color: AppColors.error,
-                fontSize: 11.5,
+                fontSize: 13,
                 fontStyle: FontStyle.italic,
               ),
             ),
@@ -277,14 +276,7 @@ class _SuggestionDropdown extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE0E5FF), width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.12),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
-          ),
-        ],
+        border: Border.all(color: Bt.line),
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
@@ -295,7 +287,7 @@ class _SuggestionDropdown extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
               decoration: const BoxDecoration(
                 color: Color(0xFFF4F5FF),
-                border: Border(bottom: BorderSide(color: Color(0xFFE0E5FF))),
+                border: Border(bottom: BorderSide(color: Color(0xFFE8F1FC))),
               ),
               child: Row(
                 children: [
@@ -308,8 +300,8 @@ class _SuggestionDropdown extends StatelessWidget {
                   Text(
                     'Recent Entries',
                     style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
                       color: AppColors.primary,
                       letterSpacing: 0.5,
                     ),
@@ -320,7 +312,7 @@ class _SuggestionDropdown extends StatelessWidget {
                         ? 'No matches'
                         : '${items.length} match${items.length == 1 ? '' : 'es'}',
                     style: const TextStyle(
-                      fontSize: 10.5,
+                      fontSize: 12,
                       fontWeight: FontWeight.w600,
                       color: AppColors.textLight,
                     ),
@@ -335,7 +327,7 @@ class _SuggestionDropdown extends StatelessWidget {
                 itemCount: items.length + (showAddNew ? 1 : 0),
                 separatorBuilder: (_, p1) => const Divider(
                   height: 1,
-                  color: Color(0xFFF0EEF8),
+                  color: Color(0xFFEEF1F5),
                   indent: 14,
                   endIndent: 14,
                 ),
@@ -398,7 +390,7 @@ class _SuggestionRow extends StatelessWidget {
               height: 36,
               decoration: BoxDecoration(
                 color: isCurrentProject
-                    ? const Color(0xFFEEF0FF)
+                    ? const Color(0xFFE8F1FC)
                     : const Color(0xFFF5F5F5),
                 borderRadius: BorderRadius.circular(10),
               ),
@@ -435,16 +427,16 @@ class _SuggestionRow extends StatelessWidget {
                           Text(
                             rateLabel,
                             style: const TextStyle(
-                              fontSize: 12,
+                              fontSize: 13,
                               fontWeight: FontWeight.w600,
-                              color: Color(0xFF15803D),
+                              color: Color(0xFF067647),
                             ),
                           ),
                         if (rateLabel.isNotEmpty && dateLabel.isNotEmpty)
                           const Text(
                             '  ·  ',
                             style: TextStyle(
-                              fontSize: 12,
+                              fontSize: 13,
                               color: AppColors.textLight,
                             ),
                           ),
@@ -454,7 +446,7 @@ class _SuggestionRow extends StatelessWidget {
                               'Used $dateLabel',
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
-                                fontSize: 11.5,
+                                fontSize: 13,
                                 color: AppColors.textLight,
                               ),
                             ),
@@ -470,13 +462,13 @@ class _SuggestionRow extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFEEF0FF),
-                  borderRadius: BorderRadius.circular(20),
+                  color: const Color(0xFFE8F1FC),
+                  borderRadius: BorderRadius.circular(Bt.rCard),
                 ),
                 child: Text(
                   unit,
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: 13,
                     fontWeight: FontWeight.w700,
                     color: AppColors.primary,
                   ),
@@ -505,13 +497,13 @@ class _AddNewRow extends StatelessWidget {
               width: 36,
               height: 36,
               decoration: BoxDecoration(
-                color: const Color(0xFFF0FDF4),
+                color: const Color(0xFFE7F6EE),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: const Icon(
                 Icons.add_circle_outline_rounded,
                 size: 18,
-                color: Color(0xFF15803D),
+                color: Color(0xFF067647),
               ),
             ),
             const SizedBox(width: 10),
@@ -532,8 +524,8 @@ class _AddNewRow extends StatelessWidget {
                   const Text(
                     'Add as new entry',
                     style: TextStyle(
-                      fontSize: 11.5,
-                      color: Color(0xFF15803D),
+                      fontSize: 13,
+                      color: Color(0xFF067647),
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -543,7 +535,7 @@ class _AddNewRow extends StatelessWidget {
             const Icon(
               Icons.arrow_forward_ios_rounded,
               size: 13,
-              color: Color(0xFF15803D),
+              color: Color(0xFF067647),
             ),
           ],
         ),

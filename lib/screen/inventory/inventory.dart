@@ -1,3 +1,4 @@
+import 'package:buildtrack_mobile/design/design.dart';
 import 'dart:async';
 import 'package:buildtrack_mobile/common/themes/app_colors.dart';
 import 'package:buildtrack_mobile/controller/nav_controller.dart';
@@ -65,7 +66,6 @@ class _InventoryScreenContent extends StatefulWidget {
 class _InventoryScreenContentState extends State<_InventoryScreenContent> {
   final GlobalKey _helpKey = GlobalKey();
   static Color _blue = AppColors.primary;
-  static const Color _bg = AppColors.gradientStart;
   static const Color _dark = AppColors.textDark;
   static const Color _gray = AppColors.textLight;
   final _pageController = PageController();
@@ -386,8 +386,8 @@ class _InventoryScreenContentState extends State<_InventoryScreenContent> {
         vendors.add(r.vendor.toLowerCase());
       }
     }
-    const alertRed = Color(0xFFEF4444);
-    const green = Color(0xFF10B981);
+    const alertRed = Color(0xFFC01048);
+    const green = Color(0xFF067647);
     if (type == 'labour') {
       return [
         _KpiData('Total Days', _fmtNum(totalQty), Icons.groups_outlined, _blue),
@@ -489,26 +489,28 @@ class _InventoryScreenContentState extends State<_InventoryScreenContent> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _bg,
+      backgroundColor: Bt.ground,
       body: SafeArea(
         bottom: false,
         child: Column(
           children: [
-            AppTopBar(
+            BtLargeHeader(
               title: 'Inventory',
-              rightWidget: Row(
+              trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Showcase(
                     key: _helpKey,
                     description: 'Tap here anytime to replay this tour and get help.',
-                    tooltipBackgroundColor: const Color(0xFF1E1E2C),
+                    tooltipBackgroundColor: Bt.ink,
                     textColor: Colors.white,
                     tooltipBorderRadius: BorderRadius.circular(16),
                     tooltipPadding: const EdgeInsets.all(16),
-                    child: IconButton(
-                      icon: Icon(Icons.help_outline, color: AppColors.primary),
-                      onPressed: () {
+                    child: BtIconButton(
+                      icon: Icons.help_outline_rounded,
+                      semantic: 'App guidelines',
+                      color: Bt.ink2,
+                      onTap: () {
                         ShowCaseWidget.of(context).startShowCase([
                           ShowcaseKeys.inventoryProjectContext,
                           ShowcaseKeys.inventoryFilters,
@@ -518,10 +520,14 @@ class _InventoryScreenContentState extends State<_InventoryScreenContent> {
                       },
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  GestureDetector(
-                    onTap: () => Navigator.pushNamed(context, '/profile'),
-                    child: const ProfileAvatar(radius: 18),
+                  Semantics(
+                    button: true,
+                    label: 'Account',
+                    child: InkWell(
+                      customBorder: const CircleBorder(),
+                      onTap: () => Navigator.pushNamed(context, '/profile'),
+                      child: const Padding(padding: EdgeInsets.all(4), child: ProfileAvatar(radius: 18)),
+                    ),
                   ),
                 ],
               ),
@@ -587,13 +593,7 @@ class _InventoryScreenContentState extends State<_InventoryScreenContent> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFFE0E5FF)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 8,
-            ),
-          ],
+          border: Border.all(color: Bt.line),
         ),
         child: Row(
           children: [
@@ -612,10 +612,10 @@ class _InventoryScreenContentState extends State<_InventoryScreenContent> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'PROJECT CONTEXT',
+                    'Project context',
                     style: TextStyle(
-                      fontSize: 9.5,
-                      fontWeight: FontWeight.w800,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
                       color: _gray,
                       letterSpacing: 1.1,
                     ),
@@ -625,7 +625,7 @@ class _InventoryScreenContentState extends State<_InventoryScreenContent> {
                     label,
                     style: const TextStyle(
                       fontSize: 14,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w700,
                       color: _dark,
                     ),
                     overflow: TextOverflow.ellipsis,
@@ -657,21 +657,14 @@ class _InventoryScreenContentState extends State<_InventoryScreenContent> {
     return SizedBox(
       height: 48,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFE8E5F6)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.03),
-              blurRadius: 6,
-            ),
-          ],
+          color: Bt.fill,
+          borderRadius: BorderRadius.circular(Bt.rInput),
         ),
         child: Row(
           children: [
-            const Icon(Icons.search, color: _gray, size: 20),
+            const Icon(Icons.search_rounded, color: Bt.ink3, size: 22),
             const SizedBox(width: 10),
             Expanded(
               child: TextField(
@@ -711,20 +704,16 @@ class _InventoryScreenContentState extends State<_InventoryScreenContent> {
     ];
     const labels = ['Materials', 'Labour', 'Equipment'];
     return Container(
-      padding: const EdgeInsets.all(5),
+      padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE8E5F6)),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 8),
-        ],
+        color: Bt.fill,
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
         children: List.generate(3, (i) {
           final active = i == _tabIndex;
-          final textColor = active ? Colors.white : const Color(0xFF4B4966);
-          final iconColor = active ? Colors.white : const Color(0xFF757299);
+          final textColor = active ? Bt.ink : Bt.ink2;
+          final iconColor = active ? Bt.ink : Bt.ink3;
           Widget tabChild = InkWell(
             onTap: () {
               setState(() => _tabIndex = i);
@@ -737,10 +726,11 @@ class _InventoryScreenContentState extends State<_InventoryScreenContent> {
             borderRadius: BorderRadius.circular(10),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.symmetric(vertical: 11),
+              padding: const EdgeInsets.symmetric(vertical: 9),
               decoration: BoxDecoration(
-                gradient: active ? AppGradients.primaryButton : null,
-                borderRadius: BorderRadius.circular(10),
+                color: active ? Bt.card : null,
+                borderRadius: BorderRadius.circular(9),
+                boxShadow: active ? const [BoxShadow(color: Color(0x1F101828), blurRadius: 2, offset: Offset(0, 1))] : null,
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -751,8 +741,8 @@ class _InventoryScreenContentState extends State<_InventoryScreenContent> {
                     labels[i],
                     style: TextStyle(
                       color: textColor,
-                      fontWeight: active ? FontWeight.w800 : FontWeight.w600,
-                      fontSize: 12.5,
+                      fontWeight: active ? FontWeight.w700 : FontWeight.w600,
+                      fontSize: 13,
                     ),
                   ),
                 ],
@@ -1132,7 +1122,7 @@ class _DateGroupHeaderDelegate extends SliverPersistentHeaderDelegate {
                 label,
                 style: const TextStyle(
                   fontSize: 13,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w700,
                   color: AppColors.textDark,
                   letterSpacing: -0.2,
                 ),
@@ -1147,7 +1137,7 @@ class _DateGroupHeaderDelegate extends SliverPersistentHeaderDelegate {
                 child: Text(
                   '$count ${count == 1 ? "Item" : "Items"}',
                   style: const TextStyle(
-                    fontSize: 10.5,
+                    fontSize: 12,
                     fontWeight: FontWeight.w700,
                     color: AppColors.primaryBlue,
                   ),
@@ -1245,14 +1235,14 @@ class _PurchaseCard extends StatelessWidget {
   }
   Color get _iconBg {
     if (record.type == 'labour') {
-      return const Color(0xFFEEF2FF);
+      return const Color(0xFFE8F1FC);
     }
     if (record.type == 'equipment') {
-      return const Color(0xFFECFDF5);
+      return const Color(0xFFE7F6EE);
     }
     final cat = record.categoryName.toLowerCase();
     if (cat.contains('cement')) {
-      return const Color(0xFFE8F5E9);
+      return const Color(0xFFE7F6EE);
     }
     if (cat.contains('steel') || cat.contains('iron')) {
       return const Color(0xFFE3F2FD);
@@ -1267,20 +1257,20 @@ class _PurchaseCard extends StatelessWidget {
       return const Color(0xFFF3E5F5);
     }
     if (cat.contains('plumb') || cat.contains('pipe')) {
-      return const Color(0xFFE8EAF6);
+      return const Color(0xFFEEF1F5);
     }
-    return const Color(0xFFEEF2FF);
+    return const Color(0xFFE8F1FC);
   }
   Color get _iconColor {
     if (record.type == 'labour') {
       return AppColors.primaryBlue;
     }
     if (record.type == 'equipment') {
-      return const Color(0xFF16A34A);
+      return const Color(0xFF067647);
     }
     final cat = record.categoryName.toLowerCase();
     if (cat.contains('cement')) {
-      return const Color(0xFF4CAF50);
+      return const Color(0xFF067647);
     }
     if (cat.contains('steel') || cat.contains('iron')) {
       return const Color(0xFF1565C0);
@@ -1353,13 +1343,6 @@ class _PurchaseCard extends StatelessWidget {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
-                blurRadius: 10,
-                offset: const Offset(0, 2),
-              ),
-            ],
           ),
           child: Padding(
             padding: const EdgeInsets.all(14),
@@ -1387,7 +1370,7 @@ class _PurchaseCard extends StatelessWidget {
                             record.itemName,
                             style: const TextStyle(
                               fontSize: 14.5,
-                              fontWeight: FontWeight.w800,
+                              fontWeight: FontWeight.w700,
                               color: AppColors.textDark,
                               letterSpacing: -0.2,
                             ),
@@ -1405,7 +1388,7 @@ class _PurchaseCard extends StatelessWidget {
                                       ? '$_vendorLabel: ${record.vendor}'
                                       : '$_vendorLabel: —',
                                   style: TextStyle(
-                                    fontSize: 11.5,
+                                    fontSize: 13,
                                     color: record.vendor.isNotEmpty
                                         ? AppColors.textLight
                                         : AppColors.textLight.withValues(
@@ -1489,30 +1472,30 @@ class _PurchaseCard extends StatelessWidget {
                         const Icon(
                           Icons.check_circle_outline,
                           size: 13,
-                          color: Color(0xFF15803D),
+                          color: Color(0xFF067647),
                         ),
                         const SizedBox(width: 5),
                         Text(
                           '${formatCurrency(record.paidAmount)} Paid',
                           style: const TextStyle(
-                            fontSize: 12,
+                            fontSize: 13,
                             fontWeight: FontWeight.w700,
-                            color: Color(0xFF15803D),
+                            color: Color(0xFF067647),
                           ),
                         ),
                         const SizedBox(width: 16),
                         const Icon(
                           Icons.schedule,
                           size: 13,
-                          color: Color(0xFFDC2626),
+                          color: Color(0xFFC01048),
                         ),
                         const SizedBox(width: 5),
                         Text(
                           '${formatCurrency(pending)} Pending',
                           style: const TextStyle(
-                            fontSize: 12,
+                            fontSize: 13,
                             fontWeight: FontWeight.w700,
-                            color: Color(0xFFDC2626),
+                            color: Color(0xFFC01048),
                           ),
                         ),
                       ],
@@ -1551,7 +1534,7 @@ class _PurchaseCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 10),
-                const Divider(height: 1, color: Color(0xFFF0EEF8)),
+                const Divider(height: 1, color: Color(0xFFEEF1F5)),
                 const SizedBox(height: 10),
                 Row(
                   children: [
@@ -1675,7 +1658,7 @@ class _PurchaseCard extends StatelessWidget {
   Widget _vertDivider() => Container(
     width: 1,
     height: 28,
-    color: const Color(0xFFE5E7EB),
+    color: const Color(0xFFE4E7EC),
     margin: const EdgeInsets.symmetric(horizontal: 4),
   );
 }
@@ -1691,8 +1674,8 @@ class _MetricCell extends StatelessWidget {
           value,
           style: TextStyle(
             fontSize: highlight ? 14 : 12.5,
-            fontWeight: highlight ? FontWeight.w900 : FontWeight.w700,
-            color: highlight ? AppColors.primaryBlue : Color(0xFF1A1A2E),
+            fontWeight: highlight ? FontWeight.w700 : FontWeight.w700,
+            color: highlight ? AppColors.primaryBlue : Color(0xFF101828),
             letterSpacing: -0.2,
           ),
           textAlign: TextAlign.center,
@@ -1703,7 +1686,7 @@ class _MetricCell extends StatelessWidget {
         Text(
           label,
           style: const TextStyle(
-            fontSize: 9.5,
+            fontSize: 12,
             color: AppColors.textLight,
             fontWeight: FontWeight.w600,
           ),
@@ -1734,13 +1717,6 @@ class _PurchaseActionBtn extends StatelessWidget {
         deco = BoxDecoration(
           gradient: AppGradients.primaryButton,
           borderRadius: BorderRadius.circular(10),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.primary.withValues(alpha: 0.15),
-              blurRadius: 6,
-              offset: const Offset(0, 2),
-            ),
-          ],
         );
         color = Colors.white;
         break;
@@ -1772,7 +1748,7 @@ class _PurchaseActionBtn extends StatelessWidget {
               child: Text(
                 label,
                 style: TextStyle(
-                  fontSize: 10.5,
+                  fontSize: 12,
                   fontWeight: FontWeight.w700,
                   color: color,
                 ),
@@ -1823,11 +1799,11 @@ class _FiltersRow extends StatelessWidget {
                       decoration: BoxDecoration(
                         gradient: isActive ? AppGradients.primaryButton : null,
                         color: isActive ? null : Colors.white,
-                        borderRadius: BorderRadius.circular(20),
+                        borderRadius: BorderRadius.circular(Bt.rCard),
                         border: Border.all(
                           color: isActive
                               ? Colors.transparent
-                              : const Color(0xFFDDE0F0),
+                              : const Color(0xFFE4E7EC),
                           width: 1.2,
                         ),
                         boxShadow: isActive
@@ -1847,7 +1823,7 @@ class _FiltersRow extends StatelessWidget {
                         style: TextStyle(
                           color: isActive ? Colors.white : AppColors.textLight,
                           fontWeight: FontWeight.w700,
-                          fontSize: 12.5,
+                          fontSize: 13,
                         ),
                       ),
                     ),
@@ -1882,17 +1858,8 @@ class _FiltersRow extends StatelessWidget {
                 ),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: const Color(0xFFDDE0F0),
-                    width: 1.2,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.04),
-                      blurRadius: 6,
-                    ),
-                  ],
+                  borderRadius: BorderRadius.circular(Bt.rCard),
+                  border: Border.all(color: Bt.line),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -1906,7 +1873,7 @@ class _FiltersRow extends StatelessWidget {
                     Text(
                       dateFilter == 'All' ? 'All Time' : dateFilter,
                       style: const TextStyle(
-                        fontSize: 12,
+                        fontSize: 13,
                         fontWeight: FontWeight.w700,
                         color: AppColors.textDark,
                       ),
@@ -1947,7 +1914,7 @@ class _DateRangeSheet extends StatelessWidget {
       margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(Bt.rCard),
       ),
       child: SafeArea(
         child: Padding(
@@ -1961,7 +1928,7 @@ class _DateRangeSheet extends StatelessWidget {
                   width: 36,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFDDE0F0),
+                    color: const Color(0xFFE4E7EC),
                     borderRadius: BorderRadius.circular(4),
                   ),
                 ),
@@ -1971,7 +1938,7 @@ class _DateRangeSheet extends StatelessWidget {
                 'Filter by Date',
                 style: TextStyle(
                   fontSize: 17,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w700,
                   color: AppColors.textDark,
                 ),
               ),
@@ -2127,16 +2094,9 @@ class _KpiCard extends StatelessWidget {
         border: Border.all(
           color: data.isAlert
               ? data.color.withValues(alpha: 0.35)
-              : const Color(0xFFEEEBF8),
+              : const Color(0xFFEEF1F5),
           width: data.isAlert ? 1.5 : 1,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2158,8 +2118,8 @@ class _KpiCard extends StatelessWidget {
                 data.value,
                 style: TextStyle(
                   fontSize: 14.5,
-                  fontWeight: FontWeight.w900,
-                  color: data.isAlert ? data.color : const Color(0xFF1A1A2E),
+                  fontWeight: FontWeight.w700,
+                  color: data.isAlert ? data.color : const Color(0xFF101828),
                   letterSpacing: -0.3,
                 ),
                 maxLines: 1,
@@ -2169,7 +2129,7 @@ class _KpiCard extends StatelessWidget {
               Text(
                 data.label,
                 style: const TextStyle(
-                  fontSize: 9.5,
+                  fontSize: 12,
                   color: AppColors.textLight,
                   fontWeight: FontWeight.w600,
                 ),
@@ -2206,7 +2166,7 @@ class _EmptyState extends StatelessWidget {
               height: 76,
               decoration: BoxDecoration(
                 color: AppColors.primaryBlue.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(22),
+                borderRadius: BorderRadius.circular(Bt.rCard),
               ),
               child: Icon(icon, color: AppColors.primaryBlue, size: 34),
             ),
@@ -2215,7 +2175,7 @@ class _EmptyState extends StatelessWidget {
               title,
               style: const TextStyle(
                 fontSize: 17,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w700,
                 color: AppColors.textDark,
               ),
               textAlign: TextAlign.center,
@@ -2248,13 +2208,6 @@ class _EmptyState extends StatelessWidget {
                   decoration: BoxDecoration(
                     gradient: AppGradients.primaryButton,
                     borderRadius: BorderRadius.circular(14),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.primaryBlue.withValues(alpha: 0.3),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
                   ),
                   child: const Row(
                     mainAxisSize: MainAxisSize.min,
@@ -2297,7 +2250,7 @@ class _ProjectSelectorSheet extends StatelessWidget {
       margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(Bt.rCard),
       ),
       child: SafeArea(
         child: Padding(
@@ -2311,7 +2264,7 @@ class _ProjectSelectorSheet extends StatelessWidget {
                   width: 36,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFDDE0F0),
+                    color: const Color(0xFFE4E7EC),
                     borderRadius: BorderRadius.circular(4),
                   ),
                 ),
@@ -2321,7 +2274,7 @@ class _ProjectSelectorSheet extends StatelessWidget {
                 'Select Project',
                 style: TextStyle(
                   fontSize: 17,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w700,
                   color: AppColors.textDark,
                 ),
               ),

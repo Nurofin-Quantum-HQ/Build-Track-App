@@ -1,3 +1,5 @@
+import 'package:buildtrack_mobile/common/widgets/entry_widgets.dart';
+import 'package:buildtrack_mobile/design/design.dart';
 import 'package:buildtrack_mobile/common/themes/app_colors.dart';
 import 'package:buildtrack_mobile/controller/project_provider.dart';
 import 'package:buildtrack_mobile/models/construction_models.dart';
@@ -19,11 +21,11 @@ class EditProjectScreen extends StatefulWidget {
 }
 class _EditProjectScreenState extends State<EditProjectScreen> {
   static var primaryBlue = AppColors.primary;
-  static const bgColor = AppColors.gradientStart;
   static const textDark = AppColors.textDark;
   static const textGray = AppColors.textLight;
   final _scrollController = ScrollController();
   final _formKey = GlobalKey<FormState>();
+  int _step = 0;
   late final TextEditingController _nameCtrl;
   late final TextEditingController _cityCtrl;
   late final TextEditingController _mapAddressCtrl;
@@ -656,7 +658,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Project updated!'),
-            backgroundColor: Colors.green,
+            backgroundColor: Color(0xFF067647),
           ),
         );
         Navigator.pop(context, updated);
@@ -664,83 +666,46 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text('Error: $e'), backgroundColor: const Color(0xFFC01048)),
         );
       }
     } finally {
       if (mounted) setState(() => _saving = false);
     }
   }
+  void _goStep(int i) {
+    setState(() => _step = i);
+    if (_scrollController.hasClients) _scrollController.jumpTo(0);
+  }
+
+  /// Required fields live on earlier steps; jump back to them so errors are visible.
+  void _finish() {
+    if (_nameCtrl.text.trim().isEmpty || _cityCtrl.text.trim().isEmpty) {
+      _goStep(0);
+      WidgetsBinding.instance.addPostFrameCallback((_) => _formKey.currentState?.validate());
+      return;
+    }
+    _save();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: bgColor,
+      backgroundColor: Bt.ground,
+      appBar: BtNavBar(title: 'Edit project', subtitle: (_currentProject.projectCode != null && _currentProject.projectCode!.isNotEmpty) ? _currentProject.projectCode! : null),
       body: SafeArea(
         bottom: false,
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-              child: Row(
-                children: [
-                  GestureDetector(
-                    onTap: () => Navigator.pop(context),
-                    child: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.06),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.arrow_back_ios_new,
-                        color: textDark,
-                        size: 18,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  const Text(
-                    'Edit Project',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w900,
-                      color: textDark,
-                      letterSpacing: -0.4,
-                    ),
-                  ),
-                  const Spacer(),
-                  if (_currentProject.projectCode != null &&
-                      _currentProject.projectCode!.isNotEmpty)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: primaryBlue.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        _currentProject.projectCode!,
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                          color: primaryBlue,
-                        ),
-                      ),
-                    ),
-                ],
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+              child: BtSegmented<int>(
+                segments: const {0: 'Basics', 1: 'Building', 2: 'Budget', 3: 'Phases'},
+                value: _step,
+                onChanged: _goStep,
               ),
             ),
-            const SizedBox(height: 16),
             if (_loading)
               Container(
                 width: double.infinity,
@@ -768,7 +733,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
                     Text(
                       'Loading latest project data…',
                       style: TextStyle(
-                        fontSize: 12,
+                        fontSize: 13,
                         fontWeight: FontWeight.w600,
                         color: primaryBlue,
                       ),
@@ -786,6 +751,11 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      Offstage(
+                        offstage: _step != 0,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
                       _buildSectionCard(
                         title: 'Project Setup',
                         icon: Icons.business_center_rounded,
@@ -839,10 +809,10 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
                             _groupContainer(
                               icon: Icons.person_rounded,
                               title: 'Client Details',
-                              child: Row(
+                              child: Column(
+ crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
-                                  Expanded(
-                                    child: Column(
+                                  Padding(padding: EdgeInsets.zero, child: Column(
                                       crossAxisAlignment:
                                           CrossAxisAlignment.start,
                                       children: [
@@ -856,9 +826,8 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
                                       ],
                                     ),
                                   ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
+                                  const SizedBox(height: 16),
+                                  Padding(padding: EdgeInsets.zero, child: Column(
                                       crossAxisAlignment:
                                           CrossAxisAlignment.start,
                                       children: [
@@ -880,10 +849,10 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
                             _groupContainer(
                               icon: Icons.engineering_rounded,
                               title: 'Site Team',
-                              child: Row(
+                              child: Column(
+ crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
-                                  Expanded(
-                                    child: Column(
+                                  Padding(padding: EdgeInsets.zero, child: Column(
                                       crossAxisAlignment:
                                           CrossAxisAlignment.start,
                                       children: [
@@ -897,9 +866,8 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
                                       ],
                                     ),
                                   ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
+                                  const SizedBox(height: 16),
+                                  Padding(padding: EdgeInsets.zero, child: Column(
                                       crossAxisAlignment:
                                           CrossAxisAlignment.start,
                                       children: [
@@ -919,7 +887,14 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
                           ],
                         ),
                       ),
-                      const SizedBox(height: 16),
+                          ],
+                        ),
+                      ),
+                      Offstage(
+                        offstage: _step != 1,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
                       _buildAccordion(
                         title: 'Building Type',
                         isExpanded: _buildingExpanded,
@@ -929,10 +904,10 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(
+                            Column(
+ crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
-                                Expanded(
-                                  child: Column(
+                                Padding(padding: EdgeInsets.zero, child: Column(
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
@@ -953,9 +928,8 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
                                     ],
                                   ),
                                 ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
+                                const SizedBox(height: 16),
+                                Padding(padding: EdgeInsets.zero, child: Column(
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
@@ -1017,7 +991,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
                                     Text(
                                       _buildingTypeError!,
                                       style: TextStyle(
-                                        fontSize: 12,
+                                        fontSize: 13,
                                         fontWeight: FontWeight.w600,
                                         color: Colors.red.shade400,
                                       ),
@@ -1108,7 +1082,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
                                       border: Border.all(
                                         color: sel
                                             ? primaryBlue
-                                            : const Color(0xFFEEF0F5),
+                                            : const Color(0xFFEEF1F5),
                                         width: 1.5,
                                       ),
                                     ),
@@ -1129,7 +1103,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
                               Text(
                                 '${_selectedFloorChips.length} floor${_selectedFloorChips.length > 1 ? 's' : ''} selected: ${_selectedFloorChips.join(', ')}',
                                 style: TextStyle(
-                                  fontSize: 12,
+                                  fontSize: 13,
                                   fontWeight: FontWeight.w600,
                                   color: primaryBlue.withValues(alpha: 0.8),
                                 ),
@@ -1147,7 +1121,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _label('ROOM TYPES', uppercase: true),
+                            _label('Room types', uppercase: true),
                             const SizedBox(height: 16),
                             _counter(
                               '1 BHK',
@@ -1187,11 +1161,11 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
                             const Padding(
                               padding: EdgeInsets.symmetric(vertical: 20),
                               child: Divider(
-                                color: Color(0xFFEEF0F5),
+                                color: Color(0xFFEEF1F5),
                                 height: 1,
                               ),
                             ),
-                            _label('BATHROOM TYPES', uppercase: true),
+                            _label('Bathroom types', uppercase: true),
                             const SizedBox(height: 16),
                             _counter(
                               'Western',
@@ -1285,7 +1259,14 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
                         ),
                         child: _buildCheckboxGrid(_kTerraceEdit),
                       ),
-                      const SizedBox(height: 16),
+                          ],
+                        ),
+                      ),
+                      Offstage(
+                        offstage: _step != 2,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
                       _buildAccordion(
                         title: 'Dates, Budget & Status',
                         isExpanded: _datesExpanded,
@@ -1294,7 +1275,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _label('PROJECT TIMELINE', uppercase: true),
+                            _label('Project timeline', uppercase: true),
                             const SizedBox(height: 16),
                             Row(
                               children: [
@@ -1341,11 +1322,11 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
                             const Padding(
                               padding: EdgeInsets.symmetric(vertical: 20),
                               child: Divider(
-                                color: Color(0xFFEEF0F5),
+                                color: Color(0xFFEEF1F5),
                                 height: 1,
                               ),
                             ),
-                            _label('BUDGET BREAKDOWN', uppercase: true),
+                            _label('Budget breakdown', uppercase: true),
                             const SizedBox(height: 16),
                             Row(
                               children: [
@@ -1421,11 +1402,11 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
                             const Padding(
                               padding: EdgeInsets.symmetric(vertical: 20),
                               child: Divider(
-                                color: Color(0xFFEEF0F5),
+                                color: Color(0xFFEEF1F5),
                                 height: 1,
                               ),
                             ),
-                            _label('PROJECT STATUS', uppercase: true),
+                            _label('Project status', uppercase: true),
                             const SizedBox(height: 16),
                             Wrap(
                               spacing: 8,
@@ -1444,12 +1425,12 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
                                     decoration: BoxDecoration(
                                       color: isSel
                                           ? (isCancel
-                                                ? const Color(0xFFFFF0F0)
+                                                ? const Color(0xFFFDECEF)
                                                 : primaryBlue.withValues(
                                                     alpha: 0.1,
                                                   ))
                                           : Colors.white,
-                                      borderRadius: BorderRadius.circular(20),
+                                      borderRadius: BorderRadius.circular(Bt.rCard),
                                       border: Border.all(
                                         color: isSel
                                             ? (isCancel
@@ -1457,7 +1438,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
                                                       alpha: 0.5,
                                                     )
                                                   : primaryBlue)
-                                            : const Color(0xFFEEF0F5),
+                                            : const Color(0xFFEEF1F5),
                                         width: 1.5,
                                       ),
                                     ),
@@ -1468,7 +1449,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
                                         fontWeight: FontWeight.w700,
                                         color: isSel
                                             ? (isCancel
-                                                  ? Colors.red
+                                                  ? const Color(0xFFC01048)
                                                   : primaryBlue)
                                             : textGray,
                                       ),
@@ -1480,10 +1461,21 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
                           ],
                         ),
                       ),
-                      const SizedBox(height: 16),
+                          ],
+                        ),
+                      ),
+                      Offstage(
+                        offstage: _step != 3,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
                       _buildCsvImportExportCard(),
                       const SizedBox(height: 16),
                       _buildConstructionPhasesCard(),
+                          ],
+                        ),
+                      ),
+
                     ],
                   ),
                 ),
@@ -1492,42 +1484,11 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
           ],
         ),
       ),
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-          child: SizedBox(
-            width: double.infinity,
-            height: 52,
-            child: ElevatedButton(
-              onPressed: (_saving || _mainBuildingType == null) ? null : _save,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: primaryBlue,
-                disabledBackgroundColor: primaryBlue.withValues(alpha: 0.6),
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-              ),
-              child: _saving
-                  ? const SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: CircularProgressIndicator(
-                        color: Colors.white,
-                        strokeWidth: 2.5,
-                      ),
-                    )
-                  : const Text(
-                      'Save Changes',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.white,
-                        letterSpacing: 0.3,
-                      ),
-                    ),
-            ),
-          ),
+      bottomNavigationBar: EntryBottomBar(
+        child: BtButton(
+          label: 'Save Changes',
+          loading: _saving,
+          onPressed: (_saving || _mainBuildingType == null) ? null : _finish,
         ),
       ),
     );
@@ -1540,9 +1501,9 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8F9FF),
+        color: const Color(0xFFF6F7F9),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFEEF0F5), width: 1.5),
+        border: Border.all(color: Bt.line),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1554,8 +1515,8 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
               Text(
                 title,
                 style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
                   color: textDark,
                   letterSpacing: 0.3,
                 ),
@@ -1577,14 +1538,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFEEF0F5), width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        border: Border.all(color: Bt.line),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1606,14 +1560,14 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
                   title,
                   style: const TextStyle(
                     fontSize: 16,
-                    fontWeight: FontWeight.w900,
+                    fontWeight: FontWeight.w700,
                     color: textDark,
                   ),
                 ),
               ],
             ),
           ),
-          const Divider(height: 1, color: Color(0xFFEEF0F5)),
+          const Divider(height: 1, color: Color(0xFFEEF1F5)),
           Padding(padding: const EdgeInsets.all(16), child: child),
         ],
       ),
@@ -1629,10 +1583,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFEEF0F5), width: 1.5),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 8),
-        ],
+        border: Border.all(color: Bt.line),
       ),
       child: Column(
         children: [
@@ -1648,7 +1599,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
                     title,
                     style: const TextStyle(
                       fontSize: 15,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w700,
                       color: textDark,
                     ),
                   ),
@@ -1669,7 +1620,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
             firstChild: const SizedBox(width: double.infinity, height: 0),
             secondChild: Column(
               children: [
-                const Divider(height: 1, color: Color(0xFFEEF0F5)),
+                const Divider(height: 1, color: Color(0xFFEEF1F5)),
                 Padding(padding: const EdgeInsets.all(16), child: child),
               ],
             ),
@@ -1684,12 +1635,11 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
   }
   Widget _label(String text, {IconData? icon, bool uppercase = false}) {
     final tw = Text(
-      uppercase ? text.toUpperCase() : text,
+      text,
       style: TextStyle(
-        fontSize: uppercase ? 12 : 13,
-        fontWeight: FontWeight.w800,
-        color: uppercase ? textDark.withValues(alpha: 0.5) : textGray,
-        letterSpacing: uppercase ? 1.2 : 0.3,
+        fontSize: uppercase ? 15 : 14,
+        fontWeight: uppercase ? FontWeight.w600 : FontWeight.w500,
+        color: uppercase ? Bt.ink : Bt.ink2,
       ),
     );
     if (icon == null) return tw;
@@ -1733,7 +1683,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
         prefixIcon: icon != null ? Icon(icon, size: 18, color: textGray) : null,
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFFEEF0F5), width: 1.5),
+          borderSide: const BorderSide(color: Color(0xFFEEF1F5), width: 1.5),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
@@ -1764,7 +1714,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
       decoration: BoxDecoration(
         color: disabled ? const Color(0xFFF5F5F8) : Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFEEF0F5), width: 1.5),
+        border: Border.all(color: Bt.line),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
@@ -1817,7 +1767,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
         Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: const Color(0xFFEEF0F5), width: 1.5),
+            border: Border.all(color: Bt.line),
           ),
           child: Row(
             children: [
@@ -1835,14 +1785,14 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
                 alignment: Alignment.center,
                 decoration: const BoxDecoration(
                   border: Border.symmetric(
-                    vertical: BorderSide(color: Color(0xFFEEF0F5), width: 1.5),
+                    vertical: BorderSide(color: Color(0xFFEEF1F5), width: 1.5),
                   ),
                 ),
                 child: Text(
                   value.toString(),
                   style: const TextStyle(
                     fontSize: 14,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                     color: textDark,
                   ),
                 ),
@@ -1890,7 +1840,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
                             borderRadius: BorderRadius.circular(4),
                           ),
                           side: const BorderSide(
-                            color: Color(0xFFDDE0E8),
+                            color: Color(0xFFE4E7EC),
                             width: 1.5,
                           ),
                         ),
@@ -1929,7 +1879,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFEEF0F5), width: 1.5),
+          border: Border.all(color: Bt.line),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1940,7 +1890,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
                     ? '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}'
                     : (hint ?? 'Select'),
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: 13,
                   fontWeight: FontWeight.w600,
                   color: date != null
                       ? textDark
@@ -1972,14 +1922,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFEEF0F5), width: 1.5),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.025),
-                blurRadius: 6,
-                offset: const Offset(0, 2),
-              ),
-            ],
+            border: Border.all(color: Bt.line),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1988,12 +1931,12 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
                 children: [
                   const Flexible(
                     child: Text(
-                      'CONSTRUCTION PHASES',
+                      'Construction phases',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: 13,
-                        fontWeight: FontWeight.w900,
+                        fontWeight: FontWeight.w700,
                         color: textDark,
                         letterSpacing: 0.5,
                       ),
@@ -2012,7 +1955,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
                     child: Text(
                       'Select All',
                       style: TextStyle(
-                        fontSize: 12,
+                        fontSize: 13,
                         fontWeight: FontWeight.w700,
                         color: primaryBlue,
                       ),
@@ -2022,7 +1965,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
                   Text(
                     '|',
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 13,
                       color: textGray.withValues(alpha: 0.4),
                     ),
                   ),
@@ -2039,7 +1982,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
                     child: Text(
                       'Clear',
                       style: TextStyle(
-                        fontSize: 12,
+                        fontSize: 13,
                         fontWeight: FontWeight.w700,
                         color: textGray.withValues(alpha: 0.7),
                       ),
@@ -2051,7 +1994,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
               Text(
                 'Select phases and activities tracked for this project.',
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: 13,
                   color: textGray.withValues(alpha: 0.8),
                 ),
               ),
@@ -2099,14 +2042,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFEEF0F5), width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.025),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        border: Border.all(color: Bt.line),
       ),
       child: Column(
         children: [
@@ -2134,14 +2070,14 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
                                 onPressed: () => Navigator.pop(ctx, false),
                                 child: const Text(
                                   'Cancel',
-                                  style: TextStyle(color: Colors.grey),
+                                  style: TextStyle(color: Color(0xFF667085)),
                                 ),
                               ),
                               TextButton(
                                 onPressed: () => Navigator.pop(ctx, true),
                                 child: const Text(
                                   'Remove',
-                                  style: TextStyle(color: Colors.red),
+                                  style: TextStyle(color: Color(0xFFC01048)),
                                 ),
                               ),
                             ],
@@ -2168,7 +2104,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
                         border: Border.all(
                           color: phase.isSelected
                               ? primaryBlue
-                              : const Color(0xFFCDD0DA),
+                              : const Color(0xFFD0D5DD),
                           width: 1.5,
                         ),
                       ),
@@ -2187,7 +2123,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
                       phase.name,
                       style: const TextStyle(
                         fontSize: 15,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                         color: textDark,
                       ),
                     ),
@@ -2223,7 +2159,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
             secondChild: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Divider(height: 1, color: Color(0xFFEEF0F5)),
+                const Divider(height: 1, color: Color(0xFFEEF1F5)),
                 ReorderableListView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
@@ -2236,13 +2172,6 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
                       child: DecoratedBox(
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.06),
-                              blurRadius: 18,
-                              offset: const Offset(0, 6),
-                            ),
-                          ],
                         ),
                         child: child,
                       ),
@@ -2286,7 +2215,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
                                 border: Border.all(
                                   color: act.isSelected
                                       ? primaryBlue
-                                      : const Color(0xFFCDD0DA),
+                                      : const Color(0xFFD0D5DD),
                                   width: 1.5,
                                 ),
                               ),
@@ -2309,7 +2238,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
                                       : FontWeight.w400,
                                   color: act.isSelected
                                       ? textDark
-                                      : const Color(0xFF6B7280),
+                                      : const Color(0xFF667085),
                                 ),
                               ),
                             ),
@@ -2318,7 +2247,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
                               child: const Icon(
                                 Icons.drag_indicator_rounded,
                                 size: 20,
-                                color: Color(0xFFDDE0E8),
+                                color: Color(0xFFE4E7EC),
                               ),
                             ),
                           ],
@@ -2337,7 +2266,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
                     ),
                     decoration: BoxDecoration(
                       color: primaryBlue.withValues(alpha: 0.06),
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: BorderRadius.circular(Bt.rCard),
                       border: Border.all(
                         color: primaryBlue.withValues(alpha: 0.2),
                         width: 1,
@@ -2376,7 +2305,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
           'Edit Phase',
           style: TextStyle(
             fontSize: 18,
-            fontWeight: FontWeight.w900,
+            fontWeight: FontWeight.w700,
             color: textDark,
           ),
         ),
@@ -2390,7 +2319,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
               borderSide: BorderSide(color: primaryBlue, width: 2),
             ),
             enabledBorder: UnderlineInputBorder(
-              borderSide: BorderSide(color: Color(0xFFDDE0E8)),
+              borderSide: BorderSide(color: Color(0xFFE4E7EC)),
             ),
           ),
         ),
@@ -2466,7 +2395,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
           'Add Custom Phase',
           style: TextStyle(
             fontSize: 18,
-            fontWeight: FontWeight.w900,
+            fontWeight: FontWeight.w700,
             color: textDark,
           ),
         ),
@@ -2479,7 +2408,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
               borderSide: BorderSide(color: primaryBlue, width: 2),
             ),
             enabledBorder: UnderlineInputBorder(
-              borderSide: BorderSide(color: Color(0xFFDDE0E8)),
+              borderSide: BorderSide(color: Color(0xFFE4E7EC)),
             ),
           ),
         ),
@@ -2539,7 +2468,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
           'Add Custom Activity',
           style: TextStyle(
             fontSize: 18,
-            fontWeight: FontWeight.w900,
+            fontWeight: FontWeight.w700,
             color: textDark,
           ),
         ),
@@ -2553,7 +2482,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
               borderSide: BorderSide(color: primaryBlue, width: 2),
             ),
             enabledBorder: UnderlineInputBorder(
-              borderSide: BorderSide(color: Color(0xFFDDE0E8)),
+              borderSide: BorderSide(color: Color(0xFFE4E7EC)),
             ),
           ),
         ),
@@ -2666,7 +2595,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('CSV exported successfully!'),
-            backgroundColor: Colors.green,
+            backgroundColor: Color(0xFF067647),
           ),
         );
       }
@@ -2675,7 +2604,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to export CSV: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: const Color(0xFFC01048),
           ),
         );
       }
@@ -2845,7 +2774,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
             content: Text(
               'Successfully imported budget for $updatedCount activities!',
             ),
-            backgroundColor: Colors.green,
+            backgroundColor: const Color(0xFF067647),
           ),
         );
       }
@@ -2854,7 +2783,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Upload failed: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: const Color(0xFFC01048),
           ),
         );
       }
@@ -2868,13 +2797,6 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2885,12 +2807,12 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
                 width: 36,
                 height: 36,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                  color: const Color(0xFF067647).withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: const Icon(
                   Icons.table_chart_rounded,
-                  color: Color(0xFF10B981),
+                  color: Color(0xFF067647),
                   size: 18,
                 ),
               ),
@@ -2900,10 +2822,10 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'PHASES & BUDGET CONFIGURATION',
+                      'Phases & budget configuration',
                       style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
                         color: textGray,
                         letterSpacing: 0.5,
                       ),
@@ -2911,7 +2833,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
                     Text(
                       'Import/Export CSV budgets for all phases.',
                       style: TextStyle(
-                        fontSize: 12,
+                        fontSize: 13,
                         fontWeight: FontWeight.w600,
                         color: textDark,
                       ),
@@ -2932,7 +2854,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     side: const BorderSide(
-                      color: Color(0xFFEEF0F5),
+                      color: Color(0xFFEEF1F5),
                       width: 1.5,
                     ),
                     shape: RoundedRectangleBorder(
@@ -2940,7 +2862,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
                     ),
                     foregroundColor: primaryBlue,
                     textStyle: const TextStyle(
-                      fontSize: 12,
+                      fontSize: 13,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -2968,7 +2890,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
                             borderRadius: BorderRadius.circular(10),
                           ),
                           textStyle: const TextStyle(
-                            fontSize: 12,
+                            fontSize: 13,
                             fontWeight: FontWeight.w700,
                           ),
                         ),

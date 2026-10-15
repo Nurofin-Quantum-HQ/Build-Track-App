@@ -1,8 +1,8 @@
+import 'package:buildtrack_mobile/design/design.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../common/themes/app_colors.dart';
 import '../../common/themes/app_theme.dart';
-import '../../common/widgets/common_widgets.dart';
 import '../../controller/ai_chat_report_provider.dart';
 import '../../controller/project_provider.dart';
 import '../../services/auth_service.dart';
@@ -97,82 +97,96 @@ class _AiDashboardViewState extends State<_AiDashboardView> {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<AiChatReportProvider>();
+    final bt = context.bt;
+    final asked = _searchController.text.trim();
     return Scaffold(
-      backgroundColor: AppColors.gradientStart,
-      body: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            AppTopBar(
-              title: 'Construction Intelligence',
-              isSubScreen: true,
-              leftIcon: Icons.arrow_back,
-              onLeftTap: () => Navigator.maybePop(context),
-              rightWidget: provider.state == AiReportState.results
-                  ? IconButton(
-                      icon: const Icon(
-                        Icons.refresh,
-                        color: AppColors.textLight,
-                      ),
-                      onPressed: () {
-                        _searchController.clear();
-                        provider.resetToInitial();
-                      },
-                    )
-                  : null,
-            ),
+      backgroundColor: Bt.ground,
+      appBar: BtNavBar(
+        title: 'Ask about your costs',
+        trailing: provider.state == AiReportState.results
+            ? BtIconButton(
+                icon: Icons.refresh_rounded,
+                semantic: 'New question',
+                color: Bt.ink2,
+                onTap: () {
+                  _searchController.clear();
+                  provider.resetToInitial();
+                },
+              )
+            : null,
+      ),
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (provider.state != AiReportState.initial && asked.isNotEmpty)
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.05),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: TextField(
-                  controller: _searchController,
-                  textInputAction: TextInputAction.search,
-                  onSubmitted: (val) => _submitSearch(context, val),
-                  decoration: InputDecoration(
-                    hintText: 'Ask about materials, costs, projects...',
-                    hintStyle: AppTheme.body.copyWith(
-                      color: AppColors.textLight,
-                    ),
-                    prefixIcon: Icon(
-                      Icons.auto_awesome,
-                      color: AppColors.primary,
-                    ),
-                    suffixIcon: _searchController.text.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(
-                              Icons.clear,
-                              color: AppColors.textLight,
-                            ),
-                            onPressed: () {
-                              _searchController.clear();
-                              setState(() {});
-                            },
-                          )
-                        : null,
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 14,
+              padding: const EdgeInsets.fromLTRB(56, 8, 16, 8),
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: const BoxDecoration(
+                    color: Bt.ink,
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(18),
+                      topRight: Radius.circular(18),
+                      bottomLeft: Radius.circular(18),
+                      bottomRight: Radius.circular(4),
                     ),
                   ),
-                  onChanged: (_) => setState(() {}),
+                  child: Text(asked, style: BtText.body(context, color: Colors.white)),
                 ),
               ),
             ),
-            Expanded(child: _buildContent(provider)),
-          ],
-        ),
+          Expanded(child: _buildContent(provider)),
+          Container(
+            decoration: const BoxDecoration(color: Bt.card, border: Border(top: BorderSide(color: Bt.line))),
+            padding: EdgeInsets.fromLTRB(12, 10, 12, 10 + MediaQuery.of(context).padding.bottom),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _searchController,
+                    textInputAction: TextInputAction.search,
+                    onSubmitted: (val) => _submitSearch(context, val),
+                    onChanged: (_) => setState(() {}),
+                    style: BtText.body(context),
+                    decoration: InputDecoration(
+                      hintText: 'Ask about materials, costs, projects…',
+                      hintStyle: BtText.body(context, color: Bt.placeholder),
+                      prefixIcon: Icon(Icons.auto_awesome, color: bt.brand, size: 20),
+                      suffixIcon: _searchController.text.isNotEmpty
+                          ? IconButton(
+                              tooltip: 'Clear',
+                              icon: const Icon(Icons.cancel_rounded, color: Bt.placeholder, size: 20),
+                              onPressed: () {
+                                _searchController.clear();
+                                setState(() {});
+                              },
+                            )
+                          : null,
+                      filled: true,
+                      fillColor: Bt.ground,
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: const BorderSide(color: Bt.line)),
+                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: const BorderSide(color: Bt.line)),
+                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide(color: bt.brand, width: 1.5)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                BtIconButton(
+                  icon: Icons.arrow_upward_rounded,
+                  semantic: 'Ask',
+                  color: _searchController.text.trim().isEmpty ? Bt.placeholder : bt.brand,
+                  filled: true,
+                  onTap: _searchController.text.trim().isEmpty ? () {} : () => _submitSearch(context, _searchController.text),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -218,40 +232,35 @@ class _InitialState extends StatelessWidget {
   Widget build(BuildContext context) {
     final provider = context.watch<AiChatReportProvider>();
     return ListView(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
       children: [
+        Row(children: [
+          const BtTile(icon: Icons.auto_awesome),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text('Ask anything about your entries, costs and stock.', style: BtText.body(context, color: Bt.ink2)),
+          ),
+        ]),
         const SizedBox(height: 24),
-        Text(
-          'Quick Insights',
-          style: AppTheme.heading3.copyWith(color: AppColors.textDark),
-        ),
-        const SizedBox(height: 12),
+        const BtSectionHeader(title: 'Quick insights', caption: true),
         Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          children: quickPrompts
-              .map(
-                (p) => _PromptCard(prompt: p, onTap: () => onPromptSelected(p)),
-              )
-              .toList(),
+          spacing: 8,
+          runSpacing: 8,
+          children: quickPrompts.map((p) => _PromptCard(prompt: p, onTap: () => onPromptSelected(p))).toList(),
         ),
         if (provider.recentSearches.isNotEmpty) ...[
-          const SizedBox(height: 32),
-          Text(
-            'Recent Searches',
-            style: AppTheme.heading3.copyWith(color: AppColors.textDark),
-          ),
-          const SizedBox(height: 12),
-          ...provider.recentSearches.map(
-            (s) => ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.history, color: AppColors.textLight),
-              title: Text(
-                s,
-                style: AppTheme.body.copyWith(color: AppColors.textDark),
-              ),
-              onTap: () => onPromptSelected(s),
-            ),
+          const SizedBox(height: 28),
+          const BtSectionHeader(title: 'Recent searches', caption: true),
+          BtGroup(
+            children: [
+              for (final s in provider.recentSearches)
+                BtRow(
+                  leading: const Icon(Icons.history_rounded, color: Bt.ink3),
+                  title: s,
+                  showChevron: true,
+                  onTap: () => onPromptSelected(s),
+                ),
+            ],
           ),
         ],
       ],
@@ -263,80 +272,31 @@ class _PromptCard extends StatelessWidget {
   final String prompt;
   final VoidCallback onTap;
   @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: (MediaQuery.of(context).size.width / 2) - 24,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFDDE0F0)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(Icons.insights, color: AppColors.primary, size: 20),
-            const SizedBox(height: 12),
-            Text(
-              prompt,
-              style: AppTheme.body.copyWith(
-                color: AppColors.textDark,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => BtChip(label: prompt, icon: Icons.insights_rounded, onTap: onTap);
 }
 class _LoadingState extends StatelessWidget {
   const _LoadingState();
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildSkeletonBox(height: 100, width: double.infinity),
-          const SizedBox(height: 24),
-          Row(
-            children: [
-              Expanded(child: _buildSkeletonBox(height: 80)),
-              const SizedBox(width: 16),
-              Expanded(child: _buildSkeletonBox(height: 80)),
-            ],
-          ),
-          const SizedBox(height: 24),
-          _buildSkeletonBox(height: 200, width: double.infinity),
-          const SizedBox(height: 32),
-          Center(
-            child: Column(
-              children: [
-                CircularProgressIndicator(color: AppColors.primary),
-                const SizedBox(height: 16),
-                Text(
-                  'Generating analytics...',
-                  style: AppTheme.body.copyWith(color: AppColors.textLight),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-  Widget _buildSkeletonBox({required double height, double? width}) {
-    return Container(
-      height: height,
-      width: width,
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(16),
-      ),
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        Row(children: [
+          const BtTile(icon: Icons.auto_awesome, size: 32),
+          const SizedBox(width: 10),
+          Text('Working it out…', style: BtText.subhead(context)),
+        ]),
+        const SizedBox(height: 16),
+        const BtSkeleton(height: 96),
+        const SizedBox(height: 12),
+        const Row(children: [
+          Expanded(child: BtSkeleton(height: 72)),
+          SizedBox(width: 12),
+          Expanded(child: BtSkeleton(height: 72)),
+        ]),
+        const SizedBox(height: 12),
+        const BtSkeleton(height: 180),
+      ],
     );
   }
 }
@@ -346,37 +306,12 @@ class _ErrorState extends StatelessWidget {
   final VoidCallback onRetry;
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.error_outline, color: AppColors.error, size: 48),
-            const SizedBox(height: 16),
-            Text(
-              'Failed to generate report',
-              style: AppTheme.heading3.copyWith(color: AppColors.textDark),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              error,
-              textAlign: TextAlign.center,
-              style: AppTheme.body.copyWith(color: AppColors.textLight),
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: onRetry,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Try Again'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-              ),
-            ),
-          ],
-        ),
-      ),
+    return BtEmpty(
+      icon: Icons.error_outline_rounded,
+      title: 'Failed to generate report',
+      message: error,
+      action: 'Try Again',
+      onAction: onRetry,
     );
   }
 }
@@ -443,7 +378,7 @@ class _ResultsStateState extends State<_ResultsState> {
                     const Text(
                       'Drag items to reorder. Toggle checkbox to show/hide columns.',
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 13,
                         color: AppColors.textSecondary,
                       ),
                     ),
@@ -519,7 +454,7 @@ class _ResultsStateState extends State<_ResultsState> {
                             trailing: const Icon(
                               Icons.drag_handle,
                               size: 20,
-                              color: Colors.grey,
+                              color: Color(0xFF667085),
                             ),
                           );
                         },
@@ -538,7 +473,7 @@ class _ResultsStateState extends State<_ResultsState> {
                           },
                           child: const Text(
                             'Reset',
-                            style: TextStyle(color: Colors.grey, fontSize: 13),
+                            style: TextStyle(color: Color(0xFF667085), fontSize: 13),
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -606,7 +541,7 @@ class _ResultsStateState extends State<_ResultsState> {
                     children: [
                       Icon(
                         isCritical ? Icons.warning : Icons.info,
-                        color: isCritical ? Colors.red : AppColors.primary,
+                        color: isCritical ? const Color(0xFFC01048) : AppColors.primary,
                         size: 24,
                       ),
                       SizedBox(width: 12),
@@ -634,19 +569,12 @@ class _ResultsStateState extends State<_ResultsState> {
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [Color(0xFFE8EAF6), Color(0xFFC5CAE9)],
+                colors: [Color(0xFFEEF1F5), Color(0xFFC5CAE9)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(Bt.rCard),
               border: Border.all(color: Colors.white, width: 2),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.primary.withValues(alpha: 0.1),
-                  blurRadius: 15,
-                  offset: const Offset(0, 5),
-                ),
-              ],
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -747,7 +675,7 @@ class _ResultsStateState extends State<_ResultsState> {
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFFDDE0F0)),
+                    border: Border.all(color: Bt.line),
                   ),
                   child: Column(
                     children: List.generate(result.projectBreakdown.length, (
@@ -770,7 +698,7 @@ class _ResultsStateState extends State<_ResultsState> {
                                 if (isTop)
                                   const Text(
                                     '🏆 ',
-                                    style: TextStyle(fontSize: 12),
+                                    style: TextStyle(fontSize: 13),
                                   ),
                                 if (!isTop) const SizedBox(width: 16),
                                 Text(
@@ -809,7 +737,7 @@ class _ResultsStateState extends State<_ResultsState> {
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFDDE0F0)),
+                border: Border.all(color: Bt.line),
               ),
               child: ExpansionTile(
                 initiallyExpanded: true,
@@ -871,7 +799,7 @@ class _ResultsStateState extends State<_ResultsState> {
                   backgroundColor: AppColors.primary.withValues(alpha: 0.1),
                   labelStyle: TextStyle(color: AppColors.primary),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(Bt.rCard),
                     side: const BorderSide(color: Colors.transparent),
                   ),
                 );
@@ -919,9 +847,9 @@ class _ResultsStateState extends State<_ResultsState> {
     }
     const headerBg = Color(0xFFF1F3F8);
     const headerTextStyle = TextStyle(
-      fontSize: 11,
+      fontSize: 13,
       fontWeight: FontWeight.w700,
-      color: Color(0xFF64748B),
+      color: Color(0xFF667085),
       letterSpacing: 0.5,
     );
     const cellTextStyle = TextStyle(
@@ -930,7 +858,7 @@ class _ResultsStateState extends State<_ResultsState> {
       color: Color(0xFF1E293B),
       height: 1.4,
     );
-    const dividerColor = Color(0xFFE2E8F0);
+    const dividerColor = Color(0xFFE4E7EC);
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: SizedBox(
@@ -1001,8 +929,8 @@ class _ResultsStateState extends State<_ResultsState> {
                       child: Text(
                         (r['number'] ?? (index + 1)).toString(),
                         style: cellTextStyle.copyWith(
-                          color: const Color(0xFF94A3B8),
-                          fontSize: 12,
+                          color: const Color(0xFF98A2B3),
+                          fontSize: 13,
                         ),
                         softWrap: false,
                         maxLines: 1,
@@ -1029,7 +957,7 @@ class _ResultsStateState extends State<_ResultsState> {
                           style = style.copyWith(fontWeight: FontWeight.w500);
                         } else if (colName == 'Brand' || colName == 'Type') {
                           style = style.copyWith(
-                            color: const Color(0xFF475569),
+                            color: const Color(0xFF475467),
                           );
                         }
                       }
@@ -1057,7 +985,7 @@ class _ResultsStateState extends State<_ResultsState> {
               decoration: const BoxDecoration(
                 color: Color(0xFFF1F3F8),
                 border: Border(
-                  top: BorderSide(color: Color(0xFFCBD5E1), width: 1.5),
+                  top: BorderSide(color: Color(0xFFD0D5DD), width: 1.5),
                 ),
                 borderRadius: BorderRadius.only(
                   bottomLeft: Radius.circular(15),
@@ -1093,7 +1021,7 @@ class _ResultsStateState extends State<_ResultsState> {
                               style: const TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w700,
-                                color: Color(0xFF334155),
+                                color: Color(0xFF344054),
                                 letterSpacing: 0.3,
                               ),
                               softWrap: false,
@@ -1109,8 +1037,8 @@ class _ResultsStateState extends State<_ResultsState> {
                                   _formatCurrency(grandTotal),
                                   style: const TextStyle(
                                     fontSize: 14,
-                                    fontWeight: FontWeight.w800,
-                                    color: Color(0xFF173EEA),
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF0B63CE),
                                   ),
                                   softWrap: false,
                                   maxLines: 1,
@@ -1166,7 +1094,7 @@ class _ResultsStateState extends State<_ResultsState> {
                   severity.toUpperCase(),
                   style: TextStyle(
                     color: statusColor,
-                    fontSize: 10,
+                    fontSize: 12,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -1194,7 +1122,7 @@ class _MetricCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFDDE0F0)),
+        border: Border.all(color: Bt.line),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

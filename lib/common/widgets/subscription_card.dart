@@ -1,8 +1,8 @@
 import 'package:buildtrack_mobile/common/themes/app_colors.dart';
-import 'package:buildtrack_mobile/common/widgets/premium_cta_button.dart';
 import 'package:buildtrack_mobile/controller/project_provider.dart';
 import 'package:buildtrack_mobile/controller/subscription_provider.dart';
 import 'package:flutter/material.dart';
+import 'package:buildtrack_mobile/design/design.dart';
 import 'package:provider/provider.dart';
 
 class SubscriptionCard extends StatefulWidget {
@@ -40,322 +40,90 @@ class _SubscriptionCardState extends State<SubscriptionCard> {
         ? 0.0
         : (activeUsers / (maxUsers > 0 ? maxUsers : 1)).clamp(0.0, 1.0);
 
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        gradient: _gradientFor(plan),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: _shadowColorFor(plan),
-            blurRadius: 24,
-            offset: const Offset(0, 10),
-          ),
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Stack(
+    final bt = context.bt;
+    return BtCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Positioned(
-            right: -30,
-            top: -30,
-            child: Container(
-              width: 140,
-              height: 140,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withValues(alpha: 0.08),
-              ),
+          Row(children: [
+            BtTile(icon: sub.isPaid ? Icons.workspace_premium_rounded : Icons.auto_awesome_rounded, bg: bt.brandSoft, fg: bt.brand),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('${plan.label} Plan', style: BtText.headline(context)),
+                _StatusBadge(status: sub.status, isPaid: sub.isPaid),
+              ]),
+            ),
+            BtBadge(label: plan.badge, tone: BtTone.neutral),
+          ]),
+          const SizedBox(height: 16),
+          _UsageMeter(
+            icon: Icons.folder_outlined,
+            label: 'Projects',
+            usageText: isUnlimitedProjects ? '$activeProjects Active (Unlimited)' : '$activeProjects / $maxProjects Used',
+            progress: isUnlimitedProjects ? 0.35 : projectUsageRatio,
+            isUnlimited: isUnlimitedProjects,
+          ),
+          const SizedBox(height: 12),
+          _UsageMeter(
+            icon: Icons.people_outline,
+            label: 'Team Seats',
+            usageText: isUnlimitedUsers ? '$activeUsers Active (Unlimited)' : '$activeUsers / $maxUsers Active',
+            progress: isUnlimitedUsers ? 0.25 : userUsageRatio,
+            isUnlimited: isUnlimitedUsers,
+          ),
+          if (sub.renewalDate != null) ...[
+            const SizedBox(height: 12),
+            Row(children: [
+              const Icon(Icons.event_repeat_rounded, color: Bt.ink3, size: 16),
+              const SizedBox(width: 6),
+              Text('Renews on ${_fmtDate(sub.renewalDate!)}', style: BtText.caption(context)),
+            ]),
+          ],
+          const SizedBox(height: 8),
+          InkWell(
+            onTap: () => setState(() => _isBenefitsExpanded = !_isBenefitsExpanded),
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: Row(children: [
+                Expanded(child: Text(_isBenefitsExpanded ? 'Hide Plan Benefits' : 'View Plan Benefits & Perks', style: BtText.subhead(context, weight: FontWeight.w600, color: bt.brand))),
+                Icon(_isBenefitsExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded, color: bt.brand, size: 20),
+              ]),
             ),
           ),
-          Positioned(
-            left: -20,
-            bottom: -20,
-            child: Container(
-              width: 90,
-              height: 90,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withValues(alpha: 0.05),
-              ),
+          if (_isBenefitsExpanded)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                for (final feat in _getFeaturesForPlan(plan))
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Row(children: [
+                      const Icon(Icons.check_circle_rounded, size: 16, color: Bt.green),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text(feat, style: BtText.subhead(context, color: Bt.ink))),
+                    ]),
+                  ),
+              ]),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Header: Plan Title + Badges
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: 46,
-                      height: 46,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.22),
-                        borderRadius: BorderRadius.circular(15),
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.35),
-                          width: 1.2,
-                        ),
-                      ),
-                      child: Icon(
-                        sub.isPaid
-                            ? Icons.workspace_premium_rounded
-                            : Icons.auto_awesome_rounded,
-                        color: Colors.white,
-                        size: 24,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '${plan.label} Plan',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 19,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: -0.3,
-                            ),
-                          ),
-                          const SizedBox(height: 3),
-                          _StatusBadge(status: sub.status, isPaid: sub.isPaid),
-                        ],
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.20),
-                        borderRadius: BorderRadius.circular(30),
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.40),
-                          width: 1.2,
-                        ),
-                      ),
-                      child: Text(
-                        plan.badge,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 1.1,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 18),
-
-                // Usage Progress Bars
-                Container(
-                  padding: const EdgeInsets.all(13),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(15),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.15),
-                    ),
-                  ),
-                  child: Column(
-                    children: [
-                      _UsageMeter(
-                        icon: Icons.folder_outlined,
-                        label: 'Projects',
-                        usageText: isUnlimitedProjects
-                            ? '$activeProjects Active (Unlimited)'
-                            : '$activeProjects / $maxProjects Used',
-                        progress: isUnlimitedProjects
-                            ? 0.35
-                            : projectUsageRatio,
-                        isUnlimited: isUnlimitedProjects,
-                      ),
-                      const SizedBox(height: 10),
-                      _UsageMeter(
-                        icon: Icons.people_outline,
-                        label: 'Team Seats',
-                        usageText: isUnlimitedUsers
-                            ? '$activeUsers Active (Unlimited)'
-                            : '$activeUsers / $maxUsers Active',
-                        progress: isUnlimitedUsers ? 0.25 : userUsageRatio,
-                        isUnlimited: isUnlimitedUsers,
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Auto-renewal Notice
-                if (sub.renewalDate != null) ...[
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.event_repeat_rounded,
-                        color: Colors.white70,
-                        size: 14,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        'Renews on ${_fmtDate(sub.renewalDate!)}',
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.85),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-
-                // Expandable Plan Benefits Section
-                const SizedBox(height: 10),
-                GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _isBenefitsExpanded = !_isBenefitsExpanded;
-                    });
-                  },
-                  behavior: HitTestBehavior.opaque,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          _isBenefitsExpanded
-                              ? 'Hide Plan Benefits'
-                              : 'View Plan Benefits & Perks',
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.9),
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w600,
-                            decoration: TextDecoration.underline,
-                            decorationColor: Colors.white54,
-                          ),
-                        ),
-                        Icon(
-                          _isBenefitsExpanded
-                              ? Icons.keyboard_arrow_up_rounded
-                              : Icons.keyboard_arrow_down_rounded,
-                          color: Colors.white70,
-                          size: 18,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                if (_isBenefitsExpanded) ...[
-                  const SizedBox(height: 8),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: _getFeaturesForPlan(plan)
-                          .map(
-                            (feat) => Padding(
-                              padding: const EdgeInsets.only(bottom: 6),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                children: [
-                                  const Icon(
-                                    Icons.check_circle_rounded,
-                                    size: 14,
-                                    color: Colors.white,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      feat,
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          )
-                          .toList(),
-                    ),
-                  ),
-                ],
-
-                // Action Buttons: Upgrade Plan + Cancel Plan
-                if (widget.showUpgradeButton) ...[
-                  const SizedBox(height: 16),
-                  const Divider(color: Colors.white24, height: 1),
-                  const SizedBox(height: 14),
-                  PremiumCtaButton(
-                    label: sub.isPaid
-                        ? 'Upgrade / Change Tier'
-                        : 'Upgrade Plan',
-                    icon: Icons.rocket_launch_rounded,
-                    onTap: () => Navigator.pushNamed(context, '/subscription'),
-                    variant: CtaVariant.primary,
-                    isFullWidth: true,
-                  ),
-                  const SizedBox(height: 10),
-                  PremiumCtaButton(
-                    label: 'Cancel Plan',
-                    onTap: () => _showCancelDialog(context, sub),
-                    variant: CtaVariant.secondary,
-                    isFullWidth: true,
-                  ),
-                ] else ...[
-                  const SizedBox(height: 18),
-                  const Divider(color: Colors.white24, height: 1),
-                  const SizedBox(height: 14),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.shield_outlined,
-                          color: Colors.white70,
-                          size: 14,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          'Plan managed by your admin',
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.85),
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ],
+          if (widget.showUpgradeButton) ...[
+            const SizedBox(height: 4),
+            BtButton(
+              label: sub.isPaid ? 'Upgrade / Change Tier' : 'Upgrade Plan',
+              icon: Icons.rocket_launch_rounded,
+              onPressed: () => Navigator.pushNamed(context, '/subscription'),
             ),
-          ),
+            const SizedBox(height: 4),
+            BtButton(label: 'Cancel Plan…', variant: BtButtonVariant.quiet, onPressed: () => _showCancelDialog(context, sub)),
+          ] else ...[
+            const SizedBox(height: 8),
+            Row(children: [
+              const Icon(Icons.shield_outlined, color: Bt.ink3, size: 16),
+              const SizedBox(width: 6),
+              Text('Plan managed by your admin', style: BtText.caption(context)),
+            ]),
+          ],
         ],
       ),
     );
@@ -490,68 +258,6 @@ class _SubscriptionCardState extends State<SubscriptionCard> {
     }
   }
 
-  LinearGradient _gradientFor(SubscriptionPlan plan) {
-    switch (plan) {
-      case SubscriptionPlan.free:
-        return const LinearGradient(
-          colors: [Color(0xFF374151), Color(0xFF4B5563), Color(0xFF6B7280)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        );
-      case SubscriptionPlan.starter:
-        return const LinearGradient(
-          colors: [Color(0xFF0284C7), Color(0xFF0EA5E9), Color(0xFF38BDF8)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        );
-      case SubscriptionPlan.growth:
-        return const LinearGradient(
-          colors: [Color(0xFF047857), Color(0xFF059669), Color(0xFF10B981)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        );
-      case SubscriptionPlan.pro:
-        return const LinearGradient(
-          colors: [
-            AppColors.primaryBlue,
-            AppColors.primaryPurple,
-            Color(0xFF9B59FF),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        );
-      case SubscriptionPlan.business:
-        return const LinearGradient(
-          colors: [Color(0xFFD97706), Color(0xFFF59E0B), Color(0xFFFBBF24)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        );
-      case SubscriptionPlan.enterprise:
-        return const LinearGradient(
-          colors: [Color(0xFF0F172A), Color(0xFF1E293B), Color(0xFF334155)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        );
-    }
-  }
-
-  Color _shadowColorFor(SubscriptionPlan plan) {
-    switch (plan) {
-      case SubscriptionPlan.free:
-        return const Color(0xFF4B5563).withValues(alpha: 0.3);
-      case SubscriptionPlan.starter:
-        return const Color(0xFF0EA5E9).withValues(alpha: 0.35);
-      case SubscriptionPlan.growth:
-        return const Color(0xFF059669).withValues(alpha: 0.35);
-      case SubscriptionPlan.pro:
-        return AppColors.primaryPurple.withValues(alpha: 0.4);
-      case SubscriptionPlan.business:
-        return const Color(0xFFD97706).withValues(alpha: 0.35);
-      case SubscriptionPlan.enterprise:
-        return Colors.black.withValues(alpha: 0.45);
-    }
-  }
-
   String _fmtDate(DateTime d) {
     const months = [
       'Jan',
@@ -589,54 +295,16 @@ class _UsageMeter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bool isNearLimit = progress >= 0.85 && !isUnlimited;
-    final Color progressColor = isNearLimit
-        ? const Color(0xFFFCA5A5)
-        : Colors.white;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Row(
-              children: [
-                Icon(icon, color: Colors.white70, size: 14),
-                const SizedBox(width: 6),
-                Text(
-                  label,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-            Text(
-              usageText,
-              style: TextStyle(
-                color: isNearLimit
-                    ? const Color(0xFFFECDD3)
-                    : Colors.white.withValues(alpha: 0.9),
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 6),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(6),
-          child: LinearProgressIndicator(
-            value: progress,
-            minHeight: 5,
-            backgroundColor: Colors.white.withValues(alpha: 0.2),
-            valueColor: AlwaysStoppedAnimation<Color>(progressColor),
-          ),
-        ),
-      ],
-    );
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Row(children: [
+        Icon(icon, color: Bt.ink3, size: 16),
+        const SizedBox(width: 6),
+        Expanded(child: Text(label, style: BtText.subhead(context))),
+        Text(usageText, style: BtText.num(BtText.subhead(context, weight: FontWeight.w600, color: isNearLimit ? Bt.amber : Bt.ink))),
+      ]),
+      const SizedBox(height: 6),
+      BtProgress(value: progress, thin: true, color: isNearLimit ? Bt.amber : null),
+    ]);
   }
 }
 
@@ -654,11 +322,9 @@ class _StatusBadge extends StatelessWidget {
       SubscriptionStatus.unknown => isPaid ? 'Active' : 'Free Tier',
     };
     final color = switch (status) {
-      SubscriptionStatus.active =>
-        isPaid ? const Color(0xFF4ADE80) : const Color(0xFF93C5FD),
-      SubscriptionStatus.expired => const Color(0xFFFCA5A5),
-      SubscriptionStatus.unknown =>
-        isPaid ? const Color(0xFF4ADE80) : const Color(0xFF93C5FD),
+      SubscriptionStatus.active => isPaid ? Bt.green : Bt.ink3,
+      SubscriptionStatus.expired => Bt.red,
+      SubscriptionStatus.unknown => isPaid ? Bt.green : Bt.ink3,
     };
 
     return Row(
@@ -674,7 +340,7 @@ class _StatusBadge extends StatelessWidget {
           label,
           style: TextStyle(
             color: color,
-            fontSize: 12,
+            fontSize: 13,
             fontWeight: FontWeight.w600,
           ),
         ),

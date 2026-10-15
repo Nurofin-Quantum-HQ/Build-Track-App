@@ -1,3 +1,4 @@
+import 'package:buildtrack_mobile/design/design.dart';
 import 'dart:math' as math;
 import 'package:buildtrack_mobile/common/controllers/voice_recording_controller.dart';
 import 'package:buildtrack_mobile/common/themes/app_colors.dart';
@@ -81,11 +82,11 @@ class VoiceConfirmationSheet extends StatefulWidget {
 class _VoiceConfirmationSheetState extends State<VoiceConfirmationSheet>
     with TickerProviderStateMixin {
   static final Color _blue = AppColors.primaryBlue;
-  static const _bgColor = Color(0xFFF4F6FC);
+  static const _bgColor = Color(0xFFF6F7F9);
   static const _cardBg = Colors.white;
   static const _textDark = Color(0xFF0F1724);
   static const _textGray = Color(0xFF5A6B82);
-  static const _successGreen = Color(0xFF10B981);
+  static const _successGreen = Color(0xFF067647);
   final _entry = _EntryData();
   _StepId _currentStep = _StepId.entryType;
   final _answerCtrl = TextEditingController();
@@ -441,18 +442,18 @@ class _VoiceConfirmationSheetState extends State<VoiceConfirmationSheet>
             child: Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: const Color(0xFFFFF0F0),
+                color: const Color(0xFFFDECEF),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: Colors.red.shade200),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.error_outline, color: Colors.red, size: 16),
+                  const Icon(Icons.error_outline, color: Color(0xFFC01048), size: 16),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       _sttError,
-                      style: const TextStyle(color: Colors.red, fontSize: 12),
+                      style: const TextStyle(color: Color(0xFFC01048), fontSize: 13),
                     ),
                   ),
                 ],
@@ -478,7 +479,7 @@ class _VoiceConfirmationSheetState extends State<VoiceConfirmationSheet>
               padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
               decoration: BoxDecoration(
                 gradient: isListening ? null : AppGradients.primaryButton,
-                color: isListening ? const Color(0xFFEEF0F8) : null,
+                color: isListening ? const Color(0xFFEEF1F5) : null,
                 borderRadius: BorderRadius.circular(50),
                 border: isListening
                     ? Border.all(color: _blue.withValues(alpha: 0.3))
@@ -638,7 +639,7 @@ class _VoiceConfirmationSheetState extends State<VoiceConfirmationSheet>
         width: 40,
         height: 4,
         decoration: BoxDecoration(
-          color: const Color(0xFFDDE0F0),
+          color: const Color(0xFFE4E7EC),
           borderRadius: BorderRadius.circular(16),
         ),
       ),
@@ -661,7 +662,7 @@ class _VoiceConfirmationSheetState extends State<VoiceConfirmationSheet>
                   'BuildTrack AI',
                   style: TextStyle(
                     fontSize: 13,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                     color: _blue,
                     letterSpacing: 0.5,
                   ),
@@ -685,7 +686,7 @@ class _VoiceConfirmationSheetState extends State<VoiceConfirmationSheet>
               width: 34,
               height: 34,
               decoration: BoxDecoration(
-                color: const Color(0xFFEEF0F8),
+                color: const Color(0xFFEEF1F5),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: const Icon(Icons.close, size: 18, color: _textGray),
@@ -740,7 +741,7 @@ class _VoiceConfirmationSheetState extends State<VoiceConfirmationSheet>
               Text(
                 'Step ${_stepIndex + 1} of $_totalSteps',
                 style: const TextStyle(
-                  fontSize: 11.5,
+                  fontSize: 13,
                   fontWeight: FontWeight.w700,
                   color: _textGray,
                 ),
@@ -748,7 +749,7 @@ class _VoiceConfirmationSheetState extends State<VoiceConfirmationSheet>
               Text(
                 _stepLabel,
                 style: TextStyle(
-                  fontSize: 11.5,
+                  fontSize: 13,
                   fontWeight: FontWeight.w700,
                   color: _blue,
                 ),
@@ -890,7 +891,7 @@ class _VoiceConfirmationSheetState extends State<VoiceConfirmationSheet>
             borderRadius: BorderRadius.circular(16),
             border: selected
                 ? null
-                : Border.all(color: const Color(0xFFDDE4F8), width: 1.5),
+                : Border.all(color: Bt.line),
             boxShadow: [
               if (selected)
                 BoxShadow(
@@ -912,8 +913,8 @@ class _VoiceConfirmationSheetState extends State<VoiceConfirmationSheet>
               Text(
                 label,
                 style: TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w800,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
                   color: selected ? Colors.white : _textDark,
                 ),
               ),
@@ -922,7 +923,7 @@ class _VoiceConfirmationSheetState extends State<VoiceConfirmationSheet>
                 sub,
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 10,
+                  fontSize: 12,
                   color: selected
                       ? Colors.white.withValues(alpha: 0.75)
                       : _textGray,
@@ -1226,13 +1227,6 @@ class _VoiceConfirmationSheetState extends State<VoiceConfirmationSheet>
       decoration: BoxDecoration(
         gradient: AppGradients.primaryButton,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: _blue.withValues(alpha: 0.2),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
       ),
       child: Row(
         children: [
@@ -1245,7 +1239,7 @@ class _VoiceConfirmationSheetState extends State<VoiceConfirmationSheet>
                 'Estimated Amount',
                 style: TextStyle(
                   color: Colors.white70,
-                  fontSize: 11,
+                  fontSize: 13,
                   fontWeight: FontWeight.w600,
                   letterSpacing: 0.5,
                 ),
@@ -1255,7 +1249,7 @@ class _VoiceConfirmationSheetState extends State<VoiceConfirmationSheet>
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 22,
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ],
@@ -1460,18 +1454,11 @@ class _VoiceConfirmationSheetState extends State<VoiceConfirmationSheet>
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             color: _cardBg,
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(Bt.rCard),
             border: Border.all(
               color: _blue.withValues(alpha: 0.25),
               width: 1.5,
             ),
-            boxShadow: [
-              BoxShadow(
-                color: _blue.withValues(alpha: 0.06),
-                blurRadius: 20,
-                offset: const Offset(0, 6),
-              ),
-            ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1483,14 +1470,14 @@ class _VoiceConfirmationSheetState extends State<VoiceConfirmationSheet>
                 ),
                 decoration: BoxDecoration(
                   gradient: AppGradients.primaryButton,
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(Bt.rCard),
                 ),
                 child: Text(
-                  _entry.typeLabel.toUpperCase(),
+                  _entry.typeLabel,
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
                     letterSpacing: 0.8,
                   ),
                 ),
@@ -1514,7 +1501,7 @@ class _VoiceConfirmationSheetState extends State<VoiceConfirmationSheet>
                 'Rate',
                 _entry.rate != null ? '₹${_entry.rate}' : null,
               ),
-              const Divider(height: 20, color: Color(0xFFEEF0F8)),
+              const Divider(height: 20, color: Color(0xFFEEF1F5)),
               _reviewRowAmount(
                 'Total Amount',
                 '₹${_formatAmount(_entry.computedAmount)}',
@@ -1547,18 +1534,18 @@ class _VoiceConfirmationSheetState extends State<VoiceConfirmationSheet>
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: const Color(0xFFFFF0F0),
+              color: const Color(0xFFFDECEF),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: Colors.red.shade200),
             ),
             child: Row(
               children: [
-                const Icon(Icons.error_outline, color: Colors.red, size: 18),
+                const Icon(Icons.error_outline, color: Color(0xFFC01048), size: 18),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     _saveError!,
-                    style: const TextStyle(color: Colors.red, fontSize: 13),
+                    style: const TextStyle(color: Color(0xFFC01048), fontSize: 13),
                   ),
                 ),
               ],
@@ -1605,7 +1592,7 @@ class _VoiceConfirmationSheetState extends State<VoiceConfirmationSheet>
             'Entry Saved!',
             style: TextStyle(
               fontSize: 22,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w700,
               color: _textDark,
             ),
           ),
@@ -1657,7 +1644,7 @@ class _VoiceConfirmationSheetState extends State<VoiceConfirmationSheet>
           label,
           style: const TextStyle(
             fontSize: 14,
-            fontWeight: FontWeight.w800,
+            fontWeight: FontWeight.w700,
             color: _textDark,
           ),
         ),
@@ -1668,7 +1655,7 @@ class _VoiceConfirmationSheetState extends State<VoiceConfirmationSheet>
             value,
             style: const TextStyle(
               fontSize: 18,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w700,
               color: Colors.white,
             ),
           ),
@@ -1706,8 +1693,8 @@ class _VoiceConfirmationSheetState extends State<VoiceConfirmationSheet>
     return Text(
       text,
       style: const TextStyle(
-        fontSize: 11,
-        fontWeight: FontWeight.w800,
+        fontSize: 13,
+        fontWeight: FontWeight.w700,
         color: _textGray,
         letterSpacing: 1.1,
       ),
@@ -1730,7 +1717,7 @@ class _VoiceConfirmationSheetState extends State<VoiceConfirmationSheet>
           color: isSelected ? _blue.withValues(alpha: 0.06) : _cardBg,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isSelected ? _blue : const Color(0xFFDDE4F8),
+            color: isSelected ? _blue : const Color(0xFFE4E7EC),
             width: isSelected ? 2 : 1.5,
           ),
         ),
@@ -1742,7 +1729,7 @@ class _VoiceConfirmationSheetState extends State<VoiceConfirmationSheet>
               decoration: BoxDecoration(
                 color: isSelected
                     ? _blue.withValues(alpha: 0.12)
-                    : const Color(0xFFF0F2FF),
+                    : const Color(0xFFE8F1FC),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(
@@ -1768,7 +1755,7 @@ class _VoiceConfirmationSheetState extends State<VoiceConfirmationSheet>
                     Text(
                       subtitle,
                       style: const TextStyle(
-                        fontSize: 12,
+                        fontSize: 13,
                         color: _textGray,
                         fontWeight: FontWeight.w500,
                       ),
@@ -1796,10 +1783,10 @@ class _VoiceConfirmationSheetState extends State<VoiceConfirmationSheet>
         decoration: BoxDecoration(
           gradient: selected ? AppGradients.primaryButton : null,
           color: selected ? null : _cardBg,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(Bt.rCard),
           border: selected
               ? null
-              : Border.all(color: const Color(0xFFDDE4F8), width: 1.5),
+              : Border.all(color: Bt.line),
           boxShadow: [
             if (selected)
               BoxShadow(
@@ -1832,7 +1819,7 @@ class _VoiceConfirmationSheetState extends State<VoiceConfirmationSheet>
         decoration: BoxDecoration(
           color: _cardBg,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFFDDE4F8)),
+          border: Border.all(color: Bt.line),
         ),
         child: TextField(
           controller: ctrl,
@@ -1874,16 +1861,13 @@ class _VoiceConfirmationSheetState extends State<VoiceConfirmationSheet>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionLabel(label.toUpperCase()),
+        _buildSectionLabel(label),
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
             color: _cardBg,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFDDE4F8)),
-            boxShadow: [
-              BoxShadow(color: _blue.withValues(alpha: 0.04), blurRadius: 10),
-            ],
+            border: Border.all(color: Bt.line),
           ),
           child: TextField(
             controller: ctrl,
@@ -1939,13 +1923,6 @@ class _VoiceConfirmationSheetState extends State<VoiceConfirmationSheet>
           decoration: BoxDecoration(
             gradient: AppGradients.primaryButton,
             borderRadius: BorderRadius.circular(50),
-            boxShadow: [
-              BoxShadow(
-                color: _blue.withValues(alpha: 0.35),
-                blurRadius: 18,
-                offset: const Offset(0, 6),
-              ),
-            ],
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -1957,7 +1934,7 @@ class _VoiceConfirmationSheetState extends State<VoiceConfirmationSheet>
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 17,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ],
@@ -1993,7 +1970,7 @@ class _VoiceConfirmationSheetState extends State<VoiceConfirmationSheet>
                 style: TextStyle(
                   color: _blue,
                   fontSize: 15,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ],
@@ -2046,7 +2023,7 @@ class _VoiceConfirmationSheetState extends State<VoiceConfirmationSheet>
             style: TextStyle(
               color: Colors.white,
               fontSize: 17,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ],
@@ -2168,7 +2145,7 @@ class _AnswerChip extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
         color: AppColors.primaryBlue.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(Bt.rCard),
         border: Border.all(color: AppColors.primaryBlue.withValues(alpha: 0.2)),
       ),
       child: Row(
@@ -2183,7 +2160,7 @@ class _AnswerChip extends StatelessWidget {
           Text(
             value,
             style: const TextStyle(
-              fontSize: 12,
+              fontSize: 13,
               fontWeight: FontWeight.w700,
               color: AppColors.primaryBlue,
             ),

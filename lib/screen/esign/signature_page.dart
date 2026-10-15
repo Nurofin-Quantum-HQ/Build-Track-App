@@ -1,3 +1,4 @@
+import 'package:buildtrack_mobile/design/design.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 
@@ -73,86 +74,61 @@ class _SignaturePageState extends State<SignaturePage> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(backgroundColor: Bt.ground, body: Center(child: CircularProgressIndicator()));
     }
     if (_errorMessage != null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Sign Receipt')),
-        body: Center(child: Text(_errorMessage!, style: const TextStyle(color: Colors.red, fontSize: 18))),
+        backgroundColor: Bt.ground,
+        appBar: const BtNavBar(title: 'Sign receipt', showBack: false),
+        body: BtEmpty(icon: Icons.error_outline_rounded, title: 'Can\'t open this receipt', message: _errorMessage!),
       );
     }
     if (_transaction?['eSignStatus'] == 'Signed') {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Receipt Signed')),
-        body: const Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.check_circle, color: Colors.green, size: 80),
-              SizedBox(height: 20),
-              Text('Thank you! This receipt has been securely signed.', style: TextStyle(fontSize: 18)),
-            ],
-          ),
+      return const Scaffold(
+        backgroundColor: Bt.ground,
+        appBar: BtNavBar(title: 'Receipt signed', showBack: false),
+        body: BtEmpty(
+          icon: Icons.check_circle_rounded,
+          title: 'Thank you!',
+          message: 'This receipt has been securely signed.',
         ),
       );
     }
     return Scaffold(
-      appBar: AppBar(title: const Text('Review & Sign Receipt'), centerTitle: true),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
-        child: Center(
-          child: Container(
-            constraints: const BoxConstraints(maxWidth: 600),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Card(
-                  elevation: 4,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  child: Padding(
-                    padding: const EdgeInsets.all(24.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Center(child: Text('CASH RECEIPT', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold))),
-                        const Divider(height: 40),
-                        _buildRow('Project', _transaction?['projectName'] ?? 'N/A'),
-                        const SizedBox(height: 12),
-                        _buildRow('Type', _transaction?['type'] ?? 'N/A'),
-                        const SizedBox(height: 12),
-                        _buildRow('Amount', '₹${_transaction?['amount'] ?? 0}'),
-                        const SizedBox(height: 12),
-                        _buildRow('Date', _transaction?['date']?.substring(0, 10) ?? 'N/A'),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 32),
-                const Text('Authorize & Sign:', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
-                const SizedBox(height: 12),
-                ElevatedButton(
-                  onPressed: _isSubmitting ? null : _submitSignature,
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                  ),
-                  child: _isSubmitting
-                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Text('Authorize and Sign'),
-                ),
-              ],
-            ),
+      backgroundColor: Bt.ground,
+      appBar: const BtNavBar(title: 'Review & sign receipt', showBack: false),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 600),
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+            children: [
+              Text('Cash receipt', style: BtText.largeTitle(context)),
+              const SizedBox(height: 4),
+              Text('Please check the details below, then authorize.', style: BtText.body(context, color: Bt.ink2)),
+              const SizedBox(height: 20),
+              BtGroup(children: [
+                _buildRow('Project', _transaction?['projectName'] ?? 'N/A'),
+                _buildRow('Type', _transaction?['type'] ?? 'N/A'),
+                _buildRow('Amount', '₹${_transaction?['amount'] ?? 0}'),
+                _buildRow('Date', _transaction?['date']?.substring(0, 10) ?? 'N/A'),
+              ]),
+            ],
+          ),
+        ),
+      ),
+      bottomNavigationBar: SafeArea(
+        child: Container(
+          decoration: const BoxDecoration(color: Bt.card, border: Border(top: BorderSide(color: Bt.line))),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+          child: BtButton(
+            label: 'Authorize and Sign',
+            loading: _isSubmitting,
+            onPressed: _isSubmitting ? null : _submitSignature,
           ),
         ),
       ),
     );
   }
-  Widget _buildRow(String label, String value) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(label, style: const TextStyle(fontSize: 16, color: Colors.grey)),
-        Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
-      ],
-    );
-  }
+  Widget _buildRow(String label, String value) => BtValueRow(label: label, value: value);
 }

@@ -1,8 +1,8 @@
+import 'package:buildtrack_mobile/design/design.dart';
 import 'dart:convert';
 import 'dart:developer' as dev;
 import 'package:buildtrack_mobile/common/themes/app_colors.dart';
 import 'package:buildtrack_mobile/common/themes/app_theme.dart';
-import 'package:buildtrack_mobile/common/widgets/common_widgets.dart';
 import 'package:buildtrack_mobile/common/widgets/entry_widgets.dart';
 import 'package:buildtrack_mobile/controller/entry_permissions.dart';
 import 'package:flutter/material.dart';
@@ -18,7 +18,6 @@ class TransactionLogsScreen extends StatefulWidget {
 class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
   static var primaryBlue = AppColors.primary;
   static var purple = AppColors.primary;
-  static const bgColor = AppColors.gradientStart;
   static const textDark = AppColors.textDark;
   static const textGray = AppColors.textLight;
   int _filterIndex = 0;
@@ -34,9 +33,9 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
   Color _getCategoryColor(String category) {
     switch (category) {
       case 'labour':
-        return const Color(0xFF2E7D32);
+        return const Color(0xFF067647);
       case 'equipment':
-        return const Color(0xFFE65100);
+        return const Color(0xFFB54708);
       default:
         return primaryBlue;
     }
@@ -44,11 +43,11 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
   Color _getCategoryBg(String category) {
     switch (category) {
       case 'labour':
-        return const Color(0xFFE8F5E9);
+        return const Color(0xFFE7F6EE);
       case 'equipment':
-        return const Color(0xFFFFF3E0);
+        return const Color(0xFFFEF3E7);
       default:
-        return const Color(0xFFEEF0FF);
+        return const Color(0xFFE8F1FC);
     }
   }
   List<Map<String, dynamic>> get _filteredLogs {
@@ -451,26 +450,23 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: bgColor,
+      backgroundColor: Bt.ground,
+      appBar: BtNavBar(
+        title: _itemName.isNotEmpty
+            ? '${_itemName[0].toUpperCase()}${_itemName.substring(1)}'
+            : 'Project Logs',
+      ),
       body: SafeArea(
+        top: false,
         bottom: false,
         child: Column(
           children: [
-            AppTopBar(
-              title: _itemName.isNotEmpty
-                  ? '${_itemName[0].toUpperCase()}${_itemName.substring(1)}'
-                  : 'Project Logs',
-              isSubScreen: true,
-              leftIcon: Icons.arrow_back,
-              onLeftTap: () => Navigator.maybePop(context),
-            ),
-            const Divider(height: 1, thickness: 1, color: Color(0xFFEEF0F8)),
             Expanded(
               child: SingleChildScrollView(
                 physics: const ClampingScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     if (!_isGeneral) ...[
                       _buildSummaryCard(),
@@ -481,16 +477,7 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
                     _buildLogsHeader(),
                     const SizedBox(height: 14),
                     if (_isLoading)
-                      Padding(
-                        padding: EdgeInsets.symmetric(vertical: 60),
-                        child: Center(
-                          child: CircularProgressIndicator(
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              primaryBlue,
-                            ),
-                          ),
-                        ),
-                      )
+                      const BtSkeletonList(count: 4)
                     else if (_filteredLogs.isEmpty)
                       _buildEmptyState()
                     else
@@ -513,57 +500,27 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
       final logs = entry.value;
       final collapsed = _collapsedGroups[groupLabel] ?? (groupLabel != 'Today');
       widgets.add(
-        InkWell(
-          onTap: () =>
-              setState(() => _collapsedGroups[groupLabel] = !collapsed),
-          borderRadius: BorderRadius.circular(10),
-          child: Container(
-            margin: const EdgeInsets.only(bottom: 8),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF0EEF8),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 6,
-                  height: 6,
-                  decoration: BoxDecoration(
-                    color: primaryBlue,
-                    shape: BoxShape.circle,
+        Semantics(
+          button: true,
+          expanded: !collapsed,
+          child: InkWell(
+            onTap: () => setState(() => _collapsedGroups[groupLabel] = !collapsed),
+            borderRadius: BorderRadius.circular(Bt.rTile),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(4, 10, 4, 10),
+              child: Row(
+                children: [
+                  Text(groupLabel, style: BtText.headline(context)),
+                  const SizedBox(width: 8),
+                  Text('${logs.length} ${logs.length == 1 ? "entry" : "entries"}', style: BtText.caption(context)),
+                  const Spacer(),
+                  AnimatedRotation(
+                    duration: const Duration(milliseconds: 200),
+                    turns: collapsed ? 0 : 0.5,
+                    child: const Icon(Icons.keyboard_arrow_down_rounded, color: Bt.ink3, size: 22),
                   ),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  groupLabel,
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w800,
-                    color: primaryBlue,
-                    letterSpacing: 0.2,
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  '${logs.length} entry${logs.length != 1 ? "ies" : ""}',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: textGray,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const Spacer(),
-                AnimatedRotation(
-                  duration: const Duration(milliseconds: 200),
-                  turns: collapsed ? 0 : 0.5,
-                  child: Icon(
-                    Icons.keyboard_arrow_down,
-                    color: primaryBlue,
-                    size: 18,
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -592,21 +549,17 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 26, horizontal: 22),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFEEEFFF), Color(0xFFF5F0FF)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: const Color(0xFFCDD0FF), width: 2),
+        color: Bt.card,
+        border: Border.all(color: Bt.line),
+        borderRadius: BorderRadius.circular(Bt.rCard),
       ),
       child: Column(
         children: [
           Text(
-            'TOTAL ${_itemType.toUpperCase()} STOCK',
+            'Total ${_itemType.toLowerCase()} stock',
             style: AppTheme.label.copyWith(
               color: textGray,
-              fontSize: 11,
+              fontSize: 13,
               letterSpacing: 1.1,
             ),
           ),
@@ -618,7 +571,7 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
                   text: _formatQty(net),
                   style: const TextStyle(
                     fontSize: 50,
-                    fontWeight: FontWeight.w900,
+                    fontWeight: FontWeight.w700,
                     color: AppColors.primaryPurple,
                     letterSpacing: -2,
                     height: 1,
@@ -646,7 +599,7 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
                 child: _summaryBadge(
                   Icons.remove_circle_outline,
                   _totalUsed > 0 ? '-${_formatQty(_totalUsed)} Used' : '0 Used',
-                  const Color(0xFFE040FB),
+                  const Color(0xFF0B63CE),
                 ),
               ),
               Container(width: 1, height: 28, color: const Color(0xFFCDD0FF)),
@@ -676,7 +629,7 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
             style: TextStyle(
               color: color,
               fontWeight: FontWeight.w700,
-              fontSize: 11.5,
+              fontSize: 13,
               letterSpacing: 0.2,
             ),
           ),
@@ -737,8 +690,8 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
                     label,
                     style: TextStyle(
                       color: dot,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
                       letterSpacing: 0.2,
                     ),
                   ),
@@ -752,7 +705,7 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
                     style: const TextStyle(
                       color: AppColors.textDark,
                       fontSize: 17,
-                      fontWeight: FontWeight.w900,
+                      fontWeight: FontWeight.w700,
                       height: 1.1,
                     ),
                   ),
@@ -761,7 +714,7 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
                     formatCurrency(total),
                     style: TextStyle(
                       color: dot,
-                      fontSize: 10.5,
+                      fontSize: 12,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -778,8 +731,8 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
           'Fully Paid',
           fullyPaid,
           fullyPaidTotal,
-          const Color(0xFF15803D),
-          const Color(0xFFF0FDF4),
+          const Color(0xFF067647),
+          const Color(0xFFE7F6EE),
           const Color(0xFFBBF7D0),
         ),
         const SizedBox(width: 8),
@@ -787,8 +740,8 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
           'Partial',
           partial,
           partialTotal,
-          const Color(0xFFB45309),
-          const Color(0xFFFFFBEB),
+          const Color(0xFFB54708),
+          const Color(0xFFFEF3E7),
           const Color(0xFFFDE68A),
         ),
         const SizedBox(width: 8),
@@ -796,7 +749,7 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
           'Not Paid',
           notPaid,
           notPaidTotal,
-          const Color(0xFFDC2626),
+          const Color(0xFFC01048),
           const Color(0xFFFFF5F5),
           const Color(0xFFFECACA),
         ),
@@ -805,59 +758,17 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
   }
   Widget _buildLogsHeader() {
     const filters = ['All', '+ Added', '- Used'];
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Movement Logs',
-                style: AppTheme.heading3.copyWith(color: textDark),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                'Tracking historical distribution',
-                style: AppTheme.caption.copyWith(color: textGray),
-              ),
-            ],
-          ),
-        ),
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: List.generate(filters.length, (i) {
-            final sel = i == _filterIndex;
-            return Padding(
-              padding: EdgeInsets.only(left: i == 0 ? 0 : 6),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(20),
-                onTap: () => setState(() => _filterIndex = i),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: sel ? primaryBlue : Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: sel ? primaryBlue : const Color(0xFFDDE0F0),
-                    ),
-                  ),
-                  child: Text(
-                    filters[i],
-                    style: TextStyle(
-                      color: sel ? Colors.white : textGray,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ),
-            );
-          }),
+        Text('Movement logs', style: BtText.title(context)),
+        const SizedBox(height: 2),
+        Text('Tracking historical distribution', style: BtText.caption(context)),
+        const SizedBox(height: 12),
+        BtSegmented<int>(
+          segments: {for (var i = 0; i < filters.length; i++) i: filters[i]},
+          value: _filterIndex,
+          onChanged: (i) => setState(() => _filterIndex = i),
         ),
       ],
     );
@@ -892,7 +803,7 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
               height: 76,
               decoration: BoxDecoration(
                 color: primaryBlue.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(22),
+                borderRadius: BorderRadius.circular(Bt.rCard),
               ),
               child: Icon(icon, color: primaryBlue, size: 34),
             ),
@@ -900,7 +811,7 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
             Text(
               title,
               style: AppTheme.bodyLarge.copyWith(
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w700,
                 color: textDark,
                 fontSize: 16,
               ),
@@ -1041,7 +952,7 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
     final logCategory = log['category'] as String? ?? _itemType;
     final iconColor = _getCategoryColor(logCategory);
     final iconBg = _getCategoryBg(logCategory);
-    final accent = isPositive ? primaryBlue : const Color(0xFFE040FB);
+    final accent = isPositive ? primaryBlue : const Color(0xFF0B63CE);
     return Material(
       color: Colors.white,
       borderRadius: BorderRadius.circular(14),
@@ -1086,12 +997,6 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
             border: Border(left: BorderSide(color: accent, width: 3.5)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
-                blurRadius: 8,
-              ),
-            ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1142,7 +1047,7 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
                                 child: Text(
                                   log['supplier'] as String,
                                   style: const TextStyle(
-                                    fontSize: 10.5,
+                                    fontSize: 12,
                                     color: textGray,
                                     fontWeight: FontWeight.w600,
                                   ),
@@ -1188,7 +1093,7 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
                 ],
               ),
               const SizedBox(height: 10),
-              const Divider(height: 1, color: Color(0xFFF0EEF8)),
+              const Divider(height: 1, color: Color(0xFFEEF1F5)),
               const SizedBox(height: 8),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
@@ -1205,7 +1110,7 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
                       style: AppTheme.caption.copyWith(
                         color: textGray,
                         fontWeight: FontWeight.w600,
-                        fontSize: 11,
+                        fontSize: 13,
                       ),
                     ),
                   ),
@@ -1265,7 +1170,7 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
                         border: Border.all(
                           color: canSettle
                               ? primaryBlue
-                              : const Color(0xFFDDE0F0),
+                              : const Color(0xFFE4E7EC),
                           width: 1.5,
                         ),
                       ),
@@ -1278,7 +1183,7 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
                                 : Icons.check_circle_outline,
                             color: canSettle
                                 ? primaryBlue
-                                : const Color(0xFF9CA3AF),
+                                : const Color(0xFF98A2B3),
                             size: 13,
                           ),
                           const SizedBox(width: 5),
@@ -1287,9 +1192,9 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
                             style: TextStyle(
                               color: canSettle
                                   ? primaryBlue
-                                  : const Color(0xFF9CA3AF),
-                              fontSize: 11,
-                              fontWeight: FontWeight.w800,
+                                  : const Color(0xFF98A2B3),
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
                         ],

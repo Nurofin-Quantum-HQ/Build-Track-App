@@ -55,7 +55,7 @@ class UserSession extends ChangeNotifier {
   static bool get isMason => _role == UserRole.mason;
   static TextStyle getCompanyTextStyle({
     double fontSize = 18,
-    FontWeight fontWeight = FontWeight.w800,
+    FontWeight fontWeight = FontWeight.w700,
     Color? color,
     double? letterSpacing,
   }) {
@@ -189,7 +189,7 @@ class UserSession extends ChangeNotifier {
       try {
         final hex = themePref.replaceAll('#', '');
         if (hex.length == 6) {
-          final colorVal = int.parse('FF', radix: 16);
+          final colorVal = int.parse('FF$hex', radix: 16);
           final prefs = await SharedPreferences.getInstance();
           await prefs.setInt('app_theme_color', colorVal);
           // Update global color for immediate effect before provider reloads

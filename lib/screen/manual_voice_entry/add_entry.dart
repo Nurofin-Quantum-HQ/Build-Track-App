@@ -1,11 +1,10 @@
+import 'package:buildtrack_mobile/design/design.dart';
 import 'dart:convert';
 import 'package:csv/csv.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:buildtrack_mobile/common/themes/app_colors.dart';
 import 'package:buildtrack_mobile/controller/nav_controller.dart';
-import 'package:buildtrack_mobile/common/themes/app_theme.dart';
-import 'package:buildtrack_mobile/common/widgets/app_widgets.dart';
 import 'package:buildtrack_mobile/common/widgets/common_widgets.dart';
 import 'package:buildtrack_mobile/controller/project_provider.dart';
 import 'package:buildtrack_mobile/controller/inventory_provider.dart';
@@ -67,10 +66,6 @@ class _AddEntryScreenContent extends StatefulWidget {
   State<_AddEntryScreenContent> createState() => _AddEntryScreenContentState();
 }
 class _AddEntryScreenContentState extends State<_AddEntryScreenContent> {
-  static var primaryBlue = AppColors.primary;
-  static const bgColor = AppColors.gradientStart;
-  static const textDark = AppColors.textDark;
-  static const textGray = AppColors.textLight;
   final ScrollController _scrollController = ScrollController();
   
   @override
@@ -241,7 +236,7 @@ class _AddEntryScreenContentState extends State<_AddEntryScreenContent> {
             content: Text(
               '${type == "all" ? "All" : type[0].toUpperCase() + type.substring(1)} template downloaded successfully!',
             ),
-            backgroundColor: Colors.green,
+            backgroundColor: const Color(0xFF067647),
           ),
         );
       }
@@ -250,7 +245,7 @@ class _AddEntryScreenContentState extends State<_AddEntryScreenContent> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Download failed: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: const Color(0xFFC01048),
           ),
         );
       }
@@ -443,7 +438,7 @@ class _AddEntryScreenContentState extends State<_AddEntryScreenContent> {
                     const SizedBox(height: 16),
                     LinearProgressIndicator(
                       value: progressValue,
-                      backgroundColor: Colors.grey[200],
+                      backgroundColor: const Color(0xFFEEF1F5),
                       valueColor: AlwaysStoppedAnimation<Color>(
                         AppColors.primary,
                       ),
@@ -1098,7 +1093,7 @@ class _AddEntryScreenContentState extends State<_AddEntryScreenContent> {
                     Text(
                       'Successfully imported: $successCount',
                       style: const TextStyle(
-                        color: Colors.green,
+                        color: Color(0xFF067647),
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -1117,7 +1112,7 @@ class _AddEntryScreenContentState extends State<_AddEntryScreenContent> {
                     Text(
                       'Failed: $failedCount',
                       style: TextStyle(
-                        color: failedCount > 0 ? Colors.red : Colors.grey,
+                        color: failedCount > 0 ? const Color(0xFFC01048) : const Color(0xFF667085),
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -1132,9 +1127,9 @@ class _AddEntryScreenContentState extends State<_AddEntryScreenContent> {
                         width: double.maxFinite,
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: Colors.grey[50],
+                          color: const Color(0xFFF6F7F9),
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.grey[200]!),
+                          border: Border.all(color: Bt.line),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1146,7 +1141,7 @@ class _AddEntryScreenContentState extends State<_AddEntryScreenContent> {
                                     msg,
                                     style: TextStyle(
                                       color: Colors.red[800],
-                                      fontSize: 12,
+                                      fontSize: 13,
                                     ),
                                   ),
                                 ),
@@ -1176,7 +1171,7 @@ class _AddEntryScreenContentState extends State<_AddEntryScreenContent> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Upload failed: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: const Color(0xFFC01048),
           ),
         );
       }
@@ -1188,244 +1183,135 @@ class _AddEntryScreenContentState extends State<_AddEntryScreenContent> {
     return Showcase(
       key: ShowcaseKeys.addEntryCSV,
       description: 'Upload bulk entries via CSV. Download templates and upload completed files here.',
-      tooltipBackgroundColor: const Color(0xFF1E1E2C),
+      tooltipBackgroundColor: Bt.ink,
       textColor: Colors.white,
       tooltipBorderRadius: BorderRadius.circular(16),
       tooltipPadding: const EdgeInsets.all(16),
-      child: Container(
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 10,
-              offset: const Offset(0, 3),
-          ),
-        ],
-        border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
-      ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  Icons.receipt_long_rounded,
-                  color: AppColors.primary,
-                  size: 22,
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'BULK ENTRY IMPORT',
-                      style: TextStyle(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w800,
-                        color: textGray,
-                        letterSpacing: 0.6,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Upload bulk entries via CSV',
-                      style: AppTheme.heading3.copyWith(
-                        fontSize: 15,
-                        color: textDark,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Import Materials, Labour, or Equipment entries. Download the clean template below, fill it, and upload the file.',
-            style: AppTheme.body.copyWith(
-              color: textGray,
-              fontSize: 12.5,
-              height: 1.35,
+          const BtSectionHeader(title: 'Import many from a spreadsheet'),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 0, 4, 12),
+            child: Text(
+              'Import Materials, Labour, or Equipment entries. Download the template, fill it, and upload the file.',
+              style: BtText.subhead(context),
             ),
           ),
-          const SizedBox(height: 18),
-          Row(
+          BtGroup(
             children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: _isUploadingCsv
-                      ? null
-                      : () => _downloadCsvTemplate('all'),
-                  icon: const Icon(Icons.download_rounded, size: 18),
-                  label: const Text('Download Template'),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    side: BorderSide(
-                      color: AppColors.primary,
-                      width: 1.5,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    foregroundColor: AppColors.primary,
-                    textStyle: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
+              BtRow(
+                leading: const BtTile(icon: Icons.download_rounded),
+                title: 'Download Template',
+                subtitle: 'CSV with the columns you chose',
+                showChevron: true,
+                onTap: _isUploadingCsv ? null : () => _downloadCsvTemplate('all'),
               ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
               Showcase(
                 key: _csvKey,
                 title: 'Customize Template',
                 description: 'You can adjust which columns appear in the CSV.',
-                child: TextButton.icon(
-                  onPressed: _isUploadingCsv ? null : _openCustomizeColumnsSheet,
-                  icon: const Icon(Icons.settings_outlined, size: 16),
-                  label: const Text('Customize Template Columns'),
-                  style: TextButton.styleFrom(
-                    foregroundColor: AppColors.primary,
-                    textStyle: const TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
+                child: BtRow(
+                  leading: const BtTile(icon: Icons.view_column_outlined),
+                  title: 'Customize Template Columns',
+                  subtitle: 'Choose, hide and reorder columns',
+                  showChevron: true,
+                  onTap: _isUploadingCsv ? null : _openCustomizeColumnsSheet,
                 ),
+              ),
+              BtRow(
+                leading: _isUploadingCsv
+                    ? const SizedBox(width: 40, height: 40, child: Padding(padding: EdgeInsets.all(10), child: CircularProgressIndicator(strokeWidth: 2)))
+                    : const BtTile(icon: Icons.upload_file_rounded),
+                title: _isUploadingCsv ? 'Uploading…' : 'Upload CSV File',
+                titleColor: context.bt.brand,
+                titleWeight: FontWeight.w600,
+                subtitle: 'Each row becomes an entry',
+                onTap: _isUploadingCsv ? null : _uploadCsv,
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16.0),
-            child: Text(
-              'Rule: If you skip an optional column in a row, use "###" instead of leaving it completely blank to ensure strict format parsing.',
-              style: TextStyle(
-                fontSize: 12,
-                color: AppColors.textLight,
-                fontStyle: FontStyle.italic,
-              ),
-              textAlign: TextAlign.center,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 10, 4, 0),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.info_outline_rounded, size: 16, color: Bt.ink3),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'If you skip an optional column in a row, type "###" instead of leaving it blank so the file parses correctly.',
+                    style: BtText.caption(context),
+                  ),
+                ),
+              ],
             ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: _isUploadingCsv ? null : _uploadCsv,
-                  icon: const Icon(Icons.upload_file_rounded, size: 18),
-                  label: const Text('Upload CSV File'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    textStyle: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ),
-            ],
           ),
         ],
       ),
-    ));
+    );
   }
   @override
   Widget build(BuildContext context) {
+    final canPop = Navigator.canPop(context);
     return Scaffold(
-      backgroundColor: bgColor,
+      backgroundColor: Bt.ground,
       body: SafeArea(
         bottom: false,
-        child: Column(
+        child: ListView(
+          controller: _scrollController,
+          physics: const ClampingScrollPhysics(),
+          padding: const EdgeInsets.only(bottom: 32),
           children: [
-            AppTopBar(
-              title: 'Add Entry',
-              leftIcon: Navigator.canPop(context) ? Icons.arrow_back : null,
-              onLeftTap: Navigator.canPop(context)
-                  ? () => Navigator.pop(context)
-                  : null,
-              rightWidget: Row(
+            if (canPop)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(4, 4, 4, 0),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: BtIconButton(
+                    icon: Icons.arrow_back_ios_new_rounded,
+                    size: 20,
+                    semantic: 'Back',
+                    onTap: () => Navigator.pop(context),
+                  ),
+                ),
+              ),
+            BtLargeHeader(
+              title: 'Add entry',
+              trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  GestureDetector(
+                  BtIconButton(
+                    icon: Icons.help_outline_rounded,
+                    semantic: 'Help',
+                    color: Bt.ink2,
                     onTap: () => ShowCaseWidget.of(context).startShowCase([_csvKey]),
-                    child: Container(
-                      padding: const EdgeInsets.all(7),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.1),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        Icons.help_outline,
-                        color: AppColors.primary,
-                        size: 19,
-                      ),
-                    ),
                   ),
-                  const SizedBox(width: 8),
-                  GestureDetector(
-                    onTap: () => Navigator.pushNamed(context, '/profile'),
-                    child: const ProfileAvatar(radius: 18),
+                  Semantics(
+                    button: true,
+                    label: 'Account',
+                    child: InkWell(
+                      customBorder: const CircleBorder(),
+                      onTap: () => Navigator.pushNamed(context, '/profile'),
+                      child: const Padding(padding: EdgeInsets.all(4), child: ProfileAvatar(radius: 18)),
+                    ),
                   ),
                 ],
               ),
             ),
-            Expanded(
-              child: SingleChildScrollView(
-                controller: _scrollController,
-                physics: const ClampingScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 12),
-                    Text(
-                      'What are you\nadding?',
-                      style: AppTheme.heading1.copyWith(
-                        fontSize: 30,
-                        letterSpacing: -0.6,
-                        height: 1.15,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Select the entry type to log for the current shift.',
-                      style: AppTheme.body.copyWith(color: textGray),
-                    ),
-                    const SizedBox(height: 24),
-                    const AppSectionHeader(title: 'Entry Type'),
-                    ...List.generate(
-                      _entries.length,
-                      (i) => _entryCard(context, i),
-                    ),
-                    const SizedBox(height: 24),
-                    _buildCsvImportCard(context),
-                  ],
-                ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: Bt.gutter),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text('Select the entry type to log for the current shift.', style: BtText.body(context, color: Bt.ink2)),
+                  const SizedBox(height: 16),
+                  BtGroup(
+                    children: List.generate(_entries.length, (i) => _entryCard(context, i)),
+                  ),
+                  const SizedBox(height: 32),
+                  _buildCsvImportCard(context),
+                ],
               ),
             ),
           ],
@@ -1437,18 +1323,6 @@ class _AddEntryScreenContentState extends State<_AddEntryScreenContent> {
   Widget _entryCard(BuildContext context, int index) {
     final entry = _entries[index];
     final String type = entry['type'] as String;
-    final Map<String, Color> iconColors = {
-      'material': primaryBlue,
-      'labour': primaryBlue,
-      'equipment': primaryBlue,
-    };
-    final Map<String, Color> iconBgColors = {
-      'material': primaryBlue.withValues(alpha: 0.1),
-      'labour': primaryBlue.withValues(alpha: 0.1),
-      'equipment': primaryBlue.withValues(alpha: 0.1),
-    };
-    final Color iconColor = iconColors[type] ?? primaryBlue;
-    final Color iconBg = iconBgColors[type] ?? const Color(0xFFF0F2F8);
     GlobalKey? showcaseKey;
     String description = '';
     if (type == 'material') {
@@ -1462,49 +1336,15 @@ class _AddEntryScreenContentState extends State<_AddEntryScreenContent> {
       description = 'Record heavy machinery runtime, fuel logs, and maintenance events.';
     }
 
-    Widget cardContent = AppCard(
+    Widget cardContent = BtRow(
+      leading: BtTypeTile(type: type),
+      title: entry['title'] as String,
+      subtitle: entry['subtitle'] as String,
+      subtitleMaxLines: 2,
+      titleWeight: FontWeight.w600,
+      minHeight: 72,
+      showChevron: true,
       onTap: () => _navigateToContext(context, type),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              color: iconBg,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Icon(entry['icon'] as IconData, color: iconColor, size: 26),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  entry['title'] as String,
-                  style: AppTheme.heading3.copyWith(fontSize: 17),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  entry['subtitle'] as String,
-                  style: AppTheme.body.copyWith(
-                    color: textGray,
-                    fontSize: 13,
-                    height: 1.4,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          Icon(
-            Icons.chevron_right,
-            color: textGray.withValues(alpha: 0.5),
-            size: 20,
-          ),
-        ],
-      ),
     );
 
     if (showcaseKey != null) {
@@ -1571,154 +1411,131 @@ class _CustomizeTemplateSheetState extends State<CustomizeTemplateSheet> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.only(
-        left: 20,
-        right: 20,
-        top: 20,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-      ),
       decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(20),
-          topRight: Radius.circular(20),
-        ),
+        color: Bt.card,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(Bt.rSheet)),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'Customize Columns',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textDark,
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            BtSheetHeader(
+              title: 'Customize columns',
+              subtitle: '${_visibility.values.where((v) => v).length} of ${_columns.length} shown · drag ≡ to reorder',
+            ),
+            ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.55),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(Bt.rCard),
+                    border: Border.all(color: Bt.line),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: ReorderableListView.builder(
+                    shrinkWrap: true,
+                    buildDefaultDragHandles: false,
+                    itemCount: _columns.length,
+                    onReorder: (oldIndex, newIndex) {
+                      setState(() {
+                        if (newIndex > oldIndex) {
+                          newIndex -= 1;
+                        }
+                        final String item = _columns.removeAt(oldIndex);
+                        _columns.insert(newIndex, item);
+                      });
+                    },
+                    itemBuilder: (context, index) {
+                      final col = _columns[index];
+                      final isVisible = _visibility[col] ?? true;
+                      return Material(
+                        key: ValueKey(col),
+                        color: Bt.card,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (index > 0) const Divider(height: 1, indent: 16, color: Bt.line),
+                            SizedBox(
+                              height: 52,
+                              child: Row(children: [
+                                const SizedBox(width: 16),
+                                Expanded(child: Text(col, style: BtText.body(context, color: isVisible ? Bt.ink : Bt.ink3))),
+                                BtSwitch(
+                                  value: isVisible,
+                                  onChanged: (val) => setState(() => _visibility[col] = val),
+                                ),
+                                ReorderableDragStartListener(
+                                  index: index,
+                                  child: const SizedBox(width: 48, height: 52, child: Icon(Icons.drag_handle_rounded, color: Bt.ink3)),
+                                ),
+                              ]),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
                 ),
               ),
-              IconButton(
-                icon: const Icon(Icons.close),
-                onPressed: () => Navigator.pop(context),
-              ),
-            ],
-          ),
-          const Text(
-            'Drag handles to reorder columns. Toggle checkboxes to hide/show them in the downloaded template.',
-            style: TextStyle(fontSize: 13, color: AppColors.textLight),
-          ),
-          const SizedBox(height: 12),
-          Flexible(
-            child: SizedBox(
-              height: 350,
-              child: ReorderableListView.builder(
-                shrinkWrap: true,
-                itemCount: _columns.length,
-                onReorder: (oldIndex, newIndex) {
-                  setState(() {
-                    if (newIndex > oldIndex) {
-                      newIndex -= 1;
-                    }
-                    final String item = _columns.removeAt(oldIndex);
-                    _columns.insert(newIndex, item);
-                  });
-                },
-                itemBuilder: (context, index) {
-                  final col = _columns[index];
-                  final isVisible = _visibility[col] ?? true;
-                  return ListTile(
-                    key: ValueKey(col),
-                    leading: const Icon(
-                      Icons.drag_indicator,
-                      color: Colors.grey,
-                    ),
-                    title: Text(
-                      col,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: isVisible ? AppColors.textDark : Colors.grey,
-                      ),
-                    ),
-                    trailing: Checkbox(
-                      value: isVisible,
-                      activeColor: AppColors.primary,
-                      onChanged: (val) {
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: BtButton(
+                      label: 'Reset',
+                      variant: BtButtonVariant.secondary,
+                      onPressed: () {
                         setState(() {
-                          _visibility[col] = val ?? false;
+                          _columns = [
+                            'Date',
+                            'Project',
+                            'Floor',
+                            'Phase',
+                            'Activity',
+                            'Type',
+                            'Name',
+                            'Category / Trade',
+                            'Subtype',
+                            'Brand',
+                            'Supplier / Operator',
+                            'Quantity',
+                            'Unit',
+                            'Rate',
+                            'Overtime',
+                            'IsWithGst',
+                            'GstPercentage',
+                            'Payment Status',
+                            'Notes',
+                          ];
+                          _visibility = {for (var c in _columns) c: true};
                         });
                       },
                     ),
-                  );
-                },
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    flex: 2,
+                    child: BtButton(
+                      label: 'Apply Changes',
+                      onPressed: () {
+                        Navigator.pop(context, {
+                          'columns': _columns,
+                          'visibility': _visibility,
+                        });
+                      },
+                    ),
+                  ),
+                ],
               ),
             ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              TextButton(
-                onPressed: () {
-                  setState(() {
-                    _columns = [
-                      'Date',
-                      'Project',
-                      'Floor',
-                      'Phase',
-                      'Activity',
-                      'Type',
-                      'Name',
-                      'Category / Trade',
-                      'Subtype',
-                      'Brand',
-                      'Supplier / Operator',
-                      'Quantity',
-                      'Unit',
-                      'Rate',
-                      'Overtime',
-                      'IsWithGst',
-                      'GstPercentage',
-                      'Payment Status',
-                      'Notes',
-                    ];
-                    _visibility = {for (var c in _columns) c: true};
-                  });
-                },
-                child: const Text(
-                  'Reset to Default',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-              ),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 12,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-                onPressed: () {
-                  Navigator.pop(context, {
-                    'columns': _columns,
-                    'visibility': _visibility,
-                  });
-                },
-                child: const Text(
-                  'Apply Changes',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-              ),
-            ],
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

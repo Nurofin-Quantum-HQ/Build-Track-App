@@ -1,10 +1,8 @@
+import 'package:buildtrack_mobile/design/design.dart';
 import 'package:buildtrack_mobile/common/themes/app_colors.dart';
-import 'package:buildtrack_mobile/common/themes/app_theme.dart';
-import 'package:buildtrack_mobile/common/widgets/app_widgets.dart';
 import 'package:buildtrack_mobile/common/widgets/entry_widgets.dart';
 import 'package:buildtrack_mobile/controller/entry_model.dart';
 import 'package:buildtrack_mobile/controller/entry_permissions.dart';
-import 'package:buildtrack_mobile/common/utils/currency_formatter.dart';
 import 'package:buildtrack_mobile/services/api_service.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -17,9 +15,6 @@ class EntryDetailScreen extends StatefulWidget {
   State<EntryDetailScreen> createState() => _EntryDetailScreenState();
 }
 class _EntryDetailScreenState extends State<EntryDetailScreen> {
-  static var primaryBlue = AppColors.primary;
-  static const bgColor = AppColors.gradientStart;
-  static const textDark = AppColors.textDark;
   static const textGray = AppColors.textLight;
   bool _argsLoaded = false;
   Map _args = {};
@@ -100,36 +95,6 @@ class _EntryDetailScreenState extends State<EntryDetailScreen> {
       debugPrint('Error fetching transaction details: $e');
     }
   }
-  static Color _typeColor(String type) {
-    switch (type) {
-      case 'labour':
-        return const Color(0xFF2E7D32);
-      case 'equipment':
-        return const Color(0xFFE65100);
-      default:
-        return primaryBlue;
-    }
-  }
-  static Color _typeBg(String type) {
-    switch (type) {
-      case 'labour':
-        return const Color(0xFFE8F5E9);
-      case 'equipment':
-        return const Color(0xFFFFF3E0);
-      default:
-        return const Color(0xFFEEF0FF);
-    }
-  }
-  static IconData _typeIcon(String type) {
-    switch (type) {
-      case 'labour':
-        return Icons.people_outline;
-      case 'equipment':
-        return Icons.construction_outlined;
-      default:
-        return Icons.inventory_2_outlined;
-    }
-  }
   static String _typeLabel(String type) {
     switch (type) {
       case 'labour':
@@ -149,28 +114,6 @@ class _EntryDetailScreenState extends State<EntryDetailScreen> {
       default:
         return '/add-material';
     }
-  }
-  Widget _fieldLabel(String t) =>
-      Text(t, style: AppTheme.label.copyWith(color: textGray));
-  Widget _contextRow(IconData icon, String label, String value) {
-    return Row(
-      children: [
-        Icon(icon, size: 16, color: textGray),
-        const SizedBox(width: 8),
-        Text(label, style: AppTheme.caption.copyWith(color: textGray)),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            value,
-            style: AppTheme.bodyLarge.copyWith(
-              fontWeight: FontWeight.w700,
-              color: textDark,
-            ),
-            textAlign: TextAlign.end,
-          ),
-        ),
-      ],
-    );
   }
   String _formatDateTimeWithTime(dynamic dateVal) {
     if (dateVal == null) return '';
@@ -295,460 +238,203 @@ class _EntryDetailScreenState extends State<EntryDetailScreen> {
         _payStatus == PaymentStatus.partial ||
         _payStatus == PaymentStatus.overdue;
     final bool isSettled = _payStatus == PaymentStatus.paid;
+    final double progress = _billAmount > 0 ? (_paidAmount / _billAmount).clamp(0.0, 1.0) : 0.0;
+    final bool showPay = canSettle && RoleManager.canApprovePayments;
+    final String payLabel = _payStatus == PaymentStatus.partial
+        ? 'Settle remaining'
+        : 'Record payment';
+    final String projectLabel = _projectName ??
+        context.read<ProjectProvider>().projects.where((p) => p.id == projectId).firstOrNull?.name ??
+        projectId;
+    final whereParts = [_phase, _activity, _floor].where((v) => v != null && v.trim().isNotEmpty).join(' · ');
+    String statusLabel;
+    BtTone statusTone;
+    switch (_payStatus) {
+      case PaymentStatus.paid:
+        statusLabel = 'Paid';
+        statusTone = BtTone.green;
+        break;
+      case PaymentStatus.partial:
+        statusLabel = 'Part paid';
+        statusTone = BtTone.amber;
+        break;
+      case PaymentStatus.overdue:
+        statusLabel = 'Overdue';
+        statusTone = BtTone.red;
+        break;
+      default:
+        statusLabel = 'Not paid';
+        statusTone = BtTone.amber;
+    }
+    final typeWord = _typeLabel(type);
     return Scaffold(
       resizeToAvoidBottomInset: true,
-      backgroundColor: bgColor,
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildTopBar(context, type, args, canEdit, canDelete),
-            const Divider(height: 1, thickness: 1, color: Color(0xFFEEF0F8)),
-            Expanded(
-              child: SingleChildScrollView(
-                physics: const ClampingScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-                child: Column(
+      backgroundColor: Bt.ground,
+      appBar: BtNavBar(
+        title: '${typeWord[0]}${typeWord.substring(1).toLowerCase()} entry',
+        trailing: canDelete
+            ? BtIconButton(
+                icon: Icons.more_horiz_rounded,
+                semantic: 'More actions',
+                onTap: () => showBtSheet(
+                  context,
+                  title: 'Entry',
+                  builder: (sheetCtx) => BtGroup(children: [
+                    BtRow(
+                      leading: BtTile(icon: Icons.delete_outline_rounded, bg: Bt.redSoft, fg: Bt.red),
+                      title: 'Delete entry…',
+                      titleColor: Bt.red,
+                      onTap: () {
+                        Navigator.pop(sheetCtx);
+                        _showDeleteDialog(context, id: args['id']?.toString() ?? '', projectId: projectId);
+                      },
+                    ),
+                  ]),
+                ),
+              )
+            : null,
+      ),
+      body: ListView(
+        physics: const ClampingScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+        children: [
+          BtCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        _buildTypeBadge(type),
-                        const SizedBox(width: 8),
-                        PaymentStatusChip(status: _payStatus),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    AppCard(
-                      margin: EdgeInsets.zero,
+                    BtTypeTile(type: type),
+                    const SizedBox(width: 12),
+                    Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _fieldLabel('ITEM'),
-                          const SizedBox(height: 6),
-                          Text(
-                            name,
-                            style: AppTheme.heading2.copyWith(
-                              fontSize: 20,
-                              color: textDark,
-                              height: 1.3,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            title,
-                            style: AppTheme.body.copyWith(color: textGray),
-                          ),
-                          if (supplier.isNotEmpty) ...[
-                            const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                const Icon(
-                                  Icons.storefront_outlined,
-                                  color: textGray,
-                                  size: 13,
-                                ),
-                                const SizedBox(width: 5),
-                                Text(
-                                  supplier,
-                                  style: AppTheme.caption.copyWith(
-                                    color: textGray,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
+                          Text(name, style: BtText.headline(context)),
+                          if (title.isNotEmpty && title != name)
+                            Text(title, style: BtText.caption(context)),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 14),
-                    AppCard(
-                      margin: EdgeInsets.zero,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _fieldLabel('EXECUTION CONTEXT'),
-                          const SizedBox(height: 10),
-                          _contextRow(
-                            Icons.business_outlined,
-                            'Project',
-                            _projectName ?? projectId,
-                          ),
-                          const SizedBox(height: 8),
-                          _contextRow(
-                            Icons.layers_outlined,
-                            'Floor / Zone',
-                            _floor ?? '—',
-                          ),
-                          const SizedBox(height: 8),
-                          _contextRow(
-                            Icons.flag_outlined,
-                            'Phase',
-                            _phase ?? '—',
-                          ),
-                          const SizedBox(height: 8),
-                          _contextRow(
-                            Icons.task_alt_outlined,
-                            'Activity',
-                            _activity ?? '—',
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    AppCard(
-                      margin: EdgeInsets.zero,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    _fieldLabel('QUANTITY / VALUE'),
-                                    const SizedBox(height: 6),
-                                    Text(
-                                      amount,
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w900,
-                                        fontSize: 26,
-                                        color: isPositive
-                                            ? _typeColor(type)
-                                            : const Color(0xFFE040FB),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    _fieldLabel('REFERENCE'),
-                                    const SizedBox(height: 6),
-                                    Text(
-                                      ref,
-                                      style: AppTheme.bodyLarge.copyWith(
-                                        fontWeight: FontWeight.w700,
-                                        color: textDark,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                          AppDivider(verticalPadding: 12),
-                          _fieldLabel('PURCHASE DATE'),
-                          const SizedBox(height: 6),
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.calendar_today_outlined,
-                                color: _typeColor(type),
-                                size: 14,
-                              ),
-                              const SizedBox(width: 6),
-                              Expanded(
-                                child: Text(
-                                  displayDate,
-                                  style: AppTheme.bodyLarge.copyWith(
-                                    fontWeight: FontWeight.w700,
-                                    color: textDark,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    if (_billAmount > 0) ...[
-                      _buildSettlementCard(
-                        due: due,
-                        method: method,
-                        lastUpdated: lastUpdated,
-                      ),
-                      const SizedBox(height: 14),
-                    ],
-                    _buildPaymentHistoryCard(),
-                    if (_paymentHistory.isNotEmpty) const SizedBox(height: 14),
-                    AppCard(
-                      margin: EdgeInsets.zero,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _fieldLabel('INVOICE / BILL'),
-                          const SizedBox(height: 12),
-                          if (invoiceList.isEmpty)
-                            const InvoiceAttachmentCard(
-                              attachment: null,
-                              fileName: null,
-                            )
-                          else
-                            ...invoiceList.map((url) => Padding(
-                                  padding: const EdgeInsets.only(bottom: 8.0),
-                                  child: InvoiceAttachmentCard(
-                                    attachment: null,
-                                    fileName: url,
-                                  ),
-                                )),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    AppCard(
-                      margin: EdgeInsets.zero,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _fieldLabel('PAYMENT RECEIPT'),
-                          const SizedBox(height: 12),
-                          if (receiptList.isEmpty)
-                            const PaymentReceiptCard(fileName: null)
-                          else
-                            ...receiptList.map((url) => Padding(
-                                  padding: const EdgeInsets.only(bottom: 8.0),
-                                  child: PaymentReceiptCard(fileName: url),
-                                )),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    if (canSettle && RoleManager.canApprovePayments)
-                      _buildRecordPaymentCTA(
-                        context,
-                        id: args['id']?.toString() ?? '',
-                        title: title,
-                        ref: ref,
-                        supplier: supplier,
-                        type: type,
-                      ),
-                    if (isSettled) _buildSettledBadge(),
-                    if (canDelete) ...[
-                      const SizedBox(height: 16),
-                      _buildDeleteAction(
-                        context,
-                        id: args['id']?.toString() ?? '',
-                        projectId: projectId,
-                      ),
-                    ],
-                    const SizedBox(height: 8),
+                    const SizedBox(width: 8),
+                    BtBadge(label: statusLabel, tone: statusTone),
                   ],
                 ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-  Widget _buildTopBar(
-    BuildContext context,
-    String type,
-    Map args,
-    bool canEdit,
-    bool canDelete,
-  ) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
-      child: Row(
-        children: [
-          GestureDetector(
-            onTap: () => Navigator.pop(context),
-            child: Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: const Color(0xFFF0F2FF),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: const Icon(Icons.arrow_back, color: textDark, size: 20),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              'Entry Detail',
-              style: AppTheme.heading3.copyWith(color: textDark),
+                if (_billAmount > 0) ...[
+                  const SizedBox(height: 16),
+                  Text(formatInr(_billAmount), style: BtText.amount(context)),
+                  const SizedBox(height: 12),
+                  BtProgress(value: progress, color: Bt.green),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Text.rich(TextSpan(children: [
+                        TextSpan(text: formatInr(_paidAmount), style: BtText.num(BtText.subhead(context, color: Bt.green, weight: FontWeight.w600))),
+                        TextSpan(text: ' paid', style: BtText.subhead(context)),
+                      ])),
+                      const Spacer(),
+                      Text.rich(TextSpan(children: [
+                        TextSpan(text: formatInr(due), style: BtText.num(BtText.subhead(context, color: due > 0 ? Bt.amber : Bt.green, weight: FontWeight.w600))),
+                        TextSpan(text: ' due', style: BtText.subhead(context)),
+                      ])),
+                    ],
+                  ),
+                ],
+                if (isSettled) ...[
+                  const SizedBox(height: 12),
+                  Row(children: [
+                    const Icon(Icons.check_circle_rounded, color: Bt.green, size: 18),
+                    const SizedBox(width: 6),
+                    Text('Payment settled', style: BtText.subhead(context, color: Bt.green, weight: FontWeight.w600)),
+                  ]),
+                ],
+              ],
             ),
           ),
-          if (canEdit)
-            TextButton(
-              onPressed: () => Navigator.pushNamed(
-                context,
-                _editRoute(type),
-                arguments: {
-                  ...args,
-                  'isEditing': true,
-                  'status': _entryStatus.name,
-                },
-              ),
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
-                backgroundColor: const Color(0xFFEEF0FF),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-              ),
-              child: Text(
-                'Edit',
-                style: TextStyle(
-                  color: primaryBlue,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 14,
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-  Widget _buildTypeBadge(String type) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: _typeBg(type),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(_typeIcon(type), color: _typeColor(type), size: 13),
-          const SizedBox(width: 6),
-          Text(
-            _typeLabel(type),
-            style: TextStyle(
-              color: _typeColor(type),
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0.8,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-  Widget _buildSettlementCard({
-    required double due,
-    required String method,
-    required String lastUpdated,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFEEF0F8)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'SETTLEMENT SUMMARY',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
-              color: textGray,
-              letterSpacing: 1.0,
-            ),
-          ),
-          const SizedBox(height: 14),
-          _settlementRow(
-            'Bill Amount',
-            formatCurrency(_billAmount),
-            color: textDark,
-          ),
-          const SizedBox(height: 10),
-          _settlementRow(
-            'Paid Amount',
-            formatCurrency(_paidAmount),
-            color: const Color(0xFF15803D),
-          ),
-          const SizedBox(height: 10),
-          _settlementRow(
-            'Due Amount',
-            formatCurrency(due),
-            color: due > 0 ? const Color(0xFFD97706) : const Color(0xFF15803D),
-            bold: true,
-          ),
-          if (method.isNotEmpty || lastUpdated.isNotEmpty) ...[
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 12),
-              child: Divider(height: 1, color: Color(0xFFF0F0F8)),
-            ),
-            if (method.isNotEmpty)
-              _settlementRow('Payment Method', method, color: textDark),
-            if (lastUpdated.isNotEmpty) ...[
-              const SizedBox(height: 10),
-              _settlementRow('Last Updated', lastUpdated, color: textGray),
+          const SizedBox(height: 16),
+          BtGroup(
+            children: [
+              BtValueRow(label: 'Project', value: projectLabel),
+              if (whereParts.isNotEmpty) BtValueRow(label: 'Where', value: whereParts),
+              BtValueRow(label: 'Date', value: displayDate),
+              BtValueRow(label: 'Quantity / value', value: amount, valueColor: isPositive ? null : Bt.red),
+              BtValueRow(label: 'Reference', value: ref),
+              if (supplier.isNotEmpty) BtValueRow(label: 'Supplier', value: supplier),
+              if (method.isNotEmpty) BtValueRow(label: 'Payment method', value: method),
+              if (_billAmount > 0 && lastUpdated.isNotEmpty) BtValueRow(label: 'Last updated', value: lastUpdated),
             ],
+          ),
+          if (_paymentHistory.isNotEmpty) ...[
+            const SizedBox(height: 24),
+            _buildPaymentHistoryCard(),
           ],
+          const SizedBox(height: 24),
+          const BtSectionHeader(title: 'Invoice / bill'),
+          if (invoiceList.isEmpty)
+            const InvoiceAttachmentCard(attachment: null, fileName: null)
+          else
+            ...invoiceList.map((url) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8.0),
+                  child: InvoiceAttachmentCard(attachment: null, fileName: url),
+                )),
+          const SizedBox(height: 24),
+          const BtSectionHeader(title: 'Payment receipt'),
+          if (receiptList.isEmpty)
+            const PaymentReceiptCard(fileName: null)
+          else
+            ...receiptList.map((url) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8.0),
+                  child: PaymentReceiptCard(fileName: url),
+                )),
         ],
       ),
+      bottomNavigationBar: (canEdit || showPay)
+          ? EntryBottomBar(
+              child: Row(
+                children: [
+                  if (canEdit)
+                    Expanded(
+                      child: BtButton(
+                        label: 'Edit',
+                        variant: BtButtonVariant.secondary,
+                        onPressed: () => Navigator.pushNamed(
+                          context,
+                          _editRoute(type),
+                          arguments: {
+                            ...args,
+                            'isEditing': true,
+                            'status': _entryStatus.name,
+                          },
+                        ),
+                      ),
+                    ),
+                  if (canEdit && showPay) const SizedBox(width: 12),
+                  if (showPay)
+                    Expanded(
+                      flex: 2,
+                      child: BtButton(
+                        label: payLabel,
+                        onPressed: () => _openRecordPayment(
+                          context,
+                          id: args['id']?.toString() ?? '',
+                          title: title,
+                          type: type,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            )
+          : null,
     );
   }
-  Widget _settlementRow(
-    String label,
-    String value, {
-    Color color = textDark,
-    bool bold = false,
-  }) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Flexible(
-          child: Text(
-            label,
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: textGray,
-            ),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Flexible(
-          child: Text(
-            value,
-            textAlign: TextAlign.end,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: bold ? FontWeight.w900 : FontWeight.w700,
-              color: color,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-  Widget _buildRecordPaymentCTA(
+  void _openRecordPayment(
     BuildContext context, {
     required String id,
     required String title,
-    required String ref,
-    required String supplier,
     required String type,
   }) {
-    final label = _payStatus == PaymentStatus.partial
-        ? 'Settle Remaining Payment'
-        : 'Record Payment';
-    return GestureDetector(
-      onTap: () {
         final projectProvider = context.read<ProjectProvider>();
         String pName = 'Unknown Project';
         String pId = _args['projectId'] ?? _args['project'] ?? '';
@@ -813,66 +499,6 @@ class _EntryDetailScreenState extends State<EntryDetailScreen> {
             }
           }
         });
-      },
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFF3B5CF6), Color(0xFF7C3AED)],
-          ),
-          borderRadius: BorderRadius.circular(50),
-          boxShadow: [
-            BoxShadow(
-              color: primaryBlue.withValues(alpha: 0.35),
-              blurRadius: 14,
-              offset: const Offset(0, 5),
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.payments_outlined, color: Colors.white, size: 20),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-  Widget _buildSettledBadge() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 14),
-      decoration: BoxDecoration(
-        color: const Color(0xFFECFDF5),
-        borderRadius: BorderRadius.circular(50),
-        border: Border.all(color: const Color(0xFF6EE7B7), width: 1.5),
-      ),
-      child: const Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.check_circle_rounded, color: Color(0xFF15803D), size: 20),
-          SizedBox(width: 8),
-          Text(
-            'Payment Settled',
-            style: TextStyle(
-              color: Color(0xFF15803D),
-              fontSize: 15,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ],
-      ),
-    );
   }
   Widget _buildPaymentHistoryCard() {
     if (_paymentHistory.isEmpty) return const SizedBox.shrink();
@@ -880,178 +506,38 @@ class _EntryDetailScreenState extends State<EntryDetailScreen> {
     final displayedHistory = _viewAllPayments
         ? reversedHistory
         : [reversedHistory.first];
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFEEF0F8)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Row(
-                children: [
-                  Icon(Icons.history_rounded, color: textGray, size: 16),
-                  SizedBox(width: 8),
-                  Text(
-                    'PAYMENT HISTORY',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      color: textGray,
-                      letterSpacing: 1.0,
-                    ),
-                  ),
-                ],
-              ),
-              if (_paymentHistory.length > 1)
-                GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _viewAllPayments = !_viewAllPayments;
-                    });
-                  },
-                  child: Text(
-                    _viewAllPayments
-                        ? 'View Less'
-                        : 'View All (${_paymentHistory.length})',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: primaryBlue,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: displayedHistory.length,
-            separatorBuilder: (_, _) => const Padding(
-              padding: EdgeInsets.symmetric(vertical: 10),
-              child: Divider(height: 1, color: Color(0xFFF0F0F8)),
-            ),
-            itemBuilder: (context, index) {
-              final item = displayedHistory[index] ?? {};
-              final rawDate = item['date'] ?? item['paymentDate'];
-              final String formattedDate = _formatDateTimeWithTime(rawDate);
-              final double amt = (item['amount'] as num?)?.toDouble() ?? 0;
-              final String method = item['method'] as String? ?? 'Cash';
-              final String note = item['note'] as String? ?? '';
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              formattedDate,
-                              style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w700,
-                                color: textDark,
-                              ),
-                            ),
-                            const SizedBox(height: 3),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 3,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFEEF0FF),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Text(
-                                method.toUpperCase(),
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w800,
-                                  color: primaryBlue,
-                                  letterSpacing: 0.5,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        formatCurrency(amt),
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w900,
-                          color: Color(0xFF15803D),
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (note.isNotEmpty) ...[
-                    const SizedBox(height: 6),
-                    Text(
-                      'Note: $note',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontStyle: FontStyle.italic,
-                        color: textGray,
-                      ),
-                    ),
-                  ],
-                ],
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-  Widget _buildDeleteAction(
-    BuildContext context, {
-    required String id,
-    required String projectId,
-  }) {
-    return GestureDetector(
-      onTap: () => _showDeleteDialog(context, id: id, projectId: projectId),
-      behavior: HitTestBehavior.opaque,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        BtSectionHeader(
+          title: 'Payments',
+          action: _paymentHistory.length > 1
+              ? (_viewAllPayments ? 'View less' : 'View all (${_paymentHistory.length})')
+              : null,
+          onAction: () => setState(() => _viewAllPayments = !_viewAllPayments),
+        ),
+        BtGroup(
           children: [
-            Icon(
-              Icons.delete_outline_rounded,
-              color: Colors.red.withValues(alpha: 0.65),
-              size: 16,
-            ),
-            const SizedBox(width: 6),
-            Text(
-              'Delete Entry',
-              style: TextStyle(
-                color: Colors.red.withValues(alpha: 0.65),
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+            for (final raw in displayedHistory)
+              Builder(builder: (context) {
+                final item = raw ?? {};
+                final rawDate = item['date'] ?? item['paymentDate'];
+                final String formattedDate = _formatDateTimeWithTime(rawDate);
+                final double amt = (item['amount'] as num?)?.toDouble() ?? 0;
+                final String method = item['method'] as String? ?? 'Cash';
+                final String note = item['note'] as String? ?? '';
+                return BtRow(
+                  leading: BtTile(icon: Icons.check_rounded, bg: Bt.greenSoft, fg: Bt.green),
+                  title: method,
+                  subtitle: note.isNotEmpty ? '$formattedDate · $note' : formattedDate,
+                  subtitleMaxLines: 2,
+                  minHeight: 64,
+                  trailing: Text(formatInr(amt), style: BtText.num(BtText.body(context, weight: FontWeight.w600))),
+                );
+              }),
           ],
         ),
-      ),
+      ],
     );
   }
   void _showDeleteDialog(
@@ -1065,7 +551,7 @@ class _EntryDetailScreenState extends State<EntryDetailScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text(
           'Delete Entry?',
-          style: TextStyle(fontWeight: FontWeight.w800),
+          style: TextStyle(fontWeight: FontWeight.w700),
         ),
         content: const Text(
           'This action cannot be undone. The entry will be permanently removed.',
@@ -1091,7 +577,7 @@ class _EntryDetailScreenState extends State<EntryDetailScreen> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text('Entry deleted successfully'),
-                      backgroundColor: Colors.red,
+                      backgroundColor: Color(0xFFC01048),
                     ),
                   );
                   Navigator.pop(context);
@@ -1099,7 +585,7 @@ class _EntryDetailScreenState extends State<EntryDetailScreen> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text('Failed to delete entry'),
-                      backgroundColor: Colors.red,
+                      backgroundColor: Color(0xFFC01048),
                     ),
                   );
                 }
@@ -1108,7 +594,7 @@ class _EntryDetailScreenState extends State<EntryDetailScreen> {
               }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
+              backgroundColor: const Color(0xFFC01048),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),

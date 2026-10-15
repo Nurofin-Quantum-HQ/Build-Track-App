@@ -1,6 +1,6 @@
+import 'package:buildtrack_mobile/design/design.dart';
 import 'package:buildtrack_mobile/common/themes/app_colors.dart';
-import 'package:buildtrack_mobile/common/themes/app_gradients.dart';
-import 'package:buildtrack_mobile/common/widgets/common_widgets.dart';
+import 'package:buildtrack_mobile/common/widgets/entry_widgets.dart';
 import 'package:buildtrack_mobile/controller/project_provider.dart';
 import 'package:buildtrack_mobile/controller/user_session.dart';
 import 'package:buildtrack_mobile/models/construction_models.dart';
@@ -18,7 +18,6 @@ class UpdateProgressScreen extends StatefulWidget {
 }
 class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
   static var primaryBlue = AppColors.primary;
-  static const bgColor = AppColors.gradientStart;
   static const textDark = AppColors.textDark;
   static const textGray = AppColors.textLight;
   String? _selectedProjectId;
@@ -101,7 +100,7 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
                     const Text(
                       'Title',
                       style: TextStyle(
-                        fontSize: 12,
+                        fontSize: 13,
                         color: AppColors.textLight,
                       ),
                     ),
@@ -117,7 +116,7 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
                     const Text(
                       'Description',
                       style: TextStyle(
-                        fontSize: 12,
+                        fontSize: 13,
                         color: AppColors.textLight,
                       ),
                     ),
@@ -134,7 +133,7 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
                     const Text(
                       'Status',
                       style: TextStyle(
-                        fontSize: 12,
+                        fontSize: 13,
                         color: AppColors.textLight,
                       ),
                     ),
@@ -345,27 +344,11 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
   }
   Widget _sectionLabel(String text) => Padding(
     padding: const EdgeInsets.only(bottom: 8),
-    child: Text(
-      text,
-      style: TextStyle(
-        fontSize: 13,
-        fontWeight: FontWeight.w800,
-        color: primaryBlue,
-        letterSpacing: 0.4,
-      ),
-    ),
+    child: Text(text, style: BtText.subhead(context, weight: FontWeight.w500)),
   );
   Widget _sectionTitle(String text) => Padding(
     padding: const EdgeInsets.only(bottom: 12),
-    child: Text(
-      text,
-      style: const TextStyle(
-        fontSize: 16,
-        fontWeight: FontWeight.w800,
-        color: textDark,
-        letterSpacing: -0.2,
-      ),
-    ),
+    child: Text(text, style: BtText.headline(context)),
   );
   Widget _dropdownCard<T>({
     required T? value,
@@ -384,17 +367,9 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
           color: Colors.white,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: enabled
-                ? (safe != null ? primaryBlue : const Color(0xFFE0E5FF))
-                : const Color(0xFFE0E5FF),
-            width: 1.5,
+            color: Bt.inputBorder,
+            width: 1,
           ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.03),
-              blurRadius: 8,
-            ),
-          ],
         ),
         child: DropdownButtonHideUnderline(
           child: DropdownButton<T>(
@@ -427,140 +402,75 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
   }
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: bgColor,
-      body: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            AppTopBar(
-              title: _launchedFromTracker
-                  ? 'Progress Update'
-                  : 'Update Progress',
-              isSubScreen: true,
-              leftIcon: Icons.arrow_back,
-              onLeftTap: () => Navigator.maybePop(context),
-            ),
-            Expanded(
-              child: Consumer<ProjectProvider>(
-                builder: (context, provider, _) {
-                  final projects = provider.projects;
-                  final selProject = _selectedProjectId == null
-                      ? null
-                      : projects.cast<ProjectModel?>().firstWhere(
-                          (p) => p?.id == _selectedProjectId,
-                          orElse: () => null,
-                        );
-                  final floors = (selProject?.floors?.isNotEmpty ?? false)
-                      ? List<String>.from(selProject!.floors!)
-                      : <String>[];
-                  if (floors.isNotEmpty &&
-                      _selectedFloor != null &&
-                      !floors.contains(_selectedFloor)) {
-                    floors.add(_selectedFloor!);
-                  }
-                  final phaseNames = _phasesFor(selProject);
-                  final activityNames = _activitiesFor(_selectedPhaseName);
-                  return SingleChildScrollView(
-                    physics: const ClampingScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (_launchedFromTracker) ...[
-                          _buildTrackerContextBanner(),
-                          const SizedBox(height: 16),
-                        ],
-                        _buildContextCard(
-                          projects: projects,
-                          floors: floors,
-                          phaseNames: phaseNames,
-                          activityNames: activityNames,
-                        ),
-                        const SizedBox(height: 20),
-                        if (_selectedPhaseName != null &&
-                            (floors.isEmpty || _selectedFloor != null)) ...[
-                          _buildStageSummaryCard(),
-                          const SizedBox(height: 20),
-                        ],
-                        _buildTaskChecklist(),
-                        const SizedBox(height: 20),
-                        _buildExecutionNotes(),
-                        const SizedBox(height: 20),
-                        _buildDateField(),
-                        const SizedBox(height: 20),
-                        _buildPhotoUpload(),
-                        const SizedBox(height: 20),
-                        _buildMaterialConsumption(context, provider),
-                        const SizedBox(height: 32),
-                        _buildSaveButton(context, provider),
-                        const SizedBox(height: 16),
-                      ],
-                    ),
-                  );
-                },
+    return Consumer<ProjectProvider>(
+      builder: (context, provider, _) {
+        final projects = provider.projects;
+        final selProject = _selectedProjectId == null
+            ? null
+            : projects.cast<ProjectModel?>().firstWhere(
+                (p) => p?.id == _selectedProjectId,
+                orElse: () => null,
+              );
+        final floors = (selProject?.floors?.isNotEmpty ?? false)
+            ? List<String>.from(selProject!.floors!)
+            : <String>[];
+        if (floors.isNotEmpty &&
+            _selectedFloor != null &&
+            !floors.contains(_selectedFloor)) {
+          floors.add(_selectedFloor!);
+        }
+        final phaseNames = _phasesFor(selProject);
+        final activityNames = _activitiesFor(_selectedPhaseName);
+        return Scaffold(
+          backgroundColor: Bt.ground,
+          appBar: BtNavBar(
+            title: _launchedFromTracker ? 'Progress update' : 'Daily update',
+          ),
+          body: ListView(
+            physics: const ClampingScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+            children: [
+              if (_launchedFromTracker) ...[
+                _buildTrackerContextBanner(),
+                const SizedBox(height: 20),
+              ],
+              _buildContextCard(
+                projects: projects,
+                floors: floors,
+                phaseNames: phaseNames,
+                activityNames: activityNames,
               ),
-            ),
-          ],
-        ),
-      ),
+              const SizedBox(height: 28),
+              if (_selectedPhaseName != null &&
+                  (floors.isEmpty || _selectedFloor != null)) ...[
+                _buildStageSummaryCard(),
+                const SizedBox(height: 28),
+              ],
+              _buildTaskChecklist(),
+              const SizedBox(height: 28),
+              _buildExecutionNotes(),
+              const SizedBox(height: 28),
+              _buildPhotoUpload(),
+              const SizedBox(height: 28),
+              _buildMaterialConsumption(context, provider),
+              const SizedBox(height: 28),
+              _buildDateField(),
+            ],
+          ),
+          bottomNavigationBar: EntryBottomBar(child: _buildSaveButton(context, provider)),
+        );
+      },
     );
   }
   Widget _buildTrackerContextBanner() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: primaryBlue.withValues(alpha: 0.07),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: primaryBlue.withValues(alpha: 0.20),
-          width: 1.2,
-        ),
+    return BtGroup(children: [
+      BtRow(
+        leading: const BtTile(icon: Icons.place_outlined),
+        title: [_selectedPhaseName, _selectedActivityName].where((v) => v != null && v.isNotEmpty).join(' · '),
+        subtitle: 'Update for ${formatDate(_selectedDate)}',
+        minHeight: 60,
       ),
-      child: Row(
-        children: [
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              color: primaryBlue.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(9),
-            ),
-            child: Icon(
-              Icons.checklist_rounded,
-              color: primaryBlue,
-              size: 16,
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Activity Progress Update',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                    color: primaryBlue,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  '${_selectedPhaseName ?? ""} › ${_selectedActivityName ?? ""}',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: textGray,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
+    ]);
   }
   Widget _buildContextCard({
     required List<ProjectModel> projects,
@@ -572,14 +482,7 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 12,
-            offset: const Offset(0, 3),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(Bt.rCard),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -600,15 +503,7 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
                 ),
               ),
               const SizedBox(width: 10),
-              const Text(
-                'EXECUTION CONTEXT',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                  color: textGray,
-                  letterSpacing: 1.2,
-                ),
-              ),
+              Text('Where', style: BtText.headline(context)),
             ],
           ),
           const SizedBox(height: 20),
@@ -736,44 +631,25 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       decoration: BoxDecoration(
-        color: const Color(0xFFF3F4FF),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: primaryBlue.withValues(alpha: 0.25),
-          width: 1.5,
-        ),
+        color: Bt.fill,
+        borderRadius: BorderRadius.circular(Bt.rInput),
       ),
       child: Row(
         children: [
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-                color: textDark,
-              ),
-            ),
-          ),
-          const Icon(Icons.lock_outline_rounded, size: 14, color: textGray),
+          Expanded(child: Text(value, style: BtText.body(context, color: Bt.ink2))),
+          const Icon(Icons.lock_outline_rounded, size: 16, color: Bt.ink3),
         ],
       ),
     );
   }
+
   Widget _buildStageSummaryCard() {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFEEF0FF), width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(Bt.rCard),
+        border: Border.all(color: Bt.line),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -782,14 +658,14 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
               color: primaryBlue.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(Bt.rCard),
             ),
             child: Text(
-              'ACTIVE EXECUTION CONTEXT',
+              'Current activity',
               style: TextStyle(
                 color: primaryBlue,
-                fontSize: 9.5,
-                fontWeight: FontWeight.w800,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
                 letterSpacing: 0.9,
               ),
             ),
@@ -799,7 +675,7 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
             _selectedPhaseName ?? '',
             style: const TextStyle(
               fontSize: 22,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w700,
               color: textDark,
               letterSpacing: -0.4,
               height: 1.2,
@@ -836,10 +712,10 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(
-                'OVERALL COMPLETION',
+                'Overall completion',
                 style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w800,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
                   color: textGray,
                   letterSpacing: 0.6,
                 ),
@@ -848,7 +724,7 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
                 '${(_completionProgress * 100).toInt()}%',
                 style: TextStyle(
                   color: primaryBlue,
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.w700,
                   fontSize: 14,
                 ),
               ),
@@ -858,7 +734,7 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
             data: SliderTheme.of(context).copyWith(
               trackHeight: 7,
               activeTrackColor: primaryBlue,
-              inactiveTrackColor: const Color(0xFFE8ECF8),
+              inactiveTrackColor: const Color(0xFFEEF1F5),
               thumbColor: primaryBlue,
               overlayColor: primaryBlue.withValues(alpha: 0.10),
               thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
@@ -901,18 +777,12 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _sectionTitle('Assigned Tasks'),
+        _sectionTitle('Your tasks'),
         Container(
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFE0E5FF), width: 1.5),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.03),
-                blurRadius: 8,
-              ),
-            ],
+            border: Border.all(color: Bt.line),
           ),
           child: Column(
             children: relevantTasks.map((task) {
@@ -973,7 +843,7 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
                 subtitle: task.description.isNotEmpty
                     ? Text(
                         task.description,
-                        style: const TextStyle(fontSize: 12),
+                        style: const TextStyle(fontSize: 13),
                       )
                     : null,
                 activeColor: primaryBlue,
@@ -993,30 +863,13 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _sectionTitle('Execution Notes'),
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFE0E5FF), width: 1.5),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.03),
-                blurRadius: 8,
-              ),
-            ],
-          ),
-          child: TextField(
-            controller: _notesCtrl,
-            maxLines: 5,
-            decoration: const InputDecoration(
-              hintText: 'What work was completed today?',
-              hintStyle: TextStyle(color: textGray, fontSize: 14),
-              border: InputBorder.none,
-              contentPadding: EdgeInsets.all(14),
-            ),
-            style: const TextStyle(fontSize: 14, color: textDark, height: 1.5),
-          ),
+        _sectionTitle('What got done today?'),
+        TextField(
+          controller: _notesCtrl,
+          maxLines: 5,
+          minLines: 4,
+          style: BtText.body(context),
+          decoration: btInput(context, hint: 'What work was completed today?'),
         ),
       ],
     );
@@ -1033,7 +886,7 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _sectionTitle('Update Date'),
+              _sectionLabel('Update date'),
               GestureDetector(
                 onTap: () async {
                   final picked = await showDatePicker(
@@ -1054,39 +907,12 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
                   );
                   if (picked != null) setState(() => _selectedDate = picked);
                 },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 15,
-                    horizontal: 10,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: const Color(0xFFE0E5FF),
-                      width: 1.5,
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.calendar_month_outlined,
-                        color: primaryBlue,
-                        size: 19,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          updateDateStr,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 13,
-                            color: textDark,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
+                child: IgnorePointer(
+                  child: BtPickerField(
+                    text: updateDateStr,
+                    placeholder: updateDateStr == 'Select date',
+                    icon: Icons.calendar_today_outlined,
+                    onTap: () {},
                   ),
                 ),
               ),
@@ -1098,7 +924,7 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _sectionTitle('Completion Date'),
+              _sectionLabel('Completion date'),
               GestureDetector(
                 onTap: () async {
                   final picked = await showDatePicker(
@@ -1119,41 +945,12 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
                   );
                   if (picked != null) setState(() => _completionDate = picked);
                 },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 15,
-                    horizontal: 10,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: const Color(0xFFE0E5FF),
-                      width: 1.5,
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.event_available,
-                        color: primaryBlue,
-                        size: 19,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          completionDateStr,
-                          style: TextStyle(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 13,
-                            color: _completionDate != null
-                                ? textDark
-                                : textGray,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
+                child: IgnorePointer(
+                  child: BtPickerField(
+                    text: completionDateStr,
+                    placeholder: completionDateStr == 'Select date',
+                    icon: Icons.calendar_today_outlined,
+                    onTap: () {},
                   ),
                 ),
               ),
@@ -1167,7 +964,7 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _sectionTitle('Progress Photos'),
+        _sectionTitle('Photos · up to 4'),
         if (_attachments.isEmpty)
           GestureDetector(
             onTap: () async {
@@ -1182,9 +979,9 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
               width: double.infinity,
               height: 120,
               decoration: BoxDecoration(
-                color: const Color(0xFFF8F9FF),
+                color: const Color(0xFFF6F7F9),
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFFCCCFE8), width: 1.5),
+                border: Border.all(color: const Color(0xFFD0D5DD), width: 1.5),
               ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -1213,9 +1010,9 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
                   ),
                   const SizedBox(height: 4),
                   const Text(
-                    'PNG, JPG, JPEG',
+                    'PNG, JPG, jpeg',
                     style: TextStyle(
-                      fontSize: 11,
+                      fontSize: 13,
                       color: Color(0xFF8A90A8),
                       fontWeight: FontWeight.w600,
                     ),
@@ -1239,17 +1036,7 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
                       height: 90,
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: const Color(0xFFEEF0FF),
-                          width: 1.5,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.04),
-                            blurRadius: 4,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
+                        border: Border.all(color: Bt.line),
                       ),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(10),
@@ -1284,7 +1071,7 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
                         child: Container(
                           padding: const EdgeInsets.all(4),
                           decoration: const BoxDecoration(
-                            color: Colors.black54,
+                            color: Color(0xFF475467),
                             shape: BoxShape.circle,
                           ),
                           child: const Icon(
@@ -1312,10 +1099,10 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
                     width: 90,
                     height: 90,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF8F9FF),
+                      color: const Color(0xFFF6F7F9),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: const Color(0xFFCCCFE8),
+                        color: const Color(0xFFD0D5DD),
                         width: 1.5,
                       ),
                     ),
@@ -1360,13 +1147,6 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1375,10 +1155,10 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(
-                'MATERIAL CONSUMPTION',
+                'Material consumption',
                 style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
                   color: textGray,
                   letterSpacing: 0.7,
                 ),
@@ -1390,11 +1170,11 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
                   arguments: {'type': 'material'},
                 ),
                 child: Text(
-                  'ADD MATERIAL',
+                  'Add material',
                   style: TextStyle(
                     color: primaryBlue,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
                     letterSpacing: 0.5,
                   ),
                 ),
@@ -1450,15 +1230,15 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
           decoration: BoxDecoration(
-            color: const Color(0xFFEEF0FF),
+            color: const Color(0xFFE8F1FC),
             borderRadius: BorderRadius.circular(7),
           ),
           child: Text(
             qty,
             style: TextStyle(
               color: primaryBlue,
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ),
@@ -1600,40 +1380,11 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
           }
         }
       },
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 18),
-        decoration: BoxDecoration(
-          gradient: AppGradients.primaryButton,
-          borderRadius: BorderRadius.circular(50),
-          boxShadow: [
-            BoxShadow(
-              color: primaryBlue.withValues(alpha: 0.35),
-              blurRadius: 14,
-              offset: const Offset(0, 5),
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              _launchedFromTracker
-                  ? Icons.check_circle_rounded
-                  : Icons.check_circle_outline,
-              color: Colors.white,
-              size: 22,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 17,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ],
+      child: IgnorePointer(
+        child: BtButton(
+          label: label,
+          icon: _launchedFromTracker ? Icons.check_circle_rounded : Icons.check_circle_outline,
+          onPressed: () {},
         ),
       ),
     );
@@ -1680,10 +1431,10 @@ class PhotoAttachment {
   }
   Color get iconColor {
     if (localAttachment != null) return localAttachment!.iconColor;
-    return const Color(0xFF6B7280);
+    return const Color(0xFF667085);
   }
   Color get iconBg {
     if (localAttachment != null) return localAttachment!.iconBg;
-    return const Color(0xFFF3F4F6);
+    return const Color(0xFFEEF1F5);
   }
 }

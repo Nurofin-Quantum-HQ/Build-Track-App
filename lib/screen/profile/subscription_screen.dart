@@ -1,3 +1,5 @@
+import 'package:buildtrack_mobile/common/widgets/entry_widgets.dart';
+import 'package:buildtrack_mobile/design/design.dart';
 import 'package:buildtrack_mobile/common/themes/app_colors.dart';
 import 'package:buildtrack_mobile/common/themes/app_gradients.dart';
 import 'package:buildtrack_mobile/common/themes/app_theme.dart';
@@ -201,195 +203,143 @@ class _SubscriptionScreenContentState
     });
   }
 
+  SubscriptionPlan? _picked;
+
   @override
   Widget build(BuildContext context) {
     final sub = context.watch<SubscriptionProvider>();
+    final bt = context.bt;
+    final current = _plans.firstWhere((p) => p.plan == sub.currentPlan, orElse: () => _plans.first);
+    final upgradeable = _plans.where((p) => p.productId != null && p.plan != sub.currentPlan).toList();
+    final selected = _plans.firstWhere(
+      (p) => p.plan == (_picked ?? (upgradeable.where((u) => u.isHighlighted).firstOrNull ?? upgradeable.firstOrNull ?? current).plan),
+      orElse: () => current,
+    );
+    final canBuy = selected.productId != null && selected.plan != sub.currentPlan;
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFAFA),
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildTopBar(context),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(20, 10, 20, 40),
-                child: Column(
-                  children: [
-                    _buildHero(),
-                    const SizedBox(height: 32),
-                    if (sub.error.isNotEmpty) ...[
-                      _ErrorBanner(message: sub.error),
-                      const SizedBox(height: 20),
-                    ],
-                    Showcase(
-                      key: _plansKey,
-                      description:
-                          'Choose the plan that fits your business needs.',
-                      child: Column(
-                        children: List.generate(_plans.length, (i) {
-                          final plan = _plans[i];
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 24),
-                            child: _PlanCard(
-                              info: plan,
-                              isCurrentPlan: sub.currentPlan == plan.plan,
-                              isPurchasing: sub.isPurchasing,
-                              onUpgrade: () => _onUpgrade(context, sub, plan),
-                            ),
-                          );
-                        }),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        GestureDetector(
-                          onTap: () => _onRestore(context, sub),
-                          behavior: HitTestBehavior.opaque,
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              vertical: 8,
-                              horizontal: 8,
-                            ),
-                            child: Text(
-                              'Restore Purchases',
-                              style: TextStyle(
-                                color: AppColors.primary.withValues(alpha: 0.8),
-                                fontWeight: FontWeight.w600,
-                                fontSize: 13.5,
-                                decoration: TextDecoration.underline,
-                                decorationColor: AppColors.primary.withValues(
-                                  alpha: 0.4,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const Text(
-                          ' • ',
-                          style: TextStyle(color: Color(0xFFD0D5DD)),
-                        ),
-                        GestureDetector(
-                          onTap: () => _showCancelDialog(context, sub),
-                          behavior: HitTestBehavior.opaque,
-                          child: const Padding(
-                            padding: EdgeInsets.symmetric(
-                              vertical: 8,
-                              horizontal: 8,
-                            ),
-                            child: Text(
-                              'Cancel Plan',
-                              style: TextStyle(
-                                color: Color(0xFFD92D20),
-                                fontWeight: FontWeight.w600,
-                                fontSize: 13.5,
-                                decoration: TextDecoration.underline,
-                                decorationColor: Color(0xFFFECDCA),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    const Text(
-                      'Subscriptions auto-renew monthly.\nCancel anytime from your account settings.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF667085),
-                        height: 1.5,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
+      backgroundColor: Bt.ground,
+      appBar: BtNavBar(
+        title: 'Plan & billing',
+        trailing: Showcase(
+          key: _ctaKey,
+          description: 'Get help and understand how this screen works.',
+          child: BtIconButton(
+            icon: Icons.help_outline_rounded,
+            semantic: 'Help',
+            color: Bt.ink2,
+            onTap: () => ShowCaseWidget.of(context).startShowCase([_plansKey, _ctaKey]),
+          ),
         ),
       ),
-    );
-  }
-
-  Widget _buildTopBar(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 8, 16, 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
         children: [
-          IconButton(
-            icon: const Icon(Icons.close_rounded, color: AppColors.textDark),
-            onPressed: () => Navigator.maybePop(context),
+          BtCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(children: [
+                  Expanded(child: Text('You\'re on ${current.title}', style: BtText.title(context))),
+                  BtBadge(label: '${current.maxUsers} users', tone: BtTone.neutral),
+                ]),
+                const SizedBox(height: 4),
+                Text('${current.maxProjectsLabel} · ${current.tagline}', style: BtText.subhead(context)),
+              ],
+            ),
+          ),
+          if (sub.error.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            _ErrorBanner(message: sub.error),
+          ],
+          const SizedBox(height: 24),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+            child: Text('Choose a plan · monthly', style: BtText.caption(context)),
           ),
           Showcase(
-            key: _ctaKey,
-            description: 'Get help and understand how this screen works.',
-            child: IconButton(
-              icon: const Icon(Icons.help_outline, color: AppColors.textDark),
-              onPressed: () {
-                ShowCaseWidget.of(context).startShowCase([_plansKey, _ctaKey]);
-              },
+            key: _plansKey,
+            description: 'Choose the plan that fits your business needs.',
+            child: BtGroup(
+              children: [
+                for (final p in _plans)
+                  Material(
+                    color: p.plan == selected.plan ? bt.brandSoft : Colors.transparent,
+                    child: BtRow(
+                      leading: Icon(
+                        p.plan == selected.plan ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded,
+                        color: p.plan == selected.plan ? bt.brand : Bt.inputBorder,
+                        size: 24,
+                      ),
+                      title: p.title,
+                      subtitle: '${p.maxProjectsLabel} · ${p.maxUsers >= 9999 ? 'unlimited' : p.maxUsers} people',
+                      minHeight: 64,
+                      onTap: () => setState(() => _picked = p.plan),
+                      trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                        if (p.plan == sub.currentPlan) ...[
+                          const BtBadge(label: 'Current', tone: BtTone.green),
+                          const SizedBox(width: 8),
+                        ] else if (p.isHighlighted) ...[
+                          const BtBadge(label: 'Popular', tone: BtTone.brand),
+                          const SizedBox(width: 8),
+                        ],
+                        Text(p.price, style: BtText.num(BtText.headline(context))),
+                      ]),
+                    ),
+                  ),
+              ],
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHero() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-          decoration: BoxDecoration(
-            color: AppColors.primary.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(30),
-            border: Border.all(
-              color: AppColors.primary.withValues(alpha: 0.15),
+          const SizedBox(height: 24),
+          BtSectionHeader(title: '${selected.title} includes'),
+          BtCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(selected.tagline, style: BtText.subhead(context)),
+                const SizedBox(height: 10),
+                for (final f in selected.features)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 5),
+                    child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      const Icon(Icons.check_rounded, color: Bt.green, size: 20),
+                      const SizedBox(width: 10),
+                      Expanded(child: Text(f, style: BtText.body(context))),
+                    ]),
+                  ),
+              ],
             ),
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                Icons.auto_awesome_rounded,
-                color: AppColors.primary,
-                size: 14,
+              TextButton(
+                onPressed: () => _onRestore(context, sub),
+                style: TextButton.styleFrom(foregroundColor: Bt.ink2, minimumSize: const Size(44, 44)),
+                child: const Text('Restore Purchases'),
               ),
-              SizedBox(width: 6),
-              Text(
-                'Unlock Premium Features',
-                style: TextStyle(
-                  color: AppColors.primary,
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.2,
-                ),
+              const Text('·', style: TextStyle(color: Bt.placeholder)),
+              TextButton(
+                onPressed: () => _showCancelDialog(context, sub),
+                style: TextButton.styleFrom(foregroundColor: Bt.red, minimumSize: const Size(44, 44)),
+                child: const Text('Cancel Plan…'),
               ),
             ],
           ),
-        ),
-        const SizedBox(height: 20),
-        Text(
-          'Supercharge your\nconstruction projects',
-          textAlign: TextAlign.center,
-          style: AppTheme.heading1.copyWith(
-            fontSize: 28,
-            letterSpacing: -0.6,
-            height: 1.15,
-            color: const Color(0xFF101828),
+          Text(
+            'Subscriptions auto-renew monthly.\nCancel anytime from your account settings.',
+            textAlign: TextAlign.center,
+            style: BtText.caption(context),
           ),
+        ],
+      ),
+      bottomNavigationBar: EntryBottomBar(
+        child: BtButton(
+          label: canBuy ? '${selected.cta} · ${selected.price}${selected.period.startsWith('/') ? selected.period : ' ${selected.period}'}' : 'Current plan',
+          loading: sub.isPurchasing,
+          onPressed: (!canBuy || sub.isPurchasing) ? null : () => _onUpgrade(context, sub, selected),
         ),
-        const SizedBox(height: 12),
-        const Text(
-          'Choose a plan that scales with your business.',
-          textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 15, color: Color(0xFF667085), height: 1.4),
-        ),
-      ],
+      ),
     );
   }
 
@@ -448,7 +398,7 @@ class _SubscriptionScreenContentState
         return StatefulBuilder(
           builder: (ctx, setDialogState) => AlertDialog(
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(Bt.rCard),
             ),
             title: const Row(
               children: [
@@ -537,14 +487,7 @@ class _SubscriptionScreenContentState
               height: 72,
               decoration: BoxDecoration(
                 gradient: AppGradients.primaryButton,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.primaryPurple.withValues(alpha: 0.3),
-                    blurRadius: 20,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
+                borderRadius: BorderRadius.circular(Bt.rCard),
               ),
               child: const Icon(
                 Icons.check_rounded,
@@ -581,339 +524,6 @@ class _SubscriptionScreenContentState
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _PlanCard extends StatelessWidget {
-  const _PlanCard({
-    required this.info,
-    required this.isCurrentPlan,
-    required this.isPurchasing,
-    required this.onUpgrade,
-  });
-  final _PlanInfo info;
-  final bool isCurrentPlan;
-  final bool isPurchasing;
-  final VoidCallback onUpgrade;
-  @override
-  Widget build(BuildContext context) {
-    final bool isPro = info.isHighlighted;
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(
-              color: isPro ? AppColors.primary : Color(0xFFEAECF0),
-              width: isPro ? 2 : 1,
-            ),
-            boxShadow: isPro
-                ? [
-                    BoxShadow(
-                      color: AppColors.primary.withValues(alpha: 0.08),
-                      blurRadius: 24,
-                      offset: const Offset(0, 12),
-                    ),
-                    BoxShadow(
-                      color: AppColors.primary.withValues(alpha: 0.04),
-                      blurRadius: 8,
-                      offset: const Offset(0, 4),
-                    ),
-                  ]
-                : [
-                    BoxShadow(
-                      color: const Color(0xFF101828).withValues(alpha: 0.04),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        info.title,
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -0.3,
-                          color: isPro
-                              ? AppColors.primary
-                              : const Color(0xFF101828),
-                        ),
-                      ),
-                    ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        _LimitPill(
-                          icon: Icons.people_outline,
-                          label: info.maxUsers == 999999
-                              ? 'Unlimited users'
-                              : '${info.maxUsers} users',
-                        ),
-                        const SizedBox(height: 4),
-                        _LimitPill(
-                          icon: Icons.folder_outlined,
-                          label: info.maxProjectsLabel,
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  info.tagline,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Color(0xFF667085),
-                    height: 1.4,
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.baseline,
-                  textBaseline: TextBaseline.alphabetic,
-                  children: [
-                    Text(
-                      info.price,
-                      style: const TextStyle(
-                        fontSize: 36,
-                        fontWeight: FontWeight.w900,
-                        color: Color(0xFF101828),
-                        letterSpacing: -1.0,
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      info.period,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF667085),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                const Divider(color: Color(0xFFEAECF0), height: 1),
-                const SizedBox(height: 24),
-                ...info.features.map(
-                  (f) => _FeatureItem(text: f, isHighlighted: isPro),
-                ),
-                const SizedBox(height: 8),
-                _buildCta(),
-              ],
-            ),
-          ),
-        ),
-        if (isPro)
-          Positioned(
-            top: -14,
-            right: 24,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                gradient: AppGradients.primaryButton,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.primaryPurple.withValues(alpha: 0.3),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: const Text(
-                'Most Popular',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.3,
-                ),
-              ),
-            ),
-          ),
-        if (isCurrentPlan && !isPro)
-          Positioned(
-            top: -14,
-            right: 24,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: const Color(0xFF101828),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: const Text(
-                'Your Plan',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-
-  Widget _buildCta() {
-    if (isCurrentPlan) {
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF2F4F7),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFEAECF0)),
-        ),
-        child: const Center(
-          child: Text(
-            'Current Plan',
-            style: TextStyle(
-              color: Color(0xFF475467),
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-      );
-    }
-    if (info.isHighlighted) {
-      return PremiumCtaButton(
-        label: info.cta,
-        isFullWidth: true,
-        isLoading: isPurchasing,
-        onTap: onUpgrade,
-        variant: CtaVariant.primary,
-      );
-    }
-    return GestureDetector(
-      onTap: isPurchasing ? null : onUpgrade,
-      behavior: HitTestBehavior.opaque,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFD0D5DD), width: 1.5),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF101828).withValues(alpha: 0.05),
-              blurRadius: 2,
-              offset: const Offset(0, 1),
-            ),
-          ],
-        ),
-        child: Center(
-          child: isPurchasing
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.5,
-                    color: Color(0xFF344054),
-                  ),
-                )
-              : Text(
-                  info.cta,
-                  style: const TextStyle(
-                    color: Color(0xFF344054),
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-        ),
-      ),
-    );
-  }
-}
-
-class _LimitPill extends StatelessWidget {
-  const _LimitPill({required this.icon, required this.label});
-  final IconData icon;
-  final String label;
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF2F4F7),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 11, color: const Color(0xFF667085)),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 11,
-              color: Color(0xFF344054),
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _FeatureItem extends StatelessWidget {
-  const _FeatureItem({required this.text, required this.isHighlighted});
-  final String text;
-  final bool isHighlighted;
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            margin: const EdgeInsets.only(top: 1),
-            decoration: BoxDecoration(
-              color: isHighlighted
-                  ? AppColors.primary.withValues(alpha: 0.1)
-                  : const Color(0xFFF2F4F7),
-              shape: BoxShape.circle,
-            ),
-            padding: const EdgeInsets.all(4),
-            child: Icon(
-              Icons.check_rounded,
-              size: 14,
-              color: isHighlighted
-                  ? AppColors.primary
-                  : const Color(0xFF667085),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              text,
-              style: const TextStyle(
-                fontSize: 14.5,
-                color: Color(0xFF344054),
-                height: 1.4,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }

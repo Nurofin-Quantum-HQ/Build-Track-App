@@ -1,3 +1,4 @@
+import 'package:buildtrack_mobile/design/design.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -115,9 +116,7 @@ class _FulfillmentPaymentScreenState extends State<FulfillmentPaymentScreen> {
     {'label': 'Card', 'icon': Icons.credit_card_outlined},
     {'label': 'Cheque', 'icon': Icons.description_outlined},
   ];
-  static const Color _kDark = Color(0xFF1E1E2E);
-  static const Color _kGray = Color(0xFF6B7280);
-  static const Color _kLightBg = Color(0xFFF4F5FF);
+  static const Color _kDark = Color(0xFF101828);
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -268,7 +267,7 @@ class _FulfillmentPaymentScreenState extends State<FulfillmentPaymentScreen> {
                       ? '${formatCurrency(amount)} recorded via $_selectedMethod'
                       : 'Payment details updated successfully',
                 ),
-                backgroundColor: const Color(0xFF15803D),
+                backgroundColor: const Color(0xFF067647),
                 behavior: SnackBarBehavior.floating,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -358,239 +357,85 @@ class _FulfillmentPaymentScreenState extends State<FulfillmentPaymentScreen> {
           ? 'Remaining: ${formatCurrency(rem)}'
           : 'Full settlement via partial recording';
     }
-    final double parentW = MediaQuery.of(context).size.width;
-    final double chipW = (parentW - 40) / 2;
-    final double fullW = parentW - 32;
+    final bt = context.bt;
+    final bool amountDisabled = _selectedStatus == PaymentStatus.pending;
     return Scaffold(
-      backgroundColor: _kLightBg,
-      body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-              child: Row(
-                children: [
-                  GestureDetector(
-                    onTap: () => Navigator.pop(context),
-                    child: Container(
-                      width: 38,
-                      height: 38,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFFE2E4F6)),
+      backgroundColor: Bt.ground,
+      appBar: const BtNavBar(title: 'Record payment'),
+      body: ListView(
+        physics: const ClampingScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+        children: [
+          BtCard(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                BtTypeTile(type: _itemType),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(_itemName, maxLines: 2, overflow: TextOverflow.ellipsis, style: BtText.headline(context)),
+                      Text(
+                        [
+                          _projectName.isNotEmpty ? _projectName : 'Project',
+                          if (_quantity > 0 && _rate > 0)
+                            '${_quantity % 1 == 0 ? _quantity.toInt() : _quantity} × ₹${_rate % 1 == 0 ? _rate.toInt() : _rate}',
+                        ].join(' · '),
+                        style: BtText.caption(context),
                       ),
-                      child: const Icon(
-                        Icons.arrow_back_ios_new_rounded,
-                        color: Color(0xFF173EEA),
-                        size: 16,
-                      ),
-                    ),
+                    ],
                   ),
-                  const SizedBox(width: 14),
-                  const Expanded(
-                    child: Text(
-                      'Fulfillment & Payment',
-                      style: TextStyle(
-                        color: _kDark,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: SingleChildScrollView(
-                physics: const ClampingScrollPhysics(),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                const SizedBox(width: 12),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(18),
-                      decoration: const BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [Color(0xFF173EEA), Color(0xFF6B2FD9)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.all(Radius.circular(18)),
-                      ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'INVENTORY ITEM DETAILS',
-                                  style: TextStyle(
-                                    color: Colors.white54,
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.w800,
-                                    letterSpacing: 1.3,
-                                  ),
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  _itemName,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w900,
-                                    letterSpacing: -0.3,
-                                    height: 1.2,
-                                  ),
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  '${_itemType.toUpperCase()} · ${_projectName.isNotEmpty ? _projectName : "Project"}',
-                                  style: const TextStyle(
-                                    color: Colors.white70,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                if (_quantity > 0 && _rate > 0)
-                                  Padding(
-                                    padding: const EdgeInsets.only(top: 4),
-                                    child: Text(
-                                      'Qty: ${_quantity % 1 == 0 ? _quantity.toInt() : _quantity} @ ₹${_rate % 1 == 0 ? _rate.toInt() : _rate}',
-                                      style: const TextStyle(
-                                        color: Colors.white60,
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              const Text(
-                                'OUTSTANDING',
-                                style: TextStyle(
-                                  color: Colors.white54,
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: 1.2,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                formatCurrency(_outstanding),
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: -0.5,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                '${formatCurrency(_alreadyPaid)} paid',
-                                style: const TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    const Text(
-                      'PAYMENT STATUS',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                        color: _kGray,
-                        letterSpacing: 1.0,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        _buildStatusCard(
-                          PaymentStatus.paid,
-                          'Fully Paid',
-                          const Color(0xFF15803D),
-                          const Color(0xFFDCFCE7),
-                          (v) => setState(() {
-                            _selectedStatus = v;
-                            _amountError = null;
-                            _amountCtrl.text = _outstanding.toStringAsFixed(0);
-                          }),
-                        ),
-                        const SizedBox(width: 8),
-                        _buildStatusCard(
-                          PaymentStatus.partial,
-                          'Partial',
-                          const Color(0xFFB45309),
-                          const Color(0xFFFEF3C7),
-                          (v) => setState(() {
-                            _selectedStatus = v;
-                            _amountError = null;
-                            if (_amountCtrl.text == '0' ||
-                                _amountCtrl.text ==
-                                    _outstanding.toStringAsFixed(0)) {
-                              _amountCtrl.clear();
-                            }
-                          }),
-                        ),
-                        const SizedBox(width: 8),
-                        _buildStatusCard(
-                          PaymentStatus.pending,
-                          'Not Paid',
-                          const Color(0xFFDC2626),
-                          const Color(0xFFFEE2E2),
-                          (v) => setState(() {
-                            _selectedStatus = v;
-                            _amountError = null;
-                            _amountCtrl.text = '0';
-                          }),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-                    const Text(
-                      'ACTUAL AMOUNT PAID (₹)',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                        color: _kGray,
-                        letterSpacing: 1.0,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    AnimatedOpacity(
-                      opacity: _selectedStatus == PaymentStatus.pending
-                          ? 0.4
-                          : 1.0,
-                      duration: const Duration(milliseconds: 180),
-                      child: SizedBox(
-                        height: 60,
-                        child: TextField(
-                          controller: _amountCtrl,
-                          enabled: _selectedStatus != PaymentStatus.pending,
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
-                          ),
-                          onChanged: (val) {
+                    Text('Still due', style: BtText.caption(context)),
+                    Text(formatInr(_outstanding), style: BtText.num(BtText.headline(context).copyWith(color: _outstanding > 0 ? Bt.amber : Bt.green))),
+                    Text('${formatInr(_alreadyPaid)} paid', style: BtText.caption(context)),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+          EntryLabeled(
+            label: 'Payment status',
+            child: BtSegmented<PaymentStatus>(
+              segments: const {
+                PaymentStatus.paid: 'Fully paid',
+                PaymentStatus.partial: 'Partial',
+                PaymentStatus.pending: 'Not paid',
+              },
+              value: _selectedStatus == PaymentStatus.overdue ? PaymentStatus.pending : _selectedStatus,
+              onChanged: (v) => setState(() {
+                _selectedStatus = v;
+                _amountError = null;
+                if (v == PaymentStatus.paid) {
+                  _amountCtrl.text = _outstanding.toStringAsFixed(0);
+                } else if (v == PaymentStatus.partial) {
+                  if (_amountCtrl.text == '0' || _amountCtrl.text == _outstanding.toStringAsFixed(0)) {
+                    _amountCtrl.clear();
+                  }
+                } else {
+                  _amountCtrl.text = '0';
+                }
+              }),
+            ),
+          ),
+          const SizedBox(height: 20),
+          EntryLabeled(
+            label: 'Amount paid',
+            child: AnimatedOpacity(
+              opacity: amountDisabled ? 0.45 : 1.0,
+              duration: const Duration(milliseconds: 180),
+              child: TextField(
+                controller: _amountCtrl,
+                enabled: !amountDisabled,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                onChanged: (val) {
                             if (val.length > 1 &&
                                 val.startsWith('0') &&
                                 !val.startsWith('0.')) {
@@ -618,316 +463,111 @@ class _FulfillmentPaymentScreenState extends State<FulfillmentPaymentScreen> {
                               }
                             });
                           },
-                          textAlignVertical: TextAlignVertical.center,
-                          decoration: InputDecoration(
-                            prefixText: '₹ ',
-                            prefixStyle: const TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w600,
-                              color: _kGray,
-                            ),
-                            hintText: '0.00',
-                            hintStyle: const TextStyle(color: _kGray),
-                            filled: true,
-                            fillColor: Colors.white,
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 14,
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(
-                                color: _amountError != null
-                                    ? const Color(0xFFDC2626)
-                                    : const Color(0xFFE2E4F6),
-                                width: _amountError != null ? 1.5 : 1.0,
-                              ),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(
-                                color: _amountError != null
-                                    ? const Color(0xFFDC2626)
-                                    : const Color(0xFF4F46E5),
-                                width: 1.5,
-                              ),
-                            ),
-                            disabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(
-                                color: _amountError != null
-                                    ? const Color(0xFFDC2626)
-                                    : const Color(0xFFE2E4F6),
-                                width: 1.0,
-                              ),
-                            ),
-                          ),
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w800,
-                            color: _kDark,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    const Text(
-                      'PAYMENT METHOD',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                        color: _kGray,
-                        letterSpacing: 1.0,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        ..._pMethods.take(4).map((m) {
-                          final lbl = m['label'] as String;
-                          final ico = m['icon'] as IconData;
-                          final sel = _selectedMethod == lbl;
-                          return _buildMethodChip(lbl, ico, sel, chipW, () {
-                            setState(() => _selectedMethod = lbl);
-                          });
-                        }),
-                        Builder(
-                          builder: (_) {
-                            const lbl = 'Cheque';
-                            const ico = Icons.description_outlined;
-                            final sel = _selectedMethod == lbl;
-                            return _buildMethodChip(lbl, ico, sel, fullW, () {
-                              setState(() => _selectedMethod = lbl);
-                            });
-                          },
-                        ),
-                      ],
-                    ),
-                    if (_selectedMethod == 'Cash') ...[
-                      const SizedBox(height: 16),
-                      CheckboxListTile(
-                        title: const Text(
-                          'Request E-Signature for Cash Receipt',
-                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _kDark),
-                        ),
-                        value: _requestEsign,
-                        onChanged: (val) => setState(() => _requestEsign = val ?? false),
-                        controlAffinity: ListTileControlAffinity.leading,
-                        contentPadding: EdgeInsets.zero,
-                        activeColor: const Color(0xFF173EEA),
-                      ),
-                      if (_requestEsign)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 8.0, bottom: 8.0),
-                          child: TextField(
-                            controller: _clientEmailCtrl,
-                            keyboardType: TextInputType.emailAddress,
-                            decoration: InputDecoration(
-                              labelText: 'Client Email Address',
-                              labelStyle: const TextStyle(color: _kGray, fontSize: 13),
-                              prefixIcon: const Icon(Icons.email_outlined, color: _kGray, size: 20),
-                              filled: true,
-                              fillColor: Colors.white,
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: const BorderSide(color: Color(0xFFE2E4F6)),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: const BorderSide(color: Color(0xFF173EEA), width: 1.5),
-                              ),
-                            ),
-                            style: const TextStyle(fontSize: 14, color: _kDark, fontWeight: FontWeight.w500),
-                          ),
-                        ),
-                      if (_requestEsign && !_isEsignCompleted) ...[
-                        const SizedBox(height: 8),
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            onPressed: _isEsignPolling ? () {
-                              setState(() => _isEsignPolling = false);
-                            } : _startEsignFlow,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: _isEsignPolling ? Colors.red : const Color(0xFF173EEA),
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            ),
-                            child: Text(_isEsignPolling ? 'Cancel Polling' : 'Send for E-Signature', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                          ),
-                        ),
-                        if (_esignStatusText.isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 8),
-                            child: Text(_esignStatusText, style: TextStyle(color: _isEsignPolling ? Colors.orange : (_isEsignCompleted ? Colors.green : Colors.red), fontWeight: FontWeight.bold)),
-                          )
-                      ],
-                      if (_isEsignCompleted) ...[
-                         const SizedBox(height: 8),
-                         Container(
-                           padding: const EdgeInsets.all(12),
-                           decoration: BoxDecoration(color: Colors.green.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.green)),
-                           child: const Row(
-                             children: [
-                               Icon(Icons.check_circle, color: Colors.green),
-                               SizedBox(width: 8),
-                               Text('Signature successfully captured!', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
-                             ]
-                           )
-                         )
-                      ],
-                    ],
-                    const SizedBox(height: 20),
+                style: BtText.num(BtText.amount(context, size: 28)),
+                decoration: btInput(context, hint: '0', prefixText: '₹ ', errorText: _amountError).copyWith(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                ),
+              ),
+            ),
+          ),
+          if (_amountError == null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
+              child: Text(helperText, style: BtText.caption(context)),
+            ),
+          const SizedBox(height: 24),
+          EntryLabeled(
+            label: 'Method',
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final m in _pMethods)
+                  BtChip(
+                    label: m['label'] as String,
+                    icon: m['icon'] as IconData,
+                    selected: _selectedMethod == m['label'],
+                    onTap: () => setState(() => _selectedMethod = m['label'] as String),
+                  ),
+              ],
+            ),
+          ),
+          if (_selectedMethod == 'Cash') ...[
+            const SizedBox(height: 16),
+            BtCard(
+              padding: const EdgeInsets.fromLTRB(12, 4, 16, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  CheckboxListTile(
+                    title: Text('Request e-signature for cash receipt', style: BtText.body(context)),
+                    value: _requestEsign,
+                    onChanged: (val) => setState(() => _requestEsign = val ?? false),
+                    controlAffinity: ListTileControlAffinity.leading,
+                    contentPadding: EdgeInsets.zero,
+                    activeColor: bt.brand,
+                  ),
+                  if (_requestEsign)
                     Padding(
-                      padding: const EdgeInsets.only(top: 5, left: 2),
-                      child: Text(
-                        _amountError ?? helperText,
-                        style: TextStyle(
-                          color: _amountError != null
-                              ? const Color(0xFFDC2626)
-                              : const Color(0xFF6B7280),
-                          fontSize: 11,
-                          fontStyle: _amountError != null
-                              ? FontStyle.italic
-                              : FontStyle.normal,
-                          fontWeight: FontWeight.w500,
-                        ),
+                      padding: const EdgeInsets.only(left: 4, bottom: 8),
+                      child: TextField(
+                        controller: _clientEmailCtrl,
+                        keyboardType: TextInputType.emailAddress,
+                        style: BtText.body(context),
+                        decoration: btInput(context, hint: 'Client email address', prefix: const Icon(Icons.email_outlined, color: Bt.ink3, size: 20)),
                       ),
                     ),
-                    const SizedBox(height: 20),
-                    const Text(
-                      'PAYMENT RECEIPT',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                        color: _kGray,
-                        letterSpacing: 1.0,
+                  if (_requestEsign && !_isEsignCompleted) ...[
+                    Padding(
+                      padding: const EdgeInsets.only(left: 4),
+                      child: BtButton(
+                        label: _isEsignPolling ? 'Cancel Polling' : 'Send for E-Signature',
+                        variant: _isEsignPolling ? BtButtonVariant.destructive : BtButtonVariant.secondary,
+                        small: true,
+                        onPressed: _isEsignPolling ? () => setState(() => _isEsignPolling = false) : _startEsignFlow,
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    GestureDetector(
-                      onTap: () async {
-                        final attachment = await pickAttachmentDirect(context);
-                        if (attachment != null) {
-                          setState(() {
-                            _uploadedReceipt = attachment.name;
-                            _newReceiptDataUri = attachment.dataUri;
-                          });
-                        }
-                      },
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 180),
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 14,
-                          horizontal: 16,
-                        ),
-                        decoration: BoxDecoration(
-                          color: _uploadedReceipt != null
-                              ? const Color(0xFFF0FDF4)
-                              : Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: _uploadedReceipt != null
-                                ? const Color(0xFF15803D)
-                                : const Color(0xFFCCCFE8),
-                            width: 1.5,
+                    if (_esignStatusText.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(4, 10, 0, 0),
+                        child: Row(children: [
+                          if (_isEsignPolling) ...[
+                            const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Bt.amber)),
+                            const SizedBox(width: 8),
+                          ],
+                          Expanded(
+                            child: Text(
+                              _esignStatusText,
+                              style: BtText.subhead(context, weight: FontWeight.w500, color: _isEsignPolling ? Bt.amber : (_isEsignCompleted ? Bt.green : Bt.red)),
+                            ),
                           ),
-                        ),
-                        child: _uploadedReceipt != null
-                            ? Row(
-                                children: [
-                                  const Icon(
-                                    Icons.check_circle_outline,
-                                    color: Color(0xFF15803D),
-                                    size: 18,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      _uploadedReceipt!,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        color: Color(0xFF15803D),
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  GestureDetector(
-                                    onTap: () => setState(() {
-                                      _uploadedReceipt = null;
-                                      _newReceiptDataUri = null;
-                                    }),
-                                    child: const Icon(
-                                      Icons.close,
-                                      color: Color(0xFF6B7280),
-                                      size: 16,
-                                    ),
-                                  ),
-                                ],
-                              )
-                            : Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Container(
-                                    width: 32,
-                                    height: 32,
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFEEEFFF),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: const Icon(
-                                      Icons.upload_outlined,
-                                      color: Color(0xFF173EEA),
-                                      size: 16,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  const Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'Upload Payment Receipt',
-                                        style: TextStyle(
-                                          color: _kDark,
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                                      SizedBox(height: 1),
-                                      Text(
-                                        'PNG, JPG, PDF — UPI / Bank / Cheque proof',
-                                        style: TextStyle(
-                                          color: _kGray,
-                                          fontSize: 10.5,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
+                        ]),
                       ),
+                  ],
+                  if (_isEsignCompleted)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 4, top: 4),
+                      child: Row(children: [
+                        const Icon(Icons.check_circle_rounded, color: Bt.green, size: 18),
+                        const SizedBox(width: 8),
+                        Text('Signature successfully captured!', style: BtText.subhead(context, color: Bt.green, weight: FontWeight.w600)),
+                      ]),
                     ),
-                    const SizedBox(height: 20),
-                    const Text(
-                      'PAYMENT DATE',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                        color: _kGray,
-                        letterSpacing: 1.0,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    GestureDetector(
-                      onTap: () async {
+                ],
+              ),
+            ),
+          ],
+          const SizedBox(height: 24),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: EntryLabeled(
+                  label: 'Payment date',
+                  child: BtPickerField(
+                    text: formatDate(_selectedPaymentDate),
+                    icon: Icons.calendar_today_outlined,
+                    onTap: () async {
                         final picked = await showDatePicker(
                           context: context,
                           initialDate: _selectedPaymentDate,
@@ -936,7 +576,7 @@ class _FulfillmentPaymentScreenState extends State<FulfillmentPaymentScreen> {
                           builder: (c, child) => Theme(
                             data: Theme.of(c).copyWith(
                               colorScheme: const ColorScheme.light(
-                                primary: Color(0xFF173EEA),
+                                primary: Color(0xFF0B63CE),
                                 onPrimary: Colors.white,
                                 onSurface: _kDark,
                               ),
@@ -952,238 +592,90 @@ class _FulfillmentPaymentScreenState extends State<FulfillmentPaymentScreen> {
                           ));
                         }
                       },
-                      child: Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 14,
-                          horizontal: 16,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: const Color(0xFFCCCFE8),
-                            width: 1.5,
-                          ),
-                        ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          EntryLabeled(
+            label: 'Payment proof',
+            child: (_uploadedReceipt != null && _uploadedReceipt!.isNotEmpty)
+                ? BtGroup(children: [
+                    BtRow(
+                      leading: BtTile(icon: Icons.check_rounded, bg: Bt.greenSoft, fg: Bt.green),
+                      title: _uploadedReceipt!,
+                      trailing: BtIconButton(
+                        icon: Icons.close_rounded,
+                        semantic: 'Remove receipt',
+                        color: Bt.ink3,
+                        onTap: () => setState(() {
+                          _uploadedReceipt = null;
+                          _newReceiptDataUri = null;
+                        }),
+                      ),
+                    ),
+                  ])
+                : Material(
+                    color: Bt.card,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(Bt.rInput),
+                      side: const BorderSide(color: Bt.inputBorder),
+                    ),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(Bt.rInput),
+                      onTap: () async {
+                        final attachment = await pickAttachmentDirect(context);
+                        if (attachment != null) {
+                          setState(() {
+                            _uploadedReceipt = attachment.name;
+                            _newReceiptDataUri = attachment.dataUri;
+                          });
+                        }
+                      },
+                      child: SizedBox(
+                        height: 56,
                         child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(
-                              Icons.calendar_month_outlined,
-                              color: Color(0xFF173EEA),
-                              size: 18,
-                            ),
+                            const Icon(Icons.upload_rounded, color: Bt.ink2, size: 20),
                             const SizedBox(width: 8),
-                            Text(
-                              '${_selectedPaymentDate.day}/${_selectedPaymentDate.month}/${_selectedPaymentDate.year}',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 14,
-                                color: _kDark,
-                              ),
-                            ),
+                            Text('Upload payment receipt', style: BtText.body(context, weight: FontWeight.w500)),
+                            Text('  · PNG, JPG, PDF', style: BtText.caption(context)),
                           ],
                         ),
                       ),
                     ),
-                    const SizedBox(height: 20),
-                    const Text(
-                      'REMARKS / REFERENCE NUMBER',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                        color: _kGray,
-                        letterSpacing: 1.0,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    EntryNotesField(
-                      controller: _noteCtrl,
-                      hint: 'Transaction ID, cheque number, or remarks…',
-                    ),
-                    const SizedBox(height: 24),
-                  ],
-                ),
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                border: Border(
-                  top: BorderSide(color: Color(0xFFE8EAFF), width: 1),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    flex: 2,
-                    child: GestureDetector(
-                      onTap: _isSaving ? null : () => Navigator.pop(context),
-                      child: Container(
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: const Color(0xFFDDE0F0),
-                            width: 1.5,
-                          ),
-                        ),
-                        child: const Center(
-                          child: Text(
-                            'Cancel',
-                            style: TextStyle(
-                              color: _kGray,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    flex: 5,
-                    child: GestureDetector(
-                      onTap: _isSaving ? null : _handleConfirmPayment,
-                      child: Container(
-                        height: 48,
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFF173EEA), Color(0xFF6B2FD9)],
-                          ),
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(
-                                0xFF173EEA,
-                              ).withValues(alpha: 0.25),
-                              blurRadius: 8,
-                              offset: const Offset(0, 3),
-                            ),
-                          ],
-                        ),
-                        child: Center(
-                          child: _isSaving
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    color: Colors.white,
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.check_circle_outline,
-                                      color: Colors.white,
-                                      size: 18,
-                                    ),
-                                    SizedBox(width: 6),
-                                    Flexible(
-                                      child: Text(
-                                        'Confirm Payment & Update Inventory',
-                                        textAlign: TextAlign.center,
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.w800,
-                                          fontSize: 13,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+          ),
+          const SizedBox(height: 20),
+          EntryLabeled(
+            label: 'Remarks / reference number',
+            child: EntryNotesField(
+              controller: _noteCtrl,
+              hint: 'Transaction ID, cheque number, or remarks…',
             ),
-          ],
-        ),
+          ),
+        ],
       ),
-    );
-  }
-  Widget _buildStatusCard(
-    PaymentStatus status,
-    String label,
-    Color activeColor,
-    Color activeBg,
-    void Function(PaymentStatus) onSelect,
-  ) {
-    final bool isSelected = _selectedStatus == status;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => onSelect(status),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            color: isSelected ? activeBg : Colors.white,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: isSelected ? activeColor : const Color(0xFFE2E4F6),
-              width: isSelected ? 1.8 : 1.0,
-            ),
-          ),
-          child: Center(
-            child: Text(
-              label,
-              style: TextStyle(
-                color: isSelected ? activeColor : _kGray,
-                fontSize: 12.5,
-                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-  Widget _buildMethodChip(
-    String label,
-    IconData icon,
-    bool isSelected,
-    double width,
-    VoidCallback onTap,
-  ) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        width: width,
-        height: 46,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFFEEF1FF) : Colors.white,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: isSelected
-                ? const Color(0xFF173EEA)
-                : const Color(0xFFE2E4F6),
-            width: isSelected ? 1.5 : 1.0,
-          ),
-        ),
+      bottomNavigationBar: EntryBottomBar(
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              icon,
-              color: isSelected ? const Color(0xFF173EEA) : _kGray,
-              size: 16,
+            Expanded(
+              child: BtButton(
+                label: 'Cancel',
+                variant: BtButtonVariant.secondary,
+                onPressed: _isSaving ? null : () => Navigator.pop(context),
+              ),
             ),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                color: isSelected ? const Color(0xFF173EEA) : _kDark,
-                fontSize: 12,
-                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+            const SizedBox(width: 12),
+            Expanded(
+              flex: 2,
+              child: BtButton(
+                label: 'Confirm Payment',
+                icon: Icons.check_circle_outline,
+                loading: _isSaving,
+                onPressed: _isSaving ? null : _handleConfirmPayment,
               ),
             ),
           ],

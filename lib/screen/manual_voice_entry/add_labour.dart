@@ -1,7 +1,7 @@
+import 'package:buildtrack_mobile/design/design.dart';
 import 'dart:convert';
 import 'package:buildtrack_mobile/common/themes/app_colors.dart';
 import 'package:buildtrack_mobile/common/widgets/autocomplete_name_field.dart';
-import 'package:buildtrack_mobile/common/widgets/common_widgets.dart';
 import 'package:buildtrack_mobile/common/widgets/entry_widgets.dart';
 import 'package:buildtrack_mobile/common/widgets/upload_box.dart';
 import 'package:buildtrack_mobile/common/utils/image_pick_helper.dart';
@@ -1247,39 +1247,20 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
         children: [
           Row(
             children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF15803D).withValues(alpha: 0.10),
-                  borderRadius: BorderRadius.circular(13),
-                ),
-                child: const Icon(
-                  Icons.payments_outlined,
-                  color: Color(0xFF15803D),
-                  size: 22,
-                ),
-              ),
-              const SizedBox(width: 14),
+              const BtTile(icon: Icons.payments_outlined, bg: Bt.greenSoft, fg: Bt.green),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       _isEditing ? 'Payment History' : 'Pay Now',
-                      style: const TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.textDark,
-                      ),
+                      style: BtText.headline(context),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       _isEditing ? 'Manage payments for this entry' : 'Optionally log payment while adding',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textLight,
-                      ),
+                      style: BtText.caption(context),
                     ),
                   ],
                 ),
@@ -1324,7 +1305,7 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
           if (!_isEditing) ...[
             const SizedBox(height: 16),
             CheckboxListTile(
-              title: const Text('Request E-Signature for Cash Receipt'),
+              title: Text('Request e-signature for cash receipt', style: BtText.body(context)),
               value: _requestEsign,
               onChanged: (val) => setState(() => _requestEsign = val ?? false),
               controlAffinity: ListTileControlAffinity.leading,
@@ -1336,24 +1317,20 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
                 child: TextFormField(
                   controller: _clientEmailCtrl,
                   keyboardType: TextInputType.emailAddress,
-                  decoration: const InputDecoration(
-                    labelText: 'Client Email Address',
-                    prefixIcon: Icon(Icons.email_outlined),
-                    border: OutlineInputBorder(),
-                  ),
+                  decoration: btInput(context, hint: 'Client email address', prefix: const Icon(Icons.email_outlined, color: Bt.ink3)),
                 ),
               ),
           ],
           if (!_isEditing && _recordPaymentNow && _paymentResult != null) ...[
             const SizedBox(height: 16),
-            const Divider(color: Color(0xFFF0EEF8)),
+            const Divider(color: Bt.line),
             const SizedBox(height: 12),
             _buildPaymentSummary(),
           ],
           if (_isEditing) ...[
             const SizedBox(height: 16),
             if (_paymentHistory.isNotEmpty) ...[
-              const Divider(color: Color(0xFFF0EEF8)),
+              const Divider(color: Bt.line),
               const SizedBox(height: 12),
               ..._paymentHistory.asMap().entries.map((entry) {
                 final idx = entry.key;
@@ -1449,9 +1426,8 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: const Color(0xFFF0FDF4),
+          color: const Color(0xFFE7F6EE),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFF86EFAC), width: 1.5),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1460,7 +1436,7 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
               children: [
                 const Icon(
                   Icons.check_circle_rounded,
-                  color: Color(0xFF16A34A),
+                  color: Color(0xFF067647),
                   size: 18,
                 ),
                 const SizedBox(width: 8),
@@ -1468,13 +1444,13 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
                   'Payment',
                   style: TextStyle(
                     fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF15803D),
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF067647),
                   ),
                 ),
                 const Spacer(),
                 IconButton(
-                  icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
+                  icon: const Icon(Icons.delete_outline, size: 18, color: Color(0xFFC01048)),
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
                   onPressed: () {
@@ -1514,8 +1490,8 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
               Text(
                 'Note: $note',
                 style: const TextStyle(
-                  fontSize: 11,
-                  color: Color(0xFF4B5563),
+                  fontSize: 13,
+                  color: Color(0xFF475467),
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -1561,9 +1537,8 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: const Color(0xFFF0FDF4),
+          color: const Color(0xFFE7F6EE),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFF86EFAC), width: 1.5),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1572,7 +1547,7 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
               children: [
                 const Icon(
                   Icons.check_circle_rounded,
-                  color: Color(0xFF16A34A),
+                  color: Color(0xFF067647),
                   size: 18,
                 ),
                 const SizedBox(width: 8),
@@ -1580,17 +1555,17 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
                   'Payment Recorded',
                   style: TextStyle(
                     fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF15803D),
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF067647),
                   ),
                 ),
                 const Spacer(),
                 const Text(
                   'Tap to edit',
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF15803D),
+                    color: Color(0xFF067647),
                   ),
                 ),
               ],
@@ -1624,8 +1599,8 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
               Text(
                 'Note: $note',
                 style: const TextStyle(
-                  fontSize: 11,
-                  color: Color(0xFF4B5563),
+                  fontSize: 13,
+                  color: Color(0xFF475467),
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -1641,7 +1616,7 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFD1FAE5), width: 1),
+        border: Border.all(color: Bt.line),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1649,24 +1624,24 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
           Text(
             label,
             style: const TextStyle(
-              fontSize: 10,
+              fontSize: 12,
               fontWeight: FontWeight.w600,
-              color: Color(0xFF6B7280),
+              color: Color(0xFF667085),
             ),
           ),
           const SizedBox(height: 3),
           Row(
             children: [
-              Icon(icon, size: 11, color: const Color(0xFF15803D)),
+              Icon(icon, size: 11, color: const Color(0xFF067647)),
               const SizedBox(width: 3),
               Expanded(
                 child: Text(
                   value,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF111827),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF101828),
                   ),
                 ),
               ),
@@ -1707,7 +1682,7 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
                       width: 40,
                       height: 4,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFE2E8F0),
+                        color: const Color(0xFFE4E7EC),
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
@@ -1727,7 +1702,7 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
                           ),
                           child: const Icon(
                             Icons.history_rounded,
-                            color: Color(0xFF2E7D32),
+                            color: Color(0xFF067647),
                             size: 20,
                           ),
                         ),
@@ -1739,7 +1714,7 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
                               'Recent Labour Entries',
                               style: TextStyle(
                                 fontSize: 17,
-                                fontWeight: FontWeight.w800,
+                                fontWeight: FontWeight.w700,
                                 color: AppColors.textDark,
                                 letterSpacing: -0.3,
                               ),
@@ -1747,7 +1722,7 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
                             Text(
                               '${_recentEntries.length} similar entr${_recentEntries.length == 1 ? "y" : "ies"} found',
                               style: const TextStyle(
-                                fontSize: 12,
+                                fontSize: 13,
                                 color: AppColors.textLight,
                                 fontWeight: FontWeight.w500,
                               ),
@@ -1759,7 +1734,7 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
                   ),
                   const Padding(
                     padding: EdgeInsets.fromLTRB(20, 14, 20, 0),
-                    child: Divider(color: Color(0xFFF0EEF8)),
+                    child: Divider(color: Color(0xFFEEF1F5)),
                   ),
                   Expanded(
                     child: ListView.separated(
@@ -1811,12 +1786,6 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
                                   color: const Color(0xFFEEEFF8),
                                   width: 1.2,
                                 ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.04),
-                                    blurRadius: 8,
-                                  ),
-                                ],
                               ),
                               child: Row(
                                 children: [
@@ -1831,7 +1800,7 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
                                     ),
                                     child: const Icon(
                                       Icons.people_outlined,
-                                      color: Color(0xFF2E7D32),
+                                      color: Color(0xFF067647),
                                       size: 20,
                                     ),
                                   ),
@@ -1860,7 +1829,7 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
                                             if (dateStr.isNotEmpty) dateStr,
                                           ].join(' · '),
                                           style: const TextStyle(
-                                            fontSize: 11.5,
+                                            fontSize: 13,
                                             color: AppColors.textLight,
                                             fontWeight: FontWeight.w500,
                                           ),
@@ -1885,9 +1854,9 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
                                     child: const Text(
                                       'Use',
                                       style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w800,
-                                        color: Color(0xFF2E7D32),
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w700,
+                                        color: Color(0xFF067647),
                                       ),
                                     ),
                                   ),
@@ -1979,18 +1948,18 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Delete Entry?', style: TextStyle(fontWeight: FontWeight.w800)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Bt.rCard)),
+        title: const Text('Delete Entry?', style: TextStyle(fontWeight: FontWeight.w700)),
         content: const Text('Are you sure you want to permanently delete this entry?'),
         actionsPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel', style: TextStyle(color: Colors.black54, fontWeight: FontWeight.w600)),
+            child: const Text('Cancel', style: TextStyle(color: Color(0xFF475467), fontWeight: FontWeight.w600)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
+              backgroundColor: const Color(0xFFC01048),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               elevation: 0,
             ),
@@ -2004,12 +1973,12 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
                   }
                   context.read<ProjectProvider>().load();
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Entry deleted successfully'), backgroundColor: Colors.red),
+                    const SnackBar(content: Text('Entry deleted successfully'), backgroundColor: Color(0xFFC01048)),
                   );
                   Navigator.pop(context); // Pop edit screen
                 } else if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Failed to delete entry'), backgroundColor: Colors.red),
+                    const SnackBar(content: Text('Failed to delete entry'), backgroundColor: Color(0xFFC01048)),
                   );
                 }
               }
@@ -2023,52 +1992,30 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
   @override
   Widget build(BuildContext context) {
     context.watch<ProjectProvider>().projects;
+    final title = _isEditing ? 'Edit labour' : _isDuplicate ? 'Repeat entry' : 'Labour';
+    final showRecent = _selectedProjectId != null && !_isEditing;
+    final qtyText = _qtyCtrl.text.isEmpty ? '—' : _qtyCtrl.text;
+    final rateText = _rateCtrl.text.isEmpty ? '—' : '₹${_rateCtrl.text}';
     return Scaffold(
       resizeToAvoidBottomInset: true,
-      backgroundColor: AppColors.gradientStart,
-      body: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            AppTopBar(
-              title: _isEditing
-                  ? 'Modify Labour Log'
-                  : _isDuplicate
-                  ? 'Repeat Entry'
-                  : 'Log Labour Force',
-              isSubScreen: true,
-              leftIcon: Icons.arrow_back,
-              onLeftTap: () => Navigator.maybePop(context),
-              rightWidget: _isEditing ? GestureDetector(
+      backgroundColor: Bt.ground,
+      appBar: BtNavBar(
+        title: title,
+        trailing: _isEditing
+            ? BtIconButton(
+                icon: Icons.delete_outline_rounded,
+                semantic: 'Delete entry',
+                color: Bt.red,
                 onTap: () => _showDeleteDialog(context),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.red.withOpacity(0.2)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.delete_outline_rounded, color: Colors.red, size: 16),
-                      const SizedBox(width: 4),
-                      const Text('Delete', style: TextStyle(color: Colors.red, fontSize: 13, fontWeight: FontWeight.w700)),
-                    ],
-                  ),
-                ),
-              ) : null,
-            ),
-            Expanded(
-              child: SingleChildScrollView(
-                key: const PageStorageKey('add_labour_scroll'),
-                controller: _scrollCtrl,
-                physics: const ClampingScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (_isEditing || _isDuplicate) ...[
+              )
+            : null,
+      ),
+      body: ListView(
+        controller: _scrollCtrl,
+        physics: const ClampingScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+        children: [
+          if (_isEditing || _isDuplicate) ...[
                       ExecutionContextCard(
                         selectedProjectId: _selectedProjectId,
                         selectedFloor: _selectedFloor,
@@ -2142,127 +2089,98 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
                           });
                         },
                       ),
-                      const SizedBox(height: 16),
-                    ],
-                    if (_floorWarning != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 12),
-                        child: Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFFF3E0),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: const Color(0xFFFFB74D)),
-                          ),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Icon(
-                                Icons.warning_amber_rounded,
-                                color: Color(0xFFE65100),
-                                size: 20,
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Text(
-                                  _floorWarning!,
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    color: Color(0xFFBF360C),
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+                      const SizedBox(height: 20),
+          ] else
+            EntryWhereSummary(
+              projectId: _selectedProjectId,
+              floor: _selectedFloor,
+              phase: _selectedPhase,
+              activity: _selectedActivity,
+            ),
+          if (_floorWarning != null) EntryNotice(_floorWarning!),
+          if (_phaseWarning != null) EntryNotice(_phaseWarning!),
+          if (_activityWarning != null) EntryNotice(_activityWarning!),
+          if (showRecent) ...[
+            if (_recentEntries.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 24),
+                child: EntryRecentRow(count: _recentEntries.length, onTap: _showRecentEntriesSheet),
+              ),
+          ],
+          EntryFormSection(
+            children: [
+              EntryLabeled(
+                label: 'Labour type',
+                required: true,
+                child: AutocompleteNameField(
+                  controller: _nameCtrl,
+                  hint: 'e.g. Mason, Carpenter, Steel Fixer',
+                  suggestions: const [],
+                  onChanged: (_) => setState(() => _nameError = null),
+                  onSuggestionSelected: _prefillFromRecent,
+                  errorText: _nameError,
+                ),
+              ),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: EntryLabeled(
+                      label: 'Quantity',
+                      required: true,
+                      child: EntryUnderlineField(
+                        controller: _qtyCtrl,
+                        hint: '0',
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        onChanged: (_) => setState(() => _qtyError = null),
+                        error: _qtyError,
                       ),
-                    if (_phaseWarning != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 8),
-                        child: Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFFF3E0),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: const Color(0xFFFFB74D)),
-                          ),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Icon(
-                                Icons.warning_amber_rounded,
-                                color: Color(0xFFE65100),
-                                size: 20,
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Text(
-                                  _phaseWarning!,
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    color: Color(0xFFBF360C),
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: EntryLabeled(
+                      label: 'Unit',
+                      required: true,
+                      child: UnitSelectorField(
+                        value: _selectedUnit,
+                        units: kLabourUnits,
+                        hint: 'Day, Hour, Sq ft',
+                        onChanged: (u) => setState(() {
+                          _selectedUnit = u;
+                          _unitError = null;
+                        }),
+                        error: _unitError,
                       ),
-                    if (_activityWarning != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 8),
-                        child: Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFFF3E0),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: const Color(0xFFFFB74D)),
-                          ),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Icon(
-                                Icons.warning_amber_rounded,
-                                color: Color(0xFFE65100),
-                                size: 20,
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Text(
-                                  _activityWarning!,
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    color: Color(0xFFBF360C),
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+                    ),
+                  ),
+                ],
+              ),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: EntryLabeled(
+                      label: _selectedUnit == null ? 'Rate' : 'Rate per ${_selectedUnit!}',
+                      required: true,
+                      child: EntryUnderlineField(
+                        controller: _rateCtrl,
+                        hint: '0',
+                        prefix: '₹',
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        onChanged: (_) => setState(() => _rateError = null),
+                        error: _rateError,
                       ),
-                    EntrySectionCard(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const EntryCardHeader(
-                            icon: Icons.people_outline,
-                            title: 'Labour Entry',
-                            subtitle:
-                                'Date · Labour Type · Unit · Qty · Rate · Amount',
-                          ),
-                          const SizedBox(height: 20),
-                          const Divider(color: Color(0xFFF0EEF8)),
-                          const SizedBox(height: 16),
-                          const EntryFieldLabel('Date', required: true),
-                          const SizedBox(height: 8),
-                          GestureDetector(
-                            onTap: () async {
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: EntryLabeled(
+                      label: 'Date',
+                      required: true,
+                      child: EntryDateField(
+                        date: _selectedDate,
+                        onTap: () async {
                               final picked = await showDatePicker(
                                 context: context,
                                 initialDate: _selectedDate,
@@ -2293,345 +2211,72 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
                                 });
                               }
                             },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 0,
-                                vertical: 12,
-                              ),
-                              decoration: const BoxDecoration(
-                                border: Border(
-                                  bottom: BorderSide(
-                                    color: Color(0xFF173EEA),
-                                    width: 2,
-                                  ),
-                                ),
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Icons.calendar_today_outlined,
-                                    color: AppColors.primary,
-                                    size: 18,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    '${_selectedDate.day.toString().padLeft(2, '0')}/${_selectedDate.month.toString().padLeft(2, '0')}/${_selectedDate.year}',
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
-                                      color: AppColors.textDark,
-                                    ),
-                                  ),
-                                  const Spacer(),
-                                  Icon(
-                                    Icons.keyboard_arrow_down_rounded,
-                                    color: AppColors.primary,
-                                    size: 22,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-                          const EntryFieldLabel('Labour Type', required: true),
-                          const SizedBox(height: 8),
-                          AutocompleteNameField(
-                            controller: _nameCtrl,
-                            hint: 'e.g. Mason, Carpenter, Steel Fixer',
-                            suggestions: const [],
-                            onChanged: (_) => setState(() => _nameError = null),
-                            onSuggestionSelected: _prefillFromRecent,
-                            errorText: _nameError,
-                          ),
-                          const SizedBox(height: 20),
-                          const EntryFieldLabel('Unit', required: true),
-                          const SizedBox(height: 8),
-                          UnitSelectorField(
-                            value: _selectedUnit,
-                            units: kLabourUnits,
-                            hint: 'Select unit (e.g. Day, Hour, Sq ft)',
-                            onChanged: (u) => setState(() {
-                              _selectedUnit = u;
-                              _unitError = null;
-                            }),
-                            error: _unitError,
-                          ),
-                          const SizedBox(height: 20),
-                          const EntryFieldLabel('Quantity', required: true),
-                          const SizedBox(height: 8),
-                          EntryUnderlineField(
-                            controller: _qtyCtrl,
-                            hint: '0',
-                            suffix: _selectedUnit ?? 'Unit',
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                            onChanged: (_) => setState(() => _qtyError = null),
-                            error: _qtyError,
-                          ),
-                          const SizedBox(height: 20),
-                          const EntryFieldLabel('Rate (₹)', required: true),
-                          const SizedBox(height: 8),
-                          EntryUnderlineField(
-                            controller: _rateCtrl,
-                            hint: '0',
-                            prefix: '₹',
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                            onChanged: (_) => setState(() => _rateError = null),
-                            error: _rateError,
-                          ),
-                          const SizedBox(height: 20),
-                          const EntryFieldLabel('Amount (₹)'),
-                          const SizedBox(height: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 14,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF0F2FF),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: const Color(0xFFCDD1F0),
-                                width: 1.5,
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(
-                                  Icons.currency_rupee_rounded,
-                                  size: 16,
-                                  color: Color(0xFF173EEA),
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  (() {
-                                    final qty =
-                                        double.tryParse(_qtyCtrl.text) ?? 0;
-                                    final rate =
-                                        double.tryParse(_rateCtrl.text) ?? 0;
-                                    final sub = qty * rate;
-                                    return sub > 0
-                                        ? sub.toStringAsFixed(
-                                            sub % 1 == 0 ? 0 : 2,
-                                          )
-                                        : '—';
-                                  })(),
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w900,
-                                    color: Color(0xFF173EEA),
-                                    letterSpacing: -0.3,
-                                  ),
-                                ),
-                                const Spacer(),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 3,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFE0E3FF),
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: const Text(
-                                    'Auto',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w800,
-                                      color: Color(0xFF173EEA),
-                                      letterSpacing: 0.5,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 24),
-                          Row(
-                            children: [
-                              const Expanded(
-                                child: Divider(color: Color(0xFFF0EEF8)),
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                ),
-                                child: Text(
-                                  'OPTIONAL DETAILS',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w800,
-                                    color: AppColors.textLight,
-                                    letterSpacing: 1.0,
-                                  ),
-                                ),
-                              ),
-                              const Expanded(
-                                child: Divider(color: Color(0xFFF0EEF8)),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          const EntryFieldLabel('Trade / Work Type (Optional)'),
-                          const SizedBox(height: 8),
-                          EntryUnderlineField(
-                            controller: _workTypeCtrl,
-                            hint: 'e.g. Masonry, Barbending, Concrete Crew',
-                          ),
-                          const SizedBox(height: 20),
-                          const EntryFieldLabel('Contractor / Team (Optional)'),
-                          const SizedBox(height: 8),
-                          EntryUnderlineField(
-                            controller: _categoryCtrl,
-                            hint: 'e.g. Vertex Infra Contractors',
-                          ),
-                          const SizedBox(height: 20),
-                          const EntryFieldLabel('Overtime Amount (Optional)'),
-                          const SizedBox(height: 8),
-                          EntryUnderlineField(
-                            controller: _overtimeCtrl,
-                            hint: '0',
-                            prefix: '₹',
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                            onChanged: (_) => setState(() {}),
-                          ),
-                          const SizedBox(height: 20),
-                          const EntryFieldLabel('Notes (Optional)'),
-                          const SizedBox(height: 8),
-                          EntryNotesField(controller: _notesCtrl),
-                        ],
                       ),
                     ),
-                    CostSummaryCard(
-                      totalAmount: _totalCost(),
-                      label: 'Calculated Operational Labor Budget',
-                      subtotals: [
-                        (
-                          'Qty × Rate',
-                          '${_qtyCtrl.text.isEmpty ? "—" : _qtyCtrl.text} ${_selectedUnit ?? "Unit"} × ₹${_rateCtrl.text.isEmpty ? "—" : _rateCtrl.text}',
-                        ),
-                        (
-                          'Overtime',
-                          '₹ ${_overtimeCtrl.text.isEmpty ? "0" : _overtimeCtrl.text}',
-                        ),
-                      ],
-                    ),
-                    EntrySectionCard(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const EntryCardHeader(
-                            icon: Icons.receipt_long_outlined,
-                            title: 'Invoice / Bill',
-                            subtitle:
-                                'Attach invoice, bill, or supporting document (optional)',
-                          ),
-                          const SizedBox(height: 16),
-                          UploadBox(
-                            attachment: _attachment,
-                            emptyLabel: 'Tap to upload invoice / bill',
-                            onPicked: (a) => setState(() => _attachment = a),
-                            onRemove: () => setState(() => _attachment = null),
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (RoleManager.canApprovePayments)
-                      _buildPaymentSection(),
-                    const SizedBox(height: 4),
-                    if (_selectedProjectId != null &&
-                        !_isEditing) ...[
-                      if (_recentEntries.isNotEmpty) ...[
-                        const SizedBox(height: 16),
-                        GestureDetector(
-                          onTap: _showRecentEntriesSheet,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 14,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(
-                                color: const Color(0xFFD1EDD4),
-                                width: 1.2,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.03),
-                                  blurRadius: 8,
-                                ),
-                              ],
-                            ),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 40,
-                                  height: 40,
-                                  decoration: BoxDecoration(
-                                    color: const Color(
-                                      0xFF2E7D32,
-                                    ).withValues(alpha: 0.08),
-                                    borderRadius: BorderRadius.circular(11),
-                                  ),
-                                  child: const Icon(
-                                    Icons.history_rounded,
-                                    color: Color(0xFF2E7D32),
-                                    size: 20,
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      const Text(
-                                        'Recent Labour Entries',
-                                        style: TextStyle(
-                                          fontSize: 13.5,
-                                          fontWeight: FontWeight.w800,
-                                          color: AppColors.textDark,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        '${_recentEntries.length} similar entr${_recentEntries.length == 1 ? "y" : "ies"} found · Tap to view',
-                                        style: const TextStyle(
-                                          fontSize: 11.5,
-                                          color: AppColors.textLight,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const Icon(
-                                  Icons.chevron_right_rounded,
-                                  color: AppColors.textLight,
-                                  size: 22,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                      ],
-                    ],
-                    EntrySubmitButton(
-                      label: RoleManager.canApprovePayments
-                          ? 'Save Labour Entry'
-                          : 'Submit to Supervisor',
-                      icon: Icons.check_circle,
-                      isLoading: _isSaving,
-                      onTap: () => _save(context),
-                    ),
-                    const SizedBox(height: 24),
-                  ],
+                  ),
+                ],
+              ),
+              EntryLabeled(
+                label: 'Overtime amount',
+                child: EntryUnderlineField(
+                  controller: _overtimeCtrl,
+                  hint: '0',
+                  prefix: '₹',
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  onChanged: (_) => setState(() {}),
                 ),
               ),
-            ),
-          ],
+              EntryTotalCard(
+                total: _totalCost(),
+                label: 'Total',
+                lines: [
+                  ('$qtyText ${_selectedUnit ?? "Unit"} × $rateText', formatInr((double.tryParse(_qtyCtrl.text) ?? 0) * (double.tryParse(_rateCtrl.text) ?? 0))),
+                  ('Overtime', '₹ ${_overtimeCtrl.text.isEmpty ? "0" : _overtimeCtrl.text}'),
+                ],
+              ),
+            ],
+          ),
+          if (RoleManager.canApprovePayments) _buildPaymentSection(),
+          EntryFormSection(
+            title: 'Bill or invoice',
+            caption: 'optional',
+            children: [
+              UploadBox(
+                attachment: _attachment,
+                emptyLabel: 'Tap to upload invoice / bill',
+                onPicked: (a) => setState(() => _attachment = a),
+                onRemove: () => setState(() => _attachment = null),
+              ),
+            ],
+          ),
+          EntryFormSection(
+            title: 'More details',
+            caption: 'optional',
+            children: [
+              EntryLabeled(
+                label: 'Trade / work type',
+                child: EntryUnderlineField(controller: _workTypeCtrl, hint: 'e.g. Masonry, Barbending, Concrete Crew'),
+              ),
+              EntryLabeled(
+                label: 'Contractor / team',
+                child: EntryUnderlineField(controller: _categoryCtrl, hint: 'e.g. Vertex Infra Contractors'),
+              ),
+              EntryLabeled(
+                label: 'Notes',
+                child: EntryNotesField(controller: _notesCtrl),
+              ),
+            ],
+          ),
+        ],
+      ),
+      bottomNavigationBar: EntryBottomBar(
+        child: EntrySubmitButton(
+          label: RoleManager.canApprovePayments
+              ? 'Save Labour Entry'
+              : 'Submit to Supervisor',
+          icon: Icons.check_circle,
+          isLoading: _isSaving,
+          onTap: () => _save(context),
         ),
       ),
     );

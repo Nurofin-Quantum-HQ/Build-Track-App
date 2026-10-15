@@ -1,3 +1,5 @@
+import 'package:buildtrack_mobile/controller/nav_controller.dart';
+import 'package:buildtrack_mobile/design/design.dart';
 import 'dart:convert';
 import 'package:buildtrack_mobile/common/themes/app_colors.dart';
 import 'package:buildtrack_mobile/common/widgets/common_widgets.dart';
@@ -431,168 +433,149 @@ class _ReportsViewState extends State<_ReportsView> {
     List<String> tempActive = List.from(_getActiveColumnsForTab(tabName));
     final inactive = allCols.where((c) => !tempActive.contains(c)).toList();
     List<String> tempAll = [...tempActive, ...inactive];
-    showDialog(
+    showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Bt.card,
+      barrierColor: Bt.scrim,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(Bt.rSheet))),
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
-            return Dialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              backgroundColor: Colors.white,
-              child: Container(
-                width: 320,
-                padding: EdgeInsets.all(20),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Customize Columns',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.primary,
-                          ),
+            final maxListH = MediaQuery.of(context).size.height * 0.55;
+            return SafeArea(
+              top: false,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  BtSheetHeader(
+                    title: 'Edit columns',
+                    subtitle: '${tempActive.length} of ${tempAll.length} shown · drag ≡ to reorder',
+                  ),
+                  ConstrainedBox(
+                    constraints: BoxConstraints(maxHeight: maxListH),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Bt.card,
+                          borderRadius: BorderRadius.circular(Bt.rCard),
+                          border: Border.all(color: Bt.line),
                         ),
-                        IconButton(
-                          icon: Icon(Icons.close, size: 20),
-                          onPressed: () => Navigator.of(context).pop(),
-                        ),
-                      ],
-                    ),
-                    Divider(height: 1),
-                    SizedBox(height: 10),
-                    Text(
-                      'Drag items to reorder. Toggle checkbox to show/hide columns.',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                    SizedBox(height: 12),
-                    SizedBox(
-                      height: 300,
-                      child: ReorderableListView.builder(
-                        shrinkWrap: true,
-                        itemCount: tempAll.length,
-                        onReorder: (oldIndex, newIndex) {
-                          setDialogState(() {
-                            if (newIndex > oldIndex) {
-                              newIndex -= 1;
-                            }
-                            final item = tempAll.removeAt(oldIndex);
-                            tempAll.insert(newIndex, item);
-                            final newTempActive = <String>[];
-                            for (final col in tempAll) {
-                              if (tempActive.contains(col)) {
-                                newTempActive.add(col);
-                              }
-                            }
-                            tempActive = newTempActive;
-                          });
-                        },
-                        itemBuilder: (context, index) {
-                          final col = tempAll[index];
-                          final isChecked = tempActive.contains(col);
-                          return ListTile(
-                            key: ValueKey(col),
-                            contentPadding: EdgeInsets.zero,
-                            dense: true,
-                            title: Text(
-                              col,
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            leading: Checkbox(
-                              activeColor: AppColors.primary,
-                              value: isChecked,
-                              onChanged: (val) {
-                                setDialogState(() {
-                                  if (val == true) {
-                                    tempActive.add(col);
-                                    final newTempActive = <String>[];
-                                    for (final c in tempAll) {
-                                      if (tempActive.contains(c)) {
-                                        newTempActive.add(c);
-                                      }
-                                    }
-                                    tempActive = newTempActive;
-                                  } else {
-                                    if (tempActive.length > 1) {
-                                      tempActive.remove(col);
-                                    } else {
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        SnackBar(
-                                          content: Text(
-                                            'At least one column must be visible.',
-                                          ),
-                                          duration: Duration(seconds: 1),
-                                        ),
-                                      );
-                                    }
-                                  }
-                                });
-                              },
-                            ),
-                            trailing: Icon(
-                              Icons.drag_handle,
-                              size: 20,
-                              color: Colors.grey,
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        TextButton(
-                          onPressed: () {
+                        clipBehavior: Clip.antiAlias,
+                        child: ReorderableListView.builder(
+                          shrinkWrap: true,
+                          buildDefaultDragHandles: false,
+                          itemCount: tempAll.length,
+                          onReorder: (oldIndex, newIndex) {
                             setDialogState(() {
-                              tempActive = List.from(allCols);
-                              tempAll = List.from(allCols);
+                              if (newIndex > oldIndex) {
+                                newIndex -= 1;
+                              }
+                              final item = tempAll.removeAt(oldIndex);
+                              tempAll.insert(newIndex, item);
+                              final newTempActive = <String>[];
+                              for (final col in tempAll) {
+                                if (tempActive.contains(col)) {
+                                  newTempActive.add(col);
+                                }
+                              }
+                              tempActive = newTempActive;
                             });
                           },
-                          child: Text(
-                            'Reset',
-                            style: TextStyle(color: Colors.grey, fontSize: 13),
+                          itemBuilder: (context, index) {
+                            final col = tempAll[index];
+                            final isChecked = tempActive.contains(col);
+                            return Material(
+                              key: ValueKey(col),
+                              color: Bt.card,
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (index > 0) const Divider(height: 1, indent: 16, color: Bt.line),
+                                  SizedBox(
+                                    height: 52,
+                                    child: Row(
+                                      children: [
+                                        const SizedBox(width: 16),
+                                        Expanded(
+                                          child: Text(col, style: BtText.body(context, color: isChecked ? Bt.ink : Bt.ink3)),
+                                        ),
+                                        BtSwitch(
+                                          value: isChecked,
+                                          onChanged: (val) {
+                                            setDialogState(() {
+                                              if (val == true) {
+                                                tempActive.add(col);
+                                                final newTempActive = <String>[];
+                                                for (final c in tempAll) {
+                                                  if (tempActive.contains(c)) {
+                                                    newTempActive.add(c);
+                                                  }
+                                                }
+                                                tempActive = newTempActive;
+                                              } else {
+                                                if (tempActive.length > 1) {
+                                                  tempActive.remove(col);
+                                                } else {
+                                                  btToast(context, 'At least one column must be visible.', error: true);
+                                                }
+                                              }
+                                            });
+                                          },
+                                        ),
+                                        ReorderableDragStartListener(
+                                          index: index,
+                                          child: const SizedBox(
+                                            width: 48,
+                                            height: 52,
+                                            child: Icon(Icons.drag_handle_rounded, size: 22, color: Bt.ink3),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: BtButton(
+                            label: 'Reset',
+                            variant: BtButtonVariant.secondary,
+                            onPressed: () {
+                              setDialogState(() {
+                                tempActive = List.from(allCols);
+                                tempAll = List.from(allCols);
+                              });
+                            },
                           ),
                         ),
-                        SizedBox(width: 8),
-                        ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          onPressed: () {
-                            _setActiveColumnsForTab(tabName, tempActive);
-                            Navigator.of(context).pop();
-                          },
-                          child: Text(
-                            'Save',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                            ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          flex: 2,
+                          child: BtButton(
+                            label: 'Save',
+                            onPressed: () {
+                              _setActiveColumnsForTab(tabName, tempActive);
+                              Navigator.of(context).pop();
+                            },
                           ),
                         ),
                       ],
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             );
           },
@@ -662,7 +645,7 @@ class _ReportsViewState extends State<_ReportsView> {
     final whole = parts[0];
     final decimal = parts[1];
     if (whole.length <= 3) {
-      return 'Rs. $whole.$decimal';
+      return '₹$whole.$decimal';
     }
     final lastThree = whole.substring(whole.length - 3);
     final remaining = whole.substring(0, whole.length - 3);
@@ -676,7 +659,7 @@ class _ReportsViewState extends State<_ReportsView> {
       count++;
     }
     final formattedRemaining = buffer.toString().split('').reversed.join('');
-    return 'Rs. $formattedRemaining,$lastThree.$decimal';
+    return '₹$formattedRemaining,$lastThree.$decimal';
   }
 
   void _setDatePreset(String preset) {
@@ -863,7 +846,7 @@ class _ReportsViewState extends State<_ReportsView> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Import template downloaded!'),
-            backgroundColor: Color(0xFF15803D),
+            backgroundColor: Color(0xFF067647),
           ),
         );
       }
@@ -872,7 +855,7 @@ class _ReportsViewState extends State<_ReportsView> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Template download failed: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: const Color(0xFFC01048),
           ),
         );
       }
@@ -951,7 +934,7 @@ class _ReportsViewState extends State<_ReportsView> {
                 Text(
                   'Successfully imported: ${result.successCount}',
                   style: TextStyle(
-                    color: Color(0xFF15803D),
+                    color: Color(0xFF067647),
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -970,7 +953,7 @@ class _ReportsViewState extends State<_ReportsView> {
                 Text(
                   'Failed: ${result.failedCount}',
                   style: TextStyle(
-                    color: result.failedCount > 0 ? Colors.red : Colors.grey,
+                    color: result.failedCount > 0 ? const Color(0xFFC01048) : const Color(0xFF667085),
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -985,9 +968,9 @@ class _ReportsViewState extends State<_ReportsView> {
                     constraints: BoxConstraints(maxHeight: 150),
                     padding: EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: Colors.grey[50],
+                      color: const Color(0xFFF6F7F9),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.grey[200]!),
+                      border: Border.all(color: Bt.line),
                     ),
                     child: SingleChildScrollView(
                       child: Column(
@@ -998,7 +981,7 @@ class _ReportsViewState extends State<_ReportsView> {
                             err,
                             style: TextStyle(
                               color: Colors.red[800],
-                              fontSize: 12,
+                              fontSize: 13,
                             ),
                           ),
                         )).toList(),
@@ -1025,7 +1008,7 @@ class _ReportsViewState extends State<_ReportsView> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Import failed: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: const Color(0xFFC01048),
           ),
         );
       }
@@ -1035,188 +1018,88 @@ class _ReportsViewState extends State<_ReportsView> {
   }
 
   Widget _buildCsvImportCard(String quickCategoryTab, List<String> activeCols) {
-    return Container(
-      padding: EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: AppColors.cardBg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.cardBorder),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 10,
-            offset: Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Color(0xFF173EEA).withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  Icons.upload_file_rounded,
-                  color: Color(0xFF173EEA),
-                  size: 22,
-                ),
-              ),
-              SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'CSV Import',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.textPrimary,
-                        letterSpacing: -0.3,
-                      ),
-                    ),
-                    SizedBox(height: 2),
-                    Text(
-                      'Download template, customize columns, then upload',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: _isImportingCsv
-                      ? null
-                      : () => _handleDownloadImportTemplate(
-                          quickCategoryTab,
-                          activeCols,
-                        ),
-                  icon: Icon(Icons.download_rounded, size: 16),
-                  label: Text(
-                    'Download Template',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    padding: EdgeInsets.symmetric(vertical: 12),
-                    side: BorderSide(
-                      color: AppColors.primary,
-                      width: 1.5,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    foregroundColor: AppColors.primary,
-                  ),
-                ),
-              ),
-              SizedBox(width: 8),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: _isImportingCsv
-                      ? null
-                      : () => _showCustomizeColumnsDialog(
-                          context,
-                          quickCategoryTab,
-                        ),
-                  icon: Icon(Icons.edit_note, size: 16),
-                  label: Text(
-                    'Customize Columns',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    padding: EdgeInsets.symmetric(vertical: 12),
-                    side: BorderSide(
-                      color: AppColors.primary,
-                      width: 1.5,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    foregroundColor: AppColors.primary,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: _isImportingCsv ? null : _handleUploadCsv,
-                  icon: _isImportingCsv
-                      ? SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : Icon(Icons.upload_file_rounded, size: 16),
-                  label: Text(
-                    _isImportingCsv ? 'Importing...' : 'Upload CSV File',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    padding: EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                ),
-              ),
-              SizedBox(width: 8),
-              Container(
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: IconButton(
-                  onPressed: _isImportingCsv ? null : _handleRevertCsv,
-                  icon: Icon(Icons.undo, color: AppColors.primary),
-                  tooltip: 'Revert Last CSV Import',
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
+    final tab = quickCategoryTab.isEmpty ? 'All' : quickCategoryTab;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const BtSectionHeader(title: 'Import from a spreadsheet'),
+        BtGroup(
+          children: [
+            BtRow(
+              leading: const BtTile(icon: Icons.download_rounded),
+              title: 'Download template',
+              subtitle: 'CSV with your chosen columns',
+              showChevron: true,
+              onTap: _isImportingCsv ? null : () => _handleDownloadImportTemplate(tab, activeCols),
+            ),
+            BtRow(
+              leading: const BtTile(icon: Icons.view_column_outlined),
+              title: 'Customize columns',
+              subtitle: 'Pick and reorder template columns',
+              showChevron: true,
+              onTap: _isImportingCsv ? null : () => _showCustomizeColumnsDialog(context, tab),
+            ),
+            BtRow(
+              leading: _isImportingCsv
+                  ? const SizedBox(width: 40, height: 40, child: Padding(padding: EdgeInsets.all(10), child: CircularProgressIndicator(strokeWidth: 2)))
+                  : const BtTile(icon: Icons.upload_file_rounded),
+              title: _isImportingCsv ? 'Importing…' : 'Upload CSV file',
+              subtitle: 'Adds every row as an entry',
+              titleColor: context.bt.brand,
+              titleWeight: FontWeight.w600,
+              onTap: _isImportingCsv ? null : _handleUploadCsv,
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        BtGroup(
+          children: [
+            BtRow(
+              leading: BtTile(icon: Icons.undo_rounded, bg: Bt.redSoft, fg: Bt.red),
+              title: 'Revert last CSV import…',
+              titleColor: Bt.red,
+              onTap: _isImportingCsv
+                  ? null
+                  : () async {
+                      final ok = await btConfirm(
+                        context,
+                        title: 'Revert last import?',
+                        message: 'Entries added by your most recent CSV upload will be removed.',
+                        confirmLabel: 'Revert',
+                      );
+                      if (ok) _handleRevertCsv();
+                    },
+            ),
+          ],
+        ),
+      ],
     );
   }
 
+  /// Keep filters across visits (main: ReportFilterState). Every state change in this
+  /// screen is a filter/sort/page change, so mirror it once here instead of at each call site.
   @override
-  Widget build(BuildContext context) {
-    final provider = context.watch<ReportProvider>();
-    final projectProvider = context.watch<ProjectProvider>();
-    final List<EntryModel> allEntries = projectProvider.entries;
-    String getProjectName(String id) {
-      return projectProvider.projects
-              .where((p) => p.id == id)
-              .firstOrNull
-              ?.name ??
-          'Unknown Project';
-    }
+  void setState(VoidCallback fn) {
+    super.setState(fn);
+    ReportFilterState.selectedProjectId = _selectedProjectId;
+    ReportFilterState.selectedFloor = _selectedFloor;
+    ReportFilterState.selectedPhaseId = _selectedPhaseId;
+    ReportFilterState.selectedActivityName = _selectedActivityName;
+    ReportFilterState.searchQuery = _searchQuery;
+    ReportFilterState.selectedItemName = _selectedItemName;
+    ReportFilterState.reportGenerated = _reportGenerated;
+    ReportFilterState.selectedTypes = Set.from(_selectedTypes);
+    ReportFilterState.selectedStatus = _selectedStatus;
+    ReportFilterState.startDate = _startDate;
+    ReportFilterState.endDate = _endDate;
+    ReportFilterState.datePreset = _datePreset;
+    ReportFilterState.sortColumn = _sortColumn;
+    ReportFilterState.sortAscending = _sortAscending;
+    ReportFilterState.currentPage = _currentPage;
+    ReportFilterState.hasSavedFilters = true;
+  }
 
+  String _quickTab() {
     String quickCategoryTab = 'All';
     if (_selectedTypes.length == 1) {
       if (_selectedTypes.contains(EntryType.material)) {
@@ -1231,7 +1114,20 @@ class _ReportsViewState extends State<_ReportsView> {
     } else {
       quickCategoryTab = '';
     }
-    final filtered = allEntries.where((entry) {
+    return quickCategoryTab;
+  }
+
+  List<EntryModel> _filterEntries(ProjectProvider projectProvider, String quickCategoryTab) {
+    final List<EntryModel> allEntries = projectProvider.entries;
+    String getProjectName(String id) {
+      return projectProvider.projects
+              .where((p) => p.id == id)
+              .firstOrNull
+              ?.name ??
+          'Unknown Project';
+    }
+
+    return allEntries.where((entry) {
       if (_selectedProjectId != 'all' &&
           entry.projectId.trim() != _selectedProjectId.trim()) {
         return false;
@@ -1407,6 +1303,23 @@ class _ReportsViewState extends State<_ReportsView> {
       }
       return true;
     }).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final provider = context.watch<ReportProvider>();
+    final projectProvider = context.watch<ProjectProvider>();
+    final List<EntryModel> allEntries = projectProvider.entries;
+    String getProjectName(String id) {
+      return projectProvider.projects
+              .where((p) => p.id == id)
+              .firstOrNull
+              ?.name ??
+          'Unknown Project';
+    }
+
+    final quickCategoryTab = _quickTab();
+    final filtered = _filterEntries(projectProvider, quickCategoryTab);
     filtered.sort((a, b) {
       int cmp = 0;
       if (_sortColumn == 'date') {
@@ -1467,7 +1380,7 @@ class _ReportsViewState extends State<_ReportsView> {
         return DataColumn(
           label: Text(
             'Date',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
           ),
           onSort: (colIndex, ascending) {
             setState(() {
@@ -1482,7 +1395,7 @@ class _ReportsViewState extends State<_ReportsView> {
         return DataColumn(
           label: Text(
             'Project',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
           ),
           onSort: (colIndex, ascending) {
             setState(() {
@@ -1497,7 +1410,7 @@ class _ReportsViewState extends State<_ReportsView> {
         return DataColumn(
           label: Text(
             'Amount (INR)',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
           ),
           numeric: true,
           onSort: (colIndex, ascending) {
@@ -1518,7 +1431,7 @@ class _ReportsViewState extends State<_ReportsView> {
         return DataColumn(
           label: Text(
             colName,
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
           ),
           numeric: true,
         );
@@ -1526,7 +1439,7 @@ class _ReportsViewState extends State<_ReportsView> {
         return DataColumn(
           label: Text(
             'Paid (INR)',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
           ),
           numeric: true,
         );
@@ -1534,7 +1447,7 @@ class _ReportsViewState extends State<_ReportsView> {
         return DataColumn(
           label: Text(
             'Remaining (INR)',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
           ),
           numeric: true,
         );
@@ -1544,1444 +1457,861 @@ class _ReportsViewState extends State<_ReportsView> {
         return DataColumn(
           label: Text(
             colName,
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
           ),
         );
       } else {
         return DataColumn(
           label: Text(
             colName,
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
           ),
         );
       }
     }).toList();
+    context.read<NavController>().markCurrent('/reports');
+    final bt = context.bt;
+    final entriesTitle = quickCategoryTab == 'All' || quickCategoryTab.isEmpty
+        ? 'Entries'
+        : '$quickCategoryTab entries';
+
+    void openFullScreen() {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => _FullScreenLogsViewer(
+            columns: columns,
+            filteredEntries: filtered,
+            getProjectName: getProjectName,
+            quickCategoryTab: quickCategoryTab,
+            title: quickCategoryTab == 'All'
+                ? 'Report Logs'
+                : '$quickCategoryTab Report Logs',
+            onExportCsv: () => _handleCsvExport(
+              filtered,
+              getProjectName,
+              quickCategoryTab,
+              activeColumns: activeCols,
+            ),
+            onExportPdf: () => _handlePdfExport(
+              filtered,
+              getProjectName,
+              quickCategoryTab,
+              activeColumns: activeCols,
+            ),
+            activeColumns: uiActiveCols,
+          ),
+        ),
+      );
+    }
+
+    void openExport() {
+      showBtSheet(
+        context,
+        title: 'Export',
+        subtitle: '$totalCount entries · current filters',
+        builder: (sheetCtx) => BtGroup(
+          children: [
+            BtRow(
+              leading: const BtTile(icon: Icons.description_outlined),
+              title: 'Download CSV',
+              subtitle: 'Opens in Excel or Google Sheets',
+              showChevron: true,
+              onTap: () {
+                Navigator.pop(sheetCtx);
+                _handleCsvExport(filtered, getProjectName, quickCategoryTab, activeColumns: activeCols);
+              },
+            ),
+            BtRow(
+              leading: const BtTile(icon: Icons.picture_as_pdf_outlined),
+              title: 'Download PDF',
+              subtitle: 'Ready to print or share',
+              showChevron: true,
+              onTap: () {
+                Navigator.pop(sheetCtx);
+                _handlePdfExport(filtered, getProjectName, quickCategoryTab, activeColumns: activeCols);
+              },
+            ),
+          ],
+        ),
+      );
+    }
+
+    void openEntriesMenu() {
+      showBtSheet(
+        context,
+        title: entriesTitle,
+        subtitle: '$totalCount entries',
+        builder: (sheetCtx) => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const BtSectionHeader(title: 'Sort by', caption: true),
+            BtGroup(
+              children: [
+                for (final o in const [
+                  ['date', false, 'Newest first'],
+                  ['date', true, 'Oldest first'],
+                  ['amount', false, 'Amount: high to low'],
+                  ['amount', true, 'Amount: low to high'],
+                  ['project', true, 'Project name'],
+                ])
+                  BtRow(
+                    title: o[2] as String,
+                    minHeight: 48,
+                    trailing: (_sortColumn == o[0] && _sortAscending == o[1])
+                        ? Icon(Icons.check_rounded, color: bt.brand, size: 20)
+                        : null,
+                    onTap: () {
+                      setState(() {
+                        _sortColumn = o[0] as String;
+                        _sortAscending = o[1] as bool;
+                        _currentPage = 1;
+                      });
+                      Navigator.pop(sheetCtx);
+                    },
+                  ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            BtGroup(
+              children: [
+                BtRow(
+                  leading: const BtTile(icon: Icons.view_column_outlined),
+                  title: 'Edit columns',
+                  subtitle: 'For table and exports',
+                  showChevron: true,
+                  onTap: () {
+                    Navigator.pop(sheetCtx);
+                    _showCustomizeColumnsDialog(context, quickCategoryTab.isEmpty ? 'All' : quickCategoryTab);
+                  },
+                ),
+                BtRow(
+                  leading: const BtTile(icon: Icons.table_chart_outlined),
+                  title: 'Open as table',
+                  subtitle: 'Full screen, can rotate',
+                  showChevron: true,
+                  onTap: () {
+                    Navigator.pop(sheetCtx);
+                    openFullScreen();
+                  },
+                ),
+                BtRow(
+                  leading: const BtTile(icon: Icons.ios_share_rounded),
+                  title: 'Export',
+                  subtitle: 'CSV or PDF',
+                  showChevron: true,
+                  onTap: () {
+                    Navigator.pop(sheetCtx);
+                    openExport();
+                  },
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+
+    final project = projectProvider.projects.where((p) => p.id == _selectedProjectId).firstOrNull;
+    final projectName = _selectedProjectId == 'all' ? 'All projects' : (project?.name ?? 'Project');
+    final projectChip = projectName.length > 18 ? '${projectName.substring(0, 17).trimRight()}…' : projectName;
+    final periodChip = _datePreset == 'Custom' && (_startDate != null || _endDate != null)
+        ? '${_startDate == null ? '…' : formatShortDate(_startDate)} – ${_endDate == null ? '…' : formatShortDate(_endDate)}'
+        : _sentence(_datePreset);
+    final extraFilters = [
+      _selectedFloor,
+      _selectedPhaseId,
+      _selectedActivityName,
+      _selectedStatus == 'All' ? null : _selectedStatus,
+    ].where((v) => v != null).length;
+
     return Scaffold(
-      backgroundColor: AppColors.gradientStart,
+      backgroundColor: Bt.ground,
       body: SafeArea(
         bottom: false,
-        child: Column(
-          children: [
-            AppTopBar(
-              title: 'Reports',
-              rightWidget: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Showcase(
-                    key: ShowcaseKeys.helpButton,
-                    description: 'Tap here anytime to replay this tour and get help.',
-                    tooltipBackgroundColor: Color(0xFF1E1E2C),
-                    textColor: Colors.white,
-                    tooltipBorderRadius: BorderRadius.circular(16),
-                    tooltipPadding: EdgeInsets.all(16),
-                    child: IconButton(
-                      icon: Icon(Icons.help_outline, color: AppColors.primary),
-                      onPressed: () {
-                        ShowCaseWidget.of(context).startShowCase([
-                          ShowcaseKeys.reportAskAI,
-                          ShowcaseKeys.reportFilters,
-                          _chartsKey,
-                          ShowcaseKeys.reportCSV,
-                          ShowcaseKeys.helpButton,
-                        ]);
-                      },
-                    ),
-                  ),
-                  SizedBox(width: 8),
-                  GestureDetector(
-                    onTap: () => Navigator.pushNamed(context, '/profile'),
-                    child: ProfileAvatar(radius: 18),
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: RefreshIndicator(
-                color: AppColors.primary,
-                onRefresh: provider.refresh,
-                child: SingleChildScrollView(
-                  controller: _scrollController,
-                  physics: AlwaysScrollableScrollPhysics(),
-                  padding: EdgeInsets.fromLTRB(16, 14, 16, 100),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Showcase(
-                        key: ShowcaseKeys.reportAskAI,
-                        description: 'Ask AI about costs, missing entries, or anything related to this report.',
-                        tooltipBackgroundColor: Color(0xFF1E1E2C),
-                        textColor: Colors.white,
-                        tooltipBorderRadius: BorderRadius.circular(16),
-                        tooltipPadding: EdgeInsets.all(16),
-                        child: _AskAiBanner(projectName: provider.selectedProjectName),
-                      ),
-                      SizedBox(height: 14),
-                      EfficiencyBanner(
-                        note: 'Tap to view category breakdowns, monthly spending trends, and budget health charts.',
-                        isExceeded: grandRemaining > 0,
-                      ),
-                      SizedBox(height: 18),
-                      Showcase(
-                        key: ShowcaseKeys.reportFilters,
-                        description: 'Filter your reports by project, date, status and more.',
-                        tooltipBackgroundColor: Color(0xFF1E1E2C),
-                        textColor: Colors.white,
-                        tooltipBorderRadius: BorderRadius.circular(16),
-                        tooltipPadding: EdgeInsets.all(16),
-                        child: _buildFiltersCard(context, projectProvider),
-                      ),
-                      SizedBox(height: 20),
-                      Text(
-                        'Filtered Cost Summary',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.textPrimary,
-                          letterSpacing: -0.3,
-                        ),
-                      ),
-                      SizedBox(height: 10),
-                      Showcase(
-                        key: _chartsKey,
-                        description: 'View a quick financial summary based on your filters.',
-                        tooltipBackgroundColor: Color(0xFF1E1E2C),
-                        textColor: Colors.white,
-                        tooltipBorderRadius: BorderRadius.circular(16),
-                        tooltipPadding: EdgeInsets.all(16),
-                        child: GridView.count(
-                        crossAxisCount: 3,
-                        shrinkWrap: true,
-                        physics: NeverScrollableScrollPhysics(),
-                        crossAxisSpacing: 10,
-                        mainAxisSpacing: 10,
-                        childAspectRatio: 1.35,
-                        children: [
-                          _buildCostCard(
-                            title: 'Total Billed',
-                            value: grandTotal,
-                            isFeatured: true,
-                            icon: Icons.account_balance_wallet_outlined,
-                          ),
-                          _buildCostCard(
-                            title: 'Paid',
-                            value: grandPaid,
-                            color: Color(0xFF15803D),
-                            icon: Icons.check_circle_outline,
-                          ),
-                          _buildCostCard(
-                            title: 'Remaining',
-                            value: grandRemaining,
-                            color: grandRemaining > 0
-                                ? Color(0xFFDC2626)
-                                : Color(0xFF15803D),
-                            icon: Icons.pending_outlined,
-                          ),
-                          _buildCostCard(
-                            title: 'Material',
-                            value: materialTotal,
-                            color: AppColors.primary,
-                            icon: Icons.construction,
-                          ),
-                          _buildCostCard(
-                            title: 'Labour',
-                            value: labourTotal,
-                            color: Color(0xFF22C55E),
-                            icon: Icons.people_outline,
-                          ),
-                          _buildCostCard(
-                            title: 'Equipment',
-                            value: equipmentTotal,
-                            color: Color(0xFFF59E0B),
-                            icon: Icons.precision_manufacturing_outlined,
-                          ),
-                        ],
-                      ),
-                      ),
-                      SizedBox(height: 10),
-                      _CategoryTabs(
-                        activeTab: quickCategoryTab,
-                        onTabChanged: (newTab) {
-                          setState(() {
-                            _currentPage = 1;
-                            _selectedItemName = null;
-                            _reportGenerated = true;
-                            _showSuggestions = false;
-                            if (newTab == 'All') {
-                              _selectedTypes.addAll({
-                                EntryType.material,
-                                EntryType.labour,
-                                EntryType.equipment,
-                              });
-                            } else if (newTab == 'Materials') {
-                              _selectedTypes.clear();
-                              _selectedTypes.add(EntryType.material);
-                            } else if (newTab == 'Labour') {
-                              _selectedTypes.clear();
-                              _selectedTypes.add(EntryType.labour);
-                            } else if (newTab == 'Equipment') {
-                              _selectedTypes.clear();
-                              _selectedTypes.add(EntryType.equipment);
-                            }
-                            ReportFilterState.selectedTypes =
-                                Set.from(_selectedTypes);
-                            ReportFilterState.currentPage = 1;
-                            ReportFilterState.selectedItemName = null;
-                            ReportFilterState.reportGenerated = true;
-                            ReportFilterState.hasSavedFilters = true;
-                          });
+        child: RefreshIndicator(
+          color: bt.brand,
+          onRefresh: provider.refresh,
+          child: ListView(
+            controller: _scrollController,
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.only(bottom: 40),
+            children: [
+              BtLargeHeader(
+                title: 'Reports',
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Showcase(
+                      key: ShowcaseKeys.helpButton,
+                      description: 'Tap here anytime to replay this tour and get help.',
+                      tooltipBackgroundColor: Bt.ink,
+                      textColor: Colors.white,
+                      tooltipBorderRadius: BorderRadius.circular(16),
+                      tooltipPadding: const EdgeInsets.all(16),
+                      child: BtIconButton(
+                        icon: Icons.help_outline_rounded,
+                        semantic: 'App guidelines',
+                        color: Bt.ink2,
+                        onTap: () {
+                          ShowCaseWidget.of(context).startShowCase([
+                            ShowcaseKeys.reportAskAI,
+                            ShowcaseKeys.reportFilters,
+                            _chartsKey,
+                            ShowcaseKeys.reportCSV,
+                            ShowcaseKeys.helpButton,
+                          ]);
                         },
                       ),
-                      if (quickCategoryTab != 'All') ...[
-                        SizedBox(height: 14),
-                        _buildCategorySubFilters(
-                          context,
-                          quickCategoryTab,
-                          allEntries,
-                        ),
-                      ] else ...[
-                        SizedBox(height: 14),
-                        _buildAllTabSearchBar(context),
-                      ],
-                      SizedBox(height: 18),
-                      if (quickCategoryTab != 'All' && !_reportGenerated)
-                        Center(
-                          child: Padding(
-                            padding: EdgeInsets.symmetric(
-                              vertical: 40,
-                              horizontal: 16,
-                            ),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Container(
-                                  padding: EdgeInsets.all(12),
-                                  decoration: BoxDecoration(
-                                    color:
-                                        (quickCategoryTab == 'Materials'
-                                                ? AppColors.primary
-                                                : (quickCategoryTab == 'Labour'
-                                                      ? Color(0xFF22C55E)
-                                                      : AppColors
-                                                            .primaryLightBlue))
-                                            .withValues(alpha: 0.1),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Icon(
-                                    Icons.analytics_outlined,
-                                    size: 40,
-                                    color: quickCategoryTab == 'Materials'
-                                        ? AppColors.primary
-                                        : (quickCategoryTab == 'Labour'
-                                              ? Color(0xFF22C55E)
-                                              : Color(0xFFF59E0B)),
-                                  ),
-                                ),
-                                SizedBox(height: 12),
-                                Text(
-                                  'Configure filters above and tap\n"Generate CSV Report" to view logs.',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    color: Colors.grey.shade600,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w500,
-                                    height: 1.4,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        )
-                      else
-                        Container(
-                          width: double.infinity,
-                          decoration: BoxDecoration(
-                            color: AppColors.cardBg,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: AppColors.cardBorder),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Padding(
-                                padding: EdgeInsets.fromLTRB(
-                                  16,
-                                  12,
-                                  16,
-                                  10,
-                                ),
-                                child: Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          quickCategoryTab == 'All'
-                                              ? 'Report Logs'
-                                              : '$quickCategoryTab Report Logs',
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.w800,
-                                            fontSize: 15,
-                                            color: AppColors.textPrimary,
-                                          ),
-                                        ),
-                                        SizedBox(height: 2),
-                                        Text(
-                                          '$totalCount entries found',
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            color: AppColors.textSecondary,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    SizedBox(width: 8),
-                                    Expanded(
-                                      child: FittedBox(
-                                        fit: BoxFit.scaleDown,
-                                        alignment: Alignment.centerRight,
-                                        child: Row(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.end,
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.center,
-                                          children: [
-                                            if (quickCategoryTab == 'All') ...[
-                                              InkWell(
-                                                onTap: () =>
-                                                    _showCustomizeColumnsDialog(
-                                                      context,
-                                                      quickCategoryTab,
-                                                    ),
-                                                borderRadius:
-                                                    BorderRadius.circular(20),
-                                                child: Container(
-                                                  padding:
-                                                      EdgeInsets.symmetric(
-                                                        horizontal: 10,
-                                                        vertical: 6,
-                                                      ),
-                                                  decoration: BoxDecoration(
-                                                    color: AppColors.primary
-                                                        .withValues(
-                                                          alpha: 0.08,
-                                                        ),
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                          20,
-                                                        ),
-                                                    border: Border.all(
-                                                      color: AppColors.primary
-                                                          .withValues(
-                                                            alpha: 0.2,
-                                                          ),
-                                                      width: 1,
-                                                    ),
-                                                  ),
-                                                  child: Row(
-                                                    mainAxisSize:
-                                                        MainAxisSize.min,
-                                                    children: [
-                                                      Icon(
-                                                        Icons.edit_note,
-                                                        size: 14,
-                                                        color:
-                                                            AppColors.primary,
-                                                      ),
-                                                      SizedBox(width: 4),
-                                                      Text(
-                                                        'Edit Columns',
-                                                        style: TextStyle(
-                                                          fontSize: 11,
-                                                          fontWeight:
-                                                              FontWeight.w700,
-                                                          color:
-                                                              AppColors.primary,
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ),
-                                              ),
-                                              SizedBox(width: 4),
-                                            ],
-                                            Theme(
-                                              data: Theme.of(context).copyWith(
-                                                cardColor: Colors.white,
-                                              ),
-                                              child: PopupMenuButton<String>(
-                                                tooltip: 'Export options',
-                                                offset: Offset(0, 32),
-                                                shape: RoundedRectangleBorder(
-                                                  borderRadius:
-                                                      BorderRadius.circular(12),
-                                                ),
-                                                onSelected: (val) {
-                                                  if (val == 'csv') {
-                                                    _handleCsvExport(
-                                                      filtered,
-                                                      getProjectName,
-                                                      quickCategoryTab,
-                                                      activeColumns: activeCols,
-                                                    );
-                                                  } else if (val == 'pdf') {
-                                                    _handlePdfExport(
-                                                      filtered,
-                                                      getProjectName,
-                                                      quickCategoryTab,
-                                                      activeColumns: activeCols,
-                                                    );
-                                                  }
-                                                },
-                                                itemBuilder: (context) => [
-                                                  PopupMenuItem(
-                                                    value: 'csv',
-                                                    child: Row(
-                                                      children: [
-                                                        Icon(
-                                                          Icons
-                                                              .description_outlined,
-                                                          color:
-                                                              AppColors.primary,
-                                                          size: 18,
-                                                        ),
-                                                        SizedBox(width: 8),
-                                                        Text('Download CSV'),
-                                                      ],
-                                                    ),
-                                                  ),
-                                                  PopupMenuItem(
-                                                    value: 'pdf',
-                                                    child: Row(
-                                                      children: [
-                                                        Icon(
-                                                          Icons
-                                                              .picture_as_pdf_outlined,
-                                                          color:
-                                                              AppColors.primary,
-                                                          size: 18,
-                                                        ),
-                                                        SizedBox(width: 8),
-                                                        Text('Download PDF'),
-                                                      ],
-                                                    ),
-                                                  ),
-                                                ],
-                                                child: Container(
-                                                  padding:
-                                                      EdgeInsets.symmetric(
-                                                        horizontal: 10,
-                                                        vertical: 6,
-                                                      ),
-                                                  decoration: BoxDecoration(
-                                                    color: AppColors.primary
-                                                        .withValues(
-                                                          alpha: 0.08,
-                                                        ),
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                          20,
-                                                        ),
-                                                    border: Border.all(
-                                                      color: AppColors.primary
-                                                          .withValues(
-                                                            alpha: 0.2,
-                                                          ),
-                                                      width: 1,
-                                                    ),
-                                                  ),
-                                                  child: Row(
-                                                    mainAxisSize:
-                                                        MainAxisSize.min,
-                                                    children: [
-                                                      Icon(
-                                                        Icons.download,
-                                                        size: 14,
-                                                        color:
-                                                            AppColors.primary,
-                                                      ),
-                                                      SizedBox(width: 4),
-                                                      Text(
-                                                        'Export',
-                                                        style: TextStyle(
-                                                          fontSize: 11,
-                                                          fontWeight:
-                                                              FontWeight.w700,
-                                                          color:
-                                                              AppColors.primary,
-                                                        ),
-                                                      ),
-                                                      SizedBox(width: 2),
-                                                      Icon(
-                                                        Icons.arrow_drop_down,
-                                                        size: 12,
-                                                        color:
-                                                            AppColors.primary,
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                            SizedBox(width: 4),
-                                            IconButton(
-                                              tooltip: 'View Full Screen',
-                                              icon: Icon(
-                                                Icons.fullscreen,
-                                                color: AppColors.primary,
-                                                size: 22,
-                                              ),
-                                              onPressed: () {
-                                                Navigator.of(context).push(
-                                                  MaterialPageRoute(
-                                                    builder: (context) =>
-                                                        _FullScreenLogsViewer(
-                                                          columns: columns,
-                                                          filteredEntries:
-                                                              filtered,
-                                                          getProjectName:
-                                                              getProjectName,
-                                                          quickCategoryTab:
-                                                              quickCategoryTab,
-                                                          title:
-                                                              quickCategoryTab ==
-                                                                  'All'
-                                                              ? 'Report Logs'
-                                                              : '$quickCategoryTab Report Logs',
-                                                          onExportCsv: () =>
-                                                              _handleCsvExport(
-                                                                filtered,
-                                                                getProjectName,
-                                                                quickCategoryTab,
-                                                                activeColumns:
-                                                                    activeCols,
-                                                              ),
-                                                          onExportPdf: () =>
-                                                              _handlePdfExport(
-                                                                filtered,
-                                                                getProjectName,
-                                                                quickCategoryTab,
-                                                                activeColumns:
-                                                                    activeCols,
-                                                              ),
-                                                          activeColumns:
-                                                              uiActiveCols,
-                                                        ),
-                                                  ),
-                                                );
-                                              },
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              Divider(height: 1),
-                              if (paginatedEntries.isNotEmpty)
-                                SingleChildScrollView(
-                                  scrollDirection: Axis.horizontal,
-                                  child: Theme(
-                                    data: Theme.of(
-                                      context,
-                                    ).copyWith(cardColor: AppColors.cardBg),
-                                    child: DataTable(
-                                      showCheckboxColumn: false,
-                                      headingRowColor: WidgetStateProperty.all(
-                                        AppColors.primary.withValues(
-                                          alpha: 0.04,
-                                        ),
-                                      ),
-                                      horizontalMargin: 16,
-                                      columnSpacing: 24,
-                                      sortColumnIndex: (() {
-                                        if (_sortColumn == 'date') {
-                                          final idx = activeCols.indexOf(
-                                            'Date',
-                                          );
-                                          return idx != -1 ? idx : null;
-                                        } else if (_sortColumn == 'project') {
-                                          final idx = activeCols.indexOf(
-                                            'Project',
-                                          );
-                                          return idx != -1 ? idx : null;
-                                        } else if (_sortColumn == 'amount') {
-                                          final idx = activeCols.indexOf(
-                                            'Amount',
-                                          );
-                                          return idx != -1 ? idx : null;
-                                        }
-                                        return null;
-                                      })(),
-                                      sortAscending: _sortAscending,
-                                      columns: columns,
-                                      rows: paginatedEntries.map((entry) {
-                                        final projectName = getProjectName(
-                                          entry.projectId,
-                                        );
-                                        return _buildDataRowForCategory(
-                                          context: context,
-                                          entry: entry,
-                                          projectName: projectName,
-                                          quickCategoryTab: quickCategoryTab,
-                                        );
-                                      }).toList(),
-                                    ),
-                                  ),
-                                )
-                              else
-                                Center(
-                                  child: Padding(
-                                    padding: EdgeInsets.symmetric(
-                                      vertical: 40,
-                                    ),
-                                    child: Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(
-                                          Icons.search_off_outlined,
-                                          size: 44,
-                                          color: Colors.grey.shade400,
-                                        ),
-                                        SizedBox(height: 10),
-                                        Text(
-                                          'No transaction logs match filters.',
-                                          style: TextStyle(
-                                            color: Colors.grey.shade600,
-                                            fontSize: 13,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              if (totalCount > 0) ...[
-                                Divider(height: 1),
-                                Padding(
-                                  padding: EdgeInsets.symmetric(
-                                    horizontal: 14,
-                                    vertical: 8,
-                                  ),
-                                  child: Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          Text(
-                                            'Show: ',
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              color: AppColors.textSecondary,
-                                            ),
-                                          ),
-                                          DropdownButton<int>(
-                                            value: _rowsPerPage,
-                                            underline: SizedBox(),
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              color: AppColors.textPrimary,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                            items: [
-                                              DropdownMenuItem(
-                                                value: 10,
-                                                child: Text('10'),
-                                              ),
-                                              DropdownMenuItem(
-                                                value: 20,
-                                                child: Text('20'),
-                                              ),
-                                              DropdownMenuItem(
-                                                value: 50,
-                                                child: Text('50'),
-                                              ),
-                                            ],
-                                            onChanged: (val) {
-                                              if (val != null) {
-                                                setState(() {
-                                                  _rowsPerPage = val;
-                                                  _currentPage = 1;
-                                                });
-                                              }
-                                            },
-                                          ),
-                                        ],
-                                      ),
-                                      Row(
-                                        children: [
-                                          IconButton(
-                                            icon: Icon(
-                                              Icons.chevron_left,
-                                              size: 20,
-                                            ),
-                                            onPressed: safeCurrentPage > 1
-                                                ? () {
-                                                    setState(() {
-                                                      _currentPage =
-                                                          safeCurrentPage - 1;
-                                                      ReportFilterState.currentPage = _currentPage;
-                                                    });
-                                                  }
-                                                : null,
-                                          ),
-                                          Text(
-                                            'Page $safeCurrentPage of $totalPages',
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              color: AppColors.textSecondary,
-                                            ),
-                                          ),
-                                          IconButton(
-                                            icon: Icon(
-                                              Icons.chevron_right,
-                                              size: 20,
-                                            ),
-                                            onPressed:
-                                                safeCurrentPage < totalPages
-                                                ? () {
-                                                    setState(() {
-                                                      _currentPage =
-                                                          safeCurrentPage + 1;
-                                                      ReportFilterState.currentPage = _currentPage;
-                                                    });
-                                                  }
-                                                : null,
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                      SizedBox(height: 20),
-                      Showcase(
-                        key: ShowcaseKeys.reportCSV,
-                        description: 'Use this to export data to CSV or import bulk entries from a CSV file.',
-                        tooltipBackgroundColor: Color(0xFF1E1E2C),
-                        textColor: Colors.white,
-                        tooltipBorderRadius: BorderRadius.circular(16),
-                        tooltipPadding: EdgeInsets.all(16),
-                        child: _buildCsvImportCard(quickCategoryTab, activeCols),
+                    ),
+                    BtIconButton(
+                      icon: Icons.ios_share_rounded,
+                      semantic: 'Export report',
+                      color: Bt.ink2,
+                      onTap: openExport,
+                    ),
+                    Semantics(
+                      button: true,
+                      label: 'Account',
+                      child: InkWell(
+                        customBorder: const CircleBorder(),
+                        onTap: () => Navigator.pushNamed(context, '/profile'),
+                        child: const Padding(padding: EdgeInsets.all(4), child: ProfileAvatar(radius: 18)),
                       ),
-                      SizedBox(height: 8),
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: Bt.gutter),
+                child: Showcase(
+                  key: ShowcaseKeys.reportAskAI,
+                  description: 'Ask AI about costs, missing entries, or anything related to this report.',
+                  tooltipBackgroundColor: Bt.ink,
+                  textColor: Colors.white,
+                  tooltipBorderRadius: BorderRadius.circular(16),
+                  tooltipPadding: const EdgeInsets.all(16),
+                  child: _AskAiBanner(projectName: provider.selectedProjectName),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Showcase(
+                key: ShowcaseKeys.reportFilters,
+                description: 'Filter your reports by project, date, status and more.',
+                tooltipBackgroundColor: Bt.ink,
+                textColor: Colors.white,
+                tooltipBorderRadius: BorderRadius.circular(16),
+                tooltipPadding: const EdgeInsets.all(16),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: Bt.gutter),
+                  child: Row(
+                    children: [
+                      BtChip(
+                        label: projectChip,
+                        trailingIcon: Icons.expand_more_rounded,
+                        selected: _selectedProjectId != 'all',
+                        onTap: () => _pickProject(context, projectProvider),
+                      ),
+                      const SizedBox(width: 8),
+                      BtChip(
+                        label: periodChip,
+                        trailingIcon: Icons.expand_more_rounded,
+                        selected: _datePreset != 'All Time',
+                        onTap: () => _pickPeriod(context),
+                      ),
+                      const SizedBox(width: 8),
+                      BtChip(
+                        label: extraFilters == 0 ? 'Filter' : 'Filter · $extraFilters',
+                        icon: Icons.tune_rounded,
+                        selected: extraFilters > 0,
+                        onTap: () => _openFilterSheet(context, projectProvider),
+                      ),
                     ],
                   ),
                 ),
               ),
-            ),
-          ],
+              const SizedBox(height: 16),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: Bt.gutter),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Showcase(
+                      key: _chartsKey,
+                      description: 'View a quick financial summary based on your filters.',
+                      tooltipBackgroundColor: Bt.ink,
+                      textColor: Colors.white,
+                      tooltipBorderRadius: BorderRadius.circular(16),
+                      tooltipPadding: const EdgeInsets.all(16),
+                      child: _buildCostSummary(
+                        context,
+                        total: grandTotal,
+                        paid: grandPaid,
+                        remaining: grandRemaining,
+                        material: materialTotal,
+                        labour: labourTotal,
+                        equipment: equipmentTotal,
+                        onType: _selectCategoryTab,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    EfficiencyBanner(
+                      note: 'Tap to view category breakdowns, monthly spending trends, and budget health charts.',
+                      isExceeded: grandRemaining > 0,
+                    ),
+                    const SizedBox(height: 28),
+                    Row(
+                      children: [
+                        Expanded(child: Text(entriesTitle, style: BtText.title(context))),
+                        Text('$totalCount', style: BtText.num(BtText.subhead(context))),
+                        const SizedBox(width: 4),
+                        BtIconButton(
+                          icon: Icons.more_horiz_rounded,
+                          semantic: 'Sort, columns, table and export',
+                          color: Bt.ink2,
+                          filled: true,
+                          onTap: openEntriesMenu,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    _CategoryTabs(
+                      activeTab: quickCategoryTab,
+                      onTabChanged: _selectCategoryTab,
+                    ),
+                    const SizedBox(height: 12),
+                    if (quickCategoryTab != 'All')
+                      _buildCategorySubFilters(context, quickCategoryTab, allEntries)
+                    else
+                      _buildAllTabSearchBar(context),
+                    const SizedBox(height: 16),
+                    if (quickCategoryTab != 'All' && !_reportGenerated)
+                      BtCard(
+                        child: BtEmpty(
+                          icon: Icons.analytics_outlined,
+                          title: 'Set your filters',
+                          message: 'Configure filters above and tap "Generate report" to view logs.',
+                        ),
+                      )
+                    else if (paginatedEntries.isEmpty)
+                      const BtCard(
+                        child: BtEmpty(
+                          icon: Icons.search_off_outlined,
+                          title: 'No transaction logs match filters.',
+                        ),
+                      )
+                    else ...[
+                      ..._buildEntryGroups(context, paginatedEntries, getProjectName),
+                      if (totalCount > _rowsPerPage || _rowsPerPage != 10)
+                        _buildPager(context, safeCurrentPage, totalPages)
+                      else
+                        const SizedBox(height: 4),
+                    ],
+                    const SizedBox(height: 28),
+                    Showcase(
+                      key: ShowcaseKeys.reportCSV,
+                      description: 'Use this to export data to CSV or import bulk entries from a CSV file.',
+                      tooltipBackgroundColor: Bt.ink,
+                      textColor: Colors.white,
+                      tooltipBorderRadius: BorderRadius.circular(16),
+                      tooltipPadding: const EdgeInsets.all(16),
+                      child: _buildCsvImportCard(quickCategoryTab, activeCols),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
       bottomNavigationBar: AppBottomNav(),
     );
   }
 
-  Widget _buildCostCard({
-    required String title,
-    required double value,
-    bool isFeatured = false,
-    Color? color,
-    required IconData icon,
-  }) {
-    final currencyStr = _formatIndianCurrency(value);
-    return Container(
-      padding: EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: isFeatured ? null : AppColors.cardBg,
-        gradient: isFeatured
-            ? LinearGradient(
-                colors: [Color(0xFF173EEA), Color(0xFF67C8FF)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              )
-            : null,
-        borderRadius: BorderRadius.circular(14),
-        border: isFeatured ? null : Border.all(color: AppColors.cardBorder),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isFeatured ? 0.12 : 0.02),
-            blurRadius: 10,
-            offset: Offset(0, 4),
-          ),
+  static String _sentence(String s) => s.isEmpty ? s : s[0].toUpperCase() + s.substring(1).toLowerCase();
+
+  void _selectCategoryTab(String newTab) {
+    setState(() {
+      _currentPage = 1;
+      _selectedItemName = null;
+      _reportGenerated = true;
+      _showSuggestions = false;
+      if (newTab == 'All') {
+        _selectedTypes.addAll({
+          EntryType.material,
+          EntryType.labour,
+          EntryType.equipment,
+        });
+      } else if (newTab == 'Materials') {
+        _selectedTypes.clear();
+        _selectedTypes.add(EntryType.material);
+      } else if (newTab == 'Labour') {
+        _selectedTypes.clear();
+        _selectedTypes.add(EntryType.labour);
+      } else if (newTab == 'Equipment') {
+        _selectedTypes.clear();
+        _selectedTypes.add(EntryType.equipment);
+      }
+    });
+  }
+
+  void _applyProject(String val) {
+    setState(() {
+      _selectedProjectId = val;
+      _selectedFloor = null;
+      _selectedPhaseId = null;
+      _selectedActivityName = null;
+      _currentPage = 1;
+    });
+    context.read<ProjectProvider>().loadEntriesForProject(val == 'all' ? null : val);
+    context.read<ReportProvider>().selectProject(val);
+  }
+
+  /// Single-choice list in a sheet. Returns the chosen value, or null if dismissed.
+  Future<String?> _pickOption(BuildContext context, String title, List<MapEntry<String, String>> options, String? current) {
+    return showBtSheet<String>(
+      context,
+      title: title,
+      builder: (sheetCtx) => BtGroup(
+        children: [
+          for (final o in options)
+            BtRow(
+              title: o.value,
+              minHeight: 48,
+              trailing: o.key == current ? Icon(Icons.check_rounded, color: sheetCtx.bt.brand, size: 20) : null,
+              onTap: () => Navigator.pop(sheetCtx, o.key),
+            ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
+    );
+  }
+
+  Future<void> _pickProject(BuildContext context, ProjectProvider projectProvider) async {
+    final val = await _pickOption(
+      context,
+      'Project',
+      [
+        const MapEntry('all', 'All projects'),
+        ...projectProvider.projects.map((p) => MapEntry(p.id, p.name)),
+      ],
+      _selectedProjectId,
+    );
+    if (val != null) _applyProject(val);
+  }
+
+  static const _periods = ['Today', 'This Week', 'This Month', 'Last 30 Days', 'This Year', 'All Time', 'Custom'];
+
+  Widget _periodPicker(BuildContext context, VoidCallback refresh) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final p in _periods)
+              BtChip(
+                label: p == 'Custom' ? 'Custom range' : _sentence(p),
+                selected: _datePreset == p,
+                onTap: () {
+                  _setDatePreset(p);
+                  refresh();
+                },
+              ),
+          ],
+        ),
+        if (_datePreset == 'Custom') ...[
+          const SizedBox(height: 12),
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Expanded(
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    title,
-                    style: TextStyle(
-                      color: isFeatured
-                          ? Colors.white.withValues(alpha: 0.85)
-                          : AppColors.textSecondary,
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    maxLines: 1,
+                child: BtField(
+                  label: 'Start date',
+                  child: BtPickerField(
+                    text: _startDate == null ? 'Select date' : _formatDateShort(_startDate!),
+                    placeholder: _startDate == null,
+                    icon: Icons.calendar_today_outlined,
+                    onTap: () async {
+                      await _selectStartDate(context);
+                      refresh();
+                    },
                   ),
                 ),
               ),
-              SizedBox(width: 4),
-              Icon(
-                icon,
-                color: isFeatured ? Colors.white : (color ?? AppColors.primary),
-                size: 18,
+              const SizedBox(width: 12),
+              Expanded(
+                child: BtField(
+                  label: 'End date',
+                  child: BtPickerField(
+                    text: _endDate == null ? 'Select date' : _formatDateShort(_endDate!),
+                    placeholder: _endDate == null,
+                    icon: Icons.calendar_today_outlined,
+                    onTap: () async {
+                      await _selectEndDate(context);
+                      refresh();
+                    },
+                  ),
+                ),
               ),
             ],
           ),
-          Column(
+        ],
+      ],
+    );
+  }
+
+  void _pickPeriod(BuildContext context) {
+    showBtSheet(
+      context,
+      title: 'Period',
+      builder: (sheetCtx) => StatefulBuilder(
+        builder: (sheetCtx, setSheet) => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _periodPicker(sheetCtx, () => setSheet(() {})),
+            const SizedBox(height: 20),
+            BtButton(label: 'Done', onPressed: () => Navigator.pop(sheetCtx)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _openFilterSheet(BuildContext context, ProjectProvider projectProvider) {
+    showBtSheet(
+      context,
+      title: 'Filter',
+      builder: (sheetCtx) => StatefulBuilder(
+        builder: (sheetCtx, setSheet) {
+          void refresh() => setSheet(() {});
+          final proj = projectProvider.projects.where((p) => p.id == _selectedProjectId).firstOrNull;
+          final floors = proj?.floors ?? [];
+          final phases = proj?.selectedPhases ?? [];
+          final selectedPhase = phases.where((p) => p.id == _selectedPhaseId).firstOrNull;
+          final List<ProjectActivity> activities = [];
+          if (_selectedPhaseId != null) {
+            activities.addAll(selectedPhase?.activities ?? []);
+          } else if (proj != null) {
+            activities.addAll(phases.expand((p) => p.activities));
+          }
+          final activityNames = activities.map((a) => a.name).toSet().toList();
+          final count = _filterEntries(projectProvider, _quickTab()).length;
+          final hasProject = _selectedProjectId != 'all';
+
+          Widget whereRow(String label, String value, bool enabled, Future<void> Function() onTap) => BtRow(
+                title: label,
+                minHeight: 52,
+                titleColor: enabled ? Bt.ink2 : Bt.placeholder,
+                trailing: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 190),
+                  child: Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.right,
+                      style: BtText.body(sheetCtx, color: enabled ? Bt.ink : Bt.placeholder)),
+                ),
+                showChevron: enabled,
+                onTap: enabled ? () async {
+                  await onTap();
+                  refresh();
+                } : null,
+              );
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Expanded(child: Text('Period', style: BtText.caption(sheetCtx))),
+                  TextButton(
+                    onPressed: () {
+                      _applyProject('all');
+                      _setDatePreset('All Time');
+                      setState(() => _selectedStatus = 'All');
+                      refresh();
+                    },
+                    style: TextButton.styleFrom(foregroundColor: sheetCtx.bt.brand, minimumSize: const Size(44, 36)),
+                    child: const Text('Reset all'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              _periodPicker(sheetCtx, refresh),
+              const SizedBox(height: 20),
+              const BtSectionHeader(title: 'Payment', caption: true),
+              BtSegmented<String>(
+                segments: const {'All': 'All', 'Fully Paid': 'Paid', 'Partial': 'Part paid', 'Not Paid': 'Not paid'},
+                value: _selectedStatus,
+                onChanged: (v) {
+                  setState(() {
+                    _selectedStatus = v;
+                    _currentPage = 1;
+                  });
+                  refresh();
+                },
+              ),
+              const SizedBox(height: 20),
+              const BtSectionHeader(title: 'Where', caption: true),
+              BtGroup(
+                children: [
+                  whereRow('Project', hasProject ? (proj?.name ?? 'Project') : 'All projects', true, () async {
+                    await _pickProject(sheetCtx, projectProvider);
+                  }),
+                  whereRow('Floor', _selectedFloor ?? 'All', hasProject && floors.isNotEmpty, () async {
+                    final v = await _pickOption(sheetCtx, 'Floor', [const MapEntry('Select Floor', 'All floors'), ...floors.map((f) => MapEntry(f, f))], _selectedFloor ?? 'Select Floor');
+                    if (v != null) setState(() { _selectedFloor = v == 'Select Floor' ? null : v; _currentPage = 1; });
+                  }),
+                  whereRow('Phase', selectedPhase?.phaseName ?? 'All', hasProject && phases.isNotEmpty, () async {
+                    final v = await _pickOption(sheetCtx, 'Phase', [const MapEntry('Select Phase', 'All phases'), ...phases.map((ph) => MapEntry(ph.id, ph.phaseName))], _selectedPhaseId ?? 'Select Phase');
+                    if (v != null) setState(() { _selectedPhaseId = v == 'Select Phase' ? null : v; _selectedActivityName = null; _currentPage = 1; });
+                  }),
+                  whereRow('Activity', _selectedActivityName ?? 'All', hasProject && activityNames.isNotEmpty, () async {
+                    final v = await _pickOption(sheetCtx, 'Activity', [const MapEntry('Select Activity', 'All activities'), ...activityNames.map((n) => MapEntry(n, n))], _selectedActivityName ?? 'Select Activity');
+                    if (v != null) setState(() { _selectedActivityName = v == 'Select Activity' ? null : v; _currentPage = 1; });
+                  }),
+                ],
+              ),
+              if (!hasProject)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
+                  child: Text('Pick a project to filter by floor, phase or activity.', style: BtText.caption(sheetCtx)),
+                ),
+              const SizedBox(height: 24),
+              BtButton(
+                label: 'Show $count ${count == 1 ? 'entry' : 'entries'}',
+                onPressed: () => Navigator.pop(sheetCtx),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  List<Widget> _buildEntryGroups(BuildContext context, List<EntryModel> entries, String Function(String) getProjectName) {
+    final groups = <String, List<EntryModel>>{};
+    for (final e in entries) {
+      final key = _sortColumn == 'date' ? formatDayGroup(e.date) : '';
+      groups.putIfAbsent(key, () => []).add(e);
+    }
+    final out = <Widget>[];
+    groups.forEach((label, items) {
+      if (label.isNotEmpty) {
+        out.add(Padding(
+          padding: const EdgeInsets.fromLTRB(4, 4, 0, 8),
+          child: Text(label, style: BtText.caption(context, weight: FontWeight.w500)),
+        ));
+      }
+      out.add(BtGroup(
+        children: [for (final e in items) _buildEntryRow(context, e, getProjectName(e.projectId))],
+      ));
+      out.add(const SizedBox(height: 16));
+    });
+    return out;
+  }
+
+  Widget _buildEntryRow(BuildContext context, EntryModel e, String projectName) {
+    final status = _getPaymentStatusLabel(e.paymentStatus, amount: e.amount, paidAmount: e.paidAmount);
+    final String statusText;
+    final Color statusColor;
+    if (status == 'Fully Paid') {
+      statusText = 'Paid';
+      statusColor = Bt.green;
+    } else if (status == 'Partial') {
+      statusText = '${formatInr(e.remainingAmount)} due';
+      statusColor = Bt.amber;
+    } else {
+      statusText = 'Not paid';
+      statusColor = Bt.red;
+    }
+    final where = [e.phase, e.activity, e.floor].where((v) => v != null && v.trim().isNotEmpty).take(1).join();
+    // With one project selected the name is redundant, so show where the work happened instead.
+    final sub = _selectedProjectId == 'all'
+        ? [projectName, if (where.isNotEmpty) where].join(' · ')
+        : (where.isNotEmpty ? where : projectName);
+    return BtRow(
+      leading: BtTypeTile(type: e.type.name),
+      title: e.description.isEmpty ? _sentence(e.type.name) : e.description,
+      subtitle: sub,
+      minHeight: 64,
+      onTap: () => _showEntryDetailsDialog(context, e, projectName),
+      trailing: Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(formatInr(e.amount), style: BtText.num(BtText.body(context, weight: FontWeight.w600))),
+          const SizedBox(height: 2),
+          Text(statusText, style: BtText.caption(context, color: statusColor, weight: FontWeight.w500)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPager(BuildContext context, int page, int totalPages) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: Row(
+        children: [
+          InkWell(
+            borderRadius: BorderRadius.circular(Bt.rChip),
+            onTap: () async {
+              final v = await _pickOption(context, 'Rows per page', const [MapEntry('10', '10'), MapEntry('20', '20'), MapEntry('50', '50')], '$_rowsPerPage');
+              if (v != null) setState(() { _rowsPerPage = int.parse(v); _currentPage = 1; });
+            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                Text('Show $_rowsPerPage', style: BtText.subhead(context)),
+                const Icon(Icons.expand_more_rounded, size: 18, color: Bt.ink3),
+              ]),
+            ),
+          ),
+          const Spacer(),
+          BtIconButton(
+            icon: Icons.chevron_left_rounded,
+            semantic: 'Previous page',
+            color: page > 1 ? Bt.ink : Bt.placeholder,
+            onTap: page > 1 ? () => setState(() => _currentPage = page - 1) : () {},
+          ),
+          Text('$page of $totalPages', style: BtText.num(BtText.subhead(context, color: Bt.ink))),
+          BtIconButton(
+            icon: Icons.chevron_right_rounded,
+            semantic: 'Next page',
+            color: page < totalPages ? Bt.ink : Bt.placeholder,
+            onTap: page < totalPages ? () => setState(() => _currentPage = page + 1) : () {},
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCostSummary(
+    BuildContext context, {
+    required double total,
+    required double paid,
+    required double remaining,
+    required double material,
+    required double labour,
+    required double equipment,
+    required ValueChanged<String> onType,
+  }) {
+    final bt = context.bt;
+    Widget split(String label, double v, Color c) => Expanded(
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Text(label, style: BtText.caption(context)),
+              const SizedBox(height: 2),
               FittedBox(
                 fit: BoxFit.scaleDown,
                 alignment: Alignment.centerLeft,
-                child: Text(
-                  currencyStr,
-                  style: TextStyle(
-                    color: isFeatured ? Colors.white : AppColors.textPrimary,
-                    fontSize: 16.5,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.2,
-                  ),
-                  maxLines: 1,
-                  softWrap: false,
-                ),
+                child: Text(formatInr(v), maxLines: 1, style: BtText.num(BtText.headline(context).copyWith(color: c))),
               ),
             ],
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFiltersCard(
-    BuildContext context,
-    ProjectProvider projectProvider,
-  ) {
-    final proj = projectProvider.projects
-        .where((p) => p.id == _selectedProjectId)
-        .firstOrNull;
-    final projectNameSelected = _selectedProjectId == 'all'
-        ? 'All projects'
-        : (proj?.name ?? 'Unknown Project');
-    final floors = proj?.floors ?? [];
-    final selectedPhase = proj?.selectedPhases
-        ?.where((p) => p.id == _selectedPhaseId)
-        .firstOrNull;
-    final selectedPhaseName = selectedPhase?.phaseName ?? 'Select Phase';
-    final List<ProjectActivity> activities = [];
-    if (_selectedPhaseId != null) {
-      activities.addAll(selectedPhase?.activities ?? []);
-    } else if (proj != null) {
-      activities.addAll(
-        proj.selectedPhases?.expand((p) => p.activities).toList() ?? [],
+        );
+    Widget type(String label, String tab, String typeName, double v, Color c) {
+      final share = total > 0 ? (v / total).clamp(0.0, 1.0) : 0.0;
+      return BtRow(
+        leading: BtTypeTile(type: typeName),
+        title: label,
+        minHeight: 64,
+        onTap: () => onType(tab),
+        trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+          SizedBox(
+            width: 96,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(formatInr(v, compact: true), style: BtText.num(BtText.body(context, weight: FontWeight.w600))),
+                const SizedBox(height: 6),
+                BtProgress(value: share, color: c, thin: true),
+              ],
+            ),
+          ),
+          const SizedBox(width: 4),
+          const Icon(Icons.chevron_right_rounded, color: Bt.placeholder, size: 22),
+        ]),
       );
     }
-    final uniqueActivityNames = activities.map((a) => a.name).toSet().toList();
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.cardBg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.cardBorder),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 10,
-            offset: Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: EdgeInsets.all(16),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Color(0xFF173EEA).withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(
-                    Icons.business,
-                    color: Color(0xFF173EEA),
-                    size: 24,
-                  ),
-                ),
-                SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Project Context',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.textPrimary,
-                          letterSpacing: -0.3,
-                        ),
-                      ),
-                      SizedBox(height: 2),
-                      Text(
-                        'Select project details',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Divider(height: 1),
-          Padding(
-            padding: EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildProjectContextDropdown(
-                        label: 'Project',
-                        selectedLabel: projectNameSelected,
-                        items: [
-                          PopupMenuItem(
-                            value: 'all',
-                            child: Text('All projects'),
-                          ),
-                          ...projectProvider.projects.map(
-                            (p) =>
-                                PopupMenuItem(value: p.id, child: Text(p.name)),
-                          ),
-                        ],
-                        onSelected: (val) {
-                          if (val != null) {
-                            setState(() {
-                              _selectedProjectId = val;
-                              _selectedFloor = null;
-                              _selectedPhaseId = null;
-                              _selectedActivityName = null;
-                              _currentPage = 1;
-                              ReportFilterState.selectedProjectId = val;
-                              ReportFilterState.selectedFloor = null;
-                              ReportFilterState.selectedPhaseId = null;
-                              ReportFilterState.selectedActivityName = null;
-                              ReportFilterState.currentPage = 1;
-                              ReportFilterState.lastKnownProjectProviderId =
-                                  val == 'all' ? null : val;
-                              ReportFilterState.hasSavedFilters = true;
-                            });
-                            if (val != 'all') {
-                              try {
-                                final matchedProj = projectProvider.projects
-                                    .firstWhere((p) => p.id == val);
-                                projectProvider.setSelectedProject(matchedProj);
-                              } catch (_) {}
-                            }
-                            context
-                                .read<ProjectProvider>()
-                                .loadEntriesForProject(
-                                  val == 'all' ? null : val,
-                                );
-                            context.read<ReportProvider>().selectProject(val);
-                          }
-                        },
-                      ),
-                    ),
-                    SizedBox(width: 12),
-                    Expanded(
-                      child: _buildProjectContextDropdown(
-                        label: 'Floor',
-                        selectedLabel: floors.isEmpty
-                            ? ''
-                            : (_selectedFloor ?? 'Select Floor'),
-                        enabled:
-                            _selectedProjectId != 'all' && floors.isNotEmpty,
-                        items: floors.isEmpty
-                            ? []
-                            : [
-                                PopupMenuItem(
-                                  value: 'Select Floor',
-                                  child: Text('Select Floor (All)'),
-                                ),
-                                ...floors.map(
-                                  (f) => PopupMenuItem(value: f, child: Text(f)),
-                                ),
-                              ],
-                        onSelected: (val) {
-                          if (floors.isEmpty) return;
-                          final floorVal = (val == 'Select Floor') ? null : val;
-                          setState(() {
-                            _selectedFloor = floorVal;
-                            _currentPage = 1;
-                            ReportFilterState.selectedFloor = floorVal;
-                            ReportFilterState.currentPage = 1;
-                            ReportFilterState.hasSavedFilters = true;
-                          });
-                          if (floorVal != null) {
-                            projectProvider.setSelectedFloor(floorVal);
-                          }
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-                SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildProjectContextDropdown(
-                        label: 'Phase',
-                        selectedLabel: selectedPhaseName,
-                        enabled:
-                            _selectedProjectId != 'all' &&
-                            (proj?.selectedPhases?.isNotEmpty ?? false),
-                        items: [
-                          PopupMenuItem(
-                            value: 'Select Phase',
-                            child: Text('Select Phase (All)'),
-                          ),
-                          ...(proj?.selectedPhases?.map(
-                                (ph) => PopupMenuItem(
-                                  value: ph.id,
-                                  child: Text(ph.phaseName),
-                                ),
-                              ) ??
-                              []),
-                        ],
-                        onSelected: (val) {
-                          final phaseVal = (val == 'Select Phase') ? null : val;
-                          setState(() {
-                            _selectedPhaseId = phaseVal;
-                            _selectedActivityName = null;
-                            _currentPage = 1;
-                            ReportFilterState.selectedPhaseId = phaseVal;
-                            ReportFilterState.selectedActivityName = null;
-                            ReportFilterState.currentPage = 1;
-                            ReportFilterState.hasSavedFilters = true;
-                          });
-                          if (phaseVal != null) {
-                            try {
-                              final matchedPhase = proj?.selectedPhases
-                                  ?.firstWhere((ph) => ph.id == phaseVal);
-                              if (matchedPhase != null) {
-                                projectProvider.setSelectedPhase(matchedPhase);
-                              }
-                            } catch (_) {}
-                          }
-                        },
-                      ),
-                    ),
-                    SizedBox(width: 12),
-                    Expanded(
-                      child: _buildProjectContextDropdown(
-                        label: 'Activity',
-                        selectedLabel:
-                            _selectedActivityName ?? 'Select Activity',
-                        enabled:
-                            _selectedProjectId != 'all' &&
-                            uniqueActivityNames.isNotEmpty,
-                        items: [
-                          PopupMenuItem(
-                            value: 'Select Activity',
-                            child: Text('Select Activity (All)'),
-                          ),
-                          ...uniqueActivityNames.map(
-                            (name) =>
-                                PopupMenuItem(value: name, child: Text(name)),
-                          ),
-                        ],
-                        onSelected: (val) {
-                          final actVal =
-                              (val == 'Select Activity') ? null : val;
-                          setState(() {
-                            _selectedActivityName = actVal;
-                            _currentPage = 1;
-                            ReportFilterState.selectedActivityName = actVal;
-                            ReportFilterState.currentPage = 1;
-                            ReportFilterState.hasSavedFilters = true;
-                          });
-                          if (actVal != null) {
-                            projectProvider.setSelectedActivity(actVal);
-                          }
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-                SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildProjectContextDropdown(
-                        label: 'Date Period',
-                        selectedLabel: _datePreset,
-                        items: [
-                          PopupMenuItem(
-                            value: 'All Time',
-                            child: Text('All Time'),
-                          ),
-                          PopupMenuItem(value: 'Today', child: Text('Today')),
-                          PopupMenuItem(
-                            value: 'This Week',
-                            child: Text('This Week'),
-                          ),
-                          PopupMenuItem(
-                            value: 'This Month',
-                            child: Text('This Month'),
-                          ),
-                          PopupMenuItem(
-                            value: 'Last 30 Days',
-                            child: Text('Last 30 Days'),
-                          ),
-                          PopupMenuItem(
-                            value: 'This Year',
-                            child: Text('This Year'),
-                          ),
-                          PopupMenuItem(
-                            value: 'Custom',
-                            child: Text('Custom Range'),
-                          ),
-                        ],
-                        onSelected: (val) {
-                          if (val != null) {
-                            _setDatePreset(val);
-                          }
-                        },
-                      ),
-                    ),
-                    SizedBox(width: 12),
-                    Expanded(
-                      child: _buildProjectContextDropdown(
-                        label: 'Payment Status',
-                        selectedLabel: _selectedStatus,
-                        items: [
-                          PopupMenuItem(
-                            value: 'All',
-                            child: Text('All Statuses'),
-                          ),
-                          PopupMenuItem(
-                            value: 'Fully Paid',
-                            child: Text('Fully Paid'),
-                          ),
-                          PopupMenuItem(
-                            value: 'Partial',
-                            child: Text('Partial'),
-                          ),
-                          PopupMenuItem(
-                            value: 'Not Paid',
-                            child: Text('Not Paid'),
-                          ),
-                        ],
-                        onSelected: (val) {
-                          if (val != null) {
-                            setState(() {
-                              _selectedStatus = val;
-                              _currentPage = 1;
-                              ReportFilterState.selectedStatus = val;
-                              ReportFilterState.currentPage = 1;
-                              ReportFilterState.hasSavedFilters = true;
-                            });
-                          }
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-                if (_datePreset == 'Custom') ...[
-                  SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildDatePickerBox(
-                          label: 'Start Date',
-                          selectedLabel: _startDate == null
-                              ? 'Select Date'
-                              : _formatDateShort(_startDate!),
-                          onTap: () => _selectStartDate(context),
-                        ),
-                      ),
-                      SizedBox(width: 12),
-                      Expanded(
-                        child: _buildDatePickerBox(
-                          label: 'End Date',
-                          selectedLabel: _endDate == null
-                              ? 'Select Date'
-                              : _formatDateShort(_endDate!),
-                          onTap: () => _selectEndDate(context),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
-  Widget _buildProjectContextDropdown({
-    required String label,
-    required String selectedLabel,
-    required List<PopupMenuEntry<String>> items,
-    required ValueChanged<String?> onSelected,
-    bool enabled = true,
-  }) {
-    return Theme(
-      data: Theme.of(context).copyWith(cardColor: Colors.white),
-      child: PopupMenuButton<String>(
-        enabled: enabled,
-        onSelected: onSelected,
-        itemBuilder: (context) => items,
-        offset: Offset(0, 50),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        child: Container(
-          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            color: enabled ? Colors.white : Colors.grey.shade50,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: enabled ? Color(0xFFE2E4FA) : Colors.grey.shade200,
-              width: 1.2,
-            ),
-          ),
-          child: Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        BtCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      label,
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w500,
-                        color: enabled
-                            ? AppColors.textSecondary
-                            : Colors.grey.shade400,
-                      ),
-                    ),
-                    SizedBox(height: 2),
-                    Text(
-                      selectedLabel,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: enabled
-                            ? AppColors.textPrimary
-                            : Colors.grey.shade400,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
+              Text('Total billed', style: BtText.subhead(context)),
+              const SizedBox(height: 2),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(formatInr(total), maxLines: 1, style: BtText.amount(context)),
               ),
-              Icon(
-                Icons.keyboard_arrow_down,
-                color: enabled ? Color(0xFF6B7280) : Colors.grey.shade300,
-                size: 20,
+              const SizedBox(height: 14),
+              IntrinsicHeight(
+                child: Row(children: [
+                  split('Paid', paid, Bt.green),
+                  const VerticalDivider(width: 24, thickness: 1, color: Bt.line),
+                  split('Still owed', remaining, remaining > 0 ? Bt.amber : Bt.green),
+                ]),
               ),
             ],
           ),
         ),
-      ),
+        const SizedBox(height: 24),
+        const BtSectionHeader(title: 'By type'),
+        BtGroup(children: [
+          type('Material', 'Materials', 'material', material, bt.series[0]),
+          type('Labour', 'Labour', 'labour', labour, bt.series[1]),
+          type('Equipment', 'Equipment', 'equipment', equipment, bt.series[2]),
+        ]),
+      ],
     );
   }
 
-  Widget _buildEditColumnsButton(String tabName) {
-    return InkWell(
-      onTap: () => _showCustomizeColumnsDialog(context, tabName),
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        height: 46,
-        padding: EdgeInsets.symmetric(horizontal: 12),
-        decoration: BoxDecoration(
-          color: AppColors.primary.withValues(alpha: 0.06),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: AppColors.primary.withValues(alpha: 0.15),
-            width: 1.2,
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.edit_note, size: 16, color: AppColors.primary),
-            SizedBox(width: 4),
-            Text(
-              'Edit Columns',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                color: AppColors.primary,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDatePickerBox({
-    required String label,
-    required String selectedLabel,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Color(0xFFE2E4FA), width: 1.2),
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    label,
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w500,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  SizedBox(height: 2),
-                  Text(
-                    selectedLabel,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-            Icon(
-              Icons.date_range_outlined,
-              color: Color(0xFF6B7280),
-              size: 20,
-            ),
-          ],
-        ),
+  Widget _searchField(BuildContext context, String hint, ValueChanged<String> onChanged) {
+    return TextField(
+      controller: _searchController,
+      onChanged: onChanged,
+      style: BtText.body(context),
+      textInputAction: TextInputAction.search,
+      decoration: InputDecoration(
+        hintText: hint,
+        hintStyle: BtText.body(context, color: Bt.placeholder),
+        prefixIcon: const Icon(Icons.search_rounded, color: Bt.ink3, size: 22),
+        suffixIcon: _searchQuery.isNotEmpty
+            ? IconButton(
+                tooltip: 'Clear search',
+                icon: const Icon(Icons.cancel_rounded, color: Bt.placeholder, size: 20),
+                onPressed: () {
+                  setState(() {
+                    _searchController.clear();
+                    _searchQuery = '';
+                    _selectedItemName = null;
+                    _showSuggestions = false;
+                  });
+                },
+              )
+            : null,
+        filled: true,
+        fillColor: Bt.fill,
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(Bt.rInput), borderSide: BorderSide.none),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(Bt.rInput), borderSide: BorderSide.none),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(Bt.rInput), borderSide: BorderSide(color: context.bt.brand, width: 1.5)),
       ),
     );
   }
 
   Widget _buildAllTabSearchBar(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.cardBg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.cardBorder),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 10,
-            offset: Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          TextField(
-            controller: _searchController,
-            onChanged: (val) {
-              setState(() {
-                _searchQuery = val.trim();
-                _reportGenerated = true;
-                ReportFilterState.searchQuery = _searchQuery;
-                ReportFilterState.reportGenerated = true;
-                ReportFilterState.hasSavedFilters = true;
-              });
-            },
-            style: TextStyle(fontSize: 13, color: AppColors.textPrimary),
-            decoration: InputDecoration(
-              hintText:
-                  'Search by description, brand, contractor, supplier, price...',
-              hintStyle: TextStyle(
-                fontSize: 13,
-                color: AppColors.textSecondary,
-              ),
-              prefixIcon: Icon(
-                Icons.search,
-                color: AppColors.textSecondary,
-                size: 20,
-              ),
-              suffixIcon: _searchQuery.isNotEmpty
-                  ? IconButton(
-                      icon: Icon(
-                        Icons.clear,
-                        color: AppColors.textSecondary,
-                        size: 18,
-                      ),
-                      onPressed: () {
-                        setState(() {
-                          _searchController.clear();
-                          _searchQuery = '';
-                          ReportFilterState.searchQuery = '';
-                          ReportFilterState.hasSavedFilters = true;
-                        });
-                      },
-                    )
-                  : null,
-              contentPadding: EdgeInsets.symmetric(
-                horizontal: 14,
-                vertical: 10,
-              ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: Color(0xFFE2E4FA)),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: Color(0xFFE2E4FA)),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: AppColors.primary),
-              ),
-            ),
-          ),
-        ],
-      ),
+    return _searchField(
+      context,
+      'Search entries',
+      (val) => setState(() {
+        _searchQuery = val.trim();
+        _currentPage = 1;
+      }),
     );
   }
 
@@ -2994,41 +2324,30 @@ class _ReportsViewState extends State<_ReportsView> {
     final String dropdownLabel;
     final EntryType targetType;
     if (tabName == 'Materials') {
-      searchPlaceholder = 'Search Materials, Brands, Suppliers, Prices...';
-      dropdownLabel = 'Material Name';
+      searchPlaceholder = 'Search materials';
+      dropdownLabel = 'Material';
       targetType = EntryType.material;
     } else if (tabName == 'Labour') {
-      searchPlaceholder = 'Search Labour, Contractors, Workers, Rates...';
+      searchPlaceholder = 'Search labour';
       dropdownLabel = 'Worker Type';
       targetType = EntryType.labour;
     } else {
-      searchPlaceholder = 'Search Equipment, Vendors, Rates...';
-      dropdownLabel = 'Equipment Name';
+      searchPlaceholder = 'Search equipment';
+      dropdownLabel = 'Equipment';
       targetType = EntryType.equipment;
     }
-    final matchingCategoryEntries = allEntries.where(
-      (e) =>
-          e.type == targetType &&
-          (_selectedProjectId == 'all' ||
-              e.projectId.trim() == _selectedProjectId.trim()),
-    );
-    final uniqueNames = matchingCategoryEntries
+    final uniqueNames = allEntries
+        .where(
+          (e) =>
+              e.type == targetType &&
+              (_selectedProjectId == 'all' ||
+                  e.projectId.trim() == _selectedProjectId.trim()),
+        )
         .map((e) => e.description)
         .where((name) => name.isNotEmpty)
         .toSet()
         .toList();
-
-    final allSuggestionCandidates = <String>{};
-    for (final e in matchingCategoryEntries) {
-      if (e.description.isNotEmpty) allSuggestionCandidates.add(e.description);
-      if ((e.brand ?? '').isNotEmpty) allSuggestionCandidates.add(e.brand!);
-      if ((e.contractor ?? '').isNotEmpty) allSuggestionCandidates.add(e.contractor!);
-      if ((e.supplier ?? '').isNotEmpty) allSuggestionCandidates.add(e.supplier!);
-      if ((e.workerName ?? '').isNotEmpty) allSuggestionCandidates.add(e.workerName!);
-      if ((e.category ?? '').isNotEmpty) allSuggestionCandidates.add(e.category!);
-    }
-
-    final suggestions = allSuggestionCandidates
+    final suggestions = uniqueNames
         .where(
           (name) => name.toLowerCase().contains(_searchQuery.toLowerCase()),
         )
@@ -3041,315 +2360,111 @@ class _ReportsViewState extends State<_ReportsView> {
             suggestions.first.toLowerCase() == _searchQuery.toLowerCase());
     return TapRegion(
       onTapOutside: (event) {
-        setState(() {
-          _showSuggestions = false;
-        });
+        if (_showSuggestions) setState(() => _showSuggestions = false);
       },
-      child: Container(
-        padding: EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: AppColors.cardBg,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.cardBorder),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.02),
-              blurRadius: 10,
-              offset: Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            TextField(
-              controller: _searchController,
-              onChanged: (val) {
-                setState(() {
-                  _searchQuery = val.trim();
-                  _showSuggestions = true;
-                  _reportGenerated = true;
-                  if (_selectedItemName != null &&
-                      _selectedItemName != _searchQuery) {
-                    _selectedItemName = null;
-                  }
-                  ReportFilterState.searchQuery = _searchQuery;
-                  ReportFilterState.selectedItemName = _selectedItemName;
-                  ReportFilterState.reportGenerated = true;
-                  ReportFilterState.hasSavedFilters = true;
-                });
-              },
-              style: TextStyle(
-                fontSize: 13,
-                color: AppColors.textPrimary,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _searchField(context, searchPlaceholder, (val) {
+            setState(() {
+              _searchQuery = val.trim();
+              _showSuggestions = true;
+              _currentPage = 1;
+              if (_selectedItemName != null && _selectedItemName != _searchQuery) {
+                _selectedItemName = null;
+              }
+            });
+          }),
+          if (showSuggestionsList) ...[
+            const SizedBox(height: 6),
+            Container(
+              constraints: const BoxConstraints(maxHeight: 220),
+              decoration: BoxDecoration(
+                color: Bt.card,
+                borderRadius: BorderRadius.circular(Bt.rInput),
+                border: Border.all(color: Bt.line),
+                boxShadow: const [BoxShadow(color: Color(0x14101828), blurRadius: 16, offset: Offset(0, 6))],
               ),
-              decoration: InputDecoration(
-                hintText: searchPlaceholder,
-                hintStyle: TextStyle(
-                  fontSize: 13,
-                  color: AppColors.textSecondary,
-                ),
-                prefixIcon: Icon(
-                  Icons.search,
-                  color: AppColors.textSecondary,
-                  size: 20,
-                ),
-                suffixIcon: _searchQuery.isNotEmpty
-                    ? IconButton(
-                        icon: Icon(
-                          Icons.clear,
-                          color: AppColors.textSecondary,
-                          size: 18,
-                        ),
-                        onPressed: () {
-                          setState(() {
-                            _searchController.clear();
-                            _searchQuery = '';
-                            _selectedItemName = null;
-                            _showSuggestions = false;
-                            ReportFilterState.searchQuery = '';
-                            ReportFilterState.selectedItemName = null;
-                            ReportFilterState.hasSavedFilters = true;
-                          });
-                        },
-                      )
-                    : null,
-                contentPadding: EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 10,
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Color(0xFFE2E4FA)),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Color(0xFFE2E4FA)),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: AppColors.primary),
-                ),
-              ),
-            ),
-            if (showSuggestionsList) ...[
-              SizedBox(height: 6),
-              Container(
-                constraints: BoxConstraints(maxHeight: 180),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Color(0xFFE2E4FA)),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.04),
-                      blurRadius: 8,
-                      offset: Offset(0, 3),
-                    ),
-                  ],
-                ),
-                child: ListView.separated(
-                  shrinkWrap: true,
-                  padding: EdgeInsets.symmetric(vertical: 4),
-                  itemCount: suggestions.length,
-                  separatorBuilder: (context, index) =>
-                      Divider(height: 1, color: Color(0xFFF3F4F6)),
-                  itemBuilder: (context, index) {
-                    final name = suggestions[index];
-                    return InkWell(
-                      onTap: () {
-                        setState(() {
-                          _searchController.text = name;
-                          _searchQuery = name;
-                          _selectedItemName = name;
-                          _showSuggestions = false;
-                          _reportGenerated = true;
-                          ReportFilterState.searchQuery = name;
-                          ReportFilterState.selectedItemName = name;
-                          ReportFilterState.reportGenerated = true;
-                          ReportFilterState.hasSavedFilters = true;
-                        });
-                      },
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 10,
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.subdirectory_arrow_right_outlined,
-                              size: 14,
-                              color: AppColors.primary,
-                            ),
-                            SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                name,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: AppColors.textPrimary,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ],
-            SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildProjectContextDropdown(
-                    label: dropdownLabel,
-                    selectedLabel: _selectedItemName ?? 'All',
-                    items: [
-                      PopupMenuItem(value: 'All', child: Text('All')),
-                      ...uniqueNames.map(
-                        (name) => PopupMenuItem(value: name, child: Text(name)),
-                      ),
-                    ],
-                    onSelected: (val) {
+              child: ListView.separated(
+                shrinkWrap: true,
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                itemCount: suggestions.length,
+                separatorBuilder: (context, index) => const Divider(height: 1, indent: 44, color: Bt.line),
+                itemBuilder: (context, index) {
+                  final name = suggestions[index];
+                  return InkWell(
+                    onTap: () {
                       setState(() {
-                        _selectedItemName = (val == 'All' || val == null)
-                            ? null
-                            : val;
-                        final selectedVal = val == 'All' ? '' : (val ?? '');
-                        _searchController.text = selectedVal;
-                        _searchQuery = selectedVal;
+                        _searchController.text = name;
+                        _searchQuery = name;
+                        _selectedItemName = name;
                         _showSuggestions = false;
-                        _reportGenerated = true;
-                        ReportFilterState.selectedItemName = _selectedItemName;
-                        ReportFilterState.searchQuery = selectedVal;
-                        ReportFilterState.reportGenerated = true;
-                        ReportFilterState.hasSavedFilters = true;
                       });
                     },
-                  ),
-                ),
-                SizedBox(width: 8),
-                _buildEditColumnsButton(tabName),
-              ],
-            ),
-            SizedBox(height: 14),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                icon: Icon(Icons.analytics_outlined, size: 18),
-                label: Text(
-                  'Generate CSV Report',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: tabName == 'Materials'
-                      ? AppColors.primary
-                      : (tabName == 'Labour'
-                            ? Color(0xFF22C55E)
-                            : Color(0xFFF59E0B)),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  padding: EdgeInsets.symmetric(vertical: 14),
-                  elevation: 0,
-                ),
-                onPressed: () {
-                  setState(() {
-                    _reportGenerated = true;
-                    _currentPage = 1;
-                    _showSuggestions = false;
-                  });
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(minHeight: 44),
+                      child: Row(
+                        children: [
+                          const SizedBox(width: 14),
+                          const Icon(Icons.search_rounded, size: 18, color: Bt.ink3),
+                          const SizedBox(width: 12),
+                          Expanded(child: Text(name, style: BtText.body(context))),
+                          const Icon(Icons.north_west_rounded, size: 16, color: Bt.placeholder),
+                          const SizedBox(width: 14),
+                        ],
+                      ),
+                    ),
+                  );
                 },
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTypeChip(EntryType type) {
-    Color color;
-    IconData icon;
-    switch (type) {
-      case EntryType.material:
-        color = AppColors.primary;
-        icon = Icons.construction;
-        break;
-      case EntryType.labour:
-        color = Color(0xFF22C55E);
-        icon = Icons.people_outline;
-        break;
-      case EntryType.equipment:
-        color = Color(0xFFF59E0B);
-        icon = Icons.precision_manufacturing_outlined;
-        break;
-    }
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 10, color: color),
-          SizedBox(width: 4),
-          Text(
-            type.name.toUpperCase(),
-            style: TextStyle(
-              color: color,
-              fontSize: 9,
-              fontWeight: FontWeight.bold,
-            ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Flexible(
+                child: BtChip(
+                  label: '$dropdownLabel: ${_selectedItemName ?? 'All'}',
+                  trailingIcon: Icons.expand_more_rounded,
+                  selected: _selectedItemName != null,
+                  onTap: () async {
+                    final val = await _pickOption(
+                      context,
+                      dropdownLabel,
+                      [const MapEntry('All', 'All'), ...uniqueNames.map((n) => MapEntry(n, n))],
+                      _selectedItemName ?? 'All',
+                    );
+                    if (val == null) return;
+                    setState(() {
+                      _selectedItemName = val == 'All' ? null : val;
+                      final selectedVal = val == 'All' ? '' : val;
+                      _searchController.text = selectedVal;
+                      _searchQuery = selectedVal;
+                      _showSuggestions = false;
+                      _currentPage = 1;
+                    });
+                  },
+                ),
+              ),
+              if (!_reportGenerated) ...[
+                const SizedBox(width: 8),
+                BtButton(
+                  label: 'Generate report',
+                  small: true,
+                  expand: false,
+                  icon: Icons.analytics_outlined,
+                  onPressed: () {
+                    setState(() {
+                      _reportGenerated = true;
+                      _currentPage = 1;
+                      _showSuggestions = false;
+                    });
+                  },
+                ),
+              ],
+            ],
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildStatusBadge(
-    String status, {
-    double? amount,
-    double? paidAmount,
-  }) {
-    Color bg;
-    Color text;
-    final label = _getPaymentStatusLabel(
-      status,
-      amount: amount,
-      paidAmount: paidAmount,
-    );
-    switch (label) {
-      case 'Fully Paid':
-        bg = Color(0xFFDCFCE7);
-        text = Color(0xFF15803D);
-        break;
-      case 'Partial':
-        bg = Color(0xFFFFFBEB);
-        text = Color(0xFFB45309);
-        break;
-      case 'Not Paid':
-      default:
-        bg = Color(0xFFFEE2E2);
-        text = Color(0xFFDC2626);
-        break;
-    }
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(color: text, fontSize: 9, fontWeight: FontWeight.bold),
       ),
     );
   }
@@ -3359,351 +2474,147 @@ class _ReportsViewState extends State<_ReportsView> {
     EntryModel entry,
     String projectName,
   ) {
-    showDialog(
-      context: context,
-      builder: (BuildContext dialogContext) {
-        return Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+    final status = _getPaymentStatusLabel(
+      entry.paymentStatus,
+      amount: entry.amount,
+      paidAmount: entry.paidAmount,
+    );
+    final canDelete = EntryPermissions.canDelete(status: entry.approvalStatus.toLowerCase(), createdBy: entry.createdBy ?? '', projectId: entry.projectId);
+    showBtSheet(
+      context,
+      title: entry.description.isEmpty ? 'Entry details' : entry.description,
+      subtitle: '$projectName · ${_sentence(entry.type.name)}',
+      builder: (sheetCtx) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          BtCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(child: Text(_formatIndianCurrency(entry.amount), style: BtText.amount(sheetCtx, size: 28))),
+                    BtBadge(label: status, tone: status == 'Fully Paid' ? BtTone.green : (status == 'Partial' ? BtTone.amber : BtTone.red)),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                IntrinsicHeight(
+                  child: Row(
+                    children: [
+                      Expanded(child: _miniStat(sheetCtx, 'Paid', _formatIndianCurrency(entry.paidAmount), Bt.green)),
+                      const VerticalDivider(width: 24, thickness: 1, color: Bt.line),
+                      Expanded(child: _miniStat(sheetCtx, 'Remaining', _formatIndianCurrency(entry.remainingAmount), entry.remainingAmount > 0 ? Bt.amber : Bt.green)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
-          backgroundColor: Colors.white,
-          child: Padding(
-            padding: EdgeInsets.all(20),
-            child: SingleChildScrollView(
+          if (entry.rejectionReason != null && entry.rejectionReason!.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            BtCard(
+              variant: BtCardVariant.danger,
               child: Column(
-                mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Entry Details',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (EntryPermissions.canDelete(status: entry.approvalStatus.toLowerCase(), createdBy: entry.createdBy ?? '', projectId: entry.projectId))
-                            IconButton(
-                              icon: Icon(Icons.delete_outline, size: 20, color: Colors.red),
-                              onPressed: () {
-                                Navigator.of(dialogContext).pop();
-                                _ReportActions.deleteEntry(context, entry);
-                              },
-                            ),
-                          IconButton(
-                            icon: Icon(Icons.close, size: 20),
-                            onPressed: () => Navigator.of(dialogContext).pop(),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  Divider(height: 1),
-                  SizedBox(height: 12),
-                  _buildDetailRow('Project', projectName),
-                  _buildDetailRow('Type', entry.type.name.toUpperCase()),
-                  _buildDetailRow('Date', _formatDateLong(entry.date)),
-                  _buildDetailRow(
-                    'Amount',
-                    _formatIndianCurrency(entry.amount),
-                  ),
-                  _buildDetailRow(
-                    'Paid',
-                    _formatIndianCurrency(entry.paidAmount),
-                  ),
-                  _buildDetailRow(
-                    'Remaining',
-                    _formatIndianCurrency(entry.remainingAmount),
-                  ),
-                  _buildDetailRow(
-                    'Status',
-                    _getPaymentStatusLabel(
-                      entry.paymentStatus,
-                      amount: entry.amount,
-                      paidAmount: entry.paidAmount,
-                    ),
-                  ),
-                  _PaymentHistorySection(
-                    entry: entry,
-                    formatCurrency: _formatIndianCurrency,
-                    formatDate: _formatDateLong,
-                  ),
-                  if (entry.description.isNotEmpty)
-                    _buildDetailRow('Description', entry.description),
-                  if (entry.brand != null && entry.brand!.isNotEmpty)
-                    _buildDetailRow('Brand', entry.brand!),
-                  if (entry.floor != null && entry.floor!.isNotEmpty)
-                    _buildDetailRow('Floor', entry.floor!),
-                  if (entry.phase != null && entry.phase!.isNotEmpty)
-                    _buildDetailRow('Phase', entry.phase!),
-                  if (entry.unit != null && entry.unit!.isNotEmpty)
-                    _buildDetailRow('Unit', entry.unit!),
-                  if (entry.rejectionReason != null &&
-                      entry.rejectionReason!.isNotEmpty)
-                    _buildDetailRow(
-                      'Rejection Reason',
-                      entry.rejectionReason!,
-                      isWarning: true,
-                    ),
-                  SizedBox(height: 12),
-                  Divider(height: 1),
-                  SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      Expanded(
-                        child: _ReportActionBtn(
-                          label: 'Add More',
-                          icon: Icons.add_circle_outline,
-                          style: _ReportActionStyle.primary,
-                          onTap: () {
-                            Navigator.of(dialogContext).pop();
-                            _ReportActions.addMore(context, entry);
-                          },
-                        ),
-                      ),
-                      SizedBox(width: 8),
-                      Expanded(
-                        child: _ReportActionBtn(
-                          label: 'Record Payment',
-                          icon: Icons.credit_card_outlined,
-                          style: _ReportActionStyle.secondary,
-                          onTap: () {
-                            Navigator.of(dialogContext).pop();
-                            _ReportActions.recordPayment(
-                              context,
-                              entry,
-                              projectName,
-                            );
-                          },
-                        ),
-                      ),
-                      SizedBox(width: 8),
-                      Expanded(
-                        child: _ReportActionBtn(
-                          label: 'Edit Entry',
-                          icon: Icons.edit_outlined,
-                          style: _ReportActionStyle.tertiary,
-                          onTap: () {
-                            Navigator.of(dialogContext).pop();
-                            _ReportActions.editEntry(context, entry);
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
+                  Text('Rejection reason', style: BtText.caption(sheetCtx, color: Bt.red, weight: FontWeight.w600)),
+                  const SizedBox(height: 2),
+                  Text(entry.rejectionReason!, style: BtText.body(sheetCtx)),
                 ],
               ),
             ),
+          ],
+          const SizedBox(height: 16),
+          BtGroup(
+            children: [
+              _buildDetailRow('Project', projectName),
+              _buildDetailRow('Type', _sentence(entry.type.name)),
+              _buildDetailRow('Date', _formatDateLong(entry.date)),
+              if (entry.description.isNotEmpty) _buildDetailRow('Description', entry.description),
+              if (entry.brand != null && entry.brand!.isNotEmpty) _buildDetailRow('Brand', entry.brand!),
+              if (entry.floor != null && entry.floor!.isNotEmpty) _buildDetailRow('Floor', entry.floor!),
+              if (entry.phase != null && entry.phase!.isNotEmpty) _buildDetailRow('Phase', entry.phase!),
+              if (entry.unit != null && entry.unit!.isNotEmpty) _buildDetailRow('Unit', entry.unit!),
+            ],
           ),
-        );
-      },
-    );
-  }
-
-  Widget _buildDetailRow(String label, String value, {bool isWarning = false}) {
-    return Padding(
-      padding: EdgeInsets.symmetric(vertical: 5),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 100,
-            child: Text(
-              label,
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
-                color: AppColors.textSecondary,
-                fontSize: 12,
+          const SizedBox(height: 8),
+          _PaymentHistorySection(
+            entry: entry,
+            formatCurrency: _formatIndianCurrency,
+            formatDate: _formatDateLong,
+          ),
+          const SizedBox(height: 16),
+          BtButton(
+            label: 'Record Payment',
+            icon: Icons.credit_card_outlined,
+            onPressed: () {
+              Navigator.of(sheetCtx).pop();
+              _ReportActions.recordPayment(context, entry, projectName);
+            },
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: BtButton(
+                  label: 'Add More',
+                  icon: Icons.add_rounded,
+                  variant: BtButtonVariant.secondary,
+                  onPressed: () {
+                    Navigator.of(sheetCtx).pop();
+                    _ReportActions.addMore(context, entry);
+                  },
+                ),
               ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: isWarning ? AppColors.error : AppColors.textPrimary,
-                fontSize: 12,
+              const SizedBox(width: 10),
+              Expanded(
+                child: BtButton(
+                  label: 'Edit Entry',
+                  icon: Icons.edit_outlined,
+                  variant: BtButtonVariant.secondary,
+                  onPressed: () {
+                    Navigator.of(sheetCtx).pop();
+                    _ReportActions.editEntry(context, entry);
+                  },
+                ),
               ),
-            ),
+            ],
           ),
+          if (canDelete) ...[
+            const SizedBox(height: 10),
+            BtButton(
+              label: 'Delete entry…',
+              variant: BtButtonVariant.destructive,
+              icon: Icons.delete_outline,
+              onPressed: () {
+                Navigator.of(sheetCtx).pop();
+                _ReportActions.deleteEntry(context, entry);
+              },
+            ),
+          ],
         ],
       ),
     );
   }
 
-  DataRow _buildDataRowForCategory({
-    required BuildContext context,
-    required EntryModel entry,
-    required String projectName,
-    required String quickCategoryTab,
-  }) {
-    final List<String> activeCols = _getActiveColumnsForTab(quickCategoryTab);
-    final List<String> uiActiveCols = [
-      ...activeCols,
-      'Add More',
-      'Record Payment',
-      'Edit Entry',
-    ];
-    final List<DataCell> cells = uiActiveCols.map((colName) {
-      if (colName == 'Purchased Date') {
-        return DataCell(
-          Text(
-            _formatDateShort(entry.date),
-            style: TextStyle(fontSize: 12),
+  Widget _miniStat(BuildContext context, String label, String value, Color color) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: BtText.caption(context)),
+          const SizedBox(height: 2),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(value, maxLines: 1, style: BtText.num(BtText.body(context, weight: FontWeight.w600, color: color))),
           ),
-        );
-      } else if (colName == 'Payment Date') {
-        final payDateStr = entry.paymentDate != null
-            ? _formatDateShort(entry.paymentDate!)
-            : '—';
-        return DataCell(Text(payDateStr, style: TextStyle(fontSize: 12)));
-      } else if (colName == 'Project') {
-        return DataCell(
-          Text(projectName, style: TextStyle(fontSize: 12)),
-        );
-      } else if (colName == 'Type') {
-        return DataCell(_buildTypeChip(entry.type));
-      } else if (colName == 'Description') {
-        return DataCell(
-          Text(
-            entry.description.isEmpty ? '—' : entry.description,
-            style: TextStyle(fontSize: 12),
-          ),
-        );
-      } else if (colName == 'Material' ||
-          colName == 'Worker Type' ||
-          colName == 'Equipment') {
-        return DataCell(
-          Text(entry.description, style: TextStyle(fontSize: 12)),
-        );
-      } else if (colName == 'Brand') {
-        return DataCell(
-          Text(entry.brand ?? '—', style: TextStyle(fontSize: 12)),
-        );
-      } else if (colName == 'Floor') {
-        return DataCell(
-          Text(entry.floor ?? '—', style: TextStyle(fontSize: 12)),
-        );
-      } else if (colName == 'Phase') {
-        return DataCell(
-          Text(entry.phase ?? '—', style: TextStyle(fontSize: 12)),
-        );
-      } else if (colName == 'Activity') {
-        return DataCell(
-          Text(entry.activity ?? '—', style: TextStyle(fontSize: 12)),
-        );
-      } else if (colName == 'Unit') {
-        return DataCell(
-          Text(entry.unit ?? '—', style: TextStyle(fontSize: 12)),
-        );
-      } else if (colName == 'Status') {
-        return DataCell(
-          _buildStatusBadge(
-            entry.paymentStatus,
-            amount: entry.amount,
-            paidAmount: entry.paidAmount,
-          ),
-        );
-      } else if (colName == 'Amount') {
-        return DataCell(
-          Text(
-            _formatIndianCurrency(entry.amount),
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-          ),
-        );
-      } else if (colName == 'Paid') {
-        return DataCell(
-          Text(
-            _formatIndianCurrency(entry.paidAmount),
-            style: TextStyle(
-              fontSize: 12,
-              color: entry.paidAmount > 0
-                  ? Color(0xFF15803D)
-                  : AppColors.textSecondary,
-            ),
-          ),
-        );
-      } else if (colName == 'Remaining') {
-        final rem = entry.remainingAmount;
-        return DataCell(
-          Text(
-            _formatIndianCurrency(rem),
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: rem > 0
-                  ? Color(0xFFDC2626)
-                  : Color(0xFF15803D),
-            ),
-          ),
-        );
-      } else if (colName == 'Rate' ||
-          colName == 'Rate/Day' ||
-          colName == 'Rent Rate') {
-        final rate = entry.ratePerUnit ?? 0.0;
-        return DataCell(
-          Text(
-            _formatIndianCurrency(rate),
-            style: TextStyle(fontSize: 12),
-          ),
-        );
-      } else if (colName == 'Qty' ||
-          colName == 'Days' ||
-          colName == 'Duration') {
-        final rate = entry.ratePerUnit ?? 0.0;
-        final val = (rate == 0) ? 0.0 : entry.amount / rate;
-        return DataCell(
-          Text(val.toStringAsFixed(1), style: TextStyle(fontSize: 12)),
-        );
-      } else if (colName == 'Add More') {
-        return DataCell(
-          _ReportActionBtn(
-            label: 'Add More',
-            icon: Icons.add_circle_outline,
-            style: _ReportActionStyle.primary,
-            onTap: () => _ReportActions.addMore(context, entry),
-          ),
-        );
-      } else if (colName == 'Record Payment') {
-        return DataCell(
-          _ReportActionBtn(
-            label: 'Record Payment',
-            icon: Icons.credit_card_outlined,
-            style: _ReportActionStyle.secondary,
-            onTap: () =>
-                _ReportActions.recordPayment(context, entry, projectName),
-          ),
-        );
-      } else if (colName == 'Edit Entry') {
-        return DataCell(
-          _ReportActionBtn(
-            label: 'Edit Entry',
-            icon: Icons.edit_outlined,
-            style: _ReportActionStyle.tertiary,
-            onTap: () => _ReportActions.editEntry(context, entry),
-          ),
-        );
-      } else {
-        return DataCell(SizedBox.shrink());
-      }
-    }).toList();
-    return DataRow(
-      onSelectChanged: (selected) {
-        if (selected ?? false) {
-          _showEntryDetailsDialog(context, entry, projectName);
-        }
-      },
-      cells: cells,
-    );
+        ],
+      );
+
+  Widget _buildDetailRow(String label, String value, {bool isWarning = false}) {
+    return BtValueRow(label: label, value: value, valueColor: isWarning ? Bt.red : null);
   }
+
+
 }
 
 class _AskAiBanner extends StatelessWidget {
@@ -3711,73 +2622,40 @@ class _AskAiBanner extends StatelessWidget {
   final String projectName;
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: () => Navigator.pushNamed(
-          context,
-          '/ai-chat',
-          arguments: {'projectName': projectName},
+    final bt = context.bt;
+    return Semantics(
+      button: true,
+      label: 'Ask AI about costs, entries and inventory',
+      excludeSemantics: true,
+      child: Material(
+        color: Bt.card,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(Bt.rInput),
+          side: const BorderSide(color: Bt.inputBorder),
         ),
-        child: Ink(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                AppColors.primary,
-                AppColors.primary.withValues(alpha: 0.80),
-              ],
-            ),
-            borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(Bt.rInput),
+          onTap: () => Navigator.pushNamed(
+            context,
+            '/ai-chat',
+            arguments: {'projectName': projectName},
           ),
-          child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+          child: SizedBox(
+            height: Bt.fieldH,
             child: Row(
               children: [
-                Container(
-                  width: 38,
-                  height: 38,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.18),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    Icons.auto_awesome,
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                ),
-                SizedBox(width: 14),
+                const SizedBox(width: 14),
+                Icon(Icons.auto_awesome, color: bt.brand, size: 20),
+                const SizedBox(width: 10),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Ask AI',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      SizedBox(height: 2),
-                      Text(
-                        'Ask about costs, entries & inventory',
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w400,
-                        ),
-                      ),
-                    ],
+                  child: Text(
+                    'Ask AI about your costs',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: BtText.body(context, color: Bt.placeholder),
                   ),
                 ),
-                Icon(
-                  Icons.arrow_forward_ios,
-                  color: Colors.white70,
-                  size: 14,
-                ),
+                const SizedBox(width: 14),
               ],
             ),
           ),
@@ -3794,58 +2672,10 @@ class _CategoryTabs extends StatelessWidget {
   static const _tabs = ['All', 'Materials', 'Labour', 'Equipment'];
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: AppColors.cardBg,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.cardBorder),
-      ),
-      child: Row(
-        children: _tabs.map((tab) {
-          final active = tab == activeTab;
-          Color activeColor;
-          switch (tab) {
-            case 'Materials':
-              activeColor = AppColors.primary;
-              break;
-            case 'Labour':
-              activeColor = Color(0xFF22C55E);
-              break;
-            case 'Equipment':
-              activeColor = Color(0xFFF59E0B);
-              break;
-            case 'All':
-            default:
-              activeColor = AppColors.primary;
-              break;
-          }
-          return Expanded(
-            child: GestureDetector(
-              onTap: () => onTabChanged(tab),
-              child: AnimatedContainer(
-                duration: Duration(milliseconds: 200),
-                padding: EdgeInsets.symmetric(vertical: 8),
-                decoration: BoxDecoration(
-                  color: active
-                      ? activeColor.withValues(alpha: 0.12)
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  tab,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: active ? activeColor : AppColors.textSecondary,
-                    fontWeight: active ? FontWeight.bold : FontWeight.normal,
-                    fontSize: 12,
-                  ),
-                ),
-              ),
-            ),
-          );
-        }).toList(),
-      ),
+    return BtSegmented<String>(
+      segments: {for (final t in _tabs) t: t},
+      value: activeTab,
+      onChanged: onTabChanged,
     );
   }
 }
@@ -3907,7 +2737,7 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
     final whole = parts[0];
     final decimal = parts[1];
     if (whole.length <= 3) {
-      return 'Rs. $whole.$decimal';
+      return '₹$whole.$decimal';
     }
     final lastThree = whole.substring(whole.length - 3);
     final remaining = whole.substring(0, whole.length - 3);
@@ -3921,7 +2751,7 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
       count++;
     }
     final formattedRemaining = buffer.toString().split('').reversed.join('');
-    return 'Rs. $formattedRemaining,$lastThree.$decimal';
+    return '₹$formattedRemaining,$lastThree.$decimal';
   }
 
   Widget _buildTypeChip(EntryType type) {
@@ -3933,7 +2763,7 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
         icon = Icons.construction;
         break;
       case EntryType.labour:
-        color = Color(0xFF22C55E);
+        color = Color(0xFF067647);
         icon = Icons.people_outline;
         break;
       case EntryType.equipment:
@@ -3956,7 +2786,7 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
             type.name.toUpperCase(),
             style: TextStyle(
               color: color,
-              fontSize: 9,
+              fontSize: 12,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -3971,17 +2801,17 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
     final label = _getPaymentStatusLabel(status);
     switch (label) {
       case 'Fully Paid':
-        bg = Color(0xFFDCFCE7);
-        text = Color(0xFF15803D);
+        bg = Color(0xFFE7F6EE);
+        text = Color(0xFF067647);
         break;
       case 'Partial':
-        bg = Color(0xFFFFFBEB);
-        text = Color(0xFFB45309);
+        bg = Color(0xFFFEF3E7);
+        text = Color(0xFFB54708);
         break;
       case 'Not Paid':
       default:
-        bg = Color(0xFFFEE2E2);
-        text = Color(0xFFDC2626);
+        bg = Color(0xFFFDECEF);
+        text = Color(0xFFC01048);
         break;
     }
     return Container(
@@ -3992,7 +2822,7 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
       ),
       child: Text(
         label,
-        style: TextStyle(color: text, fontSize: 9, fontWeight: FontWeight.bold),
+        style: TextStyle(color: text, fontSize: 12, fontWeight: FontWeight.bold),
       ),
     );
   }
@@ -4050,7 +2880,7 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
                   color: AppColors.textSecondary,
-                  fontSize: 12,
+                  fontSize: 13,
                 ),
               ),
             ),
@@ -4060,7 +2890,7 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   color: isWarning ? AppColors.error : AppColors.textPrimary,
-                  fontSize: 12,
+                  fontSize: 13,
                 ),
               ),
             ),
@@ -4100,7 +2930,7 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
                         children: [
                           if (EntryPermissions.canDelete(status: entry.approvalStatus.toLowerCase(), createdBy: entry.createdBy ?? '', projectId: entry.projectId))
                             IconButton(
-                              icon: Icon(Icons.delete_outline, size: 20, color: Colors.red),
+                              icon: Icon(Icons.delete_outline, size: 20, color: const Color(0xFFC01048)),
                               onPressed: () {
                                 Navigator.of(dialogContext).pop();
                                 _ReportActions.deleteEntry(context, entry);
@@ -4211,20 +3041,23 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
   Widget build(BuildContext context) {
     final rotated = _quarterTurns != 0;
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Bt.card,
       appBar: AppBar(
-        title: Text(
-          '${widget.title} (${widget.filteredEntries.length} entries)',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-            color: AppColors.textPrimary,
-          ),
+        centerTitle: true,
+        title: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(widget.title, style: BtText.navTitle(context)),
+            Text('${widget.filteredEntries.length} entries', style: BtText.caption(context)),
+          ],
         ),
-        backgroundColor: Colors.white,
-        elevation: 0.5,
+        backgroundColor: Bt.card,
+        surfaceTintColor: Bt.card,
+        elevation: 0,
+        shape: const Border(bottom: BorderSide(color: Bt.line)),
         leading: IconButton(
-          icon: Icon(Icons.close, color: AppColors.textPrimary),
+          tooltip: 'Close',
+          icon: const Icon(Icons.close_rounded, color: Bt.ink),
           onPressed: () => Navigator.of(context).pop(),
         ),
         actions: [
@@ -4232,7 +3065,7 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
             tooltip: rotated ? 'Straight View' : 'Rotate View (Landscape)',
             icon: Icon(
               rotated ? Icons.screen_lock_portrait : Icons.screen_rotation,
-              color: AppColors.primary,
+              color: Bt.ink2,
             ),
             onPressed: _toggleRotation,
           ),
@@ -4240,7 +3073,7 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
             data: Theme.of(context).copyWith(cardColor: Colors.white),
             child: PopupMenuButton<String>(
               tooltip: 'Export Options',
-              icon: Icon(Icons.download, color: AppColors.primary),
+              icon: const Icon(Icons.ios_share_rounded, color: Bt.ink2),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
@@ -4295,7 +3128,7 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
                   return DataCell(
                     Text(
                       _formatDateShort(entry.date),
-                      style: TextStyle(fontSize: 12),
+                      style: TextStyle(fontSize: 13),
                     ),
                   );
                 } else if (colName == 'Payment Date') {
@@ -4303,11 +3136,11 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
                       ? _formatDateShort(entry.paymentDate!)
                       : '—';
                   return DataCell(
-                    Text(payDateStr, style: TextStyle(fontSize: 12)),
+                    Text(payDateStr, style: TextStyle(fontSize: 13)),
                   );
                 } else if (colName == 'Project') {
                   return DataCell(
-                    Text(projectName, style: TextStyle(fontSize: 12)),
+                    Text(projectName, style: TextStyle(fontSize: 13)),
                   );
                 } else if (colName == 'Type') {
                   return DataCell(_buildTypeChip(entry.type));
@@ -4315,7 +3148,7 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
                   return DataCell(
                     Text(
                       entry.description.isEmpty ? '—' : entry.description,
-                      style: TextStyle(fontSize: 12),
+                      style: TextStyle(fontSize: 13),
                     ),
                   );
                 } else if (colName == 'Material' ||
@@ -4324,42 +3157,42 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
                   return DataCell(
                     Text(
                       entry.description,
-                      style: TextStyle(fontSize: 12),
+                      style: TextStyle(fontSize: 13),
                     ),
                   );
                 } else if (colName == 'Brand') {
                   return DataCell(
                     Text(
                       entry.brand ?? '—',
-                      style: TextStyle(fontSize: 12),
+                      style: TextStyle(fontSize: 13),
                     ),
                   );
                 } else if (colName == 'Floor') {
                   return DataCell(
                     Text(
                       entry.floor ?? '—',
-                      style: TextStyle(fontSize: 12),
+                      style: TextStyle(fontSize: 13),
                     ),
                   );
                 } else if (colName == 'Phase') {
                   return DataCell(
                     Text(
                       entry.phase ?? '—',
-                      style: TextStyle(fontSize: 12),
+                      style: TextStyle(fontSize: 13),
                     ),
                   );
                 } else if (colName == 'Activity') {
                   return DataCell(
                     Text(
                       entry.activity ?? '—',
-                      style: TextStyle(fontSize: 12),
+                      style: TextStyle(fontSize: 13),
                     ),
                   );
                 } else if (colName == 'Unit') {
                   return DataCell(
                     Text(
                       entry.unit ?? '—',
-                      style: TextStyle(fontSize: 12),
+                      style: TextStyle(fontSize: 13),
                     ),
                   );
                 } else if (colName == 'Status') {
@@ -4370,7 +3203,7 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
                       _formatIndianCurrency(entry.amount),
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
-                        fontSize: 12,
+                        fontSize: 13,
                       ),
                     ),
                   );
@@ -4379,9 +3212,9 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
                     Text(
                       _formatIndianCurrency(entry.paidAmount),
                       style: TextStyle(
-                        fontSize: 12,
+                        fontSize: 13,
                         color: entry.paidAmount > 0
-                            ? Color(0xFF15803D)
+                            ? Color(0xFF067647)
                             : AppColors.textSecondary,
                       ),
                     ),
@@ -4392,11 +3225,11 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
                     Text(
                       _formatIndianCurrency(rem),
                       style: TextStyle(
-                        fontSize: 12,
+                        fontSize: 13,
                         fontWeight: FontWeight.w600,
                         color: rem > 0
-                            ? Color(0xFFDC2626)
-                            : Color(0xFF15803D),
+                            ? Color(0xFFC01048)
+                            : Color(0xFF067647),
                       ),
                     ),
                   );
@@ -4407,7 +3240,7 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
                   return DataCell(
                     Text(
                       _formatIndianCurrency(rate),
-                      style: TextStyle(fontSize: 12),
+                      style: TextStyle(fontSize: 13),
                     ),
                   );
                 } else if (colName == 'Qty' ||
@@ -4418,7 +3251,7 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
                   return DataCell(
                     Text(
                       val.toStringAsFixed(1),
-                      style: TextStyle(fontSize: 12),
+                      style: TextStyle(fontSize: 13),
                     ),
                   );
                 } else if (colName == 'Add More') {
@@ -4572,7 +3405,7 @@ class _ReportActionBtn extends StatelessWidget {
       case _ReportActionStyle.primary:
         deco = BoxDecoration(
           gradient: LinearGradient(
-            colors: [Color(0xFF3B82F6), Color(0xFF1D4ED8)],
+            colors: [Color(0xFF0B63CE), Color(0xFF1D4ED8)],
           ),
           borderRadius: BorderRadius.circular(6),
         );
@@ -4582,17 +3415,17 @@ class _ReportActionBtn extends StatelessWidget {
         deco = BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: Color(0xFF3B82F6), width: 1.0),
+          border: Border.all(color: Color(0xFF0B63CE), width: 1.0),
         );
-        color = Color(0xFF3B82F6);
+        color = Color(0xFF0B63CE);
         break;
       case _ReportActionStyle.tertiary:
         deco = BoxDecoration(
-          color: Color(0xFFF3F4F6),
+          color: Color(0xFFEEF1F5),
           borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: Color(0xFFE5E7EB), width: 1.0),
+          border: Border.all(color: Color(0xFFE4E7EC), width: 1.0),
         );
-        color = Color(0xFF4B5563);
+        color = Color(0xFF475467);
         break;
     }
     return MouseRegion(
@@ -4612,7 +3445,7 @@ class _ReportActionBtn extends StatelessWidget {
                 child: Text(
                   label,
                   style: TextStyle(
-                    fontSize: 10,
+                    fontSize: 12,
                     fontWeight: FontWeight.bold,
                     color: color,
                   ),
@@ -4691,17 +3524,17 @@ class _ReportActions {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('Delete Entry?', style: TextStyle(fontWeight: FontWeight.w800)),
+        title: Text('Delete Entry?', style: TextStyle(fontWeight: FontWeight.w700)),
         content: Text('Are you sure you want to permanently delete this entry?'),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text('Cancel', style: TextStyle(color: Colors.grey)),
+            child: Text('Cancel', style: TextStyle(color: const Color(0xFF667085))),
           ),
           ElevatedButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFC01048)),
             child: Text('Delete', style: TextStyle(color: Colors.white)),
           ),
         ],
@@ -4722,12 +3555,12 @@ class _ReportActions {
         Navigator.of(context).pop(); // pop progress
         if (success) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Entry deleted successfully'), backgroundColor: Colors.red),
+            SnackBar(content: Text('Entry deleted successfully'), backgroundColor: const Color(0xFFC01048)),
           );
           context.read<ProjectProvider>().load();
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to delete entry'), backgroundColor: Colors.red),
+            SnackBar(content: Text('Failed to delete entry'), backgroundColor: const Color(0xFFC01048)),
           );
         }
       }
@@ -4869,34 +3702,10 @@ class _PaymentHistorySectionState extends State<_PaymentHistorySection> {
   @override
   Widget build(BuildContext context) {
     final history = _fetchedHistory ?? widget.entry.paymentHistory;
-    Widget header = Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          'PAYMENT HISTORY',
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.bold,
-            color: AppColors.textSecondary,
-          ),
-        ),
-        if (history.length > 1)
-          GestureDetector(
-            onTap: () {
-              setState(() {
-                _viewAll = !_viewAll;
-              });
-            },
-            child: Text(
-              _viewAll ? 'View Less' : 'View All (${history.length})',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                color: AppColors.primary,
-              ),
-            ),
-          ),
-      ],
+    Widget header = BtSectionHeader(
+      title: 'Payment history',
+      action: history.length > 1 ? (_viewAll ? 'View less' : 'View all (${history.length})') : null,
+      onAction: () => setState(() => _viewAll = !_viewAll),
     );
     Widget content;
     if (_isLoading) {
@@ -4918,7 +3727,7 @@ class _PaymentHistorySectionState extends State<_PaymentHistorySection> {
             Text(
               'Loading payment history...',
               style: TextStyle(
-                fontSize: 11,
+                fontSize: 13,
                 fontStyle: FontStyle.italic,
                 color: AppColors.textSecondary,
               ),
@@ -4933,7 +3742,7 @@ class _PaymentHistorySectionState extends State<_PaymentHistorySection> {
           child: Text(
             'Detailed payment history is unavailable for payments recorded before transaction tracking was introduced.',
             style: TextStyle(
-              fontSize: 11,
+              fontSize: 13,
               fontStyle: FontStyle.italic,
               color: AppColors.textSecondary,
             ),
@@ -4945,7 +3754,7 @@ class _PaymentHistorySectionState extends State<_PaymentHistorySection> {
           child: Text(
             'No payments recorded yet.',
             style: TextStyle(
-              fontSize: 12,
+              fontSize: 13,
               fontStyle: FontStyle.italic,
               color: AppColors.textSecondary,
             ),
@@ -4960,7 +3769,7 @@ class _PaymentHistorySectionState extends State<_PaymentHistorySection> {
         physics: NeverScrollableScrollPhysics(),
         itemCount: itemsToShow.length,
         separatorBuilder: (_, _) =>
-            Divider(height: 12, color: Color(0xFFF0F0F8)),
+            const Divider(height: 16, color: Bt.line),
         itemBuilder: (context, idx) {
           final item = itemsToShow[idx];
           final amt = (item['amount'] as num?)?.toDouble() ?? 0.0;
@@ -4990,7 +3799,7 @@ class _PaymentHistorySectionState extends State<_PaymentHistorySection> {
                           Text(
                             dateStr,
                             style: TextStyle(
-                              fontSize: 12,
+                              fontSize: 13,
                               fontWeight: FontWeight.bold,
                               color: AppColors.textPrimary,
                             ),
@@ -5008,9 +3817,9 @@ class _PaymentHistorySectionState extends State<_PaymentHistorySection> {
                                   borderRadius: BorderRadius.circular(4),
                                 ),
                                 child: Text(
-                                  method.toUpperCase(),
+                                  method.isEmpty ? method : method[0].toUpperCase() + method.substring(1),
                                   style: TextStyle(
-                                    fontSize: 9,
+                                    fontSize: 12,
                                     fontWeight: FontWeight.bold,
                                     color: AppColors.badgeInfoText,
                                   ),
@@ -5028,7 +3837,7 @@ class _PaymentHistorySectionState extends State<_PaymentHistorySection> {
                                   child: Text(
                                     'Receipt ↗',
                                     style: TextStyle(
-                                      fontSize: 10,
+                                      fontSize: 12,
                                       fontWeight: FontWeight.bold,
                                       color: AppColors.primary,
                                       decoration: TextDecoration.underline,
@@ -5056,7 +3865,7 @@ class _PaymentHistorySectionState extends State<_PaymentHistorySection> {
                   Text(
                     'Note: $note',
                     style: TextStyle(
-                      fontSize: 11,
+                      fontSize: 13,
                       fontStyle: FontStyle.italic,
                       color: AppColors.textSecondary,
                     ),
@@ -5080,15 +3889,12 @@ class _PaymentHistorySectionState extends State<_PaymentHistorySection> {
       }
     }
     return Padding(
-      padding: EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.only(top: 12),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Divider(height: 16),
           header,
-          SizedBox(height: 8),
-          content,
-          Divider(height: 16),
+          BtCard(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10), child: content),
         ],
       ),
     );

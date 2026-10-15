@@ -1,3 +1,4 @@
+import 'package:buildtrack_mobile/design/design.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'package:buildtrack_mobile/common/themes/app_colors.dart';
@@ -19,7 +20,6 @@ class _ReceiptViewerScreenState extends State<ReceiptViewerScreen> {
       TransformationController();
   TapDownDetails? _doubleTapDetails;
   static var primaryBlue = AppColors.primary;
-  static const bgColor = AppColors.gradientStart;
   static const textDark = AppColors.textDark;
   static const textGray = AppColors.textLight;
   @override
@@ -168,12 +168,12 @@ class _ReceiptViewerScreenState extends State<ReceiptViewerScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.broken_image_outlined, color: Colors.red, size: 48),
+                Icon(Icons.broken_image_outlined, color: Color(0xFFC01048), size: 48),
                 SizedBox(height: 12),
                 Text(
                   'Failed to load image from network',
                   style: TextStyle(
-                    color: Colors.red,
+                    color: Color(0xFFC01048),
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -187,7 +187,7 @@ class _ReceiptViewerScreenState extends State<ReceiptViewerScreen> {
         final base64String = normalizedReceipt.split(',').last;
         return Image.memory(base64Decode(base64String), fit: BoxFit.contain);
       } catch (e) {
-        return const Center(child: Icon(Icons.broken_image, color: Colors.red));
+        return const Center(child: Icon(Icons.broken_image, color: Color(0xFFC01048)));
       }
     } else {
       final file = File(normalizedReceipt);
@@ -198,12 +198,12 @@ class _ReceiptViewerScreenState extends State<ReceiptViewerScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.broken_image_outlined, color: Colors.red, size: 48),
+              Icon(Icons.broken_image_outlined, color: Color(0xFFC01048), size: 48),
               SizedBox(height: 12),
               Text(
                 'Local file not found',
                 style: TextStyle(
-                  color: Colors.red,
+                  color: Color(0xFFC01048),
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -218,38 +218,9 @@ class _ReceiptViewerScreenState extends State<ReceiptViewerScreen> {
     final args = (ModalRoute.of(context)?.settings.arguments as Map?) ?? {};
     final String receipt = args['receipt'] as String? ?? 'receipt.pdf';
     return Scaffold(
-      backgroundColor: bgColor,
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildTopBar(context, receipt),
-            Expanded(child: _buildReceiptView(context, receipt)),
-          ],
-        ),
-      ),
-    );
-  }
-  Widget _buildTopBar(BuildContext context, String receipt) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          GestureDetector(
-            onTap: () => Navigator.pop(context),
-            child: const Icon(Icons.arrow_back, color: textDark, size: 22),
-          ),
-          const Text(
-            'Receipt',
-            style: TextStyle(
-              color: textDark,
-              fontSize: 17,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(width: 22),
-        ],
-      ),
+      backgroundColor: Bt.ground,
+      appBar: const BtNavBar(title: 'Receipt'),
+      body: SafeArea(top: false, child: _buildReceiptView(context, receipt)),
     );
   }
   Widget _buildReceiptView(BuildContext context, String receipt) {
@@ -265,13 +236,7 @@ class _ReceiptViewerScreenState extends State<ReceiptViewerScreen> {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFFE0E5FF)),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.04),
-                  blurRadius: 8,
-                ),
-              ],
+              border: Border.all(color: Bt.line),
             ),
             child: Row(
               children: [
@@ -288,7 +253,7 @@ class _ReceiptViewerScreenState extends State<ReceiptViewerScreen> {
                     isPdf
                         ? Icons.picture_as_pdf_outlined
                         : Icons.image_outlined,
-                    color: isPdf ? Colors.red : primaryBlue,
+                    color: isPdf ? const Color(0xFFC01048) : primaryBlue,
                     size: 22,
                   ),
                 ),
@@ -310,7 +275,7 @@ class _ReceiptViewerScreenState extends State<ReceiptViewerScreen> {
                       const SizedBox(height: 2),
                       Text(
                         isPdf ? 'PDF Document' : 'Image File',
-                        style: const TextStyle(color: textGray, fontSize: 12),
+                        style: const TextStyle(color: textGray, fontSize: 13),
                       ),
                     ],
                   ),
@@ -321,14 +286,14 @@ class _ReceiptViewerScreenState extends State<ReceiptViewerScreen> {
                     vertical: 5,
                   ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFE8F5E9),
-                    borderRadius: BorderRadius.circular(20),
+                    color: const Color(0xFFE7F6EE),
+                    borderRadius: BorderRadius.circular(Bt.rCard),
                   ),
                   child: const Text(
                     'Verified',
                     style: TextStyle(
-                      color: Color(0xFF2E7D32),
-                      fontSize: 11,
+                      color: Color(0xFF067647),
+                      fontSize: 13,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -342,17 +307,11 @@ class _ReceiptViewerScreenState extends State<ReceiptViewerScreen> {
               width: double.infinity,
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 12,
-                  ),
-                ],
+                borderRadius: BorderRadius.circular(Bt.rCard),
               ),
               child: isImage
                   ? ClipRRect(
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: BorderRadius.circular(Bt.rCard),
                       child: Stack(
                         children: [
                           Center(
@@ -392,7 +351,7 @@ class _ReceiptViewerScreenState extends State<ReceiptViewerScreen> {
                             child: Container(
                               decoration: BoxDecoration(
                                 color: Colors.black.withValues(alpha: 0.6),
-                                borderRadius: BorderRadius.circular(20),
+                                borderRadius: BorderRadius.circular(Bt.rCard),
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
@@ -412,7 +371,7 @@ class _ReceiptViewerScreenState extends State<ReceiptViewerScreen> {
                                     'Reset',
                                     style: TextStyle(
                                       color: Colors.white,
-                                      fontSize: 12,
+                                      fontSize: 13,
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
@@ -462,7 +421,7 @@ class _ReceiptViewerScreenState extends State<ReceiptViewerScreen> {
                                       'Pinch to zoom / Drag to pan',
                                       style: TextStyle(
                                         color: Colors.white,
-                                        fontSize: 11,
+                                        fontSize: 13,
                                         fontWeight: FontWeight.w500,
                                       ),
                                     ),
@@ -481,12 +440,12 @@ class _ReceiptViewerScreenState extends State<ReceiptViewerScreen> {
                           width: 100,
                           height: 100,
                           decoration: BoxDecoration(
-                            color: const Color(0xFFFFEBEE),
-                            borderRadius: BorderRadius.circular(20),
+                            color: const Color(0xFFFDECEF),
+                            borderRadius: BorderRadius.circular(Bt.rCard),
                           ),
                           child: const Icon(
                             Icons.picture_as_pdf_outlined,
-                            color: Colors.red,
+                            color: Color(0xFFC01048),
                             size: 50,
                           ),
                         ),
@@ -527,13 +486,6 @@ class _ReceiptViewerScreenState extends State<ReceiptViewerScreen> {
                             decoration: BoxDecoration(
                               gradient: AppGradients.primaryButton,
                               borderRadius: BorderRadius.circular(30),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: primaryBlue.withValues(alpha: 0.4),
-                                  blurRadius: 12,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,

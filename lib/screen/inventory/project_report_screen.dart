@@ -1,3 +1,4 @@
+import 'package:buildtrack_mobile/design/design.dart';
 import 'package:buildtrack_mobile/common/themes/app_colors.dart';
 import 'package:buildtrack_mobile/common/themes/app_theme.dart';
 import 'package:buildtrack_mobile/common/widgets/app_widgets.dart';
@@ -144,13 +145,13 @@ class _SummaryCard extends StatelessWidget {
   const _SummaryCard({required this.project});
   final ProjectModel project;
   static const _stageMeta = <ProjectStage, (Color, Color)>{
-    ProjectStage.preConstruction: (Color(0xFFE8EAF6), Color(0xFF3949AB)),
+    ProjectStage.preConstruction: (Color(0xFFEEF1F5), Color(0xFF3949AB)),
     ProjectStage.sitePreparation: (Color(0xFFFCE4EC), Color(0xFFC62828)),
-    ProjectStage.foundationPlinthWork: (Color(0xFFEEEFFF), Color(0xFF4455CC)),
+    ProjectStage.foundationPlinthWork: (Color(0xFFE8F1FC), Color(0xFF4455CC)),
     ProjectStage.floorConstruction: (Color(0xFFE3F2FD), Color(0xFF1565C0)),
-    ProjectStage.finishingWork: (Color(0xFFE8F5E9), Color(0xFF2E7D32)),
+    ProjectStage.finishingWork: (Color(0xFFE7F6EE), Color(0xFF067647)),
     ProjectStage.externalWorks: (Color(0xFFF3E8FF), Color(0xFF9B59B6)),
-    ProjectStage.materialMaster: (Color(0xFFFFF3E0), Color(0xFFE65100)),
+    ProjectStage.materialMaster: (Color(0xFFFEF3E7), Color(0xFFB54708)),
     ProjectStage.labourMaster: (Color(0xFFE0F7FA), Color(0xFF00838F)),
     ProjectStage.equipmentMaster: (Color(0xFFF9FBE7), Color(0xFF827717)),
   };
@@ -188,14 +189,14 @@ class _SummaryCard extends StatelessWidget {
                 ),
                 decoration: BoxDecoration(
                   color: stageBg,
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(Bt.rCard),
                 ),
                 child: Text(
                   project.stage.label,
                   style: TextStyle(
                     color: stageFg,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
                     letterSpacing: 0.5,
                   ),
                 ),
@@ -213,7 +214,7 @@ class _SummaryCard extends StatelessWidget {
               const SizedBox(width: 4),
               Text(
                 project.location,
-                style: AppTheme.caption.copyWith(fontSize: 12),
+                style: AppTheme.caption.copyWith(fontSize: 13),
               ),
             ],
           ),
@@ -228,7 +229,7 @@ class _SummaryCard extends StatelessWidget {
               const SizedBox(width: 4),
               Text(
                 'Started ${_fmtDate(project.startDate)}',
-                style: AppTheme.caption.copyWith(fontSize: 12),
+                style: AppTheme.caption.copyWith(fontSize: 13),
               ),
             ],
           ),
@@ -247,7 +248,7 @@ class _SummaryCard extends StatelessWidget {
                 '${(pct * 100).toStringAsFixed(1)}%',
                 style: TextStyle(
                   fontSize: 13,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w700,
                   color: barColor,
                 ),
               ),
@@ -259,7 +260,7 @@ class _SummaryCard extends StatelessWidget {
             child: LinearProgressIndicator(
               value: pct,
               minHeight: 9,
-              backgroundColor: const Color(0xFFE8ECF8),
+              backgroundColor: const Color(0xFFEEF1F5),
               valueColor: AlwaysStoppedAnimation<Color>(barColor),
             ),
           ),
@@ -363,7 +364,7 @@ class _StatChip extends StatelessWidget {
               value,
               style: TextStyle(
                 fontSize: 14,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w700,
                 color: color,
               ),
             ),
@@ -371,7 +372,7 @@ class _StatChip extends StatelessWidget {
             Text(
               label,
               style: AppTheme.caption.copyWith(
-                fontSize: 10,
+                fontSize: 12,
                 color: AppColors.textLight,
               ),
             ),
@@ -439,7 +440,7 @@ class _EntrySection extends StatelessWidget {
               Text(
                 formatCurrency(total),
                 style: TextStyle(
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w700,
                   color: color,
                   fontSize: 14,
                 ),
@@ -447,7 +448,7 @@ class _EntrySection extends StatelessWidget {
             ],
           ),
           if (displayed.isNotEmpty) ...[
-            const Divider(color: Color(0xFFEEF0F8), height: 20),
+            const Divider(color: Color(0xFFEEF1F5), height: 20),
             ...displayed.map((e) => _entryRow(e, color)),
           ],
         ],
@@ -496,7 +497,7 @@ class _EntrySection extends StatelessWidget {
       case EntryType.labour:
         return AppColors.info;
       case EntryType.equipment:
-        return const Color(0xFF7B3FE7);
+        return const Color(0xFF0B63CE);
     }
   }
   String _typeLabel(EntryType t) {
@@ -554,7 +555,7 @@ class _ActivityTimeline extends StatelessWidget {
                           child: Container(
                             width: 1.5,
                             margin: const EdgeInsets.symmetric(vertical: 3),
-                            color: const Color(0xFFE0E3F0),
+                            color: const Color(0xFFE4E7EC),
                           ),
                         ),
                     ],
@@ -582,7 +583,7 @@ class _ActivityTimeline extends StatelessWidget {
                             Text(
                               formatCurrency(e.amount),
                               style: TextStyle(
-                                fontWeight: FontWeight.w800,
+                                fontWeight: FontWeight.w700,
                                 color: color,
                                 fontSize: 13,
                               ),
@@ -593,7 +594,7 @@ class _ActivityTimeline extends StatelessWidget {
                         Text(
                           _fmtDate(e.date),
                           style: AppTheme.caption.copyWith(
-                            fontSize: 11,
+                            fontSize: 13,
                             color: AppColors.textLight,
                           ),
                         ),
@@ -626,7 +627,7 @@ class _ActivityTimeline extends StatelessWidget {
       case EntryType.labour:
         return (AppColors.info, Icons.people_outline);
       case EntryType.equipment:
-        return (const Color(0xFF7B3FE7), Icons.construction_outlined);
+        return (const Color(0xFF0B63CE), Icons.construction_outlined);
     }
   }
   String _fmtDate(DateTime d) {

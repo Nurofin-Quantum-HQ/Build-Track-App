@@ -1,3 +1,4 @@
+import 'package:buildtrack_mobile/design/design.dart';
 import 'dart:typed_data';
 import 'dart:io' show File;
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -163,7 +164,7 @@ class _ReportInsightsScreenState extends State<ReportInsightsScreen> {
             Expanded(
               child: SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -350,13 +351,7 @@ class _DateRangeRow extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFDDE0F0)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 6,
-            ),
-          ],
+          border: Border.all(color: Bt.line),
         ),
         child: Row(
           children: [
@@ -370,7 +365,7 @@ class _DateRangeRow extends StatelessWidget {
               child: Text(
                 '${_fmt(fromDate)}  →  ${_fmt(toDate)}',
                 style: const TextStyle(
-                  fontSize: 12,
+                  fontSize: 13,
                   fontWeight: FontWeight.w600,
                   color: AppColors.textDark,
                 ),
@@ -400,13 +395,6 @@ class _ExportFab extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppColors.primary,
           borderRadius: BorderRadius.circular(26),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.primary.withValues(alpha: 0.4),
-              blurRadius: 16,
-              offset: const Offset(0, 6),
-            ),
-          ],
         ),
         child: const Row(
           mainAxisSize: MainAxisSize.min,
@@ -480,7 +468,7 @@ class _ExportSheetState extends State<_ExportSheet> {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFDDE0F0),
+                    color: const Color(0xFFE4E7EC),
                     borderRadius: BorderRadius.circular(16),
                   ),
                 ),
@@ -510,14 +498,14 @@ class _ExportSheetState extends State<_ExportSheet> {
                           'Export Report',
                           style: TextStyle(
                             fontSize: 17,
-                            fontWeight: FontWeight.w800,
+                            fontWeight: FontWeight.w700,
                             color: AppColors.textDark,
                           ),
                         ),
                         Text(
                           widget.project.name,
                           style: const TextStyle(
-                            fontSize: 12,
+                            fontSize: 13,
                             color: AppColors.textLight,
                           ),
                         ),
@@ -561,9 +549,9 @@ class _ExportSheetState extends State<_ExportSheet> {
               ),
               const SizedBox(height: 16),
               const Text(
-                'INCLUDE IN REPORT',
+                'Include in report',
                 style: TextStyle(
-                  fontSize: 11,
+                  fontSize: 13,
                   fontWeight: FontWeight.w700,
                   color: AppColors.textLight,
                   letterSpacing: 0.8,
@@ -652,7 +640,7 @@ class _ExportSheetState extends State<_ExportSheet> {
           decoration: BoxDecoration(
             color: value
                 ? AppColors.primary.withValues(alpha: 0.06)
-                : const Color(0xFFF8F9FF),
+                : const Color(0xFFF6F7F9),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: value
@@ -683,7 +671,7 @@ class _ExportSheetState extends State<_ExportSheet> {
                     Text(
                       subtitle,
                       style: const TextStyle(
-                        fontSize: 11,
+                        fontSize: 13,
                         color: AppColors.textLight,
                       ),
                     ),
@@ -716,7 +704,7 @@ class _ExportSheetState extends State<_ExportSheet> {
           color: isPrimary ? AppColors.primary : Colors.white,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: isPrimary ? AppColors.primary : Color(0xFFDDE0F0),
+            color: isPrimary ? AppColors.primary : Color(0xFFE4E7EC),
           ),
           boxShadow: isPrimary
               ? [
@@ -822,7 +810,7 @@ class _ExportSheetState extends State<_ExportSheet> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Export failed: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: const Color(0xFFC01048),
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
@@ -901,7 +889,7 @@ class _ReportPdfBuilder {
                     'Project Report',
                     style: const pw.TextStyle(
                       color: PdfColors.white,
-                      fontSize: 11,
+                      fontSize: 13,
                     ),
                   ),
                 ],
@@ -913,7 +901,7 @@ class _ReportPdfBuilder {
                     project.name,
                     style: pw.TextStyle(
                       color: PdfColors.white,
-                      fontSize: 12,
+                      fontSize: 13,
                       fontWeight: pw.FontWeight.bold,
                     ),
                   ),
@@ -921,7 +909,7 @@ class _ReportPdfBuilder {
                     '${_fmt(fromDate)} – ${_fmt(toDate)}',
                     style: const pw.TextStyle(
                       color: PdfColors.white,
-                      fontSize: 10,
+                      fontSize: 12,
                     ),
                   ),
                 ],
@@ -970,7 +958,7 @@ class _ReportPdfBuilder {
                     pw.Text(
                       '${(project.progress * 100).toStringAsFixed(1)}% Complete',
                       style: pw.TextStyle(
-                        fontSize: 11,
+                        fontSize: 13,
                         fontWeight: pw.FontWeight.bold,
                         color: primaryColor,
                       ),
@@ -1163,7 +1151,7 @@ class _ReportPdfBuilder {
                         child: pw.Text(
                           '… and ${entries.length - 100} more entries not shown',
                           style: pw.TextStyle(
-                            fontSize: 8,
+                            fontSize: 12,
                             color: textGray,
                             fontStyle: pw.FontStyle.italic,
                           ),
@@ -1219,7 +1207,7 @@ class _ReportPdfBuilder {
                           pw.Text(
                             phase.phaseName,
                             style: pw.TextStyle(
-                              fontSize: 11,
+                              fontSize: 13,
                               fontWeight: pw.FontWeight.bold,
                               color: textDark,
                             ),
@@ -1227,7 +1215,7 @@ class _ReportPdfBuilder {
                           pw.Text(
                             '$done / $total ($pct)',
                             style: pw.TextStyle(
-                              fontSize: 10,
+                              fontSize: 12,
                               fontWeight: pw.FontWeight.bold,
                               color: primaryColor,
                             ),
@@ -1242,7 +1230,7 @@ class _ReportPdfBuilder {
                             child: pw.Text(
                               '${a.completed ? "[x]" : "[ ]"} ${a.name}',
                               style: pw.TextStyle(
-                                fontSize: 9,
+                                fontSize: 12,
                                 color: a.completed ? textDark : textGray,
                               ),
                             ),
@@ -1333,7 +1321,7 @@ class _ReportPdfBuilder {
     child: pw.Text(
       title.toUpperCase(),
       style: pw.TextStyle(
-        fontSize: 11,
+        fontSize: 13,
         fontWeight: pw.FontWeight.bold,
         color: color,
         letterSpacing: 1.2,
@@ -1359,7 +1347,7 @@ class _ReportPdfBuilder {
           pw.Text(
             label,
             style: pw.TextStyle(
-              fontSize: 9,
+              fontSize: 12,
               color: PdfColor.fromHex('#8A92A6'),
             ),
           ),
@@ -1384,7 +1372,7 @@ class _ReportPdfBuilder {
         child: pw.Text(
           text,
           style: pw.TextStyle(
-            fontSize: 9,
+            fontSize: 12,
             fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal,
             color: color ?? PdfColor.fromHex('#1A1D3A'),
           ),
@@ -1451,7 +1439,7 @@ class _ReportPdfBuilder {
               pw.Text(
                 e.key,
                 style: pw.TextStyle(
-                  fontSize: 9,
+                  fontSize: 12,
                   color: textDark,
                   fontWeight: pw.FontWeight.bold,
                 ),
@@ -1478,13 +1466,7 @@ class _ExportDetailsHintCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE0E5FF)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 10,
-          ),
-        ],
+        border: Border.all(color: Bt.line),
       ),
       child: Row(
         children: [
@@ -1493,7 +1475,7 @@ class _ExportDetailsHintCard extends StatelessWidget {
             height: 44,
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [Color(0xFF4A6CF7), Color(0xFF7C3AED)],
+                colors: [Color(0xFF0B63CE), Color(0xFF0B63CE)],
               ),
               borderRadius: BorderRadius.circular(13),
             ),
@@ -1539,7 +1521,7 @@ class _ExportDetailsHintCard extends StatelessWidget {
                 'Export',
                 style: TextStyle(
                   color: Colors.white,
-                  fontSize: 12.5,
+                  fontSize: 13,
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -1600,7 +1582,7 @@ class _ProjectSummaryCard extends StatelessWidget {
             children: [
               if (project.id != 'all')
                 Text(
-                  'Stage: ${project.stage.name.toUpperCase()}',
+                  'Stage: ${project.stage.name[0].toUpperCase()}${project.stage.name.substring(1).toLowerCase()}',
                   style: AppTheme.label.copyWith(color: AppColors.primary),
                 )
               else
@@ -1638,7 +1620,7 @@ class _ProjectSummaryCard extends StatelessWidget {
             child: LinearProgressIndicator(
               value: spentPct,
               minHeight: 8,
-              backgroundColor: const Color(0xFFE8ECF8),
+              backgroundColor: const Color(0xFFEEF1F5),
               valueColor: AlwaysStoppedAnimation<Color>(
                 isOver ? AppColors.error : AppColors.primary,
               ),
@@ -1712,7 +1694,7 @@ class _CategoryBreakdownCard extends StatelessWidget {
                         formatCurrency(cost),
                         style: TextStyle(
                           color: color,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w700,
                           fontSize: 13,
                         ),
                       ),
@@ -1720,7 +1702,7 @@ class _CategoryBreakdownCard extends StatelessWidget {
                         hasBudget ? ' / ${formatCurrency(budget)}' : ' / —',
                         style: AppTheme.caption.copyWith(
                           color: AppColors.textLight,
-                          fontSize: 11,
+                          fontSize: 13,
                         ),
                       ),
                       const SizedBox(width: 6),
@@ -1739,7 +1721,7 @@ class _CategoryBreakdownCard extends StatelessWidget {
                           borderRadius: BorderRadius.circular(16),
                           child: LinearProgressIndicator(
                             value: pct,
-                            backgroundColor: const Color(0xFFEEF0F8),
+                            backgroundColor: const Color(0xFFEEF1F5),
                             valueColor: AlwaysStoppedAnimation<Color>(color),
                             minHeight: 8,
                           ),
@@ -1756,7 +1738,7 @@ class _CategoryBreakdownCard extends StatelessWidget {
                           style: TextStyle(
                             color: color,
                             fontWeight: FontWeight.w700,
-                            fontSize: 11,
+                            fontSize: 13,
                           ),
                         ),
                       ),
