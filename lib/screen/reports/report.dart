@@ -10,6 +10,7 @@ import 'package:buildtrack_mobile/models/project_model.dart';
 import 'package:buildtrack_mobile/screen/reports/report_export_helper.dart';
 import 'package:buildtrack_mobile/screen/reports/csv_import_helper.dart';
 import 'package:buildtrack_mobile/screen/reports/report_widgets.dart' show EfficiencyBanner;
+import 'package:buildtrack_mobile/screen/reports/report_sheet.dart';
 import 'package:buildtrack_mobile/services/api_service.dart';
 import 'package:flutter/material.dart';
 import 'package:showcaseview/showcaseview.dart';
@@ -82,6 +83,8 @@ class ReportFilterState {
   static int currentPage = 1;
   static String? lastKnownProjectProviderId;
   static bool hasSavedFilters = false;
+  /// Entries show as a spreadsheet (true) or as the card list (false).
+  static bool tableView = true;
 
   static void reset() {
     selectedProjectId = 'all';
@@ -139,6 +142,7 @@ class _ReportsViewState extends State<_ReportsView> {
   bool _sortAscending = ReportFilterState.sortAscending;
   int _currentPage = ReportFilterState.currentPage;
   int _rowsPerPage = 10;
+  bool _tableView = ReportFilterState.tableView;
   List<String> _activeColumnsAll = [
     'Purchased Date',
     'Project',
@@ -1117,6 +1121,71 @@ class _ReportsViewState extends State<_ReportsView> {
     return quickCategoryTab;
   }
 
+  /// Every word typed must appear somewhere in the entry: its text fields
+  /// (item, contractor, supplier, worker, notes, payment notes…), project,
+  /// payment status, dates or amounts. "ravi cement" finds Ravi's cement entries.
+  bool _matchesSearch(EntryModel entry, String projectName, String rawQuery) {
+    final query = rawQuery.toLowerCase().trim();
+    if (query.isEmpty) return true;
+    final text = _searchTextOf(entry);
+    final extra = [
+      projectName.toLowerCase(),
+      _getPaymentStatusLabel(entry.paymentStatus, amount: entry.amount, paidAmount: entry.paidAmount).toLowerCase(),
+      _formatDateShort(entry.date).toLowerCase(),
+      formatDate(entry.date).toLowerCase(),
+      if (entry.paymentDate != null) _formatDateShort(entry.paymentDate!).toLowerCase(),
+      if (entry.paymentDate != null) formatDate(entry.paymentDate).toLowerCase(),
+      for (final v in [entry.amount, entry.ratePerUnit ?? 0, entry.paidAmount, entry.remainingAmount]) ...[
+        _formatIndianCurrency(v).toLowerCase(),
+        formatInr(v).toLowerCase(),
+      ],
+    ].join('\u0001');
+    final numbers = [
+      for (final v in [entry.amount, entry.ratePerUnit, entry.paidAmount, entry.remainingAmount, entry.quantity])
+        if (v != null) ...[v.toString(), v.toInt().toString(), v.toStringAsFixed(2)],
+    ].join(' ');
+
+    bool tokenMatches(String token) {
+      if (text.contains(token) || extra.contains(token)) return true;
+      final cleanNumeric = token
+          .replaceAll(RegExp(r'^(rs\.?|₹)\s*', caseSensitive: false), '')
+          .replaceAll(',', '')
+          .trim();
+      return cleanNumeric.isNotEmpty &&
+          RegExp(r'^[\d.]+$').hasMatch(cleanNumeric) &&
+          numbers.contains(cleanNumeric);
+    }
+
+    if (tokenMatches(query)) return true;
+    final tokens = query.split(RegExp(r'\s+')).where((t) => t.isNotEmpty).toList();
+    return tokens.length > 1 && tokens.every(tokenMatches);
+  }
+
+  /// Lower-cased searchable text for an entry, built once per entry object.
+  static final Expando<String> _searchTextCache = Expando<String>();
+  static String _searchTextOf(EntryModel e) {
+    final cached = _searchTextCache[e];
+    if (cached != null) return cached;
+    final out = StringBuffer();
+    void add(String? v) {
+      final s = v?.trim();
+      if (s != null && s.isNotEmpty) out..write(s.toLowerCase())..write('\u0001');
+    }
+
+    for (final v in [
+      e.description, e.brand, e.contractor, e.supplier, e.category, e.workerName,
+      e.notes, e.remarks, e.floor, e.phase, e.activity, e.unit, e.type.name,
+      e.approvedBy, e.paymentMode, e.rejectionReason,
+    ]) {
+      add(v);
+    }
+    for (final p in e.paymentHistory) {
+      _collectSearchText(p, add);
+    }
+    if (e.rawJson != null) _collectSearchText(e.rawJson, add);
+    return _searchTextCache[e] = out.toString();
+  }
+
   List<EntryModel> _filterEntries(ProjectProvider projectProvider, String quickCategoryTab) {
     final List<EntryModel> allEntries = projectProvider.entries;
     String getProjectName(String id) {
@@ -1160,99 +1229,9 @@ class _ReportsViewState extends State<_ReportsView> {
       if (!_selectedTypes.contains(entry.type)) {
         return false;
       }
-      if (_searchQuery.isNotEmpty) {
-        final query = _searchQuery.toLowerCase().trim();
-        final cleanNumeric = query
-            .replaceAll(RegExp(r'^(rs\.?|₹)\s*', caseSensitive: false), '')
-            .replaceAll(',', '')
-            .trim();
-        final projectName = getProjectName(entry.projectId).toLowerCase();
-        final descMatch = entry.description.toLowerCase().contains(query);
-        final brandMatch = (entry.brand ?? '').toLowerCase().contains(query);
-        final contractorMatch =
-            (entry.contractor ?? '').toLowerCase().contains(query);
-        final supplierMatch =
-            (entry.supplier ?? '').toLowerCase().contains(query);
-        final categoryMatch =
-            (entry.category ?? '').toLowerCase().contains(query);
-        final workerMatch =
-            (entry.workerName ?? '').toLowerCase().contains(query);
-        final notesMatch = (entry.notes ?? '').toLowerCase().contains(query);
-        final remarksMatch =
-            (entry.remarks ?? '').toLowerCase().contains(query);
-        final projectMatch = projectName.contains(query);
-        final floorMatch = (entry.floor ?? '').toLowerCase().contains(query);
-        final phaseMatch = (entry.phase ?? '').toLowerCase().contains(query);
-        final activityMatch =
-            (entry.activity ?? '').toLowerCase().contains(query);
-        final unitMatch = (entry.unit ?? '').toLowerCase().contains(query);
-        final typeMatch = entry.type.name.toLowerCase().contains(query);
-        final statusMatch = _getPaymentStatusLabel(
-          entry.paymentStatus,
-          amount: entry.amount,
-          paidAmount: entry.paidAmount,
-        ).toLowerCase().contains(query);
-        final dateMatch =
-            _formatDateShort(entry.date).toLowerCase().contains(query);
-        final payDateMatch = entry.paymentDate != null
-            ? _formatDateShort(entry.paymentDate!).toLowerCase().contains(query)
-            : false;
-
-        bool amountMatch = false;
-        if (cleanNumeric.isNotEmpty) {
-          amountMatch = entry.amount.toString().contains(cleanNumeric) ||
-              entry.amount.toInt().toString().contains(cleanNumeric) ||
-              entry.amount.toStringAsFixed(2).contains(cleanNumeric) ||
-              (entry.ratePerUnit ?? 0).toString().contains(cleanNumeric) ||
-              (entry.ratePerUnit ?? 0).toInt().toString().contains(cleanNumeric) ||
-              (entry.ratePerUnit ?? 0).toStringAsFixed(2).contains(cleanNumeric) ||
-              entry.paidAmount.toString().contains(cleanNumeric) ||
-              entry.paidAmount.toInt().toString().contains(cleanNumeric) ||
-              entry.remainingAmount.toString().contains(cleanNumeric) ||
-              entry.remainingAmount.toInt().toString().contains(cleanNumeric) ||
-              (entry.quantity ?? 0).toString().contains(cleanNumeric);
-        }
-        if (!amountMatch) {
-          amountMatch =
-              _formatIndianCurrency(entry.amount).toLowerCase().contains(query) ||
-              _formatIndianCurrency(entry.ratePerUnit ?? 0).toLowerCase().contains(query) ||
-              _formatIndianCurrency(entry.paidAmount).toLowerCase().contains(query) ||
-              _formatIndianCurrency(entry.remainingAmount).toLowerCase().contains(query);
-        }
-
-        bool rawJsonMatch = false;
-        if (entry.rawJson != null) {
-          for (final val in entry.rawJson!.values) {
-            if (val != null &&
-                val is String &&
-                val.toLowerCase().contains(query)) {
-              rawJsonMatch = true;
-              break;
-            }
-          }
-        }
-
-        if (!descMatch &&
-            !brandMatch &&
-            !contractorMatch &&
-            !supplierMatch &&
-            !categoryMatch &&
-            !workerMatch &&
-            !notesMatch &&
-            !remarksMatch &&
-            !projectMatch &&
-            !floorMatch &&
-            !phaseMatch &&
-            !activityMatch &&
-            !unitMatch &&
-            !amountMatch &&
-            !typeMatch &&
-            !statusMatch &&
-            !dateMatch &&
-            !payDateMatch &&
-            !rawJsonMatch) {
-          return false;
-        }
+      if (_searchQuery.isNotEmpty &&
+          !_matchesSearch(entry, getProjectName(entry.projectId), _searchQuery)) {
+        return false;
       }
       if (quickCategoryTab != 'All' &&
           _selectedItemName != null &&
@@ -1617,6 +1596,9 @@ class _ReportsViewState extends State<_ReportsView> {
     final periodChip = _datePreset == 'Custom' && (_startDate != null || _endDate != null)
         ? '${_startDate == null ? '…' : formatShortDate(_startDate)} – ${_endDate == null ? '…' : formatShortDate(_endDate)}'
         : _sentence(_datePreset);
+    final showSheet = _tableView &&
+        !(quickCategoryTab != 'All' && !_reportGenerated) &&
+        paginatedEntries.isNotEmpty;
     final extraFilters = [
       _selectedFloor,
       _selectedPhaseId,
@@ -1762,8 +1744,20 @@ class _ReportsViewState extends State<_ReportsView> {
                     const SizedBox(height: 28),
                     Row(
                       children: [
-                        Expanded(child: Text(entriesTitle, style: BtText.title(context))),
-                        Text('$totalCount', style: BtText.num(BtText.subhead(context))),
+                        Expanded(
+                          child: Text('Entries', maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.title(context)),
+                        ),
+                        if (!_tableView) ...[
+                          Text('$totalCount', style: BtText.num(BtText.subhead(context))),
+                          const SizedBox(width: 8),
+                        ],
+                        ReportViewToggle(
+                          table: _tableView,
+                          onChanged: (v) => setState(() {
+                            _tableView = v;
+                            ReportFilterState.tableView = v;
+                          }),
+                        ),
                         const SizedBox(width: 4),
                         BtIconButton(
                           icon: Icons.more_horiz_rounded,
@@ -1800,13 +1794,50 @@ class _ReportsViewState extends State<_ReportsView> {
                           title: 'No transaction logs match filters.',
                         ),
                       )
-                    else ...[
+                    else if (!_tableView) ...[
                       ..._buildEntryGroups(context, paginatedEntries, getProjectName),
                       if (totalCount > _rowsPerPage || _rowsPerPage != 10)
                         _buildPager(context, safeCurrentPage, totalPages)
                       else
                         const SizedBox(height: 4),
                     ],
+                  ],
+                ),
+              ),
+              // The spreadsheet runs edge to edge, so it sits outside the padded column.
+              if (showSheet) ...[
+                ReportSheet(
+                  entries: paginatedEntries,
+                  columns: activeCols,
+                  totalCount: totalCount,
+                  projectNameOf: (e) => getProjectName(e.projectId),
+                  statusOf: (e) => _getPaymentStatusLabel(e.paymentStatus, amount: e.amount, paidAmount: e.paidAmount),
+                  sortColumn: _sortColumn,
+                  sortAscending: _sortAscending,
+                  onSort: (column, ascending) => setState(() {
+                    _sortColumn = column;
+                    _sortAscending = ascending;
+                    _currentPage = 1;
+                    ReportFilterState.sortColumn = column;
+                    ReportFilterState.sortAscending = ascending;
+                  }),
+                  onRowTap: (e) => _showEntryDetailsDialog(context, e, getProjectName(e.projectId)),
+                  onAddMore: (e) => _ReportActions.addMore(context, e),
+                  onRecordPayment: (e) => _ReportActions.recordPayment(context, e, getProjectName(e.projectId)),
+                  onEdit: (e) => _ReportActions.editEntry(context, e),
+                  onEditColumns: () => _showCustomizeColumnsDialog(context, quickCategoryTab.isEmpty ? 'All' : quickCategoryTab),
+                  onFullScreen: openFullScreen,
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(Bt.gutter, 4, Bt.gutter, 0),
+                  child: _buildPager(context, safeCurrentPage, totalPages),
+                ),
+              ],
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: Bt.gutter),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
                     const SizedBox(height: 28),
                     Showcase(
                       key: ShowcaseKeys.reportCSV,
@@ -3352,6 +3383,32 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
         ),
       ),
     );
+  }
+}
+
+final _objectIdPattern = RegExp(r'^[0-9a-fA-F]{24}$');
+final _isoTimestampPattern = RegExp(r'^\d{4}-\d{2}-\d{2}([T ]|$)');
+final _skipSearchKeyPattern = RegExp(
+  r'(^_?id$|^__v$|Id$|_id$|url|image|photo|receipt|signature|screenshot|attachment|token|password|^project$|^progress$)',
+  caseSensitive: false,
+);
+
+/// Feeds every text value of a raw transaction to [add] — nested ones too
+/// (worker name and trade, payment notes) — but not ids, links or raw
+/// timestamps, which would make short searches like "65" match everything.
+void _collectSearchText(dynamic value, void Function(String?) add) {
+  if (value is Map) {
+    value.forEach((k, v) {
+      if (!_skipSearchKeyPattern.hasMatch(k.toString())) _collectSearchText(v, add);
+    });
+  } else if (value is List) {
+    for (final v in value) {
+      _collectSearchText(v, add);
+    }
+  } else if (value is String) {
+    final s = value.trim();
+    if (_objectIdPattern.hasMatch(s) || _isoTimestampPattern.hasMatch(s)) return;
+    add(s);
   }
 }
 
