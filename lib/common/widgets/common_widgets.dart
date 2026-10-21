@@ -1,8 +1,6 @@
 import 'package:buildtrack_mobile/controller/nav_controller.dart';
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:buildtrack_mobile/design/design.dart';
-import 'package:buildtrack_mobile/services/api_service.dart';
 import 'package:buildtrack_mobile/common/widgets/log_sheet.dart';
 import 'package:provider/provider.dart';
 import 'package:buildtrack_mobile/controller/user_session.dart';
@@ -55,132 +53,118 @@ class AppTopBar extends StatelessWidget {
     );
   }
 }
-/// Bottom tab bar (DESIGN.md §6 BtTabBar). Tabs are role-filtered exactly as before
-/// (NavController.isRouteEnabled). Centre + opens the Log sheet. Inbox shows unread count.
-class AppBottomNav extends StatefulWidget {
+/// Bottom dock (Design V2): floating noir bar, accent + in the middle.
+/// Tabs are role-filtered exactly as before (NavController.isRouteEnabled):
+/// Home · Projects · + (log sheet) · Insights · Reports.
+/// Inbox moved to the bell on Home (approvals live on Home too).
+class AppBottomNav extends StatelessWidget {
   AppBottomNav({super.key});
-  @override
-  State<AppBottomNav> createState() => _AppBottomNavState();
-}
-
-class _AppBottomNavState extends State<AppBottomNav> {
-  static int _lastUnread = 0;
-  int _unread = _lastUnread;
-  Timer? _timer;
-
-  @override
-  void initState() {
-    super.initState();
-    _fetchUnread();
-    _timer = Timer.periodic(const Duration(seconds: 60), (_) => _fetchUnread());
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
-
-  Future<void> _fetchUnread() async {
-    try {
-      final count = await ApiService.getUnreadNotificationCount();
-      _lastUnread = count;
-      if (mounted) setState(() => _unread = count);
-    } catch (_) {}
-  }
 
   @override
   Widget build(BuildContext context) {
     final nav = context.watch<NavController>();
-    return Container(
-      decoration: const BoxDecoration(
-        color: Color(0xF5FFFFFF),
-        border: Border(top: BorderSide(color: Bt.line)),
-      ),
-      child: SafeArea(
-        top: false,
-        child: SizedBox(
-          height: 58,
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              _navItem(context, nav, '/home', Icons.home_outlined, Icons.home_rounded, 'Home'),
-              if (nav.isRouteEnabled('/projects'))
-                Expanded(
-                  child: Showcase(
-                    key: ShowcaseKeys.projects,
-                    description: 'Click here to view your projects and create new ones.',
-                    child: _navItem(context, nav, '/projects', Icons.apartment_outlined, Icons.apartment_rounded, 'Projects', expanded: false),
-                  ),
+    final bottom = MediaQuery.paddingOf(context).bottom;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(14, 6, 14, bottom > 0 ? bottom : 14),
+      child: Container(
+        height: 68,
+        decoration: BoxDecoration(
+          color: const Color(0xF20E1015),
+          borderRadius: BorderRadius.circular(26),
+          border: Border.all(color: Colors.white.withValues(alpha: .06)),
+          boxShadow: const [BoxShadow(color: Color(0x660A0B0E), blurRadius: 40, spreadRadius: -18, offset: Offset(0, 22))],
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 6),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            _tab(context, nav, '/home', Icons.home_outlined, Icons.home_rounded, 'Home'),
+            if (nav.isRouteEnabled('/projects'))
+              Expanded(
+                child: Showcase(
+                  key: ShowcaseKeys.projects,
+                  description: 'Click here to view your projects and create new ones.',
+                  child: _tab(context, nav, '/projects', Icons.apartment_outlined, Icons.apartment_rounded, 'Projects', expanded: false),
                 ),
-              if (nav.isRouteEnabled('/add-entry'))
-                Expanded(
-                  child: Showcase(
-                    key: ShowcaseKeys.addEntry,
-                    description: 'Click here to add daily entries.',
-                    child: _entryButton(context),
-                  ),
+              ),
+            if (nav.isRouteEnabled('/add-entry'))
+              Expanded(
+                child: Showcase(
+                  key: ShowcaseKeys.addEntry,
+                  description: 'Click here to add daily entries.',
+                  child: const _PlusButton(),
                 ),
-              _navItem(context, nav, '/inbox', Icons.inbox_outlined, Icons.inbox_rounded, 'Inbox', badge: _unread),
-              if (nav.isRouteEnabled('/reports'))
-                Expanded(
-                  child: Showcase(
-                    key: ShowcaseKeys.reports,
-                    description: 'View detailed project reports and bulk CSV imports here.',
-                    child: _navItem(context, nav, '/reports', Icons.bar_chart_outlined, Icons.bar_chart_rounded, 'Reports', expanded: false),
-                  ),
+              ),
+            if (nav.isRouteEnabled('/insights'))
+              _tab(context, nav, '/insights', Icons.insights_outlined, Icons.insights_rounded, 'Insights'),
+            if (nav.isRouteEnabled('/reports'))
+              Expanded(
+                child: Showcase(
+                  key: ShowcaseKeys.reports,
+                  description: 'View detailed project reports and bulk CSV imports here.',
+                  child: _tab(context, nav, '/reports', Icons.bar_chart_outlined, Icons.bar_chart_rounded, 'Reports', expanded: false),
                 ),
-            ],
-          ),
+              ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _navItem(BuildContext context, NavController nav, String route, IconData icon, IconData activeIcon, String label, {bool expanded = true, int badge = 0}) {
+  Widget _tab(BuildContext context, NavController nav, String route, IconData icon, IconData activeIcon, String label, {bool expanded = true}) {
     final isActive = nav.currentRoute == route;
-    final color = isActive ? context.bt.brand : Bt.ink3;
-    final item = Semantics(
-      button: true,
-      selected: isActive,
-      label: label,
-      child: InkWell(
-        onTap: () => nav.setRoute(route, context),
-        borderRadius: BorderRadius.circular(12),
-        child: SizedBox(
-          height: 52,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Stack(clipBehavior: Clip.none, children: [
-                Icon(isActive ? activeIcon : icon, size: 24, color: color),
-                if (badge > 0) Positioned(top: -4, right: -12, child: BtCountBadge(count: badge)),
-              ]),
-              const SizedBox(height: 3),
-              Text(label, maxLines: 1, style: BtText.tabLabel(context, color).copyWith(fontWeight: isActive ? FontWeight.w600 : FontWeight.w500)),
-            ],
-          ),
+    final accent = context.bt.accent;
+    final item = BtPressable(
+      semanticLabel: label,
+      scale: .9,
+      onTap: isActive ? null : () => nav.setRoute(route, context),
+      child: SizedBox(
+        height: 56,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            AnimatedSwitcher(
+              duration: Bt.fast,
+              child: Icon(isActive ? activeIcon : icon, key: ValueKey(isActive), size: 23, color: isActive ? accent : const Color(0xFF8A909C)),
+            ),
+            const SizedBox(height: 4),
+            Text(label, maxLines: 1, style: BtText.tabLabel(context, isActive ? Bt.bone : const Color(0xFF8A909C)).copyWith(fontWeight: isActive ? FontWeight.w600 : FontWeight.w500)),
+            const SizedBox(height: 3),
+            AnimatedContainer(
+              duration: Bt.medium,
+              curve: Bt.spring,
+              width: isActive ? 4 : 0,
+              height: 4,
+              decoration: BoxDecoration(color: accent, shape: BoxShape.circle),
+            ),
+          ],
         ),
       ),
     );
     return expanded ? Expanded(child: item) : item;
   }
+}
 
-  Widget _entryButton(BuildContext context) {
+class _PlusButton extends StatelessWidget {
+  const _PlusButton();
+  @override
+  Widget build(BuildContext context) {
     final bt = context.bt;
-    return Semantics(
-      button: true,
-      label: 'Log an entry',
-      child: Center(
-        child: InkWell(
+    return Center(
+      child: Transform.translate(
+        offset: const Offset(0, -12),
+        child: BtPressable(
+          semanticLabel: 'Log an entry',
+          scale: .9,
           onTap: () => showLogSheet(context),
-          borderRadius: BorderRadius.circular(14),
           child: Container(
-            width: 56,
-            height: 44,
+            width: 58,
+            height: 58,
             decoration: BoxDecoration(
-              gradient: bt.signature,
-              borderRadius: BorderRadius.circular(14),
+              color: bt.accent,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0xFF0E1015), width: 5),
+              boxShadow: [BoxShadow(color: bt.accent.withValues(alpha: .55), blurRadius: 26, spreadRadius: -10, offset: const Offset(0, 12))],
             ),
             child: Icon(Icons.add_rounded, color: bt.onAccent, size: 28),
           ),

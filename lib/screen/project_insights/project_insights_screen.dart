@@ -13,10 +13,14 @@ import 'package:flutter/services.dart' show SystemUiOverlayStyle;
 /// scroll (Hick's law / progressive disclosure), ≥48dp targets, phase detail as
 /// its own page so the back gesture works as expected.
 class ProjectInsightsScreen extends StatefulWidget {
-  const ProjectInsightsScreen({super.key, required this.projectId, this.projectName});
+  const ProjectInsightsScreen({super.key, required this.projectId, this.projectName, this.embedded = false});
 
   final String projectId;
   final String? projectName;
+
+  /// Used by the Insights tab: no app bar / bottom tab bar of its own —
+  /// the three sections become a segmented control at the top instead.
+  final bool embedded;
 
   @override
   State<ProjectInsightsScreen> createState() => _ProjectInsightsScreenState();
@@ -52,6 +56,19 @@ class _ProjectInsightsScreenState extends State<ProjectInsightsScreen> {
         future: _future,
         builder: (context, snap) {
           final data = snap.data;
+          if (widget.embedded) {
+            return ColoredBox(
+              color: Ins.bg,
+              child: Column(children: [
+                if (data != null)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(Ins.gutter, 14, Ins.gutter, 2),
+                    child: _EmbeddedTabs(value: _tab, onChanged: (i) => setState(() => _tab = i)),
+                  ),
+                Expanded(child: _body(snap, data)),
+              ]),
+            );
+          }
           return Scaffold(
             backgroundColor: Ins.bg,
             appBar: _AppBar(
@@ -104,25 +121,29 @@ class _ProjectInsightsScreenState extends State<ProjectInsightsScreen> {
                       ),
                     ),
                   ),
-            body: switch (snap.connectionState) {
-              ConnectionState.done when data != null => RefreshIndicator(
-                color: Ins.primary,
-                onRefresh: _refresh,
-                child: AnimatedSwitcher(
-                  duration: Ins.motion,
-                  child: KeyedSubtree(key: ValueKey(_tab), child: _tabBody(data)),
-                ),
-              ),
-              ConnectionState.done => _Error(
-                message: '${snap.error ?? 'Could not load insights'}'.replaceFirst('Exception: ', ''),
-                onRetry: _refresh,
-              ),
-              _ => const _Skeleton(),
-            },
+            body: _body(snap, data),
           );
         },
       ),
     );
+  }
+
+  Widget _body(AsyncSnapshot<ProjectInsights> snap, ProjectInsights? data) {
+    return switch (snap.connectionState) {
+      ConnectionState.done when data != null => RefreshIndicator(
+        color: Ins.primary,
+        onRefresh: _refresh,
+        child: AnimatedSwitcher(
+          duration: Ins.motion,
+          child: KeyedSubtree(key: ValueKey(_tab), child: _tabBody(data)),
+        ),
+      ),
+      ConnectionState.done => _Error(
+        message: '${snap.error ?? 'Could not load insights'}'.replaceFirst('Exception: ', ''),
+        onRetry: _refresh,
+      ),
+      _ => const _Skeleton(),
+    };
   }
 
   Widget _tabBody(ProjectInsights d) {
@@ -286,4 +307,41 @@ class _Error extends StatelessWidget {
       ),
     ),
   );
+}
+
+/// Overview · Phases · Money as a segmented control (embedded mode).
+class _EmbeddedTabs extends StatelessWidget {
+  const _EmbeddedTabs({required this.value, required this.onChanged});
+  final int value;
+  final ValueChanged<int> onChanged;
+  static const _labels = ['Overview', 'Phases', 'Money'];
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 44,
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(color: Ins.muted, borderRadius: BorderRadius.circular(14)),
+      child: Row(children: [
+        for (var i = 0; i < _labels.length; i++)
+          Expanded(
+            child: Semantics(
+              button: true,
+              selected: i == value,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => onChanged(i),
+                child: AnimatedContainer(
+                  duration: Ins.motion,
+                  alignment: Alignment.center,
+                  decoration: i == value
+                      ? BoxDecoration(color: Ins.card, borderRadius: BorderRadius.circular(10), boxShadow: const [BoxShadow(color: Color(0x1A0F172A), blurRadius: 3, offset: Offset(0, 1))])
+                      : null,
+                  child: Text(_labels[i], style: Ins.t(14, w: i == value ? FontWeight.w600 : FontWeight.w500, c: i == value ? Ins.ink : Ins.ink3)),
+                ),
+              ),
+            ),
+          ),
+      ]),
+    );
+  }
 }

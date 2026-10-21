@@ -13,9 +13,9 @@ class Ins {
   Ins._();
 
   // Surfaces
-  static const bg = Color(0xFFF8FAFC); // slate-50
+  static const bg = Color(0xFFF2F0EB); // V2 bone
   static const card = Colors.white;
-  static const muted = Color(0xFFF1F5F9); // slate-100
+  static const muted = Color(0xFFE9E6DF); // V2 bone-dark
   static const border = Color(0xFFE2E8F0); // slate-200
   static const borderStrong = Color(0xFFCBD5E1); // slate-300
 
@@ -25,8 +25,8 @@ class Ins {
   static const ink3 = Color(0xFF64748B); // slate-500 (4.8:1 on white)
 
   // Accent
-  static const primary = Color(0xFF4F46E5); // indigo-600
-  static const primarySoft = Color(0xFFEEF2FF);
+  static const primary = Color(0xFF111317); // V2 ink
+  static const primarySoft = Color(0xFFE9E6DF); // V2 bone-dark
 
   // Data
   static const material = Color(0xFF2A78D6);
@@ -41,8 +41,8 @@ class Ins {
   static const warnSoft = Color(0xFFFEF3C7);
   static const bad = Color(0xFFDC2626);
   static const badSoft = Color(0xFFFEE2E2);
-  static const info = Color(0xFF4F46E5);
-  static const infoSoft = Color(0xFFEEF2FF);
+  static const info = Color(0xFF111317);
+  static const infoSoft = Color(0xFFE9E6DF);
 
   // Diverging (under ↔ over) — blue ↔ red around a neutral grey
   static const under = Color(0xFF2A78D6);

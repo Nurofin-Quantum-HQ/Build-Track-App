@@ -19,15 +19,11 @@ class ThemeProvider extends ChangeNotifier {
     {'name': 'Slate', 'color': const Color(0xFF64748B)},
   ];
 
-  /// Built-in design presets (DESIGN.md §4). Identified by their brand colour,
-  /// which is what `themePreference` already stores — no new storage or API.
-  static const Map<BtPreset, Color> presetColors = {
-    BtPreset.harbor: BtTheme.harborBrand,
-    BtPreset.nurofin: BtTheme.nurofinBrand,
-    BtPreset.site: BtTheme.siteInk,
-  };
+  /// Built-in accent presets (Design V2). Identified by their colour, which is
+  /// what `themePreference` already stores — no new storage or API.
+  static const Map<BtPreset, Color> presetColors = BtTheme.presetColors;
 
-  Color _currentColor = BtTheme.harborBrand;
+  Color _currentColor = BtTheme.brass;
   Color get currentColor => _currentColor;
 
   BtPreset get preset {

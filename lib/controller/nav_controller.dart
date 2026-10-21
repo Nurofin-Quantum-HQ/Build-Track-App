@@ -11,12 +11,14 @@ class NavController extends ChangeNotifier {
         return 1;
       case '/add-entry':
         return 2;
-      case '/inventory':
+      case '/insights':
         return 3;
       case '/reports':
         return 4;
-      case '/inbox':
+      case '/inventory':
         return 5;
+      case '/inbox':
+        return 6;
       default:
         return 0;
     }
@@ -27,6 +29,8 @@ class NavController extends ChangeNotifier {
     if (route == '/add-entry') return RoleManager.canAddEntries;
     if (route == '/inventory') return RoleManager.canManageInventory;
     if (route == '/reports') return RoleManager.canViewReports;
+    // Insights uses the same permission as the project insights entry point.
+    if (route == '/insights') return RoleManager.canViewReports;
     if (route == '/inbox') return true;
     if (route == '/logs') return RoleManager.canNavigate('/logs');
     return false;
@@ -41,8 +45,7 @@ class NavController extends ChangeNotifier {
     final items = <String>['/home'];
     if (RoleManager.canViewProjects) items.add('/projects');
     if (RoleManager.canAddEntries) items.add('/add-entry');
-    if (RoleManager.canManageInventory) items.add('/inventory');
-    items.add('/inbox');
+    if (RoleManager.canViewReports) items.add('/insights');
     if (RoleManager.canViewReports) items.add('/reports');
     return items;
   }
@@ -58,7 +61,7 @@ class NavController extends ChangeNotifier {
       0: '/home',
       1: '/projects',
       2: '/add-entry',
-      3: '/inventory',
+      3: '/insights',
       4: '/reports',
     };
     final route = routeMap[newIndex];

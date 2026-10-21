@@ -451,7 +451,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildRoleBadge(String role) => BtBadge(label: role, tone: BtTone.brand);
   Widget _buildSettingsCard() {
     final theme = context.watch<ThemeProvider>();
-    const names = {BtPreset.harbor: 'Harbor', BtPreset.nurofin: 'Nurofin', BtPreset.site: 'Site', BtPreset.custom: 'Custom colour'};
+    const names = {BtPreset.brass: 'Brass', BtPreset.ember: 'Ember', BtPreset.cobalt: 'Cobalt', BtPreset.jade: 'Jade', BtPreset.custom: 'Custom colour'};
     return BtGroup(children: [
       BtRow(
         leading: const BtTile(icon: Icons.person_outline),
@@ -621,7 +621,7 @@ class _ThemePicker extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: Bt.card,
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: selected ? t.brand : Bt.line, width: selected ? 2 : 1),
+                  border: Border.all(color: selected ? Bt.ink : Bt.line, width: selected ? 2 : 1),
                 ),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Container(
@@ -645,11 +645,13 @@ class _ThemePicker extends StatelessWidget {
 
         return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Row(children: [
-            preset(BtPreset.harbor, 'Harbor', 'Default'),
+            preset(BtPreset.brass, 'Brass', 'Default'),
             const SizedBox(width: 8),
-            preset(BtPreset.nurofin, 'Nurofin', 'Brand'),
+            preset(BtPreset.ember, 'Ember', ''),
             const SizedBox(width: 8),
-            preset(BtPreset.site, 'Site', 'Navy + orange'),
+            preset(BtPreset.cobalt, 'Cobalt', ''),
+            const SizedBox(width: 8),
+            preset(BtPreset.jade, 'Jade', ''),
           ]),
           const SizedBox(height: 20),
           Text('Or pick a colour', style: BtText.subhead(context, weight: FontWeight.w500)),

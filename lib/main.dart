@@ -25,6 +25,7 @@ import 'package:buildtrack_mobile/pages/login.dart';
 import 'package:buildtrack_mobile/screen/inventory/material_history.dart';
 import 'package:buildtrack_mobile/screen/dashboard/notification.dart';
 import 'package:buildtrack_mobile/screen/inbox/inbox_screen.dart';
+import 'package:buildtrack_mobile/screen/project_insights/insights_hub_screen.dart';
 import 'package:buildtrack_mobile/screen/profile/profile.dart';
 import 'package:buildtrack_mobile/screen/projects/project_detail.dart';
 import 'package:buildtrack_mobile/screen/projects/projectscreen.dart';
@@ -176,6 +177,7 @@ class MyApp extends StatelessWidget {
         '/project-detail': (_) => const ProjectDetailScreen(),
         '/notifications': (_) => const NotificationsScreen(),
         '/inbox': (_) => const InboxScreen(),
+        '/insights': (_) => const InsightsHubScreen(),
         '/approvals': (_) => const ApprovalsScreen(),
         '/admin-overview': (_) => const AdminOverviewScreen(),
         '/logs': (_) => const TransactionLogsScreen(),

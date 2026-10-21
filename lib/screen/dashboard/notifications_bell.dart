@@ -1,17 +1,23 @@
 import 'dart:async';
-import 'package:buildtrack_mobile/common/themes/app_colors.dart';
+import 'package:buildtrack_mobile/design/design.dart';
 import 'package:buildtrack_mobile/services/api_service.dart';
 import 'package:flutter/material.dart';
 
+/// Bell that opens the Inbox (To approve · Activity) with the unread count.
+/// Inbox left the bottom bar in Design V2, so this is its home-screen entry.
 class NotificationsBell extends StatefulWidget {
-  const NotificationsBell({super.key});
+  const NotificationsBell({super.key, this.onDark = true});
+
+  /// Glass style for the noir hero (default); `false` for light headers.
+  final bool onDark;
 
   @override
   State<NotificationsBell> createState() => _NotificationsBellState();
 }
 
 class _NotificationsBellState extends State<NotificationsBell> {
-  int _unreadCount = 0;
+  static int _last = 0;
+  int _unreadCount = _last;
   Timer? _timer;
 
   @override
@@ -28,53 +34,26 @@ class _NotificationsBellState extends State<NotificationsBell> {
   }
 
   Future<void> _fetchUnread() async {
-    final count = await ApiService.getUnreadNotificationCount();
-    if (mounted) setState(() => _unreadCount = count);
+    try {
+      final count = await ApiService.getUnreadNotificationCount();
+      _last = count;
+      if (mounted) setState(() => _unreadCount = count);
+    } catch (_) {}
   }
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => Navigator.pushNamed(context, '/notifications'),
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(7),
-            decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              Icons.notifications_none_outlined,
-              color: AppColors.primary,
-              size: 19,
-            ),
-          ),
-          if (_unreadCount > 0)
-            Positioned(
-              top: -3,
-              right: -4,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFC01048),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                constraints: const BoxConstraints(minWidth: 16),
-                child: Text(
-                  _unreadCount > 99 ? '99+' : '$_unreadCount',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
+    return BtIconButton(
+      icon: Icons.notifications_none_rounded,
+      size: 21,
+      semantic: _unreadCount > 0 ? 'Inbox, $_unreadCount unread' : 'Inbox',
+      color: widget.onDark ? Bt.bone : Bt.ink,
+      background: widget.onDark ? Colors.white.withValues(alpha: .09) : Bt.card,
+      badge: _unreadCount,
+      onTap: () async {
+        await Navigator.pushNamed(context, '/inbox');
+        _fetchUnread();
+      },
     );
   }
 }
