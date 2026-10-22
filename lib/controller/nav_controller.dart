@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:buildtrack_mobile/controller/role_manager.dart';
+import 'package:buildtrack_mobile/controller/user_session.dart';
 class NavController extends ChangeNotifier {
   String _currentRoute = '/home';
   String get currentRoute => _currentRoute;
@@ -49,6 +50,27 @@ class NavController extends ChangeNotifier {
     if (RoleManager.canViewReports) items.add('/reports');
     return items;
   }
+  /// Order of the guided app tour across tabs. Inventory is not part of it
+  /// (it left the bottom bar); Insights has no tour steps of its own.
+  static const tourOrder = ['/home', '/projects', '/add-entry', '/reports'];
+
+  /// Called by each tab's tour `onFinish`: moves to the next tab in
+  /// [tourOrder] that this user can open, or ends the tour when none is left.
+  /// (Before, a disabled next tab made `setRoute` silently do nothing and the
+  /// tour got stuck — e.g. for new / restricted accounts.)
+  void continueTour(BuildContext context, {required String from}) {
+    if (!UserSession.globalTourActive) return;
+    final i = tourOrder.indexOf(from);
+    for (final next in tourOrder.skip(i + 1)) {
+      if (isRouteEnabled(next)) {
+        setRoute(next, context);
+        return;
+      }
+    }
+    UserSession.setGlobalTourActive(false);
+    if (_currentRoute != '/home') setRoute('/home', context);
+  }
+
   /// Record the visible tab without navigating (screen opened directly).
   void markCurrent(String route) {
     if (_currentRoute == route) return;

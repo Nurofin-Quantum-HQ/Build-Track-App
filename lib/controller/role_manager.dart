@@ -84,6 +84,11 @@ class RoleManager {
       isAdmin || UserSession.hasPermission('view_delay_tracker');
   static bool get canViewMediaGallery =>
       isAdmin || UserSession.hasPermission('view_media_gallery');
+  /// Budget figures (project budget, budget used/left). Admins always; others
+  /// only when granted "Project budget" in Assign Role (permission key below).
+  static const viewProjectBudgetKey = 'view_project_budget';
+  static bool get canViewProjectBudget =>
+      isAdmin || UserSession.hasPermission(viewProjectBudgetKey);
   static bool get canViewReports =>
       isAdmin || UserSession.hasPermission('view_reports');
   static bool get canManageExpenses =>
