@@ -10,6 +10,8 @@ class EntryPermissions {
   }) {
     if (status == 'approved') return false;
     if (UserSession.isAdmin) return true;
+    // PUT /transactions/:id needs manage_expenses or add_entries on the backend.
+    if (!RoleManager.canAddTransactions) return false;
     if (UserSession.isSupervisor) {
       return UserSession.hasProjectAccess(projectId);
     }

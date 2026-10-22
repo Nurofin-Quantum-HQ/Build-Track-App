@@ -23,8 +23,10 @@ class InboxScreen extends StatefulWidget {
   final InboxTab? initialTab;
   final InboxMode mode;
 
-  /// Who sees the "To approve" segment (same people who saw pending approvals before).
-  static bool get canSeeApprovals => UserSession.isAdmin || UserSession.isSupervisor || RoleManager.canApproveUpdates;
+  /// Who sees the "To approve" segment: people who can act on it. The backend's
+  /// approve/reject (PUT /transactions/:id/approve|reject) need approve_payments /
+  /// approve_updates (Admins always) — being a Supervisor alone is not enough.
+  static bool get canSeeApprovals => RoleManager.canApproveUpdates;
 
   @override
   State<InboxScreen> createState() => _InboxScreenState();

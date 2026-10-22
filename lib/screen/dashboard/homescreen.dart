@@ -2751,8 +2751,10 @@ class _SupervisorDashboardState extends State<_SupervisorDashboard> {
                     index: i < 8 ? i + 1 : 0,
                     child: _PendingTxCard(
                       tx: _pendingTransactions[i] as Map<String, dynamic>,
-                      onApprove: () => _handleApprove(_pendingTransactions[i]['_id']?.toString() ?? ''),
-                      onReject: () => _confirmReject(_pendingTransactions[i]['_id']?.toString() ?? ''),
+                      // PUT /transactions/:id/approve|reject need approve_payments /
+                      // approve_updates (or add_entries); others only see the queue.
+                      onApprove: RoleManager.canApproveUpdates ? () => _handleApprove(_pendingTransactions[i]['_id']?.toString() ?? '') : null,
+                      onReject: RoleManager.canApproveUpdates ? () => _confirmReject(_pendingTransactions[i]['_id']?.toString() ?? '') : null,
                     ),
                   ),
                 ),
@@ -2820,8 +2822,9 @@ class _PendingTxCard extends StatelessWidget {
     required this.onReject,
   });
   final Map<String, dynamic> tx;
-  final VoidCallback onApprove;
-  final VoidCallback onReject;
+  /// Null when the viewer may not approve/reject: the buttons are left out.
+  final VoidCallback? onApprove;
+  final VoidCallback? onReject;
   @override
   Widget build(BuildContext context) {
     final title = tx['title']?.toString() ?? 'Entry';
@@ -2845,12 +2848,14 @@ class _PendingTxCard extends StatelessWidget {
           const SizedBox(width: 8),
           Text(formatInr(amount), style: BtText.num(BtText.headline(context))),
         ]),
-        const SizedBox(height: 12),
-        Row(children: [
-          Expanded(child: BtButton(label: 'Reject…', variant: BtButtonVariant.destructive, small: true, onPressed: onReject)),
-          const SizedBox(width: 10),
-          Expanded(child: BtButton(label: 'Approve', icon: Icons.check_rounded, small: true, onPressed: onApprove)),
-        ]),
+        if (onApprove != null && onReject != null) ...[
+          const SizedBox(height: 12),
+          Row(children: [
+            Expanded(child: BtButton(label: 'Reject…', variant: BtButtonVariant.destructive, small: true, onPressed: onReject)),
+            const SizedBox(width: 10),
+            Expanded(child: BtButton(label: 'Approve', icon: Icons.check_rounded, small: true, onPressed: onApprove)),
+          ]),
+        ],
       ]),
     );
   }
@@ -2994,6 +2999,13 @@ class _MasonDashboardState extends State<_MasonDashboard> {
   Widget build(BuildContext context) {
     final projectName = context.watch<ProjectProvider>().selectedProject?.name;
     final openTasks = _tasks.where((t) => t.status != 'Completed').length;
+    // Only offer what the backend accepts: daily update = PUT /projects/:id
+    // (role/permission, or a task assigned to me on the project); material
+    // entry = POST /transactions (manage_expenses / add_entries).
+    final me = UserSession.userId;
+    final canDailyUpdate = RoleManager.canSubmitProjectUpdate ||
+        _tasks.any((t) => me.isNotEmpty && (t.assignedTo?['_id'] ?? t.assignedTo?['id'])?.toString() == me);
+    final canMaterialEntry = RoleManager.canAddTransactions;
     final hero = _HomeHero(
       top: widget.top,
       children: [
@@ -3020,10 +3032,12 @@ class _MasonDashboardState extends State<_MasonDashboard> {
     return BtHeroScroll(
       hero: hero,
       children: [
+        if (canDailyUpdate || canMaterialEntry) ...[
         BtReveal(
           index: 1,
           child: IntrinsicHeight(
             child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              if (canDailyUpdate)
               Expanded(
                 child: _BigAction(
                   ink: true,
@@ -3033,7 +3047,8 @@ class _MasonDashboardState extends State<_MasonDashboard> {
                   onTap: () => Navigator.pushNamed(context, '/update-progress'),
                 ),
               ),
-              const SizedBox(width: 12),
+              if (canDailyUpdate && canMaterialEntry) const SizedBox(width: 12),
+              if (canMaterialEntry)
               Expanded(
                 child: _BigAction(
                   icon: Icons.inventory_2_outlined,
@@ -3046,6 +3061,7 @@ class _MasonDashboardState extends State<_MasonDashboard> {
           ),
         ),
         const SizedBox(height: 24),
+        ],
         if (RoleManager.canApproveUpdates) const _HomeApprovals(),
         BtSectionHeader(title: 'Tasks assigned', action: _isLoadingTasks || _tasks.isEmpty ? null : '$openTasks open'),
         if (_isLoadingTasks)

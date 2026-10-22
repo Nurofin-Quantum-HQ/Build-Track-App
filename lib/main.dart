@@ -159,7 +159,6 @@ class MyApp extends StatelessWidget {
         '/': (_) => const LoginScreen(),
         '/login': (_) => const LoginScreen(),
         '/forgot-password': (_) => const ForgotPasswordScreen(),
-        '/create-workspace': (_) => const CreateWorkspaceScreen(),
         '/profile': (_) => const ProfileScreen(),
         '/edit-profile': (_) => const EditProfileScreen(),
         '/subscription': (_) => const SubscriptionScreen(),
@@ -171,8 +170,6 @@ class MyApp extends StatelessWidget {
         '/execution-context': (_) => const ExecutionContextScreen(),
         '/choose-entry-mode': (_) => const ChooseEntryModeScreen(),
         '/inventory': (_) => InventoryScreen(),
-        '/reports': (_) => ReportsScreen(),
-        '/assign-role': (_) => const AssignRolesScreen(),
         '/assign-task': (_) => const AssignTaskScreen(),
         '/project-detail': (_) => const ProjectDetailScreen(),
         '/notifications': (_) => const NotificationsScreen(),
@@ -180,7 +177,6 @@ class MyApp extends StatelessWidget {
         '/insights': (_) => const InsightsHubScreen(),
         '/approvals': (_) => const ApprovalsScreen(),
         '/admin-overview': (_) => const AdminOverviewScreen(),
-        '/logs': (_) => const TransactionLogsScreen(),
         '/entry-detail': (_) => const EntryDetailScreen(),
         '/update-progress': (_) => const UpdateProgressScreen(),
         '/report-insights': (_) => const ReportInsightsScreen(),
@@ -205,6 +201,14 @@ class MyApp extends StatelessWidget {
             builder: (context) => SignaturePage(token: token),
           );
         }
+        // Permission-guarded screens live here, not in `routes:` (a `routes:`
+        // entry is resolved before onGenerateRoute, so the guard below never ran).
+        final guarded = <String, WidgetBuilder>{
+          '/create-workspace': (_) => const CreateWorkspaceScreen(),
+          '/reports': (_) => ReportsScreen(),
+          '/assign-role': (_) => const AssignRolesScreen(),
+          '/logs': (_) => const TransactionLogsScreen(),
+        };
         if (!RoleManager.canNavigate(name)) {
           return MaterialPageRoute(
             builder: (context) {
@@ -229,6 +233,10 @@ class MyApp extends StatelessWidget {
               return const Scaffold(body: SizedBox.shrink());
             },
           );
+        }
+        final builder = guarded[name];
+        if (builder != null) {
+          return MaterialPageRoute(settings: settings, builder: builder);
         }
         return null;
       },

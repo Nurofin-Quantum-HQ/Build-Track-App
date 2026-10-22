@@ -2311,7 +2311,7 @@ class _RecentEntriesSection extends StatelessWidget {
   final String? currentUserId;
   @override
   Widget build(BuildContext context) {
-    final isAdmin = true;
+    final isAdmin = UserSession.isAdmin;
     final isSupervisor = UserSession.isSupervisor || RoleManager.isSupervisor;
     final hasProjectAccess = UserSession.hasProjectAccess(project.id);
     final allEntries = provider.entriesForProject(project.id).toList();

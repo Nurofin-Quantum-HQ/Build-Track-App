@@ -60,6 +60,23 @@ class RoleManager {
       isAdmin ||
       canSubmitDailyUpdate ||
       UserSession.hasPermission('add_entries');
+  /// Saving a material / labour / equipment entry (POST/PUT /transactions):
+  /// the backend requires `manage_expenses` or `add_entries` (Admins always).
+  static bool get canAddTransactions =>
+      isAdmin ||
+      UserSession.hasPermission('manage_expenses') ||
+      UserSession.hasPermission('add_entries');
+  /// Daily update / progress (PUT /projects/:id). Backend allows Admins and
+  /// Supervisors by role, these permission keys, or anyone with a task on that
+  /// project (the task case is checked by the screen that has the tasks).
+  static bool get canSubmitProjectUpdate =>
+      isAdmin ||
+      isSupervisor ||
+      UserSession.hasPermission('edit_project') ||
+      UserSession.hasPermission('manage_team') ||
+      UserSession.hasPermission('add_entry') ||
+      UserSession.hasPermission('submit_daily_update') ||
+      UserSession.hasPermission('approve_updates');
   static bool get canApproveUpdates =>
       isAdmin ||
       UserSession.hasPermission('approve_updates') ||
@@ -125,13 +142,18 @@ class RoleManager {
   static const _restrictedRoutes = <String, bool Function()>{
     '/assign-role': _checkAssignRole,
     '/reports': _checkReports,
-    '/create-workspace': _checkAdmin,
+    '/create-workspace': _checkCreateWorkspace,
     '/logs': _checkLogs,
   };
-  static bool _checkAssignRole() => canAssignRoles;
+  // Assign Role's APIs (/auth/users, /auth/provision) are Admin-only on the
+  // backend, so the `assign_roles` permission alone can't use the screen.
+  static bool _checkAssignRole() => isAdmin;
   static bool _checkReports() => canViewReports;
-  static bool _checkAdmin() => isAdmin;
-  static bool _checkLogs() => isAdmin || canViewReports;
+  // Sign-up is public: reachable when logged out (Login screen); once logged
+  // in, only Admins create another workspace (Profile row).
+  static bool _checkCreateWorkspace() => UserSession.userId.isEmpty || isAdmin;
+  // GET /transactions is open to every signed-in user (scoped server-side).
+  static bool _checkLogs() => UserSession.userId.isNotEmpty;
   static bool canNavigate(String route) {
     final check = _restrictedRoutes[route];
     if (check == null) return true;
