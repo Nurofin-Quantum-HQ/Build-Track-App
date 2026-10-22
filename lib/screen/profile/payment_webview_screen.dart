@@ -1,4 +1,4 @@
-import 'package:buildtrack_mobile/common/themes/app_colors.dart';
+import 'package:buildtrack_mobile/design/design.dart';
 import 'package:buildtrack_mobile/controller/subscription_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -168,44 +168,20 @@ class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        centerTitle: true,
-        title: const Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.lock_rounded, color: Color(0xFF12B76A), size: 16),
-            SizedBox(width: 6),
-            Text('Secure Payment', style: TextStyle(color: Color(0xFF101828), fontSize: 16, fontWeight: FontWeight.w700)),
-          ],
-        ),
-        leading: IconButton(
-          icon: const Icon(Icons.close_rounded, color: Color(0xFF344054)),
-          onPressed: () => _handlePaymentReturn(false),
-        ),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1),
-          child: Container(height: 1, color: const Color(0xFFEAECF0)),
-        ),
+      backgroundColor: Bt.ground,
+      appBar: BtNavBar(
+        title: 'Secure Payment',
+        close: true,
+        onBack: () => _handlePaymentReturn(false),
+        trailing: const Icon(Icons.lock_rounded, color: Bt.green, size: 18),
       ),
       body: Stack(
         children: [
           WebViewWidget(controller: _controller),
           if (_isLoading)
             Container(
-              color: Colors.white,
-              child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    CircularProgressIndicator(color: AppColors.primary, strokeWidth: 2.5),
-                    SizedBox(height: 16),
-                    Text('Loading secure payment...', style: TextStyle(color: Color(0xFF667085), fontSize: 14, fontWeight: FontWeight.w500)),
-                  ],
-                ),
-              ),
+              color: Bt.ground,
+              child: const BtPageLoader(label: 'Loading secure payment...'),
             ),
         ],
       ),

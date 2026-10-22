@@ -130,9 +130,7 @@ class _AddEquipmentScreenState extends State<AddEquipmentScreen> {
       if (_isEditing && (args['status'] as String?) == 'approved') {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           Navigator.maybePop(context);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Approved entries cannot be edited')),
-          );
+          btToast(context, 'Approved entries cannot be edited', error: true);
         });
         return;
       }
@@ -1285,11 +1283,23 @@ class _AddEquipmentScreenState extends State<AddEquipmentScreen> {
     if (success) {
       context.read<InventoryProvider>().loadInventory(_selectedProjectId!);
       context.read<ProjectProvider>().load();
-      _snack(
-        _isEditing
-            ? 'Equipment entry updated successfully!'
-            : 'Equipment entry saved successfully!',
+      final savedTitle = _nameCtrl.text.trim();
+      final savedTotal = _finalTotal();
+      await showBtSuccess(
+        context,
+        kind: BtSuccessKind.bags,
+        label: _isEditing
+            ? 'Entry updated'
+            : RoleManager.canApprovePayments
+            ? 'Entry saved'
+            : 'Submitted to supervisor',
+        title: _isEditing ? 'Equipment entry updated.' : 'Equipment entry saved.',
+        message: [
+          if (savedTitle.isNotEmpty) savedTitle,
+          if (savedTotal > 0) formatInr(savedTotal),
+        ].join(' · '),
       );
+      if (!mounted) return;
       if (_fromReport && Navigator.canPop(context)) {
         Navigator.pop(context, true);
       } else if (_fromReport) {
@@ -1312,14 +1322,12 @@ class _AddEquipmentScreenState extends State<AddEquipmentScreen> {
         );
       }
     } else {
-      _snack('Error saving to server. Please try again.');
+      btToast(context, 'Error saving to server. Please try again.', error: true);
     }
     setState(() => _isSaving = false);
   }
   void _snack(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg), behavior: SnackBarBehavior.floating),
-    );
+    btToast(context, msg, error: msg.toLowerCase().contains('cannot') || msg.toLowerCase().contains('error'));
   }
   Future<void> _loadRecentEntries() async {
     if (_selectedProjectId == null) {
@@ -1355,6 +1363,7 @@ class _AddEquipmentScreenState extends State<AddEquipmentScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
+      barrierColor: Bt.scrim,
       builder: (ctx) {
         return DraggableScrollableSheet(
           initialChildSize: 0.60,
@@ -1364,76 +1373,55 @@ class _AddEquipmentScreenState extends State<AddEquipmentScreen> {
           builder: (_, scrollCtrl) {
             return Container(
               decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                color: Bt.ground,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(Bt.rSheet)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Center(
                     child: Container(
-                      margin: const EdgeInsets.only(top: 12, bottom: 4),
+                      margin: const EdgeInsets.only(top: 10, bottom: 4),
                       width: 40,
-                      height: 4,
+                      height: 5,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFE4E7EC),
-                        borderRadius: BorderRadius.circular(2),
+                        color: Bt.inputBorder,
+                        borderRadius: BorderRadius.circular(3),
                       ),
                     ),
                   ),
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                    padding: const EdgeInsets.fromLTRB(18, 12, 10, 8),
                     child: Row(
                       children: [
-                        Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: const Color(
-                              0xFFE65100,
-                            ).withValues(alpha: 0.10),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Icon(
-                            Icons.history_rounded,
-                            color: Color(0xFFB54708),
-                            size: 20,
+                        BtTile(icon: Icons.history_rounded, bg: context.bt.accentSoft, fg: context.bt.accentInk),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Recent Equipment Entries', style: BtText.d3(ctx)),
+                              Text(
+                                '${_recentEntries.length} similar entr${_recentEntries.length == 1 ? "y" : "ies"} found',
+                                style: BtText.caption(ctx),
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Recent Equipment Entries',
-                              style: TextStyle(
-                                fontSize: 17,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.textDark,
-                                letterSpacing: -0.3,
-                              ),
-                            ),
-                            Text(
-                              '${_recentEntries.length} similar entr${_recentEntries.length == 1 ? "y" : "ies"} found',
-                              style: const TextStyle(
-                                fontSize: 13,
-                                color: AppColors.textLight,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
+                        BtIconButton(
+                          icon: Icons.close_rounded,
+                          size: 18,
+                          semantic: 'Close',
+                          background: Bt.fill,
+                          onTap: () => Navigator.pop(ctx),
                         ),
                       ],
                     ),
                   ),
-                  const Padding(
-                    padding: EdgeInsets.fromLTRB(20, 14, 20, 0),
-                    child: Divider(color: Color(0xFFEEF1F5)),
-                  ),
                   Expanded(
                     child: ListView.separated(
                       controller: scrollCtrl,
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
                       itemCount: _recentEntries.length,
                       separatorBuilder: (_, _) => const SizedBox(height: 10),
                       itemBuilder: (_, i) {
@@ -1461,103 +1449,66 @@ class _AddEquipmentScreenState extends State<AddEquipmentScreen> {
                         final String rateStr = rate > 0
                             ? '₹${rate % 1 == 0 ? rate.toInt() : rate}/$unit'
                             : '';
-                        return Material(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(16),
-                            onTap: () {
-                              Navigator.pop(ctx);
-                              _prefillFromRecent(tx);
-                              _snack('Prefilled from "$title"');
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.all(14),
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                  color: const Color(0xFFEEEFF8),
-                                  width: 1.2,
-                                ),
-                              ),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 44,
-                                    height: 44,
-                                    decoration: BoxDecoration(
-                                      color: const Color(
-                                        0xFFE65100,
-                                      ).withValues(alpha: 0.08),
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: const Icon(
-                                      Icons.precision_manufacturing_outlined,
-                                      color: Color(0xFFB54708),
-                                      size: 20,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          title,
-                                          style: const TextStyle(
-                                            fontSize: 13.5,
-                                            fontWeight: FontWeight.w700,
-                                            color: AppColors.textDark,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        const SizedBox(height: 3),
-                                        Text(
-                                          [
+                        final row = BtPressable(
+                          onTap: () {
+                            Navigator.pop(ctx);
+                            _prefillFromRecent(tx);
+                            _snack('Prefilled from "$title"');
+                          },
+                          scale: .98,
+                          child: Container(
+                            padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
+                            decoration: BoxDecoration(
+                              color: Bt.card,
+                              borderRadius: BorderRadius.circular(Bt.rCard),
+                              boxShadow: Bt.shadow,
+                            ),
+                            child: Row(
+                              children: [
+                                const BtTile(icon: Icons.precision_manufacturing_outlined),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        title,
+                                        style: BtText.body(ctx, weight: FontWeight.w600),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        [
                                             if (rateStr.isNotEmpty) rateStr,
                                             if (category.isNotEmpty) category,
                                             if (operator0.isNotEmpty) operator0,
                                             if (dateStr.isNotEmpty) dateStr,
-                                          ].join(' · '),
-                                          style: const TextStyle(
-                                            fontSize: 13,
-                                            color: AppColors.textLight,
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 7,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: const Color(
-                                        0xFFE65100,
-                                      ).withValues(alpha: 0.08),
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    child: const Text(
-                                      'Use',
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w700,
-                                        color: Color(0xFFB54708),
+                                        ].join(' · '),
+                                        style: BtText.num(BtText.caption(ctx)),
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
                                       ),
-                                    ),
+                                    ],
                                   ),
-                                ],
-                              ),
+                                ),
+                                const SizedBox(width: 10),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: Bt.ink,
+                                    borderRadius: BorderRadius.circular(Bt.rChip),
+                                  ),
+                                  child: Text(
+                                    'Use',
+                                    style: BtText.caption(ctx, color: Bt.bone, weight: FontWeight.w600),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         );
+                        return i < 8 ? BtReveal(index: i, child: row) : row;
                       },
                     ),
                   ),
@@ -1569,6 +1520,7 @@ class _AddEquipmentScreenState extends State<AddEquipmentScreen> {
       },
     );
   }
+
   void _prefillFromRecent(Map<String, dynamic> tx) {
     setState(() {
       _nameCtrl.text = tx['title']?.toString() ?? '';
@@ -1610,96 +1562,85 @@ class _AddEquipmentScreenState extends State<AddEquipmentScreen> {
     return (month >= 1 && month <= 12) ? months[month - 1] : '';
   }
   Widget _buildPaymentSection() {
-    return EntrySectionCard(
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 24),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
+          BtGroup(
             children: [
-              const BtTile(icon: Icons.payments_outlined, bg: Bt.greenSoft, fg: Bt.green),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _isEditing ? 'Payment History' : 'Pay Now',
-                      style: BtText.headline(context),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      _isEditing ? 'Manage payments for this entry' : 'Optionally log payment while adding',
-                      style: BtText.caption(context),
-                    ),
-                  ],
+              BtRow(
+                leading: const BtTile(icon: Icons.payments_outlined, bg: Bt.greenSoft, fg: Bt.green),
+                title: _isEditing ? 'Payment history' : 'Record a payment',
+                titleWeight: FontWeight.w600,
+                subtitle: _isEditing ? 'Manage payments for this entry' : 'Optionally log payment while adding',
+                trailing: _isEditing
+                    ? null
+                    : BtSwitch(
+                        value: _recordPaymentNow,
+                        onChanged: (v) async {
+                          if (v) {
+                            final result = await showPaymentSheet(
+                              context,
+                              entryTitle: _nameCtrl.text.trim().isEmpty
+                                  ? 'Equipment'
+                                  : _nameCtrl.text.trim(),
+                              entryRef: '',
+                              totalAmount: _finalTotal(),
+                              alreadyPaid: _existingPaidAmount,
+                              vendorName: _operatorCtrl.text.trim(),
+                              category: _typeCtrl.text.trim().isEmpty
+                                  ? 'Equipment'
+                                  : _typeCtrl.text.trim(),
+                            );
+                            if (mounted) {
+                              setState(() {
+                                if (result != null) {
+                                  _recordPaymentNow = true;
+                                  _paymentResult = result;
+                                  _scrollToBottom();
+                                }
+                              });
+                            }
+                          } else {
+                            setState(() {
+                              _recordPaymentNow = false;
+                              _paymentResult = null;
+                            });
+                          }
+                        },
+                      ),
+              ),
+              if (!_isEditing)
+                BtRow(
+                  leading: BtTile(icon: Icons.draw_outlined, bg: context.bt.accentSoft, fg: context.bt.accentInk),
+                  title: 'Request e-signature for cash receipt',
+                  subtitle: 'Client signs on their phone',
+                  subtitleMaxLines: 2,
+                  onTap: () => setState(() => _requestEsign = !_requestEsign),
+                  trailing: BtSwitch(
+                    value: _requestEsign,
+                    onChanged: (val) => setState(() => _requestEsign = val),
+                  ),
                 ),
-              ),
-              if (!_isEditing) Switch(
-                value: _recordPaymentNow,
-                activeThumbColor: AppColors.primary,
-                onChanged: (v) async {
-                  if (v) {
-                    final result = await showPaymentSheet(
-                      context,
-                      entryTitle: _nameCtrl.text.trim().isEmpty
-                          ? 'Equipment'
-                          : _nameCtrl.text.trim(),
-                      entryRef: '',
-                      totalAmount: _finalTotal(),
-                      alreadyPaid: _existingPaidAmount,
-                      vendorName: _operatorCtrl.text.trim(),
-                      category: _typeCtrl.text.trim().isEmpty
-                          ? 'Equipment'
-                          : _typeCtrl.text.trim(),
-                    );
-                    if (mounted) {
-                      setState(() {
-                        if (result != null) {
-                          _recordPaymentNow = true;
-                          _paymentResult = result;
-                          _scrollToBottom();
-                        }
-                      });
-                    }
-                  } else {
-                    setState(() {
-                      _recordPaymentNow = false;
-                      _paymentResult = null;
-                    });
-                  }
-                },
-              ),
             ],
           ),
-          if (!_isEditing) ...[
-            const SizedBox(height: 16),
-            CheckboxListTile(
-              title: Text('Request e-signature for cash receipt', style: BtText.body(context)),
-              value: _requestEsign,
-              onChanged: (val) => setState(() => _requestEsign = val ?? false),
-              controlAffinity: ListTileControlAffinity.leading,
-              contentPadding: EdgeInsets.zero,
-            ),
-            if (_requestEsign)
-              Padding(
-                padding: const EdgeInsets.only(top: 8.0, bottom: 16.0),
-                child: TextFormField(
-                  controller: _clientEmailCtrl,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: btInput(context, hint: 'Client email address', prefix: const Icon(Icons.email_outlined, color: Bt.ink3)),
-                ),
+          if (!_isEditing && _requestEsign)
+            Padding(
+              padding: const EdgeInsets.only(top: 12.0),
+              child: TextFormField(
+                controller: _clientEmailCtrl,
+                keyboardType: TextInputType.emailAddress,
+                style: BtText.body(context, weight: FontWeight.w500),
+                decoration: btInput(context, hint: 'Client email address', prefix: const Icon(Icons.email_outlined, color: Bt.ink3)),
               ),
-          ],
+            ),
           if (!_isEditing && _recordPaymentNow && _paymentResult != null) ...[
-            const SizedBox(height: 16),
-            const Divider(color: Bt.line),
             const SizedBox(height: 12),
             _buildPaymentSummary(),
           ],
           if (_isEditing) ...[
-            const SizedBox(height: 16),
             if (_paymentHistory.isNotEmpty) ...[
-              const Divider(color: Bt.line),
               const SizedBox(height: 12),
               ..._paymentHistory.asMap().entries.map((entry) {
                 final idx = entry.key;
@@ -1709,37 +1650,34 @@ class _AddEquipmentScreenState extends State<AddEquipmentScreen> {
                   child: _buildHistoryItem(payment, idx),
                 );
               }),
-            ],
-            const SizedBox(height: 8),
-            Center(
-              child: TextButton.icon(
-                onPressed: () async {
-                  final result = await showPaymentSheet(
-                    context,
-                    entryTitle: _nameCtrl.text.trim().isEmpty
-                        ? 'Equipment'
-                        : _nameCtrl.text.trim(),
-                    entryRef: '',
-                    totalAmount: _finalTotal(),
-                    alreadyPaid: _calculateTotalPaidFromHistory(),
-                    vendorName: _operatorCtrl.text.trim(),
-                    category: _typeCtrl.text.trim().isEmpty
-                        ? 'Equipment'
-                        : _typeCtrl.text.trim(),
-                  );
-                  if (result != null && mounted) {
-                    setState(() {
-                      _paymentHistory.add(result);
-                      _scrollToBottom();
-                    });
-                  }
-                },
-                icon: const Icon(Icons.add, size: 18),
-                label: const Text('Add Payment'),
-                style: TextButton.styleFrom(
-                  foregroundColor: AppColors.primary,
-                ),
-              ),
+            ] else
+              const SizedBox(height: 12),
+            BtButton(
+              label: 'Add Payment',
+              icon: Icons.add_rounded,
+              variant: BtButtonVariant.secondary,
+              small: true,
+              onPressed: () async {
+                final result = await showPaymentSheet(
+                  context,
+                  entryTitle: _nameCtrl.text.trim().isEmpty
+                      ? 'Equipment'
+                      : _nameCtrl.text.trim(),
+                  entryRef: '',
+                  totalAmount: _finalTotal(),
+                  alreadyPaid: _calculateTotalPaidFromHistory(),
+                  vendorName: _operatorCtrl.text.trim(),
+                  category: _typeCtrl.text.trim().isEmpty
+                      ? 'Equipment'
+                      : _typeCtrl.text.trim(),
+                );
+                if (result != null && mounted) {
+                  setState(() {
+                    _paymentHistory.add(result);
+                    _scrollToBottom();
+                  });
+                }
+              },
             ),
           ],
         ],
@@ -1767,7 +1705,23 @@ class _AddEquipmentScreenState extends State<AddEquipmentScreen> {
       } catch (_) {}
     }
     final note = (payment['note'] ?? '').toString();
-    return GestureDetector(
+    return _paymentCard(
+      title: 'Payment',
+      amount: amount,
+      method: method,
+      payDate: payDate,
+      note: note,
+      trailing: BtIconButton(
+        icon: Icons.delete_outline_rounded,
+        size: 20,
+        color: Bt.red,
+        semantic: 'Remove payment',
+        onTap: () {
+          setState(() {
+            _paymentHistory.removeAt(index);
+          });
+        },
+      ),
       onTap: () async {
         final result = await showPaymentSheet(
           context,
@@ -1792,82 +1746,6 @@ class _AddEquipmentScreenState extends State<AddEquipmentScreen> {
           });
         }
       },
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: const Color(0xFFE7F6EE),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(
-                  Icons.check_circle_rounded,
-                  color: Color(0xFF067647),
-                  size: 18,
-                ),
-                const SizedBox(width: 8),
-                const Text(
-                  'Payment',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF067647),
-                  ),
-                ),
-                const Spacer(),
-                IconButton(
-                  icon: const Icon(Icons.delete_outline, size: 18, color: Color(0xFFC01048)),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                  onPressed: () {
-                    setState(() {
-                      _paymentHistory.removeAt(index);
-                    });
-                  },
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: _summaryChip(
-                    Icons.currency_rupee,
-                    '₹${amount.toStringAsFixed(0)}',
-                    'Amount',
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _summaryChip(Icons.payment_outlined, method, 'Method'),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _summaryChip(
-                    Icons.calendar_today_outlined,
-                    '${payDate.day}/${payDate.month}/${payDate.year}',
-                    'Date',
-                  ),
-                ),
-              ],
-            ),
-            if (note.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text(
-                'Note: $note',
-                style: const TextStyle(
-                  fontSize: 13,
-                  color: Color(0xFF475467),
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
     );
   }
   Widget _buildPaymentSummary() {
@@ -1876,7 +1754,16 @@ class _AddEquipmentScreenState extends State<AddEquipmentScreen> {
     final payDate =
         (_paymentResult!['paymentDate'] as DateTime?) ?? DateTime.now();
     final note = (_paymentResult!['note'] as String?) ?? '';
-    return GestureDetector(
+    return _paymentCard(
+      title: 'Payment recorded',
+      amount: amount,
+      method: method,
+      payDate: payDate,
+      note: note,
+      trailing: Padding(
+        padding: const EdgeInsets.only(right: 4),
+        child: Text('Tap to edit', style: BtText.caption(context, color: Bt.green, weight: FontWeight.w600)),
+      ),
       onTap: () async {
         final result = await showPaymentSheet(
           context,
@@ -1893,75 +1780,74 @@ class _AddEquipmentScreenState extends State<AddEquipmentScreen> {
         );
         if (result != null && mounted) setState(() => _paymentResult = result);
       },
+    );
+  }
+  /// Green payment card: heading row (check · title · trailing), then
+  /// amount / method / date tiles and an optional note.
+  Widget _paymentCard({
+    required String title,
+    required double amount,
+    required String method,
+    required DateTime payDate,
+    required String note,
+    required Widget trailing,
+    required VoidCallback onTap,
+  }) {
+    return BtPressable(
+      onTap: onTap,
+      scale: .98,
       child: Container(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.fromLTRB(14, 8, 8, 14),
         decoration: BoxDecoration(
-          color: const Color(0xFFE7F6EE),
-          borderRadius: BorderRadius.circular(12),
+          color: Bt.greenSoft,
+          borderRadius: BorderRadius.circular(Bt.rCard),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                const Icon(
-                  Icons.check_circle_rounded,
-                  color: Color(0xFF067647),
-                  size: 18,
-                ),
-                const SizedBox(width: 8),
-                const Text(
-                  'Payment Recorded',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF067647),
-                  ),
-                ),
-                const Spacer(),
-                const Text(
-                  'Tap to edit',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF067647),
-                  ),
-                ),
-              ],
+            SizedBox(
+              height: Bt.touch,
+              child: Row(
+                children: [
+                  const Icon(Icons.check_circle_rounded, color: Bt.green, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text(title, style: BtText.subhead(context, color: Bt.green, weight: FontWeight.w600))),
+                  trailing,
+                ],
+              ),
             ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: _summaryChip(
-                    Icons.currency_rupee,
-                    '₹${amount.toStringAsFixed(0)}',
-                    'Amount',
+            const SizedBox(height: 4),
+            Padding(
+              padding: const EdgeInsets.only(right: 6),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _summaryChip(
+                      Icons.currency_rupee,
+                      '₹${amount.toStringAsFixed(0)}',
+                      'Amount',
+                    ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _summaryChip(Icons.payment_outlined, method, 'Method'),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _summaryChip(
-                    Icons.calendar_today_outlined,
-                    '${payDate.day}/${payDate.month}/${payDate.year}',
-                    'Date',
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _summaryChip(Icons.payment_outlined, method, 'Method'),
                   ),
-                ),
-              ],
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _summaryChip(
+                      Icons.calendar_today_outlined,
+                      '${payDate.day}/${payDate.month}/${payDate.year}',
+                      'Date',
+                    ),
+                  ),
+                ],
+              ),
             ),
             if (note.isNotEmpty) ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
               Text(
                 'Note: $note',
-                style: const TextStyle(
-                  fontSize: 13,
-                  color: Color(0xFF475467),
-                  fontWeight: FontWeight.w500,
-                ),
+                style: BtText.caption(context, color: Bt.ink2, weight: FontWeight.w500),
               ),
             ],
           ],
@@ -1971,91 +1857,51 @@ class _AddEquipmentScreenState extends State<AddEquipmentScreen> {
   }
   Widget _summaryChip(IconData icon, String value, String label) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Bt.line),
+        color: Bt.card,
+        borderRadius: BorderRadius.circular(Bt.rTile),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Text(label.toUpperCase(), style: BtText.mono(context, size: 9.5)),
+          const SizedBox(height: 4),
           Text(
-            label,
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF667085),
-            ),
-          ),
-          const SizedBox(height: 3),
-          Row(
-            children: [
-              Icon(icon, size: 11, color: const Color(0xFF067647)),
-              const SizedBox(width: 3),
-              Expanded(
-                child: Text(
-                  value,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF101828),
-                  ),
-                ),
-              ),
-            ],
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: BtText.num(BtText.subhead(context, color: Bt.ink, weight: FontWeight.w600)),
           ),
         ],
       ),
     );
   }
 
-  void _showDeleteDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Bt.rCard)),
-        title: const Text('Delete Entry?', style: TextStyle(fontWeight: FontWeight.w700)),
-        content: const Text('Are you sure you want to permanently delete this entry?'),
-        actionsPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel', style: TextStyle(color: Color(0xFF475467), fontWeight: FontWeight.w600)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFC01048),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              elevation: 0,
-            ),
-            onPressed: () async {
-              Navigator.pop(ctx);
-              if (_editingTransactionId != null) {
-                final success = await ApiService.deleteTransaction(_editingTransactionId!);
-                if (success && context.mounted) {
-                  if (_selectedProjectId != null) {
-                    context.read<InventoryProvider>().loadInventory(_selectedProjectId!);
-                  }
-                  context.read<ProjectProvider>().load();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Entry deleted successfully'), backgroundColor: Color(0xFFC01048)),
-                  );
-                  Navigator.pop(context); // Pop edit screen
-                } else if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Failed to delete entry'), backgroundColor: Color(0xFFC01048)),
-                  );
-                }
-              }
-            },
-            child: const Text('Delete', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
-          ),
-        ],
-      ),
+
+  void _showDeleteDialog(BuildContext context) async {
+    final confirmed = await btConfirm(
+      context,
+      title: 'Delete entry?',
+      message: 'Are you sure you want to permanently delete this entry?',
+      confirmLabel: 'Delete',
     );
+    if (!confirmed || !context.mounted) return;
+    if (_editingTransactionId != null) {
+      final success = await ApiService.deleteTransaction(_editingTransactionId!);
+      if (success && context.mounted) {
+        if (_selectedProjectId != null) {
+          context.read<InventoryProvider>().loadInventory(_selectedProjectId!);
+        }
+        context.read<ProjectProvider>().load();
+        btToast(context, 'Entry deleted successfully');
+        Navigator.pop(context); // Pop edit screen
+      } else if (context.mounted) {
+        btToast(context, 'Failed to delete entry', error: true);
+      }
+    }
   }
+
   @override
   Widget build(BuildContext context) {
     context.watch<ProjectProvider>().projects;
@@ -2158,12 +2004,12 @@ class _AddEquipmentScreenState extends State<AddEquipmentScreen> {
                       ),
                       const SizedBox(height: 20),
           ] else
-            EntryWhereSummary(
+            BtReveal(child: EntryWhereSummary(
               projectId: _selectedProjectId,
               floor: _selectedFloor,
               phase: _selectedPhase,
               activity: _selectedActivity,
-            ),
+            )),
           if (_floorWarning != null) EntryNotice(_floorWarning!),
           if (_phaseWarning != null) EntryNotice(_phaseWarning!),
           if (_activityWarning != null) EntryNotice(_activityWarning!),
@@ -2180,7 +2026,7 @@ class _AddEquipmentScreenState extends State<AddEquipmentScreen> {
               ),
           ],
           EntryFormSection(
-            children: [
+            children: btStagger(start: 1, [
               EntryLabeled(
                 label: 'Equipment name',
                 required: true,
@@ -2308,10 +2154,10 @@ class _AddEquipmentScreenState extends State<AddEquipmentScreen> {
                     ('GST (${_gstCtrl.text.isEmpty ? "0" : _gstCtrl.text}%)', '+ ${formatCurrency(_gstAmount())}'),
                 ],
               ),
-            ],
+            ]),
           ),
-          if (RoleManager.canApprovePayments) _buildPaymentSection(),
-          EntryFormSection(
+          if (RoleManager.canApprovePayments) BtReveal(index: 7, child: _buildPaymentSection()),
+          BtReveal(index: 8, child: EntryFormSection(
             title: 'Bill or invoice',
             caption: 'optional',
             children: [
@@ -2322,10 +2168,11 @@ class _AddEquipmentScreenState extends State<AddEquipmentScreen> {
                 onRemove: () => setState(() => _attachment = null),
               ),
             ],
-          ),
-          EntryFormSection(
+          )),
+          BtReveal(index: 9, child: EntryMoreDetails(
             title: 'More details',
-            caption: 'optional',
+            subtitle: 'Model, operator, notes',
+            autoExpand: _typeCtrl.text.trim().isNotEmpty || _operatorCtrl.text.trim().isNotEmpty || _notesCtrl.text.trim().isNotEmpty,
             children: [
               EntryLabeled(
                 label: 'Sub-class / model',
@@ -2340,7 +2187,7 @@ class _AddEquipmentScreenState extends State<AddEquipmentScreen> {
                 child: EntryNotesField(controller: _notesCtrl),
               ),
             ],
-          ),
+          )),
         ],
       ),
       bottomNavigationBar: EntryBottomBar(

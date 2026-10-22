@@ -58,24 +58,83 @@ class _CreateWorkspaceScreenState extends State<CreateWorkspaceScreen> {
     return Scaffold(
       backgroundColor: Bt.ground,
       appBar: const BtNavBar(title: 'Create workspace'),
+      bottomNavigationBar: _isEmailVerified
+          ? BtCtaBar(children: [
+              Expanded(
+                child: BtButton(
+                  label: 'Create Workspace',
+                  icon: Icons.arrow_forward_rounded,
+                  loading: _isLoading,
+                  onPressed: _isLoading ? null : _onCreatePressed,
+                ),
+              ),
+            ])
+          : null,
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
         children: [
-          _buildHeader(),
+          _buildSteps(),
           const SizedBox(height: 24),
+          BtReveal(child: _buildHeader()),
+          const SizedBox(height: 20),
+          BtReveal(index: 1, child: _buildPreview()),
+          const SizedBox(height: 28),
           _buildForm(),
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
           _buildActions(),
         ],
       ),
     );
   }
+
+  /// 01 You · 02 Company · 03 Sign-in — fills in as the form is completed.
+  Widget _buildSteps() {
+    final bt = context.bt;
+    return ListenableBuilder(
+      listenable: Listenable.merge([_nameCtrl, _phoneCtrl, _companyCtrl]),
+      builder: (context, _) {
+        final done = [
+          _nameCtrl.text.trim().isNotEmpty && _phoneCtrl.text.trim().isNotEmpty,
+          _companyCtrl.text.trim().isNotEmpty,
+          _isEmailVerified,
+        ];
+        const labels = ['01 YOU', '02 COMPANY', '03 SIGN-IN'];
+        return Row(children: [
+          for (var i = 0; i < 3; i++) ...[
+            if (i > 0) const SizedBox(width: 6),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: Container(
+                    height: 6,
+                    color: Bt.ink.withValues(alpha: .08),
+                    alignment: Alignment.centerLeft,
+                    child: AnimatedFractionallySizedBox(
+                      duration: Bt.medium,
+                      curve: Bt.ease,
+                      widthFactor: done[i] ? 1 : 0,
+                      heightFactor: 1,
+                      child: DecoratedBox(decoration: BoxDecoration(color: i == 0 ? Bt.ink : bt.accent, borderRadius: BorderRadius.circular(6))),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(labels[i], style: BtText.mono(context, color: done[i] ? Bt.ink : Bt.ink3)),
+              ]),
+            ),
+          ],
+        ]);
+      },
+    );
+  }
+
   Widget _buildHeader() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Create account', style: BtText.largeTitle(context)),
-        const SizedBox(height: 4),
+        Text('Create account', style: BtText.d2(context)),
+        const SizedBox(height: 6),
         Text(
           'Set up your workspace owner account to get started.',
           style: BtText.body(context, color: Bt.ink2),
@@ -83,6 +142,61 @@ class _CreateWorkspaceScreenState extends State<CreateWorkspaceScreen> {
       ],
     );
   }
+
+  /// Noir card previewing the company name in the chosen font (+ logo).
+  Widget _buildPreview() {
+    return BtCard(
+      variant: BtCardVariant.ink,
+      padding: const EdgeInsets.all(20),
+      child: ListenableBuilder(
+        listenable: _companyCtrl,
+        builder: (context, _) {
+          final name = _companyCtrl.text.trim();
+          final shown = name.isEmpty ? 'Your company' : name;
+          final initials = shown.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).take(2).map((w) => w[0].toUpperCase()).join();
+          return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('LIVE PREVIEW', style: BtText.mono(context, color: Bt.onNoir2)),
+            const SizedBox(height: 14),
+            Row(children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(17),
+                child: Container(
+                  width: 52,
+                  height: 52,
+                  color: Bt.bone,
+                  alignment: Alignment.center,
+                  child: _logoBytes != null
+                      ? Image.memory(_logoBytes!, width: 52, height: 52, fit: BoxFit.contain)
+                      : Text(initials, style: BtText.title(context, size: 18).copyWith(color: Bt.noir)),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: AnimatedSwitcher(
+                  duration: Bt.fast,
+                  child: Text(
+                    shown,
+                    key: ValueKey(_selectedFontStyle),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: _getFontPreviewStyle(_selectedFontStyle).copyWith(fontSize: 26, height: 1.1, color: name.isEmpty ? Bt.onNoir3 : Bt.bone),
+                  ),
+                ),
+              ),
+            ]),
+            const SizedBox(height: 10),
+            Text('This name sits at the top of everyone\'s app.', style: BtText.caption(context, color: Bt.onNoir2)),
+          ]);
+        },
+      ),
+    );
+  }
+
+  Widget _sectionLabel(String text) => Padding(
+        padding: const EdgeInsets.only(left: 2, bottom: 12),
+        child: Text(text, style: BtText.mono(context)),
+      );
+
   Widget _field(String label, TextEditingController c, String hint, {TextInputType? type, bool readOnly = false, bool obscure = false, Widget? suffix, bool required = false, Iterable<String>? autofill}) {
     return EntryLabeled(
       label: label,
@@ -98,61 +212,34 @@ class _CreateWorkspaceScreenState extends State<CreateWorkspaceScreen> {
       ),
     );
   }
+
   Widget _buildForm() {
     final bt = context.bt;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        _sectionLabel('01 · YOU'),
         EntryFormSection(
-          title: 'You',
           children: [
             _field('Full name', _nameCtrl, 'e.g. Jane Doe', autofill: const [AutofillHints.name]),
             _field('Phone number', _phoneCtrl, 'e.g. +91 98765 43210', type: TextInputType.phone, autofill: const [AutofillHints.telephoneNumber]),
           ],
         ),
+        _sectionLabel('02 · COMPANY'),
         EntryFormSection(
-          title: 'Company',
           children: [
             _field('Company name', _companyCtrl, 'e.g. Apex Construction', required: true),
             EntryLabeled(
               label: 'Company name font style',
-              child: BtPickerField(
-                text: _selectedFontStyle,
-                onTap: () async {
-                  final picked = await showBtSheet<String>(
-                    context,
-                    title: 'Font style',
-                    subtitle: 'How your company name appears in the app',
-                    builder: (sheetCtx) => BtGroup(
-                      children: [
-                        for (final font in _fontOptions)
-                          InkWell(
-                            onTap: () => Navigator.pop(sheetCtx, font),
-                            child: ConstrainedBox(
-                              constraints: const BoxConstraints(minHeight: 56),
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                                child: Row(children: [
-                                  Expanded(
-                                    child: Text(
-                                      _companyCtrl.text.trim().isEmpty ? font : _companyCtrl.text.trim(),
-                                      style: _getFontPreviewStyle(font).copyWith(fontSize: 18),
-                                    ),
-                                  ),
-                                  Text(font, style: BtText.caption(sheetCtx)),
-                                  if (font == _selectedFontStyle) ...[
-                                    const SizedBox(width: 8),
-                                    Icon(Icons.check_rounded, color: bt.brand, size: 20),
-                                  ],
-                                ]),
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  );
-                  if (picked != null) setState(() => _selectedFontStyle = picked);
-                },
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                clipBehavior: Clip.none,
+                child: Row(children: [
+                  for (final font in _fontOptions) ...[
+                    if (font != _fontOptions.first) const SizedBox(width: 8),
+                    _fontChip(font),
+                  ],
+                ]),
               ),
             ),
             EntryLabeled(
@@ -178,17 +265,32 @@ class _CreateWorkspaceScreenState extends State<CreateWorkspaceScreen> {
                         ),
                       ),
                     ])
-                  : BtButton(
-                      label: 'Upload company logo',
-                      icon: Icons.add_photo_alternate_outlined,
-                      variant: BtButtonVariant.secondary,
-                      onPressed: _pickLogo,
+                  : BtPressable(
+                      onTap: _pickLogo,
+                      semanticLabel: 'Upload company logo',
+                      child: CustomPaint(
+                        painter: _DashedBorderPainter(color: Bt.ink.withValues(alpha: .18), radius: 18),
+                        child: Padding(
+                          padding: const EdgeInsets.all(18),
+                          child: Row(children: [
+                            BtTile(icon: Icons.add_photo_alternate_outlined, bg: bt.accentSoft, fg: bt.accentInk),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                Text('Upload company logo', style: BtText.body(context, weight: FontWeight.w600)),
+                                Text('Optional · PNG or JPG', style: BtText.caption(context, color: Bt.ink2)),
+                              ]),
+                            ),
+                            const Icon(Icons.add_rounded, color: Bt.ink3, size: 20),
+                          ]),
+                        ),
+                      ),
                     ),
             ),
           ],
         ),
+        _sectionLabel('03 · SIGN-IN'),
         EntryFormSection(
-          title: 'Sign-in',
           children: [
             _field(
               'Email address',
@@ -199,70 +301,103 @@ class _CreateWorkspaceScreenState extends State<CreateWorkspaceScreen> {
               autofill: const [AutofillHints.email],
               suffix: _isEmailVerified ? const Icon(Icons.check_circle_rounded, color: Bt.green) : null,
             ),
-            if (!_isEmailVerified && !_otpSent)
-              BtButton(
-                label: 'Verify Email',
-                variant: BtButtonVariant.secondary,
-                loading: _isSendingOtp,
-                onPressed: _isSendingOtp ? null : _sendOtp,
-              ),
-            if (!_isEmailVerified && _otpSent) ...[
-              _field('Verification code (OTP)', _otpCtrl, 'Enter 6-digit code', type: TextInputType.number, autofill: const [AutofillHints.oneTimeCode]),
-              Row(
-                children: [
-                  Expanded(
-                    child: BtButton(label: 'Resend Code', variant: BtButtonVariant.secondary, onPressed: _sendOtp),
+            AnimatedSize(
+              duration: Bt.medium,
+              curve: Bt.ease,
+              alignment: Alignment.topCenter,
+              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                if (!_isEmailVerified && !_otpSent)
+                  BtButton(
+                    label: 'Verify Email',
+                    icon: Icons.mark_email_read_outlined,
+                    variant: BtButtonVariant.secondary,
+                    loading: _isSendingOtp,
+                    onPressed: _isSendingOtp ? null : _sendOtp,
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: BtButton(
-                      label: 'Confirm',
-                      loading: _isVerifyingOtp,
-                      onPressed: _isVerifyingOtp ? null : _verifyOtp,
+                if (!_isEmailVerified && _otpSent) ...[
+                  _field('Verification code (OTP)', _otpCtrl, 'Enter 6-digit code', type: TextInputType.number, autofill: const [AutofillHints.oneTimeCode]),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: BtButton(label: 'Resend Code', variant: BtButtonVariant.secondary, onPressed: _sendOtp),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: BtButton(
+                          label: 'Confirm',
+                          loading: _isVerifyingOtp,
+                          onPressed: _isVerifyingOtp ? null : _verifyOtp,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+                if (_isEmailVerified) ...[
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(color: Bt.greenSoft, borderRadius: BorderRadius.circular(Bt.rTile)),
+                    child: Row(children: [
+                      const Icon(Icons.admin_panel_settings_outlined, color: Bt.green, size: 20),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text('Email verified. This account will be created as Workspace Admin.', style: BtText.subhead(context, color: Bt.ink)),
+                      ),
+                    ]),
+                  ),
+                  const SizedBox(height: 16),
+                  _field(
+                    'Password',
+                    _passCtrl,
+                    '••••••••',
+                    obscure: _obscurePass,
+                    autofill: const [AutofillHints.newPassword],
+                    suffix: IconButton(
+                      tooltip: _obscurePass ? 'Show password' : 'Hide password',
+                      icon: Icon(_obscurePass ? Icons.visibility_outlined : Icons.visibility_off_outlined, color: Bt.ink2),
+                      onPressed: () => setState(() => _obscurePass = !_obscurePass),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  _field(
+                    'Confirm password',
+                    _confirmCtrl,
+                    '••••••••',
+                    obscure: _obscureConfirm,
+                    suffix: IconButton(
+                      tooltip: _obscureConfirm ? 'Show password' : 'Hide password',
+                      icon: Icon(_obscureConfirm ? Icons.visibility_outlined : Icons.visibility_off_outlined, color: Bt.ink2),
+                      onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
                     ),
                   ),
                 ],
-              ),
-            ],
-            if (_isEmailVerified) ...[
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(color: bt.brandSoft, borderRadius: BorderRadius.circular(Bt.rTile)),
-                child: Row(children: [
-                  Icon(Icons.admin_panel_settings_outlined, color: bt.brand, size: 20),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text('Email verified. This account will be created as Workspace Admin.', style: BtText.subhead(context, color: Bt.ink)),
-                  ),
-                ]),
-              ),
-              _field(
-                'Password',
-                _passCtrl,
-                '••••••••',
-                obscure: _obscurePass,
-                autofill: const [AutofillHints.newPassword],
-                suffix: IconButton(
-                  tooltip: _obscurePass ? 'Show password' : 'Hide password',
-                  icon: Icon(_obscurePass ? Icons.visibility_outlined : Icons.visibility_off_outlined, color: Bt.ink3),
-                  onPressed: () => setState(() => _obscurePass = !_obscurePass),
-                ),
-              ),
-              _field(
-                'Confirm password',
-                _confirmCtrl,
-                '••••••••',
-                obscure: _obscureConfirm,
-                suffix: IconButton(
-                  tooltip: _obscureConfirm ? 'Show password' : 'Hide password',
-                  icon: Icon(_obscureConfirm ? Icons.visibility_outlined : Icons.visibility_off_outlined, color: Bt.ink3),
-                  onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
-                ),
-              ),
-            ],
+              ]),
+            ),
           ],
         ),
       ],
+    );
+  }
+
+  Widget _fontChip(String font) {
+    final on = font == _selectedFontStyle;
+    return BtPressable(
+      onTap: () => setState(() => _selectedFontStyle = font),
+      scale: .95,
+      semanticLabel: 'Font $font',
+      child: AnimatedContainer(
+        duration: Bt.fast,
+        curve: Bt.ease,
+        height: 44,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: on ? Bt.ink : Bt.card,
+          borderRadius: BorderRadius.circular(14),
+          border: on ? null : Border.all(color: Bt.inputBorder),
+        ),
+        child: Text(font, style: _getFontPreviewStyle(font).copyWith(fontSize: 15, color: on ? Bt.bone : Bt.ink)),
+      ),
     );
   }
 
@@ -294,18 +429,9 @@ class _CreateWorkspaceScreenState extends State<CreateWorkspaceScreen> {
   }
 
   Widget _buildActions() {
-    final bt = context.bt;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (_isEmailVerified)
-          BtButton(
-            label: 'Create Workspace',
-            icon: Icons.arrow_forward_rounded,
-            loading: _isLoading,
-            onPressed: _isLoading ? null : _onCreatePressed,
-          ),
-        const SizedBox(height: 16),
         Wrap(
           alignment: WrapAlignment.center,
           crossAxisAlignment: WrapCrossAlignment.center,
@@ -313,9 +439,13 @@ class _CreateWorkspaceScreenState extends State<CreateWorkspaceScreen> {
             Text('Already have an account? ', style: BtText.body(context, color: Bt.ink2)),
             InkWell(
               onTap: () => Navigator.pushNamed(context, '/login'),
+              borderRadius: BorderRadius.circular(8),
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 10),
-                child: Text('Sign in', style: BtText.body(context, weight: FontWeight.w600, color: bt.brand)),
+                child: Text(
+                  'Sign in',
+                  style: BtText.body(context, weight: FontWeight.w600).copyWith(decoration: TextDecoration.underline, decorationColor: Bt.ink, decorationThickness: 1.4),
+                ),
               ),
             ),
           ],
@@ -329,7 +459,7 @@ class _CreateWorkspaceScreenState extends State<CreateWorkspaceScreen> {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text('Powered by', style: BtText.caption(context)),
+        Text('POWERED BY', style: BtText.mono(context)),
         const SizedBox(width: 6),
         Image.asset(
           'assets/images/nurofin-logo.png',
@@ -509,4 +639,29 @@ class _CreateWorkspaceScreenState extends State<CreateWorkspaceScreen> {
       );
     }
   }
+}
+
+/// Dashed rounded outline for the logo drop zone.
+class _DashedBorderPainter extends CustomPainter {
+  const _DashedBorderPainter({required this.color, required this.radius});
+  final Color color;
+  final double radius;
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+    final path = Path()..addRRect(RRect.fromRectAndRadius(Offset.zero & size, Radius.circular(radius)));
+    for (final metric in path.computeMetrics()) {
+      double d = 0;
+      while (d < metric.length) {
+        canvas.drawPath(metric.extractPath(d, d + 6), paint);
+        d += 11;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DashedBorderPainter old) => old.color != color || old.radius != radius;
 }

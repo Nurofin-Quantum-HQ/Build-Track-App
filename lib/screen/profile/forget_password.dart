@@ -27,6 +27,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       backgroundColor: Bt.ground,
       appBar: BtNavBar(
         title: _step2 ? 'Set new password' : 'Reset password',
+        trailing: Padding(
+          padding: const EdgeInsets.only(right: 4),
+          child: Text(_step2 ? 'STEP 2 OF 2' : 'STEP 1 OF 2', style: BtText.mono(context)),
+        ),
         onBack: () {
           if (_step2) {
             setState(() => _step2 = false);
@@ -35,29 +39,72 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           }
         },
       ),
+      bottomNavigationBar: BtCtaBar(vertical: true, children: [_buildActions()]),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
         children: [
-          _buildHeader(),
-          const SizedBox(height: 28),
-          _step2 ? _buildStep2Form() : _buildStep1Form(),
-          const SizedBox(height: 28),
-          _buildActions(),
+          BtReveal(child: _buildArt()),
+          const SizedBox(height: 24),
+          AnimatedSwitcher(
+            duration: Bt.medium,
+            switchInCurve: Bt.ease,
+            transitionBuilder: (child, anim) => FadeTransition(
+              opacity: anim,
+              child: SlideTransition(position: Tween(begin: const Offset(.06, 0), end: Offset.zero).animate(anim), child: child),
+            ),
+            child: Column(
+              key: ValueKey(_step2),
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildHeader(),
+                const SizedBox(height: 24),
+                _step2 ? _buildStep2Form() : _buildStep1Form(),
+                const SizedBox(height: 20),
+                _buildStepList(),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
+
+  /// Noir card with the accent lock tile that pops in.
+  Widget _buildArt() {
+    final bt = context.bt;
+    return BtCard(
+      variant: BtCardVariant.ink,
+      padding: EdgeInsets.zero,
+      child: SizedBox(
+        height: 168,
+        child: Center(
+          child: TweenAnimationBuilder<double>(
+            key: ValueKey(_step2),
+            tween: Tween(begin: Bt.reduceMotion(context) ? 1 : .6, end: 1),
+            duration: Bt.slow,
+            curve: Bt.spring,
+            builder: (_, v, child) => Transform.scale(scale: v, child: child),
+            child: Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(color: bt.accent, borderRadius: BorderRadius.circular(24)),
+              child: Icon(_step2 ? Icons.key_outlined : Icons.lock_reset_outlined, size: 32, color: bt.onAccent),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildHeader() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        BtTile(icon: _step2 ? Icons.key_outlined : Icons.lock_reset_outlined, size: 48),
-        const SizedBox(height: 16),
         Text(
           _step2 ? 'Enter reset token' : 'Forgot your password?',
-          style: BtText.largeTitle(context),
+          style: BtText.d2(context),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 8),
         Text(
           _step2
               ? 'Copy the token from the reset link in your email and enter it below.'
@@ -67,6 +114,46 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       ],
     );
   }
+
+  /// 01 Get the link · 02 Paste token, set new password.
+  Widget _buildStepList() {
+    final bt = context.bt;
+    Widget row(String n, String title, String sub, {required bool active, required bool done}) {
+      return Opacity(
+        opacity: active || done ? 1 : .55,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+          child: Row(children: [
+            SizedBox(width: 26, child: Text(n, style: BtText.mono(context, color: active ? bt.accentInk : Bt.ink3))),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(title, style: BtText.body(context, weight: FontWeight.w500)),
+                Text(sub, style: BtText.caption(context, color: Bt.ink2)),
+              ]),
+            ),
+            if (done)
+              const Icon(Icons.check_circle_rounded, color: Bt.green, size: 20)
+            else if (active)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                decoration: BoxDecoration(color: bt.accentSoft, borderRadius: BorderRadius.circular(99)),
+                child: Text('Now', style: BtText.caption(context, color: bt.accentInk, weight: FontWeight.w600)),
+              ),
+          ]),
+        ),
+      );
+    }
+
+    return Container(
+      decoration: BoxDecoration(borderRadius: BorderRadius.circular(Bt.rCard), border: Border.all(color: Bt.line)),
+      child: Column(children: [
+        row('01', 'Get the link', 'Sent to your inbox in a few seconds', active: !_step2, done: _step2),
+        const Divider(height: 1, color: Bt.line, indent: 16, endIndent: 16),
+        row('02', 'Paste token, set new password', 'At least 6 characters', active: _step2, done: false),
+      ]),
+    );
+  }
+
   Widget _buildStep1Form() {
     return EntryLabeled(
       label: 'Email address',
@@ -103,7 +190,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               hint: 'At least 6 characters',
               suffix: IconButton(
                 tooltip: _obscurePass ? 'Show password' : 'Hide password',
-                icon: Icon(_obscurePass ? Icons.visibility_outlined : Icons.visibility_off_outlined, color: Bt.ink3),
+                icon: Icon(_obscurePass ? Icons.visibility_outlined : Icons.visibility_off_outlined, color: Bt.ink2),
                 onPressed: () => setState(() => _obscurePass = !_obscurePass),
               ),
             ),
@@ -121,7 +208,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           loading: _isLoading,
           onPressed: _isLoading ? null : (_step2 ? _onSetPassword : _onSendLink),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 4),
         BtButton(
           label: _step2 ? 'Back' : 'Back to login',
           variant: BtButtonVariant.quiet,

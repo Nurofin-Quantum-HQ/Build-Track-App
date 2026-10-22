@@ -50,7 +50,7 @@ class _FulfillmentPaymentScreenState extends State<FulfillmentPaymentScreen> {
       return;
     }
     if (_clientEmailCtrl.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter client email')));
+      btToast(context, 'Please enter client email', error: true);
       return;
     }
     setState(() {
@@ -260,30 +260,19 @@ class _FulfillmentPaymentScreenState extends State<FulfillmentPaymentScreen> {
             
             context.read<ProjectProvider>().load();
             context.read<InventoryProvider>().loadInventory(_projectId);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  amount > 0
-                      ? '${formatCurrency(amount)} recorded via $_selectedMethod'
-                      : 'Payment details updated successfully',
-                ),
-                backgroundColor: const Color(0xFF067647),
-                behavior: SnackBarBehavior.floating,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
+            await showBtSuccess(
+              context,
+              kind: BtSuccessKind.money,
+              label: _itemName,
+              title: amount > 0 ? 'Payment recorded' : 'Payment updated',
+              message: amount > 0
+                  ? '${formatCurrency(amount)} recorded via $_selectedMethod'
+                  : 'Payment details updated successfully',
             );
+            if (!mounted) return;
             Navigator.pop(context, true);
           } catch (e) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Server updated payment, but client failed to parse response: $e'),
-                backgroundColor: Colors.orange.withValues(alpha: 0.8),
-                behavior: SnackBarBehavior.floating,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-            );
+            btToast(context, 'Server updated payment, but client failed to parse response: $e', error: true);
           }
         }
       } else {
@@ -306,16 +295,7 @@ class _FulfillmentPaymentScreenState extends State<FulfillmentPaymentScreen> {
             }
           } catch (_) {}
 
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(errMsg),
-              backgroundColor: Colors.red.withValues(alpha: 0.8),
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          );
+          btToast(context, errMsg, error: true);
         }
       }
     } catch (e) {
@@ -324,16 +304,7 @@ class _FulfillmentPaymentScreenState extends State<FulfillmentPaymentScreen> {
           // Handled by global interceptor, do not show another snackbar
           return;
         }
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Network or processing error: $e'),
-            backgroundColor: Colors.red.withValues(alpha: 0.8),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        );
+        btToast(context, 'Network or processing error: $e', error: true);
       }
     } finally {
       if (mounted) {
@@ -343,6 +314,32 @@ class _FulfillmentPaymentScreenState extends State<FulfillmentPaymentScreen> {
       }
     }
   }
+  Future<void> _pickPaymentDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedPaymentDate,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2100),
+      builder: (c, child) => Theme(
+        data: Theme.of(c).copyWith(
+          colorScheme: const ColorScheme.light(
+            primary: Bt.ink,
+            onPrimary: Bt.bone,
+            onSurface: _kDark,
+          ),
+        ),
+        child: child!,
+      ),
+    );
+    if (picked != null) {
+      final now = DateTime.now();
+      setState(() => _selectedPaymentDate = DateTime(
+        picked.year, picked.month, picked.day,
+        now.hour, now.minute, now.second,
+      ));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     String helperText;
@@ -359,31 +356,36 @@ class _FulfillmentPaymentScreenState extends State<FulfillmentPaymentScreen> {
     }
     final bt = context.bt;
     final bool amountDisabled = _selectedStatus == PaymentStatus.pending;
-    return Scaffold(
-      backgroundColor: Bt.ground,
-      appBar: const BtNavBar(title: 'Record payment'),
-      body: ListView(
-        physics: const ClampingScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-        children: [
-          BtCard(
+    final bool hasProof = _uploadedReceipt != null && _uploadedReceipt!.isNotEmpty;
+
+    final form = ListView(
+      key: const ValueKey('payment-form'),
+      physics: const ClampingScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 28),
+      children: [
+        // ── what is being paid
+        BtReveal(
+          child: BtCard(
+            variant: BtCardVariant.ink,
+            padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                BtTypeTile(type: _itemType),
-                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(_itemName, maxLines: 2, overflow: TextOverflow.ellipsis, style: BtText.headline(context)),
+                      Text(_itemType.toUpperCase(), style: BtText.mono(context, color: bt.accent)),
+                      const SizedBox(height: 6),
+                      Text(_itemName, maxLines: 2, overflow: TextOverflow.ellipsis, style: BtText.d3(context, color: Bt.bone)),
+                      const SizedBox(height: 2),
                       Text(
                         [
                           _projectName.isNotEmpty ? _projectName : 'Project',
                           if (_quantity > 0 && _rate > 0)
                             '${_quantity % 1 == 0 ? _quantity.toInt() : _quantity} × ₹${_rate % 1 == 0 ? _rate.toInt() : _rate}',
                         ].join(' · '),
-                        style: BtText.caption(context),
+                        style: BtText.caption(context, color: Bt.onNoir2),
                       ),
                     ],
                   ),
@@ -392,148 +394,262 @@ class _FulfillmentPaymentScreenState extends State<FulfillmentPaymentScreen> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Text('Still due', style: BtText.caption(context)),
-                    Text(formatInr(_outstanding), style: BtText.num(BtText.headline(context).copyWith(color: _outstanding > 0 ? Bt.amber : Bt.green))),
-                    Text('${formatInr(_alreadyPaid)} paid', style: BtText.caption(context)),
+                    Text('STILL DUE', style: BtText.mono(context, color: Bt.onNoir2)),
+                    const SizedBox(height: 4),
+                    BtCountUp(
+                      value: _outstanding,
+                      format: (v) => formatInr(v),
+                      style: BtText.title(context, size: 20).copyWith(color: _outstanding > 0 ? Bt.amberBright : Bt.greenBright),
+                    ),
+                    Text('${formatInr(_alreadyPaid)} paid', style: BtText.caption(context, color: Bt.onNoir2)),
                   ],
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 24),
-          EntryLabeled(
-            label: 'Payment status',
-            child: BtSegmented<PaymentStatus>(
-              segments: const {
-                PaymentStatus.paid: 'Fully paid',
-                PaymentStatus.partial: 'Partial',
-                PaymentStatus.pending: 'Not paid',
-              },
-              value: _selectedStatus == PaymentStatus.overdue ? PaymentStatus.pending : _selectedStatus,
-              onChanged: (v) => setState(() {
-                _selectedStatus = v;
-                _amountError = null;
-                if (v == PaymentStatus.paid) {
-                  _amountCtrl.text = _outstanding.toStringAsFixed(0);
-                } else if (v == PaymentStatus.partial) {
-                  if (_amountCtrl.text == '0' || _amountCtrl.text == _outstanding.toStringAsFixed(0)) {
-                    _amountCtrl.clear();
-                  }
-                } else {
-                  _amountCtrl.text = '0';
+        ),
+        const SizedBox(height: 20),
+        // ── status
+        BtReveal(
+          index: 1,
+          child: BtSegmented<PaymentStatus>(
+            segments: const {
+              PaymentStatus.paid: 'Fully paid',
+              PaymentStatus.partial: 'Partial',
+              PaymentStatus.pending: 'Not paid',
+            },
+            value: _selectedStatus == PaymentStatus.overdue ? PaymentStatus.pending : _selectedStatus,
+            onChanged: (v) => setState(() {
+              _selectedStatus = v;
+              _amountError = null;
+              if (v == PaymentStatus.paid) {
+                _amountCtrl.text = _outstanding.toStringAsFixed(0);
+              } else if (v == PaymentStatus.partial) {
+                if (_amountCtrl.text == '0' || _amountCtrl.text == _outstanding.toStringAsFixed(0)) {
+                  _amountCtrl.clear();
                 }
-              }),
-            ),
+              } else {
+                _amountCtrl.text = '0';
+              }
+            }),
           ),
-          const SizedBox(height: 20),
-          EntryLabeled(
+        ),
+        const SizedBox(height: 20),
+        // ── big amount
+        BtReveal(
+          index: 2,
+          child: BtField(
             label: 'Amount paid',
+            error: _amountError,
+            helper: helperText,
             child: AnimatedOpacity(
               opacity: amountDisabled ? 0.45 : 1.0,
-              duration: const Duration(milliseconds: 180),
+              duration: Bt.fast,
               child: TextField(
                 controller: _amountCtrl,
                 enabled: !amountDisabled,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 onChanged: (val) {
-                            if (val.length > 1 &&
-                                val.startsWith('0') &&
-                                !val.startsWith('0.')) {
-                              final stripped = val.replaceFirst(
-                                RegExp(r'^0+'),
-                                '',
-                              );
-                              if (stripped.isNotEmpty && stripped != '.') {
-                                _amountCtrl.text = stripped;
-                                _amountCtrl.selection = TextSelection.collapsed(
-                                  offset: stripped.length,
-                                );
-                                val = stripped;
-                              }
-                            }
-                            setState(() {
-                              _amountError = null;
-                              final amt = _parseAmount(val);
-                              if (amt == null || amt == 0) {
-                                _selectedStatus = PaymentStatus.pending;
-                              } else if (amt >= _outstanding) {
-                                _selectedStatus = PaymentStatus.paid;
-                              } else {
-                                _selectedStatus = PaymentStatus.partial;
-                              }
-                            });
-                          },
-                style: BtText.num(BtText.amount(context, size: 28)),
-                decoration: btInput(context, hint: '0', prefixText: '₹ ', errorText: _amountError).copyWith(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                  if (val.length > 1 &&
+                      val.startsWith('0') &&
+                      !val.startsWith('0.')) {
+                    final stripped = val.replaceFirst(
+                      RegExp(r'^0+'),
+                      '',
+                    );
+                    if (stripped.isNotEmpty && stripped != '.') {
+                      _amountCtrl.text = stripped;
+                      _amountCtrl.selection = TextSelection.collapsed(
+                        offset: stripped.length,
+                      );
+                      val = stripped;
+                    }
+                  }
+                  setState(() {
+                    _amountError = null;
+                    final amt = _parseAmount(val);
+                    if (amt == null || amt == 0) {
+                      _selectedStatus = PaymentStatus.pending;
+                    } else if (amt >= _outstanding) {
+                      _selectedStatus = PaymentStatus.paid;
+                    } else {
+                      _selectedStatus = PaymentStatus.partial;
+                    }
+                  });
+                },
+                style: BtText.d1(context),
+                cursorColor: bt.accent,
+                decoration: btInput(context, hint: '0').copyWith(
+                  hintStyle: BtText.d1(context, color: Bt.placeholder),
+                  prefixIcon: Padding(
+                    padding: const EdgeInsets.only(left: 18, right: 6),
+                    child: Text('₹', style: BtText.d2(context, color: Bt.ink3)),
+                  ),
+                  prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
+                  contentPadding: const EdgeInsets.fromLTRB(4, 18, 16, 18),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(Bt.rCard),
+                    borderSide: BorderSide(color: _amountError != null ? Bt.red : Bt.inputBorder),
+                  ),
+                  disabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(Bt.rCard),
+                    borderSide: const BorderSide(color: Bt.line),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(Bt.rCard),
+                    borderSide: BorderSide(color: _amountError != null ? Bt.red : Bt.ink, width: 2),
+                  ),
                 ),
               ),
             ),
           ),
-          if (_amountError == null)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
-              child: Text(helperText, style: BtText.caption(context)),
-            ),
-          const SizedBox(height: 24),
-          EntryLabeled(
-            label: 'Method',
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final m in _pMethods)
-                  BtChip(
-                    label: m['label'] as String,
-                    icon: m['icon'] as IconData,
-                    selected: _selectedMethod == m['label'],
-                    onTap: () => setState(() => _selectedMethod = m['label'] as String),
-                  ),
-              ],
-            ),
+        ),
+        const SizedBox(height: 22),
+        // ── method tiles
+        BtReveal(
+          index: 3,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('METHOD', style: BtText.mono(context)),
+              const SizedBox(height: 10),
+              LayoutBuilder(builder: (context, c) {
+                const gap = 8.0;
+                final w = (c.maxWidth - gap * 2) / 3;
+                return Wrap(
+                  spacing: gap,
+                  runSpacing: gap,
+                  children: [
+                    for (final m in _pMethods)
+                      SizedBox(
+                        width: w,
+                        child: _MethodTile(
+                          label: m['label'] as String,
+                          icon: m['icon'] as IconData,
+                          selected: _selectedMethod == m['label'],
+                          onTap: () => setState(() => _selectedMethod = m['label'] as String),
+                        ),
+                      ),
+                  ],
+                );
+              }),
+            ],
           ),
-          if (_selectedMethod == 'Cash') ...[
-            const SizedBox(height: 16),
-            BtCard(
-              padding: const EdgeInsets.fromLTRB(12, 4, 16, 12),
+        ),
+        const SizedBox(height: 22),
+        // ── date + remarks
+        BtReveal(
+          index: 4,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              BtGroup(children: [
+                BtValueRow(
+                  label: 'Payment date',
+                  value: formatDate(_selectedPaymentDate),
+                  onTap: _pickPaymentDate,
+                  trailing: const Icon(Icons.calendar_today_outlined, size: 18, color: Bt.ink3),
+                ),
+              ]),
+              const SizedBox(height: 14),
+              BtField(
+                label: 'Remarks / reference number',
+                optional: true,
+                child: EntryNotesField(
+                  controller: _noteCtrl,
+                  hint: 'Transaction ID, cheque number, or remarks…',
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 22),
+        // ── proof + e-sign
+        BtReveal(
+          index: 5,
+          child: BtGroup(children: [
+            if (hasProof)
+              BtRow(
+                leading: BtTile(icon: Icons.check_rounded, bg: Bt.greenSoft, fg: Bt.green),
+                title: _uploadedReceipt!,
+                subtitle: 'Payment proof attached',
+                trailing: BtIconButton(
+                  icon: Icons.close_rounded,
+                  semantic: 'Remove receipt',
+                  color: Bt.ink3,
+                  onTap: () => setState(() {
+                    _uploadedReceipt = null;
+                    _newReceiptDataUri = null;
+                  }),
+                ),
+              )
+            else
+              BtRow(
+                leading: const BtTile(icon: Icons.upload_rounded),
+                title: 'Payment proof',
+                subtitle: 'Upload payment receipt · PNG, JPG, PDF',
+                showChevron: true,
+                onTap: () async {
+                  final attachment = await pickAttachmentDirect(context);
+                  if (attachment != null) {
+                    setState(() {
+                      _uploadedReceipt = attachment.name;
+                      _newReceiptDataUri = attachment.dataUri;
+                    });
+                  }
+                },
+              ),
+            if (_selectedMethod == 'Cash')
+              BtRow(
+                leading: BtTile(icon: Icons.draw_outlined, bg: bt.accentSoft, fg: bt.accentInk),
+                title: 'E-sign cash receipt',
+                subtitle: 'Request e-signature · client signs on their phone',
+                subtitleMaxLines: 2,
+                trailing: BtSwitch(
+                  value: _requestEsign,
+                  onChanged: (val) => setState(() => _requestEsign = val),
+                ),
+              ),
+          ]),
+        ),
+        if (_selectedMethod == 'Cash' && _requestEsign) ...[
+          const SizedBox(height: 12),
+          AnimatedSize(
+            duration: Bt.fast,
+            curve: Bt.ease,
+            child: BtCard(
+              padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  CheckboxListTile(
-                    title: Text('Request e-signature for cash receipt', style: BtText.body(context)),
-                    value: _requestEsign,
-                    onChanged: (val) => setState(() => _requestEsign = val ?? false),
-                    controlAffinity: ListTileControlAffinity.leading,
-                    contentPadding: EdgeInsets.zero,
-                    activeColor: bt.brand,
-                  ),
-                  if (_requestEsign)
-                    Padding(
-                      padding: const EdgeInsets.only(left: 4, bottom: 8),
-                      child: TextField(
-                        controller: _clientEmailCtrl,
-                        keyboardType: TextInputType.emailAddress,
-                        style: BtText.body(context),
-                        decoration: btInput(context, hint: 'Client email address', prefix: const Icon(Icons.email_outlined, color: Bt.ink3, size: 20)),
-                      ),
+                  BtField(
+                    label: 'Client email',
+                    child: TextField(
+                      controller: _clientEmailCtrl,
+                      keyboardType: TextInputType.emailAddress,
+                      style: BtText.body(context),
+                      decoration: btInput(context, hint: 'Client email address', prefix: const Icon(Icons.email_outlined, color: Bt.ink3, size: 20)),
                     ),
-                  if (_requestEsign && !_isEsignCompleted) ...[
-                    Padding(
-                      padding: const EdgeInsets.only(left: 4),
-                      child: BtButton(
-                        label: _isEsignPolling ? 'Cancel Polling' : 'Send for E-Signature',
-                        variant: _isEsignPolling ? BtButtonVariant.destructive : BtButtonVariant.secondary,
-                        small: true,
-                        onPressed: _isEsignPolling ? () => setState(() => _isEsignPolling = false) : _startEsignFlow,
-                      ),
+                  ),
+                  if (!_isEsignCompleted) ...[
+                    const SizedBox(height: 12),
+                    BtButton(
+                      label: _isEsignPolling ? 'Cancel Polling' : 'Send for E-Signature',
+                      icon: _isEsignPolling ? null : Icons.send_rounded,
+                      variant: _isEsignPolling ? BtButtonVariant.destructive : BtButtonVariant.secondary,
+                      small: true,
+                      onPressed: _isEsignPolling ? () => setState(() => _isEsignPolling = false) : _startEsignFlow,
                     ),
                     if (_esignStatusText.isNotEmpty)
                       Padding(
-                        padding: const EdgeInsets.fromLTRB(4, 10, 0, 0),
+                        padding: const EdgeInsets.only(top: 10),
                         child: Row(children: [
                           if (_isEsignPolling) ...[
                             const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Bt.amber)),
                             const SizedBox(width: 8),
+                          ] else ...[
+                            const Icon(Icons.error_outline_rounded, size: 16, color: Bt.red),
+                            const SizedBox(width: 6),
                           ],
                           Expanded(
                             child: Text(
@@ -544,143 +660,201 @@ class _FulfillmentPaymentScreenState extends State<FulfillmentPaymentScreen> {
                         ]),
                       ),
                   ],
-                  if (_isEsignCompleted)
-                    Padding(
-                      padding: const EdgeInsets.only(left: 4, top: 4),
+                  if (_isEsignCompleted) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(color: Bt.greenSoft, borderRadius: BorderRadius.circular(Bt.rTile)),
                       child: Row(children: [
-                        const Icon(Icons.check_circle_rounded, color: Bt.green, size: 18),
+                        const Icon(Icons.verified_rounded, color: Bt.green, size: 18),
                         const SizedBox(width: 8),
-                        Text('Signature successfully captured!', style: BtText.subhead(context, color: Bt.green, weight: FontWeight.w600)),
+                        Expanded(child: Text('Signature successfully captured!', style: BtText.subhead(context, color: Bt.green, weight: FontWeight.w600))),
                       ]),
                     ),
+                  ],
                 ],
               ),
             ),
-          ],
-          const SizedBox(height: 24),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: EntryLabeled(
-                  label: 'Payment date',
-                  child: BtPickerField(
-                    text: formatDate(_selectedPaymentDate),
-                    icon: Icons.calendar_today_outlined,
-                    onTap: () async {
-                        final picked = await showDatePicker(
-                          context: context,
-                          initialDate: _selectedPaymentDate,
-                          firstDate: DateTime(2020),
-                          lastDate: DateTime(2100),
-                          builder: (c, child) => Theme(
-                            data: Theme.of(c).copyWith(
-                              colorScheme: const ColorScheme.light(
-                                primary: Color(0xFF0B63CE),
-                                onPrimary: Colors.white,
-                                onSurface: _kDark,
-                              ),
-                            ),
-                            child: child!,
-                          ),
-                        );
-                        if (picked != null) {
-                          final now = DateTime.now();
-                          setState(() => _selectedPaymentDate = DateTime(
-                            picked.year, picked.month, picked.day,
-                            now.hour, now.minute, now.second,
-                          ));
-                        }
-                      },
+          ),
+        ],
+      ],
+    );
+
+    return Scaffold(
+      backgroundColor: _isEsignPolling ? Bt.noir : Bt.ground,
+      appBar: _isEsignPolling ? null : BtNavBar(title: 'Record payment', subtitle: _itemName),
+      body: AnimatedSwitcher(
+        duration: Bt.medium,
+        switchInCurve: Bt.ease,
+        switchOutCurve: Curves.easeIn,
+        child: _isEsignPolling
+            ? _EsignWaitingView(
+                key: const ValueKey('esign-waiting'),
+                email: _clientEmailCtrl.text.trim(),
+                amount: _parseAmount(_amountCtrl.text) ?? 0,
+                statusText: _esignStatusText,
+                onStop: () => setState(() => _isEsignPolling = false),
+              )
+            : form,
+      ),
+      bottomNavigationBar: _isEsignPolling
+          ? null
+          : BtCtaBar(
+              children: [
+                Expanded(
+                  child: BtButton(
+                    label: 'Cancel',
+                    variant: BtButtonVariant.secondary,
+                    onPressed: _isSaving ? null : () => Navigator.pop(context),
                   ),
                 ),
+                Expanded(
+                  flex: 2,
+                  child: BtButton(
+                    label: 'Confirm Payment',
+                    icon: Icons.check_circle_outline,
+                    loading: _isSaving,
+                    onPressed: _isSaving ? null : _handleConfirmPayment,
+                  ),
+                ),
+              ],
+            ),
+    );
+  }
+}
+
+/// Payment-method tile (Record-Payment board): icon over label, ink when selected.
+class _MethodTile extends StatelessWidget {
+  const _MethodTile({required this.label, required this.icon, required this.selected, required this.onTap});
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      selected: selected,
+      child: BtPressable(
+        onTap: onTap,
+        semanticLabel: label,
+        child: AnimatedContainer(
+          duration: Bt.fast,
+          curve: Bt.ease,
+          height: 64,
+          decoration: BoxDecoration(
+            color: selected ? Bt.ink : Bt.card,
+            borderRadius: BorderRadius.circular(Bt.rTile),
+            border: Border.all(color: selected ? Bt.ink : Bt.inputBorder),
+            boxShadow: selected ? Bt.shadow : null,
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 20, color: selected ? context.bt.accent : Bt.ink2),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: BtText.caption(context, color: selected ? Bt.bone : Bt.ink, weight: FontWeight.w600),
               ),
             ],
           ),
-          const SizedBox(height: 20),
-          EntryLabeled(
-            label: 'Payment proof',
-            child: (_uploadedReceipt != null && _uploadedReceipt!.isNotEmpty)
-                ? BtGroup(children: [
-                    BtRow(
-                      leading: BtTile(icon: Icons.check_rounded, bg: Bt.greenSoft, fg: Bt.green),
-                      title: _uploadedReceipt!,
-                      trailing: BtIconButton(
-                        icon: Icons.close_rounded,
-                        semantic: 'Remove receipt',
-                        color: Bt.ink3,
-                        onTap: () => setState(() {
-                          _uploadedReceipt = null;
-                          _newReceiptDataUri = null;
-                        }),
-                      ),
-                    ),
-                  ])
-                : Material(
-                    color: Bt.card,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(Bt.rInput),
-                      side: const BorderSide(color: Bt.inputBorder),
-                    ),
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(Bt.rInput),
-                      onTap: () async {
-                        final attachment = await pickAttachmentDirect(context);
-                        if (attachment != null) {
-                          setState(() {
-                            _uploadedReceipt = attachment.name;
-                            _newReceiptDataUri = attachment.dataUri;
-                          });
-                        }
-                      },
-                      child: SizedBox(
-                        height: 56,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Icons.upload_rounded, color: Bt.ink2, size: 20),
-                            const SizedBox(width: 8),
-                            Text('Upload payment receipt', style: BtText.body(context, weight: FontWeight.w500)),
-                            Text('  · PNG, JPG, PDF', style: BtText.caption(context)),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-          ),
-          const SizedBox(height: 20),
-          EntryLabeled(
-            label: 'Remarks / reference number',
-            child: EntryNotesField(
-              controller: _noteCtrl,
-              hint: 'Transaction ID, cheque number, or remarks…',
-            ),
-          ),
-        ],
-      ),
-      bottomNavigationBar: EntryBottomBar(
-        child: Row(
-          children: [
-            Expanded(
-              child: BtButton(
-                label: 'Cancel',
-                variant: BtButtonVariant.secondary,
-                onPressed: _isSaving ? null : () => Navigator.pop(context),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              flex: 2,
-              child: BtButton(
-                label: 'Confirm Payment',
-                icon: Icons.check_circle_outline,
-                loading: _isSaving,
-                onPressed: _isSaving ? null : _handleConfirmPayment,
-              ),
-            ),
-          ],
         ),
       ),
     );
+  }
+}
+
+/// Noir "waiting for the client to sign" screen (Sign-Receipt board).
+/// Only presentation: polling lives in the parent; [onStop] = the existing cancel-polling action.
+class _EsignWaitingView extends StatelessWidget {
+  const _EsignWaitingView({super.key, required this.email, required this.amount, required this.statusText, required this.onStop});
+  final String email;
+  final double amount;
+  final String statusText;
+  final VoidCallback onStop;
+  @override
+  Widget build(BuildContext context) {
+    final bt = context.bt;
+    final top = MediaQuery.paddingOf(context).top;
+    final bottom = MediaQuery.paddingOf(context).bottom;
+    return LayoutBuilder(builder: (context, c) => SingleChildScrollView(
+      child: BtHero(
+      overlap: 0,
+      minHeight: c.maxHeight,
+      padding: EdgeInsets.fromLTRB(Bt.gutter, top + 12, Bt.gutter, bottom + 16),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(minHeight: (c.maxHeight - top - bottom - 28).clamp(0, double.infinity)),
+        child: IntrinsicHeight(child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(child: Text('Cash receipt', style: BtText.navTitle(context).copyWith(color: Bt.bone))),
+            const Spacer(),
+            // phone mock with the receipt being signed
+            BtReveal(
+              child: Center(
+                child: Container(
+                  width: 190,
+                  padding: const EdgeInsets.fromLTRB(18, 22, 18, 18),
+                  decoration: BoxDecoration(
+                    color: Bt.noir2,
+                    borderRadius: BorderRadius.circular(30),
+                    border: Border.all(color: Colors.white.withValues(alpha: .12), width: 1.5),
+                    boxShadow: [BoxShadow(color: bt.accent.withValues(alpha: .18), blurRadius: 40, spreadRadius: -8)],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      FractionallySizedBox(widthFactor: .6, child: Container(height: 6, decoration: BoxDecoration(color: Colors.white.withValues(alpha: .12), borderRadius: BorderRadius.circular(3)))),
+                      const SizedBox(height: 8),
+                      FractionallySizedBox(widthFactor: .85, child: Container(height: 6, decoration: BoxDecoration(color: Colors.white.withValues(alpha: .08), borderRadius: BorderRadius.circular(3)))),
+                      const SizedBox(height: 14),
+                      Text(formatInr(amount), style: BtText.num(BtText.d3(context, color: Bt.bone))),
+                      const SizedBox(height: 14),
+                      Container(
+                        height: 40,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(color: bt.accent, borderRadius: BorderRadius.circular(12)),
+                        child: Text('Authorize and Sign', style: BtText.caption(context, color: bt.onAccent, weight: FontWeight.w700)),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 40),
+            BtReveal(
+              index: 2,
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const BtBrickLoader(onDark: true, scale: .5),
+                      const SizedBox(width: 10),
+                      Flexible(child: Text(statusText.toUpperCase(), textAlign: TextAlign.center, style: BtText.mono(context, color: bt.accent))),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Text(email.isEmpty ? 'Sent to client' : 'Sent to $email', textAlign: TextAlign.center, style: BtText.d2(context, color: Bt.bone)),
+                  const SizedBox(height: 8),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 300),
+                    child: Text(
+                      "Keep this open — we'll pick up the signature the moment it's done.",
+                      textAlign: TextAlign.center,
+                      style: BtText.body(context, color: Bt.onNoir2),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Spacer(),
+            BtButton(label: 'Stop waiting', variant: BtButtonVariant.onDark, onPressed: onStop),
+          ],
+        )),
+      ),
+    )));
   }
 }

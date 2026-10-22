@@ -1,4 +1,3 @@
-import 'package:buildtrack_mobile/common/themes/app_colors.dart';
 import 'package:buildtrack_mobile/controller/project_provider.dart';
 import 'package:buildtrack_mobile/controller/subscription_provider.dart';
 import 'package:flutter/material.dart';
@@ -42,21 +41,23 @@ class _SubscriptionCardState extends State<SubscriptionCard> {
 
     final bt = context.bt;
     return BtCard(
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(children: [
-            BtTile(icon: sub.isPaid ? Icons.workspace_premium_rounded : Icons.auto_awesome_rounded, bg: bt.brandSoft, fg: bt.brand),
+            BtTile(icon: sub.isPaid ? Icons.workspace_premium_rounded : Icons.auto_awesome_rounded, bg: bt.accentSoft, fg: bt.accentInk),
             const SizedBox(width: 12),
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('${plan.label} Plan', style: BtText.headline(context)),
+                Text('${plan.label} Plan', style: BtText.d3(context)),
+                const SizedBox(height: 2),
                 _StatusBadge(status: sub.status, isPaid: sub.isPaid),
               ]),
             ),
             BtBadge(label: plan.badge, tone: BtTone.neutral),
           ]),
-          const SizedBox(height: 16),
+          const SizedBox(height: 18),
           _UsageMeter(
             icon: Icons.folder_outlined,
             label: 'Projects',
@@ -64,7 +65,7 @@ class _SubscriptionCardState extends State<SubscriptionCard> {
             progress: isUnlimitedProjects ? 0.35 : projectUsageRatio,
             isUnlimited: isUnlimitedProjects,
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           _UsageMeter(
             icon: Icons.people_outline,
             label: 'Team Seats',
@@ -73,40 +74,51 @@ class _SubscriptionCardState extends State<SubscriptionCard> {
             isUnlimited: isUnlimitedUsers,
           ),
           if (sub.renewalDate != null) ...[
-            const SizedBox(height: 12),
+            const SizedBox(height: 14),
             Row(children: [
-              const Icon(Icons.event_repeat_rounded, color: Bt.ink3, size: 16),
+              const Icon(Icons.event_repeat_rounded, color: Bt.ink3, size: 15),
               const SizedBox(width: 6),
-              Text('Renews on ${_fmtDate(sub.renewalDate!)}', style: BtText.caption(context)),
+              Text('RENEWS ON ${_fmtDate(sub.renewalDate!).toUpperCase()}', style: BtText.mono(context)),
             ]),
           ],
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           InkWell(
             onTap: () => setState(() => _isBenefitsExpanded = !_isBenefitsExpanded),
             borderRadius: BorderRadius.circular(8),
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 10),
               child: Row(children: [
-                Expanded(child: Text(_isBenefitsExpanded ? 'Hide Plan Benefits' : 'View Plan Benefits & Perks', style: BtText.subhead(context, weight: FontWeight.w600, color: bt.brand))),
-                Icon(_isBenefitsExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded, color: bt.brand, size: 20),
+                Expanded(child: Text(_isBenefitsExpanded ? 'Hide Plan Benefits' : 'View Plan Benefits & Perks', style: BtText.subhead(context, weight: FontWeight.w600, color: bt.accentInk))),
+                AnimatedRotation(
+                  turns: _isBenefitsExpanded ? .5 : 0,
+                  duration: Bt.fast,
+                  curve: Bt.ease,
+                  child: Icon(Icons.keyboard_arrow_down_rounded, color: bt.accentInk, size: 20),
+                ),
               ]),
             ),
           ),
-          if (_isBenefitsExpanded)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                for (final feat in _getFeaturesForPlan(plan))
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 6),
-                    child: Row(children: [
-                      const Icon(Icons.check_circle_rounded, size: 16, color: Bt.green),
-                      const SizedBox(width: 8),
-                      Expanded(child: Text(feat, style: BtText.subhead(context, color: Bt.ink))),
+          AnimatedSize(
+            duration: Bt.medium,
+            curve: Bt.ease,
+            alignment: Alignment.topCenter,
+            child: !_isBenefitsExpanded
+                ? const SizedBox(width: double.infinity)
+                : Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      for (final feat in _getFeaturesForPlan(plan))
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 7),
+                          child: Row(children: [
+                            Container(width: 6, height: 6, decoration: BoxDecoration(color: bt.accent, shape: BoxShape.circle)),
+                            const SizedBox(width: 10),
+                            Expanded(child: Text(feat, style: BtText.subhead(context, color: Bt.ink))),
+                          ]),
+                        ),
                     ]),
                   ),
-              ]),
-            ),
+          ),
           if (widget.showUpgradeButton) ...[
             const SizedBox(height: 4),
             BtButton(
@@ -114,15 +126,16 @@ class _SubscriptionCardState extends State<SubscriptionCard> {
               icon: Icons.rocket_launch_rounded,
               onPressed: () => Navigator.pushNamed(context, '/subscription'),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 2),
             BtButton(label: 'Cancel Plan…', variant: BtButtonVariant.quiet, onPressed: () => _showCancelDialog(context, sub)),
           ] else ...[
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Row(children: [
               const Icon(Icons.shield_outlined, color: Bt.ink3, size: 16),
               const SizedBox(width: 6),
               Text('Plan managed by your admin', style: BtText.caption(context)),
             ]),
+            const SizedBox(height: 4),
           ],
         ],
       ),
@@ -136,74 +149,74 @@ class _SubscriptionCardState extends State<SubscriptionCard> {
         bool isCancelling = false;
         return StatefulBuilder(
           builder: (ctx, setDialogState) => AlertDialog(
+            backgroundColor: Bt.card,
+            surfaceTintColor: Colors.transparent,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(26),
             ),
-            title: const Row(
+            title: Row(
               children: [
-                Icon(Icons.info_outline_rounded, color: AppColors.warning),
-                SizedBox(width: 8),
-                Text(
-                  'Cancel Plan',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
+                const Icon(Icons.info_outline_rounded, color: Bt.amber),
+                const SizedBox(width: 8),
+                Text('Cancel Plan', style: BtText.d3(ctx)),
               ],
             ),
             content: Text(
               sub.isPaid
                   ? 'Your ${sub.currentPlan.label} subscription will remain active until the end of the current billing cycle${sub.renewalDate != null ? ' (${_fmtDate(sub.renewalDate!)})' : ''}.\n\nAfter that, your account will revert to the Free plan with 1 project limit.'
                   : 'You are currently on the Free Plan.\n\nYour account has no active recurring charges.',
-              style: const TextStyle(
-                fontSize: 14,
-                color: AppColors.textDark,
-                height: 1.4,
-              ),
+              style: BtText.body(ctx, color: Bt.ink2),
             ),
+            actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
             actions: [
-              TextButton(
-                onPressed: isCancelling ? null : () => Navigator.pop(ctx),
-                child: const Text('Keep My Plan'),
-              ),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.error,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
+              Row(children: [
+                Expanded(
+                  child: BtButton(
+                    label: 'Keep My Plan',
+                    small: true,
+                    variant: BtButtonVariant.secondary,
+                    onPressed: isCancelling ? null : () => Navigator.pop(ctx),
                   ),
                 ),
-                onPressed: isCancelling
-                    ? null
-                    : () async {
-                        setDialogState(() => isCancelling = true);
-                        final success = await sub.cancelPlan();
-                        if (ctx.mounted) {
-                          Navigator.pop(ctx);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                success
-                                    ? 'Subscription has been cancelled successfully.'
-                                    : sub.error.isNotEmpty
-                                    ? sub.error
-                                    : 'Cancellation request submitted.',
-                              ),
-                              backgroundColor: AppColors.textDark,
-                            ),
-                          );
-                        }
-                      },
-                child: isCancelling
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Text('Confirm Cancel'),
-              ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Semantics(
+                    button: true,
+                    child: BtPressable(
+                      onTap: isCancelling
+                          ? null
+                          : () async {
+                              setDialogState(() => isCancelling = true);
+                              final success = await sub.cancelPlan();
+                              if (ctx.mounted) {
+                                Navigator.pop(ctx);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      success
+                                          ? 'Subscription has been cancelled successfully.'
+                                          : sub.error.isNotEmpty
+                                          ? sub.error
+                                          : 'Cancellation request submitted.',
+                                    ),
+                                    backgroundColor: Bt.noir,
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
+                              }
+                            },
+                      child: Container(
+                        height: 42,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(color: Bt.redBright, borderRadius: BorderRadius.circular(14)),
+                        child: isCancelling
+                            ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                            : Text('Confirm Cancel', maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.button(ctx, size: 15, color: Colors.white)),
+                      ),
+                    ),
+                  ),
+                ),
+              ]),
             ],
           ),
         );
@@ -302,8 +315,8 @@ class _UsageMeter extends StatelessWidget {
         Expanded(child: Text(label, style: BtText.subhead(context))),
         Text(usageText, style: BtText.num(BtText.subhead(context, weight: FontWeight.w600, color: isNearLimit ? Bt.amber : Bt.ink))),
       ]),
-      const SizedBox(height: 6),
-      BtProgress(value: progress, thin: true, color: isNearLimit ? Bt.amber : null),
+      const SizedBox(height: 8),
+      BtBricks(value: progress, height: 8, color: isNearLimit ? Bt.amberBright : null),
     ]);
   }
 }
@@ -338,11 +351,7 @@ class _StatusBadge extends StatelessWidget {
         const SizedBox(width: 5),
         Text(
           label,
-          style: TextStyle(
-            color: color,
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-          ),
+          style: BtText.caption(context, color: color, weight: FontWeight.w600),
         ),
       ],
     );

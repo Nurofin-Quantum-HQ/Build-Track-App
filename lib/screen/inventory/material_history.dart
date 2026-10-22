@@ -1,6 +1,4 @@
 import 'package:buildtrack_mobile/design/design.dart';
-import 'package:buildtrack_mobile/common/themes/app_colors.dart';
-import 'package:buildtrack_mobile/common/widgets/common_widgets.dart';
 import 'package:flutter/material.dart';
 class CementHistoryScreen extends StatefulWidget {
   const CementHistoryScreen({super.key});
@@ -8,25 +6,20 @@ class CementHistoryScreen extends StatefulWidget {
   State<CementHistoryScreen> createState() => _CementHistoryScreenState();
 }
 class _CementHistoryScreenState extends State<CementHistoryScreen> {
-  static var primaryBlue = AppColors.primary;
-  static var purple = AppColors.primary;
-  static const bgColor = AppColors.gradientStart;
-  static const textDark = AppColors.textDark;
-  static const textGray = AppColors.textLight;
+  // Blueprint Noir palette (the screen's demo content below is unchanged).
+  static const primaryBlue = Bt.ink;
+  static const purple = Bt.ink2;
+  static const bgColor = Bt.ground;
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: bgColor,
+      appBar: BtNavBar(title: 'Entry details', onBack: () => Navigator.maybePop(context)),
       body: SafeArea(
+        top: false,
         bottom: false,
         child: Column(
           children: [
-            AppTopBar(
-              title: 'Entry details',
-              isSubScreen: true,
-              leftIcon: Icons.arrow_back,
-              onLeftTap: () => Navigator.maybePop(context),
-            ),
             Expanded(
               child: SingleChildScrollView(
                 physics: const ClampingScrollPhysics(),
@@ -107,81 +100,43 @@ class _CementHistoryScreenState extends State<CementHistoryScreen> {
     );
   }
   Widget _buildStockCard() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 24),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFE8F1FC), Color(0xFFF5F0FF)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(Bt.rCard),
-        border: Border.all(color: const Color(0xFFCDD0FF), width: 2),
-      ),
-      child: Column(
-        children: [
-          Text(
-            'Total current stock',
-            style: TextStyle(
-              fontSize: 13,
-              color: textGray,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 1.1,
-            ),
-          ),
-          const SizedBox(height: 12),
-          RichText(
-            text: TextSpan(
+    return BtReveal(
+      child: BtCard(
+        variant: BtCardVariant.ink,
+        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 22),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('TOTAL CURRENT STOCK', style: BtText.mono(context, color: context.bt.accent)),
+            const SizedBox(height: 10),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
               children: [
-                TextSpan(
-                  text: '1,248',
-                  style: TextStyle(
-                    fontSize: 56,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.primaryPurple,
-                    letterSpacing: -2,
-                    height: 1,
-                  ),
-                ),
-                TextSpan(
-                  text: '  Units',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                    color: textGray,
-                  ),
-                ),
+                Text('1,248', style: BtText.d0(context, color: Bt.bone)),
+                const SizedBox(width: 8),
+                Text('Units', style: BtText.body(context, color: Bt.onNoir2)),
               ],
             ),
-          ),
-          const SizedBox(height: 18),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _stockBadge(Icons.category_outlined, 'GRADE A-500'),
-              const SizedBox(width: 30),
-              _stockBadge(Icons.home_work_outlined, 'SECTOR 04'),
-            ],
-          ),
-        ],
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                _stockBadge(Icons.category_outlined, 'GRADE A-500'),
+                const SizedBox(width: 22),
+                _stockBadge(Icons.home_work_outlined, 'SECTOR 04'),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
   Widget _stockBadge(IconData icon, String label) {
     return Row(
       children: [
-        Icon(icon, color: purple, size: 18),
-        const SizedBox(width: 7),
-        Text(
-          label,
-          style: TextStyle(
-            color: purple,
-            fontWeight: FontWeight.w700,
-            fontSize: 13,
-            letterSpacing: 0.3,
-          ),
-        ),
+        Icon(icon, color: Bt.onNoir2, size: 16),
+        const SizedBox(width: 6),
+        Text(label, style: BtText.mono(context, color: Bt.onNoir2)),
       ],
     );
   }
@@ -193,40 +148,23 @@ class _CementHistoryScreenState extends State<CementHistoryScreen> {
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Movement Logs',
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w700,
-                color: textDark,
-              ),
-            ),
-            const SizedBox(height: 3),
-            Text(
-              'Tracking historical distribution',
-              style: TextStyle(color: textGray, fontSize: 13),
-            ),
+            Text('MOVEMENT LOGS', style: BtText.mono(context)),
+            const SizedBox(height: 4),
+            Text('Tracking historical distribution', style: BtText.title(context, size: 18)),
           ],
         ),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Bt.line),
+            color: Bt.card,
+            borderRadius: BorderRadius.circular(Bt.rChip),
+            border: Border.all(color: Bt.inputBorder),
           ),
           child: Row(
             children: [
-              Text(
-                'Filter',
-                style: TextStyle(
-                  color: primaryBlue,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 13,
-                ),
-              ),
+              Text('Filter', style: BtText.caption(context, color: Bt.ink, weight: FontWeight.w600)),
               const SizedBox(width: 4),
-              Icon(Icons.tune, color: primaryBlue, size: 16),
+              const Icon(Icons.tune, color: Bt.ink, size: 16),
             ],
           ),
         ),
@@ -244,62 +182,28 @@ class _CementHistoryScreenState extends State<CementHistoryScreen> {
     required bool isPositive,
     required Color accent,
   }) {
-    return Container(
+    return BtCard(
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border(left: BorderSide(color: accent, width: 3.5)),
-      ),
       child: Row(
         children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: iconBg,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: iconColor, size: 21),
-          ),
+          BtTile(icon: icon, size: 42),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  name,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 14.5,
-                    color: textDark,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  subtitle,
-                  style: TextStyle(color: textGray, fontSize: 13),
-                ),
+                Text(name, style: BtText.headline(context)),
+                const SizedBox(height: 2),
+                Text(subtitle, style: BtText.caption(context)),
               ],
             ),
           ),
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text(
-                qty,
-                style: TextStyle(
-                  color: isPositive ? primaryBlue : const Color(0xFF0B63CE),
-                  fontWeight: FontWeight.w700,
-                  fontSize: 19,
-                ),
-              ),
+              Text(qty, style: BtText.num(BtText.title(context, size: 19).copyWith(color: isPositive ? Bt.green : Bt.red))),
               const SizedBox(height: 2),
-              Text(
-                date,
-                textAlign: TextAlign.right,
-                style: TextStyle(color: textGray, fontSize: 12, height: 1.3),
-              ),
+              Text(date, textAlign: TextAlign.right, style: BtText.caption(context).copyWith(fontSize: 12, height: 1.3)),
             ],
           ),
         ],

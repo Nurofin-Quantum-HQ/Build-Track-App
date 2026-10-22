@@ -1,9 +1,10 @@
-import 'package:buildtrack_mobile/common/themes/app_colors.dart';
-import 'package:buildtrack_mobile/common/themes/app_gradients.dart';
+import 'package:buildtrack_mobile/design/design.dart';
 import 'package:flutter/material.dart';
 
 enum CtaVariant { primary, secondary, outline }
 
+/// Legacy CTA kept for API compatibility — now drawn in the V2 style:
+/// primary = accent fill, secondary = glass (for noir surfaces), outline = white.
 class PremiumCtaButton extends StatelessWidget {
   const PremiumCtaButton({
     super.key,
@@ -24,80 +25,68 @@ class PremiumCtaButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bt = context.bt;
     final isPrimary = variant == CtaVariant.primary;
     final isSecondary = variant == CtaVariant.secondary;
 
     BoxDecoration decoration;
     Color textColor;
-    Color spinnerColor;
 
     if (isPrimary) {
       decoration = BoxDecoration(
-        gradient: AppGradients.primaryButton,
-        borderRadius: BorderRadius.circular(16),
+        color: bt.accent,
+        borderRadius: BorderRadius.circular(Bt.rButton),
+        boxShadow: [BoxShadow(color: bt.accent.withValues(alpha: .45), blurRadius: 26, spreadRadius: -12, offset: const Offset(0, 10))],
       );
-      textColor = Colors.white;
-      spinnerColor = Colors.white;
+      textColor = bt.onAccent;
     } else if (isSecondary) {
       decoration = BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.18),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.35),
-          width: 1.5,
-        ),
+        color: Colors.white.withValues(alpha: .10),
+        borderRadius: BorderRadius.circular(Bt.rButton),
+        border: Border.all(color: Colors.white.withValues(alpha: .14)),
       );
-      textColor = Colors.white;
-      spinnerColor = Colors.white;
+      textColor = Bt.bone;
     } else {
       decoration = BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFD0D5DD), width: 1.5),
+        color: Bt.card,
+        borderRadius: BorderRadius.circular(Bt.rButton),
+        border: Border.all(color: Bt.inputBorder),
       );
-      textColor = const Color(0xFF344054);
-      spinnerColor = AppColors.primary;
+      textColor = Bt.ink;
     }
 
-    return GestureDetector(
-      onTap: isLoading ? null : onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Container(
-        width: isFullWidth ? double.infinity : null,
-        padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 16),
-        decoration: decoration,
-        child: Center(
-          child: isLoading
-              ? SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.5,
-                    color: spinnerColor,
-                  ),
-                )
-              : FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      if (icon != null) ...[
-                        Icon(icon, color: textColor, size: 18),
-                        const SizedBox(width: 7),
+    return Semantics(
+      button: true,
+      enabled: onTap != null && !isLoading,
+      child: BtPressable(
+        onTap: isLoading ? null : onTap,
+        child: Container(
+          width: isFullWidth ? double.infinity : null,
+          height: Bt.buttonH,
+          padding: const EdgeInsets.symmetric(horizontal: 18),
+          decoration: decoration,
+          child: Center(
+            child: isLoading
+                ? SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2.2, color: textColor),
+                  )
+                : FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        if (icon != null) ...[
+                          Icon(icon, color: textColor, size: 18),
+                          const SizedBox(width: 8),
+                        ],
+                        Text(label, style: BtText.button(context, color: textColor)),
                       ],
-                      Text(
-                        label,
-                        style: TextStyle(
-                          color: textColor,
-                          fontSize: 14.5,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.1,
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
-                ),
+          ),
         ),
       ),
     );

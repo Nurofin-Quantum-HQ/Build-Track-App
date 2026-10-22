@@ -1,6 +1,5 @@
 import 'package:buildtrack_mobile/design/design.dart';
 import 'dart:convert';
-import 'package:buildtrack_mobile/common/themes/app_colors.dart';
 import 'package:buildtrack_mobile/controller/role_manager.dart';
 import 'package:buildtrack_mobile/services/api_service.dart';
 import 'package:flutter/material.dart';
@@ -105,49 +104,109 @@ class _AdminOverviewScreenState extends State<AdminOverviewScreen>
         ),
       );
     }
+    final glass = Colors.white.withValues(alpha: .09);
     return Scaffold(
       backgroundColor: Bt.ground,
-      appBar: BtNavBar(
-        title: 'Team & activity',
-        trailing: RoleManager.canAssignRole
-            ? BtIconButton(
-                icon: Icons.add_rounded,
-                semantic: 'Add team member',
-                onTap: () => Navigator.pushNamed(context, '/assign-role').then((_) => _loadUsers()),
-              )
-            : null,
-      ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+          BtHero(
+            padding: EdgeInsets.fromLTRB(Bt.gutter, MediaQuery.paddingOf(context).top + 4, Bt.gutter, 18 + 26),
             child: AnimatedBuilder(
               animation: _tabCtrl,
-              builder: (context, _) => BtSegmented<int>(
-                segments: {0: 'People (${_users.length})', 1: 'All entries (${_transactions.length})'},
-                value: _tabCtrl.index,
-                onChanged: (i) => _tabCtrl.animateTo(i),
-              ),
+              builder: (context, _) {
+                final onPeople = _tabCtrl.index == 0;
+                final count = onPeople ? _users.length : _transactions.length;
+                final loading = onPeople ? _loadingUsers : _loadingTx;
+                return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                  Row(children: [
+                    Transform.translate(
+                      offset: const Offset(-6, 0),
+                      child: BtIconButton(icon: Icons.arrow_back_ios_new_rounded, size: 18, color: Bt.bone, background: glass, semantic: 'Back', onTap: () => Navigator.of(context).maybePop()),
+                    ),
+                    Expanded(child: Text('Team & activity', textAlign: TextAlign.center, style: BtText.navTitle(context).copyWith(color: Bt.bone))),
+                    const SizedBox(width: Bt.touch - 6),
+                  ]),
+                  const SizedBox(height: 12),
+                  BtReveal(
+                    child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                      Expanded(
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          loading
+                              ? Text('—', style: BtText.d0(context, color: Bt.bone))
+                              : BtCountUp(
+                                  key: ValueKey(onPeople),
+                                  value: count.toDouble(),
+                                  format: (v) => v.round().toString(),
+                                  style: BtText.d0(context, color: Bt.bone),
+                                ),
+                          const SizedBox(height: 4),
+                          Text(onPeople ? 'people on your team' : 'entries across the workspace', style: BtText.subhead(context, color: Bt.onNoir2)),
+                        ]),
+                      ),
+                      if (RoleManager.canAssignRole)
+                        BtButton(
+                          label: 'Add member',
+                          icon: Icons.add_rounded,
+                          small: true,
+                          expand: false,
+                          variant: BtButtonVariant.accent,
+                          onPressed: () => Navigator.pushNamed(context, '/assign-role').then((_) => _loadUsers()),
+                        ),
+                    ]),
+                  ),
+                  const SizedBox(height: 18),
+                  BtReveal(
+                    index: 1,
+                    child: BtSegmented<int>(
+                      onDark: true,
+                      segments: {0: 'People (${_users.length})', 1: 'All entries (${_transactions.length})'},
+                      value: _tabCtrl.index,
+                      onChanged: (i) => _tabCtrl.animateTo(i),
+                    ),
+                  ),
+                ]);
+              },
             ),
           ),
           Expanded(
-            child: TabBarView(
-              controller: _tabCtrl,
-              children: [_buildUsersTab(), _buildTransactionsTab()],
+            child: Transform.translate(
+              offset: const Offset(0, -26),
+              child: Container(
+                decoration: const BoxDecoration(color: Bt.ground, borderRadius: BorderRadius.vertical(top: Radius.circular(Bt.rSheet))),
+                clipBehavior: Clip.antiAlias,
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 0),
+                  child: TabBarView(
+                    controller: _tabCtrl,
+                    children: [_buildUsersTab(), _buildTransactionsTab()],
+                  ),
+                ),
+              ),
             ),
           ),
         ],
       ),
     );
   }
+
+  /// Users grouped by role (in order of first appearance): "SUPERVISOR · 2".
+  List<MapEntry<String, List<Map<String, dynamic>>>> get _usersByRole {
+    final groups = <String, List<Map<String, dynamic>>>{};
+    for (final u in _users) {
+      final role = u['role']?.toString() ?? 'Mason';
+      groups.putIfAbsent(role, () => []).add(u);
+    }
+    return groups.entries.toList();
+  }
+
   Widget _buildUsersTab() {
     if (_loadingUsers) {
-      return const Padding(padding: EdgeInsets.all(16), child: BtSkeletonList(count: 3));
+      return const Padding(padding: EdgeInsets.fromLTRB(16, 22, 16, 16), child: BtSkeletonList(count: 3));
     }
     if (_usersError != null) {
       return Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 22, 16, 16),
         child: Align(alignment: Alignment.topCenter, child: BtErrorCard(message: _usersError!, onRetry: _loadUsers)),
       );
     }
@@ -157,32 +216,42 @@ class _AdminOverviewScreenState extends State<AdminOverviewScreen>
     return RefreshIndicator(
       onRefresh: _loadUsers,
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
+        padding: const EdgeInsets.fromLTRB(16, 22, 16, 66),
         children: [
-          BtGroup(
-            children: [
-              for (final u in _users)
-                _UserCard(
-                  user: u,
-                  onEdit: () => Navigator.pushNamed(
-                    context,
-                    '/assign-role',
-                    arguments: {'editUser': u},
-                  ).then((_) => _loadUsers()),
-                ),
-            ],
-          ),
+          for (final (i, g) in _usersByRole.indexed)
+            BtReveal(
+              index: i,
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 20),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                  BtSectionHeader(title: '${g.key} · ${g.value.length}', caption: true),
+                  BtGroup(
+                    children: [
+                      for (final u in g.value)
+                        _UserCard(
+                          user: u,
+                          onEdit: () => Navigator.pushNamed(
+                            context,
+                            '/assign-role',
+                            arguments: {'editUser': u},
+                          ).then((_) => _loadUsers()),
+                        ),
+                    ],
+                  ),
+                ]),
+              ),
+            ),
         ],
       ),
     );
   }
   Widget _buildTransactionsTab() {
     if (_loadingTx) {
-      return const Padding(padding: EdgeInsets.all(16), child: BtSkeletonList(count: 5));
+      return const Padding(padding: EdgeInsets.fromLTRB(16, 22, 16, 16), child: BtSkeletonList(count: 5));
     }
     if (_txError != null) {
       return Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 22, 16, 16),
         child: Align(alignment: Alignment.topCenter, child: BtErrorCard(message: _txError!, onRetry: _loadTransactions)),
       );
     }
@@ -192,9 +261,10 @@ class _AdminOverviewScreenState extends State<AdminOverviewScreen>
     return RefreshIndicator(
       onRefresh: _loadTransactions,
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
+        padding: const EdgeInsets.fromLTRB(16, 22, 16, 66),
         children: [
-          BtGroup(children: [for (final t in _transactions) _TxCard(tx: t)]),
+          BtSectionHeader(title: 'All entries · ${_transactions.length}', caption: true),
+          BtReveal(child: BtGroup(children: [for (final t in _transactions) _TxCard(tx: t)])),
         ],
       ),
     );
@@ -325,15 +395,15 @@ class _TxCard extends StatelessWidget {
     switch (type.toLowerCase()) {
       case 'wages':
         icon = Icons.people_outlined;
-        iconColor = const Color(0xFF067647);
+        iconColor = Bt.green;
         break;
       case 'expense':
         icon = Icons.precision_manufacturing_outlined;
-        iconColor = const Color(0xFFB54708);
+        iconColor = Bt.amber;
         break;
       default:
         icon = Icons.category_outlined;
-        iconColor = AppColors.primary;
+        iconColor = Bt.ink;
     }
     return BtRow(
       leading: BtTile(icon: icon, fg: iconColor),

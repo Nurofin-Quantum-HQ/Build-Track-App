@@ -1,8 +1,6 @@
 import 'package:buildtrack_mobile/design/design.dart';
 import 'dart:convert';
 import 'dart:developer' as dev;
-import 'package:buildtrack_mobile/common/themes/app_colors.dart';
-import 'package:buildtrack_mobile/common/themes/app_theme.dart';
 import 'package:buildtrack_mobile/common/widgets/entry_widgets.dart';
 import 'package:buildtrack_mobile/controller/entry_permissions.dart';
 import 'package:flutter/material.dart';
@@ -16,10 +14,6 @@ class TransactionLogsScreen extends StatefulWidget {
   State<TransactionLogsScreen> createState() => _TransactionLogsScreenState();
 }
 class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
-  static var primaryBlue = AppColors.primary;
-  static var purple = AppColors.primary;
-  static const textDark = AppColors.textDark;
-  static const textGray = AppColors.textLight;
   int _filterIndex = 0;
   String _itemName = 'Item';
   String _itemType = 'material';
@@ -30,26 +24,6 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
   String? _filterProjectId;
   bool _hasPassedProject = false;
   final Map<String, bool> _collapsedGroups = {};
-  Color _getCategoryColor(String category) {
-    switch (category) {
-      case 'labour':
-        return const Color(0xFF067647);
-      case 'equipment':
-        return const Color(0xFFB54708);
-      default:
-        return primaryBlue;
-    }
-  }
-  Color _getCategoryBg(String category) {
-    switch (category) {
-      case 'labour':
-        return const Color(0xFFE7F6EE);
-      case 'equipment':
-        return const Color(0xFFFEF3E7);
-      default:
-        return const Color(0xFFE8F1FC);
-    }
-  }
   List<Map<String, dynamic>> get _filteredLogs {
     final visible = EntryPermissions.filterMaps(_allLogs);
     switch (_filterIndex) {
@@ -94,17 +68,6 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
           0.0;
       return sum + v;
     });
-  }
-  Color _typeColor() => _getCategoryColor(_itemType);
-  IconData _typeIcon() {
-    switch (_itemType) {
-      case 'labour':
-        return Icons.people_outline;
-      case 'equipment':
-        return Icons.construction_outlined;
-      default:
-        return Icons.inventory_2_outlined;
-    }
   }
   String get _unitLabel {
     if (_allLogs.isNotEmpty) {
@@ -449,13 +412,12 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
   }
   @override
   Widget build(BuildContext context) {
+    final title = _itemName.isNotEmpty
+        ? '${_itemName[0].toUpperCase()}${_itemName.substring(1)}'
+        : 'Project Logs';
     return Scaffold(
       backgroundColor: Bt.ground,
-      appBar: BtNavBar(
-        title: _itemName.isNotEmpty
-            ? '${_itemName[0].toUpperCase()}${_itemName.substring(1)}'
-            : 'Project Logs',
-      ),
+      appBar: BtNavBar(title: title, subtitle: 'Movement logs'),
       body: SafeArea(
         top: false,
         bottom: false,
@@ -464,18 +426,18 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
             Expanded(
               child: SingleChildScrollView(
                 physics: const ClampingScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     if (!_isGeneral) ...[
-                      _buildSummaryCard(),
-                      const SizedBox(height: 14),
-                      _buildPaymentStatusStrip(),
-                      const SizedBox(height: 20),
+                      BtReveal(child: _buildSummaryCard()),
+                      const SizedBox(height: 12),
+                      BtReveal(index: 1, child: _buildPaymentStatusStrip()),
+                      const SizedBox(height: 24),
                     ],
-                    _buildLogsHeader(),
-                    const SizedBox(height: 14),
+                    BtReveal(index: 2, child: _buildLogsHeader()),
+                    const SizedBox(height: 12),
                     if (_isLoading)
                       const BtSkeletonList(count: 4)
                     else if (_filteredLogs.isEmpty)
@@ -492,9 +454,16 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
       ),
     );
   }
+  static const _groupLabels = {
+    'Today': 'TODAY',
+    'Yesterday': 'YESTERDAY',
+    'This Week': 'THIS WEEK',
+    'Older': 'OLDER',
+  };
   Widget _buildDateGroupedLogs(BuildContext context) {
     final groups = _groupByDate(_filteredLogs);
     final widgets = <Widget>[];
+    var revealIndex = 3;
     for (final entry in groups.entries) {
       final groupLabel = entry.key;
       final logs = entry.value;
@@ -503,19 +472,20 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
         Semantics(
           button: true,
           expanded: !collapsed,
-          child: InkWell(
+          child: BtPressable(
+            scale: .99,
             onTap: () => setState(() => _collapsedGroups[groupLabel] = !collapsed),
-            borderRadius: BorderRadius.circular(Bt.rTile),
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(4, 10, 4, 10),
+              padding: const EdgeInsets.fromLTRB(2, 12, 2, 10),
               child: Row(
                 children: [
-                  Text(groupLabel, style: BtText.headline(context)),
+                  Text(_groupLabels[groupLabel] ?? groupLabel.toUpperCase(), style: BtText.mono(context, color: Bt.ink2)),
                   const SizedBox(width: 8),
                   Text('${logs.length} ${logs.length == 1 ? "entry" : "entries"}', style: BtText.caption(context)),
                   const Spacer(),
                   AnimatedRotation(
-                    duration: const Duration(milliseconds: 200),
+                    duration: Bt.fast,
+                    curve: Bt.ease,
                     turns: collapsed ? 0 : 0.5,
                     child: const Icon(Icons.keyboard_arrow_down_rounded, color: Bt.ink3, size: 22),
                   ),
@@ -526,115 +496,81 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
         ),
       );
       if (!collapsed) {
-        for (final log in logs) {
-          widgets.add(
-            Padding(
+        for (var i = 0; i < logs.length; i++) {
+          final item = _TimelineRow(
+            dotColor: _statusColor(logs[i]['paymentStatus'] as PaymentStatus? ?? PaymentStatus.pending),
+            isLast: i == logs.length - 1,
+            child: Padding(
               padding: const EdgeInsets.only(bottom: 10),
-              child: _logItem(context, log),
+              child: _logItem(context, logs[i]),
             ),
           );
+          widgets.add(revealIndex < 10 ? BtReveal(index: revealIndex++, child: item) : item);
         }
-        widgets.add(const SizedBox(height: 8));
+        widgets.add(const SizedBox(height: 6));
       }
     }
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: widgets,
     );
   }
+  Color _statusColor(PaymentStatus s) {
+    switch (s) {
+      case PaymentStatus.paid:
+        return Bt.greenBright;
+      case PaymentStatus.partial:
+        return Bt.amberBright;
+      case PaymentStatus.overdue:
+        return Bt.redBright;
+      default:
+        return Bt.redBright;
+    }
+  }
   Widget _buildSummaryCard() {
     final net = _totalAdded - _totalUsed;
-    final color = _typeColor();
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 26, horizontal: 22),
-      decoration: BoxDecoration(
-        color: Bt.card,
-        border: Border.all(color: Bt.line),
-        borderRadius: BorderRadius.circular(Bt.rCard),
-      ),
-      child: Column(
-        children: [
-          Text(
-            'Total ${_itemType.toLowerCase()} stock',
-            style: AppTheme.label.copyWith(
-              color: textGray,
-              fontSize: 13,
-              letterSpacing: 1.1,
-            ),
+    final bt = context.bt;
+    Widget stat(String label, String value, Color color) => Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: BtText.caption(context, color: Bt.onNoir2)),
+              const SizedBox(height: 2),
+              Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.num(BtText.headline(context).copyWith(color: color))),
+            ],
           ),
-          const SizedBox(height: 12),
-          RichText(
-            text: TextSpan(
-              children: [
-                TextSpan(
-                  text: _formatQty(net),
-                  style: const TextStyle(
-                    fontSize: 50,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.primaryPurple,
-                    letterSpacing: -2,
-                    height: 1,
-                  ),
-                ),
-                TextSpan(
-                  text: '  $_unitLabel',
-                  style: AppTheme.bodyLarge.copyWith(color: textGray),
-                ),
-              ],
-            ),
+        );
+    return BtCard(
+      variant: BtCardVariant.ink,
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('TOTAL ${_itemType.toUpperCase()} STOCK', style: BtText.mono(context, color: bt.accent)),
+          const SizedBox(height: 10),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              BtCountUp(
+                value: net,
+                format: (v) => _formatQty(net % 1 == 0 ? v.roundToDouble() : double.parse(v.toStringAsFixed(2))),
+                style: BtText.d0(context, color: Bt.bone),
+              ),
+              const SizedBox(width: 8),
+              Text(_unitLabel, style: BtText.body(context, color: Bt.onNoir2)),
+            ],
           ),
           const SizedBox(height: 16),
           Row(
             children: [
-              Expanded(
-                child: _summaryBadge(
-                  Icons.add_circle_outline,
-                  '+${_formatQty(_totalAdded)} Added',
-                  color,
-                ),
-              ),
-              Container(width: 1, height: 28, color: const Color(0xFFCDD0FF)),
-              Expanded(
-                child: _summaryBadge(
-                  Icons.remove_circle_outline,
-                  _totalUsed > 0 ? '-${_formatQty(_totalUsed)} Used' : '0 Used',
-                  const Color(0xFF0B63CE),
-                ),
-              ),
-              Container(width: 1, height: 28, color: const Color(0xFFCDD0FF)),
-              Expanded(
-                child: _summaryBadge(
-                  Icons.balance_outlined,
-                  'Net ${_formatQty(net)}',
-                  purple,
-                ),
-              ),
+              stat('Added', '+${_formatQty(_totalAdded)}', Bt.greenBright),
+              stat('Used', _totalUsed > 0 ? '-${_formatQty(_totalUsed)}' : '0', Bt.amberBright),
+              stat('Net', _formatQty(net), Bt.bone),
             ],
           ),
         ],
       ),
-    );
-  }
-  Widget _summaryBadge(IconData icon, String label, Color color) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Icon(icon, color: color, size: 15),
-        const SizedBox(width: 4),
-        Flexible(
-          child: Text(
-            label,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: color,
-              fontWeight: FontWeight.w700,
-              fontSize: 13,
-              letterSpacing: 0.2,
-            ),
-          ),
-        ),
-      ],
     );
   }
   Widget _buildPaymentStatusStrip() {
@@ -654,72 +590,29 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
         notPaidTotal += bill;
       }
     }
-    Widget card(
-      String label,
-      int count,
-      double total,
-      Color dot,
-      Color bg,
-      Color border,
-    ) {
+    Widget card(String label, int count, double total, Color dot, Color text) {
       return Expanded(
         child: Container(
-          height: 92,
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
           decoration: BoxDecoration(
-            color: bg,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: border, width: 1.5),
+            color: Bt.card,
+            borderRadius: BorderRadius.circular(Bt.rTile + 2),
+            boxShadow: Bt.shadow,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Row(
                 children: [
-                  Container(
-                    width: 7,
-                    height: 7,
-                    decoration: BoxDecoration(
-                      color: dot,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 5),
-                  Text(
-                    label,
-                    style: TextStyle(
-                      color: dot,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.2,
-                    ),
-                  ),
+                  Container(width: 7, height: 7, decoration: BoxDecoration(color: dot, shape: BoxShape.circle)),
+                  const SizedBox(width: 6),
+                  Flexible(child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.caption(context, color: text, weight: FontWeight.w600))),
                 ],
               ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '$count item${count == 1 ? '' : 's'}',
-                    style: const TextStyle(
-                      color: AppColors.textDark,
-                      fontSize: 17,
-                      fontWeight: FontWeight.w700,
-                      height: 1.1,
-                    ),
-                  ),
-                  const SizedBox(height: 1),
-                  Text(
-                    formatCurrency(total),
-                    style: TextStyle(
-                      color: dot,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ),
+              const SizedBox(height: 10),
+              Text('$count item${count == 1 ? '' : 's'}', style: BtText.num(BtText.title(context, size: 17))),
+              const SizedBox(height: 1),
+              Text(formatCurrency(total), maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.num(BtText.caption(context, color: text, weight: FontWeight.w600))),
             ],
           ),
         ),
@@ -727,32 +620,11 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
     }
     return Row(
       children: [
-        card(
-          'Fully Paid',
-          fullyPaid,
-          fullyPaidTotal,
-          const Color(0xFF067647),
-          const Color(0xFFE7F6EE),
-          const Color(0xFFBBF7D0),
-        ),
+        card('Fully Paid', fullyPaid, fullyPaidTotal, Bt.greenBright, Bt.green),
         const SizedBox(width: 8),
-        card(
-          'Partial',
-          partial,
-          partialTotal,
-          const Color(0xFFB54708),
-          const Color(0xFFFEF3E7),
-          const Color(0xFFFDE68A),
-        ),
+        card('Partial', partial, partialTotal, Bt.amberBright, Bt.amber),
         const SizedBox(width: 8),
-        card(
-          'Not Paid',
-          notPaid,
-          notPaidTotal,
-          const Color(0xFFC01048),
-          const Color(0xFFFFF5F5),
-          const Color(0xFFFECACA),
-        ),
+        card('Not Paid', notPaid, notPaidTotal, Bt.redBright, Bt.red),
       ],
     );
   }
@@ -761,9 +633,9 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text('Movement logs', style: BtText.title(context)),
-        const SizedBox(height: 2),
-        Text('Tracking historical distribution', style: BtText.caption(context)),
+        Text('MOVEMENT LOGS', style: BtText.mono(context)),
+        const SizedBox(height: 4),
+        Text('Tracking historical distribution', style: BtText.title(context, size: 19)),
         const SizedBox(height: 12),
         BtSegmented<int>(
           segments: {for (var i = 0; i < filters.length; i++) i: filters[i]},
@@ -792,79 +664,16 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
         subtitle = 'Add material entries to start tracking transactions.';
         icon = Icons.inventory_2_outlined;
     }
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 48),
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 76,
-              height: 76,
-              decoration: BoxDecoration(
-                color: primaryBlue.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(Bt.rCard),
-              ),
-              child: Icon(icon, color: primaryBlue, size: 34),
-            ),
-            const SizedBox(height: 18),
-            Text(
-              title,
-              style: AppTheme.bodyLarge.copyWith(
-                fontWeight: FontWeight.w700,
-                color: textDark,
-                fontSize: 16,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 32),
-              child: Text(
-                subtitle,
-                style: AppTheme.caption.copyWith(color: textGray, height: 1.5),
-                textAlign: TextAlign.center,
-              ),
-            ),
-            const SizedBox(height: 20),
-            GestureDetector(
-              onTap: () => Navigator.pushNamed(
-                context,
-                _addRoute,
-                arguments: {'type': _itemType, 'prefill': _itemName},
-              ).then((_) => _fetchRealLogs()),
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 12,
-                ),
-                decoration: BoxDecoration(
-                  color: primaryBlue.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: primaryBlue.withValues(alpha: 0.2),
-                    width: 1,
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.add, color: primaryBlue, size: 16),
-                    const SizedBox(width: 6),
-                    Text(
-                      _primaryActionLabel,
-                      style: TextStyle(
-                        color: primaryBlue,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
+    return BtEmpty(
+      icon: icon,
+      title: title,
+      message: subtitle,
+      action: _primaryActionLabel,
+      onAction: () => Navigator.pushNamed(
+        context,
+        _addRoute,
+        arguments: {'type': _itemType, 'prefill': _itemName},
+      ).then((_) => _fetchRealLogs()),
     );
   }
   String _formatLogAmount(Map<String, dynamic> log) {
@@ -950,174 +759,27 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
         payStatus == PaymentStatus.partial ||
         payStatus == PaymentStatus.overdue;
     final logCategory = log['category'] as String? ?? _itemType;
-    final iconColor = _getCategoryColor(logCategory);
-    final iconBg = _getCategoryBg(logCategory);
-    final accent = isPositive ? primaryBlue : const Color(0xFF0B63CE);
-    return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(14),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(14),
-        onTap: () =>
-            Navigator.pushNamed(
-              context,
-              '/entry-detail',
-              arguments: {
-                ...log,
-                'id': log['id'],
-                'title': log['title'],
-                'ref': log['ref'],
-                'amount': log['amount'],
-                'date': log['rawDate'] ?? log['date'],
-                'isPositive': isPositive,
-                'type': logCategory,
-                'name': log['title'] ?? _itemName,
-                'receipt': receipt,
-                'attachment': log['attachment'],
-                'createdBy': log['createdBy'] ?? '',
-                'projectId': log['projectId'] ?? '',
-                'status': log['status'] ?? 'pending',
-                'paymentStatus': payStatus,
-                'billAmount': billAmt,
-                'paidAmount': paidAmt,
-                'supplier': log['supplier'] ?? '',
-                'paymentMethod': log['method'] ?? '',
-                'lastUpdated':
-                    log['rawLastUpdated'] ??
-                    log['lastUpdated'] ??
-                    log['date'] ??
-                    '',
-                'paymentHistory': log['paymentHistory'],
-              },
-            ).then((_) {
-              _fetchRealLogs();
-            }),
-        child: Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border(left: BorderSide(color: accent, width: 3.5)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 42,
-                    height: 42,
-                    decoration: BoxDecoration(
-                      color: iconBg,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(
-                      (log['icon'] as IconData?) ?? _typeIcon(),
-                      color: iconColor,
-                      size: 20,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          log['title'] as String? ?? '',
-                          style: AppTheme.bodyLarge.copyWith(
-                            fontWeight: FontWeight.w700,
-                            color: textDark,
-                          ),
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          '$_itemName • ${log['ref'] ?? ''}',
-                          style: AppTheme.caption.copyWith(color: textGray),
-                        ),
-                        if ((log['supplier'] as String? ?? '').isNotEmpty) ...[
-                          const SizedBox(height: 4),
-                          Row(
-                            children: [
-                              const Icon(
-                                Icons.store_outlined,
-                                size: 11,
-                                color: textGray,
-                              ),
-                              const SizedBox(width: 4),
-                              Flexible(
-                                child: Text(
-                                  log['supplier'] as String,
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: textGray,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        _formatLogAmount(log),
-                        style: TextStyle(
-                          color: isPositive
-                              ? primaryBlue
-                              : const Color(0xFF9C6AAB),
-                          fontWeight: FontWeight.w600,
-                          fontSize: 15,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        _formatRelativeTime(log['rawDate'] ?? log['date']),
-                        style: AppTheme.caption.copyWith(color: textGray),
-                      ),
-                      if (receipt != null && receipt.isNotEmpty)
-                        const Padding(
-                          padding: EdgeInsets.only(top: 2),
-                          child: Icon(
-                            Icons.attach_file,
-                            color: textGray,
-                            size: 12,
-                          ),
-                        ),
-                    ],
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              const Divider(height: 1, color: Color(0xFFEEF1F5)),
-              const SizedBox(height: 8),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  PaymentStatusChip(status: payStatus),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      billAmt > 0
-                          ? '${formatCurrency(paidAmt)} / ${formatCurrency(billAmt)}'
-                          : formatCurrency(paidAmt),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTheme.caption.copyWith(
-                        color: textGray,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  GestureDetector(
-                    onTap: canSettle
-                        ? () {
+    final String statusLabel;
+    final BtTone statusTone;
+    switch (payStatus) {
+      case PaymentStatus.paid:
+        statusLabel = 'Paid';
+        statusTone = BtTone.green;
+        break;
+      case PaymentStatus.partial:
+        statusLabel = 'Partial';
+        statusTone = BtTone.amber;
+        break;
+      case PaymentStatus.overdue:
+        statusLabel = 'Overdue';
+        statusTone = BtTone.red;
+        break;
+      default:
+        statusLabel = 'Pending';
+        statusTone = BtTone.red;
+    }
+    final VoidCallback? onRecordPayment = canSettle
+        ? () {
                             final projectProvider = context
                                 .read<ProjectProvider>();
                             String pName = 'Unknown Project';
@@ -1157,55 +819,176 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
                               }
                             });
                           }
-                        : null,
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 160),
-                      height: 30,
-                      padding: const EdgeInsets.symmetric(horizontal: 11),
-                      decoration: BoxDecoration(
-                        color: canSettle
-                            ? Colors.white
-                            : const Color(0xFFF5F5F5),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: canSettle
-                              ? primaryBlue
-                              : const Color(0xFFE4E7EC),
-                          width: 1.5,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            canSettle
-                                ? Icons.receipt_long_outlined
-                                : Icons.check_circle_outline,
-                            color: canSettle
-                                ? primaryBlue
-                                : const Color(0xFF98A2B3),
-                            size: 13,
-                          ),
-                          const SizedBox(width: 5),
-                          Text(
-                            canSettle ? 'Record Payment' : 'Settled',
-                            style: TextStyle(
-                              color: canSettle
-                                  ? primaryBlue
-                                  : const Color(0xFF98A2B3),
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ],
-                      ),
+        : null;
+    return BtCard(
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+      onTap: () =>
+            Navigator.pushNamed(
+              context,
+              '/entry-detail',
+              arguments: {
+                ...log,
+                'id': log['id'],
+                'title': log['title'],
+                'ref': log['ref'],
+                'amount': log['amount'],
+                'date': log['rawDate'] ?? log['date'],
+                'isPositive': isPositive,
+                'type': logCategory,
+                'name': log['title'] ?? _itemName,
+                'receipt': receipt,
+                'attachment': log['attachment'],
+                'createdBy': log['createdBy'] ?? '',
+                'projectId': log['projectId'] ?? '',
+                'status': log['status'] ?? 'pending',
+                'paymentStatus': payStatus,
+                'billAmount': billAmt,
+                'paidAmount': paidAmt,
+                'supplier': log['supplier'] ?? '',
+                'paymentMethod': log['method'] ?? '',
+                'lastUpdated':
+                    log['rawLastUpdated'] ??
+                    log['lastUpdated'] ??
+                    log['date'] ??
+                    '',
+                'paymentHistory': log['paymentHistory'],
+              },
+            ).then((_) {
+              _fetchRealLogs();
+            }),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              BtTile(icon: (log['icon'] as IconData?) ?? BtTypeTile.iconFor(logCategory), size: 40),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      log['title'] as String? ?? '',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: BtText.headline(context),
                     ),
+                    const SizedBox(height: 2),
+                    Text(
+                      [
+                        '$_itemName • ${log['ref'] ?? ''}',
+                        if ((log['supplier'] as String? ?? '').isNotEmpty) log['supplier'] as String,
+                      ].join(' · '),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: BtText.caption(context),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    _formatLogAmount(log),
+                    style: BtText.num(BtText.headline(context).copyWith(color: isPositive ? Bt.ink : Bt.red)),
+                  ),
+                  const SizedBox(height: 2),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (receipt != null && receipt.isNotEmpty) ...[
+                        const Icon(Icons.attach_file_rounded, color: Bt.ink3, size: 13),
+                        const SizedBox(width: 3),
+                      ],
+                      Text(
+                        _formatRelativeTime(log['rawDate'] ?? log['date']),
+                        style: BtText.caption(context),
+                      ),
+                    ],
                   ),
                 ],
               ),
             ],
           ),
-        ),
+          const SizedBox(height: 12),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              BtBadge(label: statusLabel, tone: statusTone),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  billAmt > 0
+                      ? '${formatCurrency(paidAmt)} / ${formatCurrency(billAmt)}'
+                      : formatCurrency(paidAmt),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: BtText.num(BtText.caption(context, weight: FontWeight.w600)),
+                ),
+              ),
+              const SizedBox(width: 8),
+              if (canSettle)
+                BtButton(
+                  label: 'Record Payment',
+                  icon: Icons.receipt_long_outlined,
+                  variant: BtButtonVariant.secondary,
+                  small: true,
+                  expand: false,
+                  onPressed: onRecordPayment,
+                )
+              else
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.check_circle_outline_rounded, color: Bt.ink3, size: 15),
+                    const SizedBox(width: 5),
+                    Text('Settled', style: BtText.caption(context, weight: FontWeight.w600)),
+                  ],
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Timeline rail (Transaction-Logs board): a status dot + a hairline joining the events.
+class _TimelineRow extends StatelessWidget {
+  const _TimelineRow({required this.child, required this.dotColor, required this.isLast});
+  final Widget child;
+  final Color dotColor;
+  final bool isLast;
+  @override
+  Widget build(BuildContext context) {
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(
+            width: 18,
+            child: Column(
+              children: [
+                const SizedBox(height: 20),
+                Container(
+                  width: 10,
+                  height: 10,
+                  decoration: BoxDecoration(
+                    color: dotColor,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Bt.ground, width: 2),
+                  ),
+                ),
+                if (!isLast) Expanded(child: Container(width: 1.5, color: Bt.line)),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(child: child),
+        ],
       ),
     );
   }

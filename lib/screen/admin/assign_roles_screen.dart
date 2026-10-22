@@ -2,7 +2,6 @@ import 'package:buildtrack_mobile/common/widgets/entry_widgets.dart';
 import 'package:buildtrack_mobile/design/design.dart';
 import 'dart:convert';
 import 'package:buildtrack_mobile/common/themes/app_colors.dart';
-import 'package:buildtrack_mobile/common/themes/app_theme.dart';
 import 'package:buildtrack_mobile/controller/role_manager.dart';
 import 'package:buildtrack_mobile/services/api_service.dart';
 import 'package:flutter/material.dart';
@@ -425,6 +424,7 @@ class _AssignRolesScreenState extends State<AssignRolesScreen> {
         backgroundColor: Bt.ground,
         appBar: BtNavBar(
           title: _isEditMode ? 'Edit user' : 'Add team member',
+          close: true,
           trailing: BtIconButton(
             icon: Icons.help_outline_rounded,
             semantic: 'Help',
@@ -438,14 +438,14 @@ class _AssignRolesScreenState extends State<AssignRolesScreen> {
           ),
         ),
         body: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+          padding: const EdgeInsets.fromLTRB(16, 6, 16, 32),
           children: [
-            _subscriptionWarning(plan),
+            BtReveal(child: _subscriptionWarning(plan)),
             const SizedBox(height: 16),
             _formCard(isAdmin),
           ],
         ),
-        bottomNavigationBar: isAdmin ? EntryBottomBar(child: _assignButton()) : null,
+        bottomNavigationBar: isAdmin ? BtCtaBar(children: [Expanded(child: _assignButton())]) : null,
       ),
     );
   }
@@ -456,10 +456,10 @@ class _AssignRolesScreenState extends State<AssignRolesScreen> {
     final bt = context.bt;
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 4, 4, 4),
-      decoration: BoxDecoration(color: bt.brandSoft, borderRadius: BorderRadius.circular(Bt.rTile)),
+      decoration: BoxDecoration(color: bt.accentSoft, borderRadius: BorderRadius.circular(Bt.rTile)),
       child: Row(
         children: [
-          Icon(Icons.lock_outline_rounded, color: bt.brand, size: 18),
+          Icon(Icons.lock_outline_rounded, color: bt.accentInk, size: 18),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
@@ -469,8 +469,8 @@ class _AssignRolesScreenState extends State<AssignRolesScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pushNamed(context, '/subscription'),
-            style: TextButton.styleFrom(foregroundColor: bt.brand, minimumSize: const Size(44, 40)),
-            child: const Text('Upgrade', style: TextStyle(fontWeight: FontWeight.w600)),
+            style: TextButton.styleFrom(foregroundColor: bt.accentInk, minimumSize: const Size(44, 40)),
+            child: Text('Upgrade', style: BtText.subhead(context, weight: FontWeight.w700, color: bt.accentInk)),
           ),
         ],
       ),
@@ -482,7 +482,7 @@ class _AssignRolesScreenState extends State<AssignRolesScreen> {
       child: Padding(
         padding: const EdgeInsets.only(left: 16, right: 4),
         child: Row(children: [
-          SizedBox(width: 100, child: Text(label, style: BtText.subhead(context))),
+          SizedBox(width: 112, child: Text(label, style: BtText.subhead(context))),
           Expanded(
             child: TextField(
               controller: c,
@@ -506,242 +506,258 @@ class _AssignRolesScreenState extends State<AssignRolesScreen> {
       ),
     );
   }
-  Widget _roleCard(String value, String title, String desc, bool isAdmin) {
-    final bt = context.bt;
+
+  static const _roleTitles = {'Supervisor': 'Supervisor', 'Mason': 'Mason', _customRoleValue: 'Custom role…'};
+  static const _roleDescs = {
+    'Supervisor': 'Approve updates, view reports, manage expenses',
+    'Mason': 'Submit updates, upload photos, report issues',
+    _customRoleValue: 'Pick a name and configure permissions manually',
+  };
+
+  Widget _roleChip(String value, bool isAdmin) {
     final selected = _selectedRole == value;
     return Semantics(
       selected: selected,
       button: true,
-      child: Material(
-        color: selected ? bt.brandSoft : Bt.card,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(Bt.rCard),
-          side: BorderSide(color: selected ? bt.brand : Bt.line, width: selected ? 1.5 : 1),
-        ),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(Bt.rCard),
-          onTap: isAdmin ? () => _applyDefaultPermissionsForRole(value) : null,
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: BtText.headline(context)),
-                const SizedBox(height: 2),
-                Text(desc, style: BtText.caption(context)),
-              ],
-            ),
-          ),
-        ),
+      child: _SelectChip(
+        label: _roleTitles[value]!,
+        selected: selected,
+        large: true,
+        onTap: isAdmin ? () => _applyDefaultPermissionsForRole(value) : null,
       ),
     );
   }
+
+  Widget _label(String text, {String? caption}) => Padding(
+        padding: const EdgeInsets.fromLTRB(2, 0, 2, 10),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(text.toUpperCase(), style: BtText.mono(context)),
+          if (caption != null) ...[
+            const SizedBox(height: 4),
+            Text(caption, style: BtText.caption(context)),
+          ],
+        ]),
+      );
+
   Widget _formCard(bool isAdmin) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Showcase(
-          key: ShowcaseKeys.assignRoleUserDetails,
-          description: 'Enter the user\'s full name and email address here.',
-          tooltipBackgroundColor: Bt.ink,
-          textColor: Colors.white,
-          tooltipBorderRadius: BorderRadius.circular(16),
-          tooltipPadding: const EdgeInsets.all(16),
-          child: BtGroup(
-            children: [
-              _inlineField('Full name', _nameCtrl, 'Enter full name'),
-              _inlineField('Email', _emailCtrl, 'Enter email address', type: TextInputType.emailAddress),
-              _inlineField(
-                _isEditMode ? 'New password' : 'Temp password',
-                _passCtrl,
-                _isEditMode ? 'Optional' : 'Enter temporary password',
-                obscure: _obscurePass,
-                suffix: IconButton(
-                  tooltip: _obscurePass ? 'Show password' : 'Hide password',
-                  icon: Icon(_obscurePass ? Icons.visibility_outlined : Icons.visibility_off_outlined, color: Bt.ink3, size: 20),
-                  onPressed: () => setState(() => _obscurePass = !_obscurePass),
+        BtReveal(
+          index: 1,
+          child: Showcase(
+            key: ShowcaseKeys.assignRoleUserDetails,
+            description: 'Enter the user\'s full name and email address here.',
+            tooltipBackgroundColor: Bt.ink,
+            textColor: Colors.white,
+            tooltipBorderRadius: BorderRadius.circular(16),
+            tooltipPadding: const EdgeInsets.all(16),
+            child: BtGroup(
+              children: [
+                _inlineField('Full name', _nameCtrl, 'Enter full name'),
+                _inlineField('Email', _emailCtrl, 'Enter email address', type: TextInputType.emailAddress),
+                _inlineField(
+                  _isEditMode ? 'New password' : 'Temp password',
+                  _passCtrl,
+                  _isEditMode ? 'Optional' : 'Enter temporary password',
+                  obscure: _obscurePass,
+                  suffix: IconButton(
+                    tooltip: _obscurePass ? 'Show password' : 'Hide password',
+                    icon: Icon(_obscurePass ? Icons.visibility_outlined : Icons.visibility_off_outlined, color: Bt.ink2, size: 20),
+                    onPressed: () => setState(() => _obscurePass = !_obscurePass),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
         const SizedBox(height: 24),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
-          child: Text('Role · sets sensible permissions', style: BtText.caption(context)),
-        ),
-        Showcase(
-          key: ShowcaseKeys.assignRoleRoleDropdown,
-          description: 'Select a standard role like Supervisor or Mason, or create a Custom Role.',
-          tooltipBackgroundColor: Bt.ink,
-          textColor: Colors.white,
-          tooltipBorderRadius: BorderRadius.circular(16),
-          tooltipPadding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              IntrinsicHeight(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Expanded(child: _roleCard('Supervisor', 'Supervisor', 'Approve updates, view reports, manage expenses', isAdmin)),
-                    const SizedBox(width: 12),
-                    Expanded(child: _roleCard('Mason', 'Mason', 'Submit updates, upload photos, report issues', isAdmin)),
-                  ],
+        BtReveal(
+          index: 2,
+          child: Showcase(
+            key: ShowcaseKeys.assignRoleRoleDropdown,
+            description: 'Select a standard role like Supervisor or Mason, or create a Custom Role.',
+            tooltipBackgroundColor: Bt.ink,
+            textColor: Colors.white,
+            tooltipBorderRadius: BorderRadius.circular(16),
+            tooltipPadding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _label('Role · sets sensible permissions'),
+                Wrap(spacing: 8, runSpacing: 8, children: [for (final r in _roles) _roleChip(r, isAdmin)]),
+                const SizedBox(height: 8),
+                AnimatedSwitcher(
+                  duration: Bt.fast,
+                  child: Padding(
+                    key: ValueKey(_selectedRole),
+                    padding: const EdgeInsets.only(left: 2),
+                    child: Text(
+                      _selectedRole == null ? 'Choose a role to start with its usual permissions.' : _roleDescs[_selectedRole] ?? '',
+                      style: BtText.caption(context, color: Bt.ink2),
+                    ),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              _roleCard(_customRoleValue, 'Custom role…', 'Pick a name and configure permissions manually', isAdmin),
-            ],
-          ),
-        ),
-        if (_isCustomRoleSelected) ...[
-          const SizedBox(height: 16),
-          EntryLabeled(
-            label: 'Custom role name',
-            child: TextField(
-              controller: _customRoleCtrl,
-              enabled: isAdmin,
-              style: BtText.body(context),
-              decoration: btInput(context, hint: 'Type new role name'),
+              ],
             ),
           ),
-        ],
-        if (_selectedRole == 'Supervisor' || _isCustomRoleSelected) ...[
-          const SizedBox(height: 16),
-          _buildOverseesRolesSelector(),
-        ],
-        const SizedBox(height: 28),
-        Text('Permissions', style: BtText.headline(context)),
-        const SizedBox(height: 2),
-        Text('Configure what this user can see and do.', style: BtText.caption(context)),
-        const SizedBox(height: 12),
-        Showcase(
-          key: ShowcaseKeys.assignRolePermissions,
-          description: 'Configure exact permissions for what this user can see or modify in the app.',
-          tooltipBackgroundColor: Bt.ink,
-          textColor: Colors.white,
-          tooltipBorderRadius: BorderRadius.circular(16),
-          tooltipPadding: const EdgeInsets.all(16),
-          child: _buildPermissionsTable(isAdmin),
+        ),
+        AnimatedSize(
+          duration: Bt.medium,
+          curve: Bt.ease,
+          alignment: Alignment.topCenter,
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            if (_isCustomRoleSelected) ...[
+              const SizedBox(height: 16),
+              EntryLabeled(
+                label: 'Custom role name',
+                child: TextField(
+                  controller: _customRoleCtrl,
+                  enabled: isAdmin,
+                  style: BtText.body(context),
+                  decoration: btInput(context, hint: 'Type new role name'),
+                ),
+              ),
+            ],
+            if (_selectedRole == 'Supervisor' || _isCustomRoleSelected) ...[
+              const SizedBox(height: 24),
+              _buildOverseesRolesSelector(),
+            ],
+          ]),
         ),
         const SizedBox(height: 28),
-        Showcase(
-          key: ShowcaseKeys.assignRoleProjectDropdown,
-          description: 'Select one or more projects this role can access. Leave empty for all.',
-          tooltipBackgroundColor: Bt.ink,
-          textColor: Colors.white,
-          tooltipBorderRadius: BorderRadius.circular(16),
-          tooltipPadding: const EdgeInsets.all(16),
-          child: _buildProjectMultiSelect(isAdmin),
+        BtReveal(
+          index: 3,
+          child: Showcase(
+            key: ShowcaseKeys.assignRoleProjectDropdown,
+            description: 'Select one or more projects this role can access. Leave empty for all.',
+            tooltipBackgroundColor: Bt.ink,
+            textColor: Colors.white,
+            tooltipBorderRadius: BorderRadius.circular(16),
+            tooltipPadding: const EdgeInsets.all(16),
+            child: _buildProjectMultiSelect(isAdmin),
+          ),
+        ),
+        const SizedBox(height: 28),
+        BtReveal(
+          index: 4,
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            _label('Permissions', caption: 'Configure what this user can see and do.'),
+            Showcase(
+              key: ShowcaseKeys.assignRolePermissions,
+              description: 'Configure exact permissions for what this user can see or modify in the app.',
+              tooltipBackgroundColor: Bt.ink,
+              textColor: Colors.white,
+              tooltipBorderRadius: BorderRadius.circular(16),
+              tooltipPadding: const EdgeInsets.all(16),
+              child: _buildPermissionsTable(isAdmin),
+            ),
+          ]),
         ),
       ],
     );
   }
+
+  /// Sections the user has opened in the permissions list.
+  final Set<String> _openSections = {};
+
+  /// `_featureRows` split into (section, rows).
+  List<MapEntry<String, List<Map<String, dynamic>>>> get _permissionSections {
+    final out = <MapEntry<String, List<Map<String, dynamic>>>>[];
+    for (final row in _featureRows) {
+      if (row.containsKey('section')) {
+        out.add(MapEntry(row['section'] as String, []));
+      } else if (out.isNotEmpty) {
+        out.last.value.add(row);
+      }
+    }
+    return out;
+  }
+
   Widget _buildPermissionsTable(bool isAdmin) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Bt.line),
-      ),
+    final bt = context.bt;
+    final sections = _permissionSections;
+    return BtCard(
+      padding: EdgeInsets.zero,
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Container(
-            padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
-            decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.06),
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(14),
-              ),
-            ),
-            child: Row(
-              children: [
-                const Expanded(
-                  flex: 5,
-                  child: Text(
-                    'Feature',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textLight,
-                      letterSpacing: 0.6,
+          for (var si = 0; si < sections.length; si++) ...[
+            if (si > 0) const Divider(height: 1, color: Bt.line),
+            Builder(builder: (context) {
+              final name = sections[si].key;
+              final rows = sections[si].value;
+              final keys = <String>{
+                for (final r in rows)
+                  if (r['type'] == 'table') ...[
+                    if (r['view'] != null) r['view'] as String,
+                    if (r['edit'] != null) r['edit'] as String,
+                    if (r['delete'] != null) r['delete'] as String,
+                  ] else
+                    r['key'] as String,
+              };
+              final on = keys.where((k) => _permissions[k] ?? false).length;
+              final open = _openSections.contains(name);
+              return AnimatedContainer(
+                duration: Bt.fast,
+                color: open ? bt.accent.withValues(alpha: .07) : Colors.transparent,
+                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                  InkWell(
+                    onTap: () => setState(() => open ? _openSections.remove(name) : _openSections.add(name)),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(minHeight: 60),
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 11, 12, 11),
+                        child: Row(children: [
+                          Expanded(
+                            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                              Text(name, style: BtText.body(context, weight: FontWeight.w600)),
+                              Text('$on of ${keys.length} on', style: BtText.num(BtText.caption(context, color: on > 0 ? bt.accentInk : Bt.ink3))),
+                            ]),
+                          ),
+                          AnimatedRotation(
+                            turns: open ? .5 : 0,
+                            duration: Bt.fast,
+                            curve: Bt.ease,
+                            child: const Icon(Icons.keyboard_arrow_down_rounded, color: Bt.ink3),
+                          ),
+                        ]),
+                      ),
                     ),
                   ),
-                ),
-                _colHeader('View'),
-                _colHeader('Edit'),
-                _colHeader('Delete'),
-              ],
-            ),
-          ),
-          ..._featureRows.asMap().entries.map((entry) {
-            final idx = entry.key;
-            final row = entry.value;
-            if (row.containsKey('section')) {
-              return _sectionDivider(row['section'] as String);
-            }
-            final type = row['type'] as String;
-            final label = row['label'] as String;
-            final desc = row['desc'] as String;
-            final isLast = idx == _featureRows.length - 1;
-            if (type == 'table') {
-              final viewKey = row['view'] as String?;
-              final editKey = row['edit'] as String?;
-              final deleteKey = row['delete'] as String?;
-              return _tableRow(
-                label: label,
-                desc: desc,
-                viewKey: viewKey,
-                editKey: editKey,
-                deleteKey: deleteKey,
-                isLast: isLast,
-                isAdmin: isAdmin,
+                  AnimatedSize(
+                    duration: Bt.medium,
+                    curve: Bt.ease,
+                    alignment: Alignment.topCenter,
+                    child: !open
+                        ? const SizedBox(width: double.infinity)
+                        : Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                            for (final row in rows)
+                              row['type'] == 'table'
+                                  ? _tableRow(
+                                      label: row['label'] as String,
+                                      desc: row['desc'] as String,
+                                      viewKey: row['view'] as String?,
+                                      editKey: row['edit'] as String?,
+                                      deleteKey: row['delete'] as String?,
+                                      isLast: false,
+                                      isAdmin: isAdmin,
+                                    )
+                                  : _toggleRow(
+                                      label: row['label'] as String,
+                                      desc: row['desc'] as String,
+                                      permKey: row['key'] as String,
+                                      isLast: false,
+                                      isAdmin: isAdmin,
+                                    ),
+                            const SizedBox(height: 6),
+                          ]),
+                  ),
+                ]),
               );
-            } else {
-              final key = row['key'] as String;
-              return _toggleRow(
-                label: label,
-                desc: desc,
-                permKey: key,
-                isLast: isLast,
-                isAdmin: isAdmin,
-              );
-            }
-          }),
+            }),
+          ],
         ],
-      ),
-    );
-  }
-  Widget _colHeader(String label) {
-    return SizedBox(
-      width: 52,
-      child: Text(
-        label,
-        textAlign: TextAlign.center,
-        style: const TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
-          color: AppColors.textLight,
-          letterSpacing: 0.5,
-        ),
-      ),
-    );
-  }
-  Widget _sectionDivider(String label) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(14, 10, 14, 4),
-      color: const Color(0xFFF6F7F9),
-      child: Text(
-        label.toUpperCase(),
-        style: const TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
-          color: AppColors.textLight,
-          letterSpacing: 0.8,
-        ),
       ),
     );
   }
@@ -754,46 +770,24 @@ class _AssignRolesScreenState extends State<AssignRolesScreen> {
     required bool isLast,
     required bool isAdmin,
   }) {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Expanded(
-                flex: 5,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      label,
-                      style: const TextStyle(
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textDark,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      desc,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: AppColors.textLight,
-                        height: 1.3,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              _permCheckbox(viewKey, isAdmin),
-              _permCheckbox(editKey, isAdmin),
-              _permCheckbox(deleteKey, isAdmin),
-            ],
-          ),
-        ),
-        if (!isLast) const Divider(height: 1, color: Color(0xFFEEF1F5)),
-      ],
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(28, 8, 16, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: BtText.subhead(context, weight: FontWeight.w600, color: Bt.ink)),
+          const SizedBox(height: 1),
+          Text(desc, style: BtText.caption(context)),
+          const SizedBox(height: 8),
+          Row(children: [
+            _permCheckbox(viewKey, isAdmin, label: 'View'),
+            const SizedBox(width: 8),
+            _permCheckbox(editKey, isAdmin, label: 'Edit'),
+            const SizedBox(width: 8),
+            _permCheckbox(deleteKey, isAdmin, label: 'Delete'),
+          ]),
+        ],
+      ),
     );
   }
   Widget _toggleRow({
@@ -804,252 +798,168 @@ class _AssignRolesScreenState extends State<AssignRolesScreen> {
     required bool isAdmin,
   }) {
     final enabled = _permissions[permKey] ?? false;
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      label,
-                      style: const TextStyle(
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textDark,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      desc,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: AppColors.textLight,
-                        height: 1.3,
-                      ),
-                    ),
-                  ],
-                ),
+    return InkWell(
+      onTap: isAdmin ? () => setState(() => _permissions[permKey] = !enabled) : null,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(28, 10, 16, 10),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label, style: BtText.subhead(context, weight: FontWeight.w600, color: Bt.ink)),
+                  const SizedBox(height: 1),
+                  Text(desc, style: BtText.caption(context)),
+                ],
               ),
-              const SizedBox(width: 8),
-              Switch(
-                value: enabled,
-                activeThumbColor: AppColors.primary,
-                onChanged: isAdmin
-                    ? (v) => setState(() => _permissions[permKey] = v)
-                    : null,
-              ),
-            ],
-          ),
+            ),
+            const SizedBox(width: 12),
+            _CheckBox(
+              value: enabled,
+              semantic: label,
+              onChanged: isAdmin ? (v) => setState(() => _permissions[permKey] = v) : null,
+            ),
+          ],
         ),
-        if (!isLast) const Divider(height: 1, color: Color(0xFFEEF1F5)),
-      ],
+      ),
     );
   }
-  Widget _permCheckbox(String? key, bool isAdmin) {
+  Widget _permCheckbox(String? key, bool isAdmin, {required String label}) {
     if (key == null) {
-      return const SizedBox(
-        width: 52,
-        child: Center(
-          child: Text(
-            '—',
-            style: TextStyle(
-              color: AppColors.textLight,
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
+      return Expanded(
+        child: Container(
+          height: 40,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(borderRadius: BorderRadius.circular(Bt.rChip), border: Border.all(color: Bt.line)),
+          child: Text('$label —', style: BtText.caption(context, color: Bt.placeholder)),
         ),
       );
     }
     final value = _permissions[key] ?? false;
-    return SizedBox(
-      width: 52,
-      child: Checkbox(
-        value: value,
-        activeColor: AppColors.primary,
-        side: const BorderSide(color: AppColors.textLight, width: 1.5),
-        onChanged: isAdmin
-            ? (v) => setState(() => _permissions[key] = v ?? false)
-            : null,
+    final bt = context.bt;
+    return Expanded(
+      child: Semantics(
+        checked: value,
+        label: label,
+        child: BtPressable(
+          onTap: isAdmin ? () => setState(() => _permissions[key] = !value) : null,
+          scale: .95,
+          child: AnimatedContainer(
+            duration: Bt.fast,
+            curve: Bt.ease,
+            height: 40,
+            decoration: BoxDecoration(
+              color: value ? bt.accentSoft : Bt.card,
+              borderRadius: BorderRadius.circular(Bt.rChip),
+              border: Border.all(color: value ? bt.accent : Bt.inputBorder, width: value ? 1.5 : 1),
+            ),
+            child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+              _CheckBox(value: value, size: 18, onChanged: null),
+              const SizedBox(width: 6),
+              Text(label, style: BtText.caption(context, color: value ? bt.accentInk : Bt.ink2, weight: FontWeight.w600)),
+            ]),
+          ),
+        ),
       ),
     );
   }
   Widget _buildProjectMultiSelect(bool isAdmin) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          children: [
-            Text(
-              'Project Access',
-              style: AppTheme.heading3.copyWith(
-                color: AppColors.textDark,
-                fontSize: 15,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              '(Optional)',
-              style: AppTheme.caption.copyWith(color: AppColors.textLight),
-            ),
-          ],
+        Padding(
+          padding: const EdgeInsets.fromLTRB(2, 0, 2, 10),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('PROJECT ACCESS · OPTIONAL', style: BtText.mono(context)),
+            const SizedBox(height: 4),
+            Text('Select one or more projects. Leave all unchecked for org-wide access.', style: BtText.caption(context)),
+          ]),
         ),
-        const SizedBox(height: 4),
-        Text(
-          'Select one or more projects. Leave all unchecked for org-wide access.',
-          style: AppTheme.caption.copyWith(color: AppColors.textLight),
-        ),
-        const SizedBox(height: 10),
         if (_isLoadingProjects)
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 14),
+            padding: const EdgeInsets.symmetric(vertical: 10),
             child: Row(
               children: [
-                SizedBox(
+                const SizedBox(
                   width: 18,
                   height: 18,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: AppColors.primary,
-                  ),
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Bt.ink),
                 ),
                 const SizedBox(width: 10),
-                Text(
-                  'Loading projects…',
-                  style: AppTheme.body.copyWith(color: AppColors.textLight),
-                ),
+                Text('Loading projects…', style: BtText.subhead(context)),
               ],
             ),
           )
         else if (_projectsError != null && _projects.isEmpty)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
+          BtCard(
+            variant: BtCardVariant.notice,
+            padding: const EdgeInsets.fromLTRB(14, 4, 4, 4),
             child: Row(
               children: [
-                const Icon(
-                  Icons.warning_amber_rounded,
-                  color: AppColors.warning,
-                  size: 16,
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    _projectsError!,
-                    style: AppTheme.caption.copyWith(color: AppColors.warning),
-                  ),
-                ),
+                const Icon(Icons.warning_amber_rounded, color: Bt.amber, size: 18),
+                const SizedBox(width: 8),
+                Expanded(child: Text(_projectsError!, style: BtText.caption(context, color: Bt.amber, weight: FontWeight.w500))),
                 TextButton(
                   onPressed: _fetchProjects,
+                  style: TextButton.styleFrom(foregroundColor: Bt.ink, minimumSize: const Size(44, 40)),
                   child: const Text('Retry'),
                 ),
               ],
             ),
           )
         else if (_projects.isEmpty)
-          Text(
-            'No projects found.',
-            style: AppTheme.caption.copyWith(color: AppColors.textLight),
-          )
+          Text('No projects found.', style: BtText.caption(context))
         else
-          Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: AppColors.primary.withValues(alpha: 0.15),
-              ),
-            ),
-            child: Column(
-              children: _projects.asMap().entries.map((entry) {
-                final idx = entry.key;
-                final project = entry.value;
-                final pid = project['id']!;
-                final checked = _selectedProjectIds.contains(pid);
-                final isLast = idx == _projects.length - 1;
-                return Column(
-                  children: [
-                    CheckboxListTile(
-                      value: checked,
-                      onChanged: isAdmin
-                          ? (value) => setState(() {
-                              if (value == true) {
-                                _selectedProjectIds.add(pid);
-                              } else {
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final project in _projects)
+                Semantics(
+                  checked: _selectedProjectIds.contains(project['id']),
+                  child: _SelectChip(
+                    label: project['name']!,
+                    selected: _selectedProjectIds.contains(project['id']),
+                    showCheck: true,
+                    onTap: isAdmin
+                        ? () => setState(() {
+                              final pid = project['id']!;
+                              if (_selectedProjectIds.contains(pid)) {
                                 _selectedProjectIds.remove(pid);
+                              } else {
+                                _selectedProjectIds.add(pid);
                               }
                             })
-                          : null,
-                      activeColor: AppColors.primary,
-                      controlAffinity: ListTileControlAffinity.leading,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                      ),
-                      dense: true,
-                      title: Text(
-                        project['name']!,
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: checked
-                              ? FontWeight.w700
-                              : FontWeight.w500,
-                          color: checked
-                              ? AppColors.primary
-                              : AppColors.textDark,
-                        ),
-                      ),
-                    ),
-                    if (!isLast)
-                      Divider(
-                        height: 1,
-                        color: AppColors.primary.withValues(alpha: 0.1),
-                      ),
-                  ],
-                );
-              }).toList(),
-            ),
-          ),
-        if (_selectedProjectIds.isNotEmpty) ...[
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.primary,
-                  borderRadius: BorderRadius.circular(Bt.rCard),
-                ),
-                child: Text(
-                  '${_selectedProjectIds.length} project${_selectedProjectIds.length > 1 ? 's' : ''} selected',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
+                        : null,
                   ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              GestureDetector(
-                onTap: () => setState(() => _selectedProjectIds.clear()),
-                child: Text(
-                  'Clear',
-                  style: TextStyle(
-                    color: AppColors.textLight,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
             ],
           ),
-        ],
-        const SizedBox(height: AppTheme.spacingMd),
+        AnimatedSize(
+          duration: Bt.fast,
+          curve: Bt.ease,
+          alignment: Alignment.topLeft,
+          child: _selectedProjectIds.isEmpty
+              ? const SizedBox(width: double.infinity)
+              : Padding(
+                  padding: const EdgeInsets.only(top: 10),
+                  child: Row(
+                    children: [
+                      BtBadge(
+                        label: '${_selectedProjectIds.length} project${_selectedProjectIds.length > 1 ? 's' : ''} selected',
+                        tone: BtTone.brand,
+                      ),
+                      const SizedBox(width: 4),
+                      TextButton(
+                        onPressed: () => setState(() => _selectedProjectIds.clear()),
+                        style: TextButton.styleFrom(foregroundColor: Bt.ink2, minimumSize: const Size(44, 36)),
+                        child: Text('Clear', style: BtText.caption(context, color: Bt.ink2, weight: FontWeight.w600)),
+                      ),
+                    ],
+                  ),
+                ),
+        ),
       ],
     );
   }
@@ -1064,86 +974,46 @@ class _AssignRolesScreenState extends State<AssignRolesScreen> {
   void _showUpgradeDialog(BuildContext context, String title, String message) {
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Bt.rCard)),
-        contentPadding: const EdgeInsets.all(24),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 60,
-              height: 60,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF0B63CE), Color(0xFF0B63CE)],
-                ),
-                borderRadius: BorderRadius.circular(16),
+      barrierColor: Bt.scrim,
+      builder: (ctx) {
+        final bt = ctx.bt;
+        return AlertDialog(
+          backgroundColor: Bt.card,
+          surfaceTintColor: Colors.transparent,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
+          contentPadding: const EdgeInsets.all(24),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(color: Bt.noir, borderRadius: BorderRadius.circular(20)),
+                child: Icon(Icons.auto_awesome_rounded, color: bt.accent, size: 28),
               ),
-              child: const Icon(
-                Icons.auto_awesome_rounded,
-                color: Colors.white,
-                size: 28,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textDark,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 13.5,
-                color: AppColors.textLight,
-                height: 1.5,
-              ),
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
+              const SizedBox(height: 16),
+              Text(title, textAlign: TextAlign.center, style: BtText.d3(ctx)),
+              const SizedBox(height: 8),
+              Text(message, textAlign: TextAlign.center, style: BtText.subhead(ctx)),
+              const SizedBox(height: 24),
+              BtButton(
+                label: 'View Plans',
+                variant: BtButtonVariant.accent,
                 onPressed: () {
                   Navigator.pop(ctx);
                   Navigator.pushNamed(context, '/subscription');
                 },
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  backgroundColor: AppColors.primary,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: const Text(
-                  'View Plans',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 15,
-                  ),
-                ),
               ),
-            ),
-            const SizedBox(height: 10),
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text(
-                'Maybe Later',
-                style: TextStyle(
-                  color: AppColors.textLight,
-                  fontWeight: FontWeight.w600,
-                ),
+              const SizedBox(height: 6),
+              BtButton(
+                label: 'Maybe Later',
+                variant: BtButtonVariant.quiet,
+                onPressed: () => Navigator.pop(ctx),
               ),
-            ),
-          ],
-        ),
-      ),
+            ],
+          ),
+        );
+      },
     );
   }
   Widget _buildOverseesRolesSelector() {
@@ -1152,80 +1022,50 @@ class _AssignRolesScreenState extends State<AssignRolesScreen> {
         .toList();
     final allRoles = [..._availableRolesToOversee, ...customAdded];
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          'Roles to Oversee',
-          style: AppTheme.heading3.copyWith(
-            color: AppColors.textDark,
-            fontSize: 15,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'Select the roles this user can approve entries for. You can also add a custom role below.',
-          style: AppTheme.caption.copyWith(color: AppColors.textLight),
-        ),
-        const SizedBox(height: 10),
+        _label('Roles to oversee', caption: 'Select the roles this user can approve entries for. You can also add a custom role below.'),
         Wrap(
           spacing: 8,
           runSpacing: 8,
           children: allRoles.map((role) {
             final isSelected = _selectedOverseesRoles.contains(role);
             final isCustom = !_availableRolesToOversee.contains(role);
-            return FilterChip(
-              label: Text(role),
+            return Semantics(
               selected: isSelected,
-              selectedColor: AppColors.primary.withValues(alpha: 0.15),
-              checkmarkColor: AppColors.primary,
-              labelStyle: TextStyle(
-                color: isSelected ? AppColors.primary : AppColors.textDark,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-              ),
-              deleteIcon: isCustom ? const Icon(Icons.close, size: 16) : null,
-              onDeleted: isCustom
-                  ? () => setState(() => _selectedOverseesRoles.remove(role))
-                  : null,
-              onSelected: (sel) {
-                setState(() {
-                  if (sel) {
+              child: _SelectChip(
+                label: role,
+                selected: isSelected,
+                showCheck: true,
+                onTap: () => setState(() {
+                  if (!isSelected) {
                     _selectedOverseesRoles.add(role);
                   } else {
                     _selectedOverseesRoles.remove(role);
                   }
-                });
-              },
+                }),
+                onDelete: isCustom ? () => setState(() => _selectedOverseesRoles.remove(role)) : null,
+              ),
             );
           }).toList(),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
         Row(
           children: [
             Expanded(
               child: TextField(
                 controller: _customOverseesRoleCtrl,
-                decoration: InputDecoration(
-                  hintText: 'Add a custom role to oversee',
-                  isDense: true,
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 10,
-                  ),
-                  filled: true,
-                  fillColor: AppTheme.surface,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
+                style: BtText.body(context),
+                decoration: btInput(context, hint: 'Add a custom role to oversee'),
                 onSubmitted: (_) => _addCustomOverseesRole(),
               ),
             ),
             const SizedBox(width: 8),
-            IconButton(
-              onPressed: _addCustomOverseesRole,
-              icon: Icon(Icons.add_circle, color: AppColors.primary),
-              tooltip: 'Add role',
+            BtIconButton(
+              icon: Icons.add_rounded,
+              semantic: 'Add role',
+              filled: true,
+              onTap: _addCustomOverseesRole,
             ),
           ],
         ),
@@ -1246,5 +1086,98 @@ class _AssignRolesScreenState extends State<AssignRolesScreen> {
       _selectedOverseesRoles.add(value);
       _customOverseesRoleCtrl.clear();
     });
+  }
+}
+
+/// Ink-when-selected chip used for roles, projects and roles-to-oversee.
+class _SelectChip extends StatelessWidget {
+  const _SelectChip({required this.label, required this.selected, this.onTap, this.onDelete, this.showCheck = false, this.large = false});
+  final String label;
+  final bool selected;
+  final VoidCallback? onTap;
+  final VoidCallback? onDelete;
+  final bool showCheck;
+  final bool large;
+  @override
+  Widget build(BuildContext context) {
+    final fg = selected ? Bt.bone : Bt.ink;
+    return Opacity(
+      opacity: onTap == null && !selected ? .55 : 1,
+      child: BtPressable(
+        onTap: onTap,
+        scale: .95,
+        child: AnimatedContainer(
+          duration: Bt.fast,
+          curve: Bt.ease,
+          constraints: BoxConstraints(minHeight: large ? 44 : 38),
+          padding: EdgeInsets.only(left: large ? 16 : 13, right: onDelete != null ? 4 : (large ? 16 : 13)),
+          decoration: BoxDecoration(
+            color: selected ? Bt.ink : Bt.card,
+            borderRadius: BorderRadius.circular(large ? 14 : Bt.rChip),
+            border: selected ? null : Border.all(color: Bt.inputBorder),
+          ),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            AnimatedSize(
+              duration: Bt.fast,
+              curve: Bt.ease,
+              child: showCheck && selected
+                  ? Padding(padding: const EdgeInsets.only(right: 6), child: Icon(Icons.check_rounded, size: 16, color: context.bt.accent))
+                  : const SizedBox.shrink(),
+            ),
+            Flexible(child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.subhead(context, weight: FontWeight.w500, color: fg).copyWith(fontSize: large ? 15 : 14))),
+            if (onDelete != null)
+              Semantics(
+                button: true,
+                label: 'Remove $label',
+                child: GestureDetector(
+                  onTap: onDelete,
+                  behavior: HitTestBehavior.opaque,
+                  child: Padding(padding: const EdgeInsets.all(8), child: Icon(Icons.close_rounded, size: 16, color: fg)),
+                ),
+              ),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
+/// Square accent checkbox (animated tick).
+class _CheckBox extends StatelessWidget {
+  const _CheckBox({required this.value, required this.onChanged, this.size = 24, this.semantic});
+  final bool value;
+  final ValueChanged<bool>? onChanged;
+  final double size;
+  final String? semantic;
+  @override
+  Widget build(BuildContext context) {
+    final bt = context.bt;
+    final box = AnimatedContainer(
+      duration: Bt.fast,
+      curve: Bt.ease,
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: value ? bt.accent : Bt.card,
+        borderRadius: BorderRadius.circular(size * .3),
+        border: Border.all(color: value ? bt.accent : Bt.inputBorder, width: 1.5),
+      ),
+      child: AnimatedScale(
+        scale: value ? 1 : 0,
+        duration: Bt.fast,
+        curve: Bt.spring,
+        child: Icon(Icons.check_rounded, size: size * .72, color: bt.onAccent),
+      ),
+    );
+    if (onChanged == null) return box;
+    return Semantics(
+      checked: value,
+      label: semantic,
+      child: GestureDetector(
+        onTap: () => onChanged!(!value),
+        behavior: HitTestBehavior.opaque,
+        child: SizedBox(width: Bt.touch, height: Bt.touch, child: Center(child: box)),
+      ),
+    );
   }
 }

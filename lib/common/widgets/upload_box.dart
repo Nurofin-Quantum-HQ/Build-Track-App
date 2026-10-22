@@ -1,5 +1,9 @@
 import 'package:buildtrack_mobile/common/utils/image_pick_helper.dart';
+import 'package:buildtrack_mobile/design/design.dart';
 import 'package:flutter/material.dart';
+
+/// Attach-a-file box (Design V2): an empty white list-row ("tap to upload"),
+/// an image preview with the file name over a dark fade, or a file row.
 class UploadBox extends StatelessWidget {
   final PickedAttachment? attachment;
   final ValueChanged<PickedAttachment> onPicked;
@@ -14,214 +18,169 @@ class UploadBox extends StatelessWidget {
     this.emptyLabel = 'Tap to attach file',
     this.height = 130,
   });
-  static const _blue = Color(0xFF0B63CE);
   @override
   Widget build(BuildContext context) {
     return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 280),
+      duration: Bt.fast,
+      switchInCurve: Bt.ease,
       transitionBuilder: (child, anim) =>
           FadeTransition(opacity: anim, child: child),
       child: attachment == null
           ? _emptyState(context)
-          : (attachment!.isImage ? _imagePreview() : _filePreview()),
+          : (attachment!.isImage ? _imagePreview(context) : _filePreview(context)),
     );
   }
   Widget _emptyState(BuildContext context) {
-    return GestureDetector(
+    return Semantics(
       key: const ValueKey('empty'),
-      onTap: () async {
-        final result = await pickAttachmentDirect(context);
-        if (result != null) onPicked(result);
-      },
-      child: Container(
-        width: double.infinity,
-        height: height,
-        decoration: BoxDecoration(
-          color: const Color(0xFFF6F7F9),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFFD0D5DD), width: 1.5),
+      button: true,
+      label: emptyLabel,
+      excludeSemantics: true,
+      child: BtPressable(
+        onTap: () async {
+          final result = await pickAttachmentDirect(context);
+          if (result != null) onPicked(result);
+        },
+        scale: .98,
+        child: Container(
+          width: double.infinity,
+          constraints: const BoxConstraints(minHeight: 68),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: Bt.card,
+            borderRadius: BorderRadius.circular(Bt.rCard),
+            boxShadow: Bt.shadow,
+          ),
+          child: Row(
+            children: [
+              const BtTile(icon: Icons.upload_file_outlined),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(emptyLabel, style: BtText.body(context, weight: FontWeight.w600)),
+                    const SizedBox(height: 2),
+                    Text('Images · PDF · DOC · XLSX', style: BtText.caption(context)),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Icon(Icons.add_rounded, color: Bt.ink3, size: 22),
+            ],
+          ),
         ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+      ),
+    );
+  }
+  Widget _imagePreview(BuildContext context) {
+    final provider = attachment!.imageProvider;
+    if (provider == null) return _filePreview(context);
+    return Container(
+      key: const ValueKey('image'),
+      decoration: BoxDecoration(borderRadius: BorderRadius.circular(Bt.rCard), boxShadow: Bt.shadow),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(Bt.rCard),
+        child: Stack(
           children: [
-            Container(
-              width: 52,
-              height: 52,
-              decoration: BoxDecoration(
-                color: _blue.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.cloud_upload_outlined,
-                color: _blue,
-                size: 26,
+            Image(
+              image: provider,
+              width: double.infinity,
+              height: height,
+              fit: BoxFit.cover,
+              errorBuilder: (_, _, _) => _fileFallback(context),
+            ),
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.transparent,
+                      Bt.noir.withValues(alpha: 0.6),
+                    ],
+                  ),
+                ),
               ),
             ),
-            const SizedBox(height: 12),
-            Text(
-              emptyLabel,
-              style: const TextStyle(
-                fontWeight: FontWeight.w700,
-                fontSize: 14,
-                color: Color(0xFF1A1D3B),
+            Positioned(
+              bottom: 12,
+              left: 14,
+              right: 56,
+              child: Text(
+                attachment!.name,
+                style: BtText.subhead(context, color: Bt.bone, weight: FontWeight.w600),
+                overflow: TextOverflow.ellipsis,
               ),
             ),
-            const SizedBox(height: 4),
-            const Text(
-              'Images · PDF · DOC · XLSX',
-              style: TextStyle(
-                fontSize: 13,
-                color: Color(0xFF8A90A8),
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.3,
-              ),
-            ),
+            Positioned(top: 6, right: 6, child: _removeButton()),
           ],
         ),
       ),
     );
   }
-  Widget _imagePreview() {
-    final provider = attachment!.imageProvider;
-    if (provider == null) return _filePreview();
-    return Stack(
-      key: const ValueKey('image'),
-      children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(14),
-          child: Image(
-            image: provider,
-            width: double.infinity,
-            height: height,
-            fit: BoxFit.cover,
-            errorBuilder: (_, _, _) => _fileFallback(),
-          ),
-        ),
-        Positioned.fill(
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(14),
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Colors.transparent,
-                  Colors.black.withValues(alpha: 0.45),
-                ],
-              ),
-            ),
-          ),
-        ),
-        Positioned(
-          bottom: 10,
-          left: 12,
-          right: 48,
-          child: Text(
-            attachment!.name,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w700,
-              fontSize: 13,
-            ),
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-        Positioned(top: 8, right: 8, child: _removeButton()),
-      ],
-    );
-  }
-  Widget _filePreview() {
+  Widget _filePreview(BuildContext context) {
     return Container(
       key: const ValueKey('file'),
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+      constraints: const BoxConstraints(minHeight: 68),
+      padding: const EdgeInsets.fromLTRB(14, 12, 6, 12),
       decoration: BoxDecoration(
-        color: const Color(0xFFEEF8EE),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.green.shade300, width: 1.5),
+        color: Bt.greenSoft,
+        borderRadius: BorderRadius.circular(Bt.rCard),
       ),
       child: Row(
         children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: attachment!.iconBg,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(
-              attachment!.icon,
-              color: attachment!.iconColor,
-              size: 24,
-            ),
-          ),
-          const SizedBox(width: 14),
+          BtTile(icon: attachment!.icon, bg: Bt.card, fg: attachment!.iconColor),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'File attached',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 14,
-                    color: Color(0xFF1A1D3B),
-                  ),
-                ),
+                Row(children: [
+                  const Icon(Icons.check_circle_rounded, color: Bt.green, size: 14),
+                  const SizedBox(width: 4),
+                  Text('File attached', style: BtText.body(context, weight: FontWeight.w600, color: Bt.green)),
+                ]),
                 const SizedBox(height: 2),
                 Text(
                   attachment!.name,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: Color(0xFF8A90A8),
-                    fontWeight: FontWeight.w500,
-                  ),
+                  style: BtText.caption(context, color: Bt.ink2),
                   overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 4),
           _removeButton(dark: false),
         ],
       ),
     );
   }
-  Widget _fileFallback() {
+  Widget _fileFallback(BuildContext context) {
     return Container(
       width: double.infinity,
       height: height,
-      color: const Color(0xFFF0F0F0),
-      child: const Column(
+      color: Bt.fill,
+      child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.broken_image_outlined, color: Color(0xFF667085), size: 32),
-          SizedBox(height: 6),
-          Text(
-            'Preview unavailable',
-            style: TextStyle(color: Color(0xFF667085), fontSize: 13),
-          ),
+          const Icon(Icons.broken_image_outlined, color: Bt.ink3, size: 32),
+          const SizedBox(height: 6),
+          Text('Preview unavailable', style: BtText.caption(context)),
         ],
       ),
     );
   }
   Widget _removeButton({bool dark = true}) {
-    return GestureDetector(
+    return BtIconButton(
+      icon: Icons.close_rounded,
+      size: 18,
+      semantic: 'Remove attachment',
+      color: dark ? Bt.bone : Bt.red,
+      background: dark ? Bt.noir.withValues(alpha: 0.55) : null,
       onTap: onRemove,
-      child: Container(
-        padding: const EdgeInsets.all(6),
-        decoration: BoxDecoration(
-          color: dark
-              ? Colors.black.withValues(alpha: 0.45)
-              : Colors.red.shade50,
-          shape: BoxShape.circle,
-        ),
-        child: Icon(
-          Icons.close,
-          color: dark ? Colors.white : const Color(0xFFC01048),
-          size: 16,
-        ),
-      ),
     );
   }
 }

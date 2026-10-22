@@ -1,5 +1,4 @@
 import 'package:buildtrack_mobile/design/design.dart';
-import 'package:buildtrack_mobile/common/themes/app_colors.dart';
 import 'package:buildtrack_mobile/common/widgets/entry_widgets.dart';
 import 'package:buildtrack_mobile/controller/entry_model.dart';
 import 'package:buildtrack_mobile/controller/entry_permissions.dart';
@@ -15,7 +14,6 @@ class EntryDetailScreen extends StatefulWidget {
   State<EntryDetailScreen> createState() => _EntryDetailScreenState();
 }
 class _EntryDetailScreenState extends State<EntryDetailScreen> {
-  static const textGray = AppColors.textLight;
   bool _argsLoaded = false;
   Map _args = {};
   EntryStatus _entryStatus = EntryStatus.pending;
@@ -267,132 +265,153 @@ class _EntryDetailScreenState extends State<EntryDetailScreen> {
         statusTone = BtTone.amber;
     }
     final typeWord = _typeLabel(type);
-    return Scaffold(
-      resizeToAvoidBottomInset: true,
-      backgroundColor: Bt.ground,
-      appBar: BtNavBar(
-        title: '${typeWord[0]}${typeWord.substring(1).toLowerCase()} entry',
-        trailing: canDelete
-            ? BtIconButton(
-                icon: Icons.more_horiz_rounded,
-                semantic: 'More actions',
-                onTap: () => showBtSheet(
-                  context,
-                  title: 'Entry',
-                  builder: (sheetCtx) => BtGroup(children: [
-                    BtRow(
-                      leading: BtTile(icon: Icons.delete_outline_rounded, bg: Bt.redSoft, fg: Bt.red),
-                      title: 'Delete entry…',
-                      titleColor: Bt.red,
-                      onTap: () {
-                        Navigator.pop(sheetCtx);
-                        _showDeleteDialog(context, id: args['id']?.toString() ?? '', projectId: projectId);
-                      },
-                    ),
-                  ]),
-                ),
-              )
-            : null,
-      ),
-      body: ListView(
-        physics: const ClampingScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+    final bt = context.bt;
+    void openPay() => _openRecordPayment(
+          context,
+          id: args['id']?.toString() ?? '',
+          title: title,
+          type: type,
+        );
+    final hero = BtHero(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          BtCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    BtTypeTile(type: type),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(name, style: BtText.headline(context)),
-                          if (title.isNotEmpty && title != name)
-                            Text(title, style: BtText.caption(context)),
-                        ],
+          Row(
+            children: [
+              BtIconButton(
+                icon: Icons.arrow_back_ios_new_rounded,
+                size: 18,
+                color: Bt.bone,
+                background: Colors.white.withValues(alpha: .09),
+                semantic: 'Back',
+                onTap: () => Navigator.of(context).maybePop(),
+              ),
+              const Spacer(),
+              if (canDelete)
+                BtIconButton(
+                  icon: Icons.more_horiz_rounded,
+                  color: Bt.bone,
+                  background: Colors.white.withValues(alpha: .09),
+                  semantic: 'More actions',
+                  onTap: () => showBtSheet(
+                    context,
+                    title: 'Entry',
+                    builder: (sheetCtx) => BtGroup(children: [
+                      BtRow(
+                        leading: BtTile(icon: Icons.delete_outline_rounded, bg: Bt.redSoft, fg: Bt.red),
+                        title: 'Delete entry…',
+                        titleColor: Bt.red,
+                        onTap: () {
+                          Navigator.pop(sheetCtx);
+                          _showDeleteDialog(context, id: args['id']?.toString() ?? '', projectId: projectId);
+                        },
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    BtBadge(label: statusLabel, tone: statusTone),
-                  ],
-                ),
-                if (_billAmount > 0) ...[
-                  const SizedBox(height: 16),
-                  Text(formatInr(_billAmount), style: BtText.amount(context)),
-                  const SizedBox(height: 12),
-                  BtProgress(value: progress, color: Bt.green),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Text.rich(TextSpan(children: [
-                        TextSpan(text: formatInr(_paidAmount), style: BtText.num(BtText.subhead(context, color: Bt.green, weight: FontWeight.w600))),
-                        TextSpan(text: ' paid', style: BtText.subhead(context)),
-                      ])),
-                      const Spacer(),
-                      Text.rich(TextSpan(children: [
-                        TextSpan(text: formatInr(due), style: BtText.num(BtText.subhead(context, color: due > 0 ? Bt.amber : Bt.green, weight: FontWeight.w600))),
-                        TextSpan(text: ' due', style: BtText.subhead(context)),
-                      ])),
-                    ],
+                    ]),
                   ),
-                ],
-                if (isSettled) ...[
-                  const SizedBox(height: 12),
-                  Row(children: [
-                    const Icon(Icons.check_circle_rounded, color: Bt.green, size: 18),
-                    const SizedBox(width: 6),
-                    Text('Payment settled', style: BtText.subhead(context, color: Bt.green, weight: FontWeight.w600)),
-                  ]),
-                ],
+                ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          BtReveal(
+            child: Row(
+              children: [
+                Text(typeWord, style: BtText.mono(context, color: bt.accent)),
+                const SizedBox(width: 10),
+                BtBadge(label: statusLabel, tone: statusTone),
               ],
             ),
           ),
-          const SizedBox(height: 16),
-          BtGroup(
-            children: [
-              BtValueRow(label: 'Project', value: projectLabel),
-              if (whereParts.isNotEmpty) BtValueRow(label: 'Where', value: whereParts),
-              BtValueRow(label: 'Date', value: displayDate),
-              BtValueRow(label: 'Quantity / value', value: amount, valueColor: isPositive ? null : Bt.red),
-              BtValueRow(label: 'Reference', value: ref),
-              if (supplier.isNotEmpty) BtValueRow(label: 'Supplier', value: supplier),
-              if (method.isNotEmpty) BtValueRow(label: 'Payment method', value: method),
-              if (_billAmount > 0 && lastUpdated.isNotEmpty) BtValueRow(label: 'Last updated', value: lastUpdated),
-            ],
+          const SizedBox(height: 10),
+          BtReveal(
+            index: 1,
+            child: Text(name, style: BtText.d2(context, color: Bt.bone)),
           ),
-          if (_paymentHistory.isNotEmpty) ...[
-            const SizedBox(height: 24),
-            _buildPaymentHistoryCard(),
+          if (title.isNotEmpty && title != name) ...[
+            const SizedBox(height: 4),
+            BtReveal(
+              index: 1,
+              child: Text(title, style: BtText.subhead(context, color: Bt.onNoir2)),
+            ),
           ],
-          const SizedBox(height: 24),
-          const BtSectionHeader(title: 'Invoice / bill'),
-          if (invoiceList.isEmpty)
-            const InvoiceAttachmentCard(attachment: null, fileName: null)
-          else
-            ...invoiceList.map((url) => Padding(
-                  padding: const EdgeInsets.only(bottom: 8.0),
-                  child: InvoiceAttachmentCard(attachment: null, fileName: url),
-                )),
-          const SizedBox(height: 24),
-          const BtSectionHeader(title: 'Payment receipt'),
-          if (receiptList.isEmpty)
-            const PaymentReceiptCard(fileName: null)
-          else
-            ...receiptList.map((url) => Padding(
-                  padding: const EdgeInsets.only(bottom: 8.0),
-                  child: PaymentReceiptCard(fileName: url),
-                )),
+          const SizedBox(height: 16),
+          BtReveal(
+            index: 2,
+            child: _billAmount > 0
+                ? BtCountUp(
+                    value: _billAmount,
+                    format: (v) => formatInr(v),
+                    style: BtText.d0(context, color: Bt.bone),
+                  )
+                : Text(
+                    amount,
+                    style: BtText.d1(context, color: isPositive ? Bt.bone : Bt.redBright),
+                  ),
+          ),
+          if (_billAmount > 0) ...[
+            const SizedBox(height: 16),
+            BtReveal(
+              index: 3,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  BtProgress(value: progress, color: Bt.greenBright, onDark: true),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Text.rich(TextSpan(children: [
+                        TextSpan(text: formatInr(_paidAmount), style: BtText.num(BtText.subhead(context, color: Bt.greenBright, weight: FontWeight.w600))),
+                        TextSpan(text: ' paid', style: BtText.subhead(context, color: Bt.onNoir2)),
+                      ])),
+                      const Spacer(),
+                      if (isSettled)
+                        Row(children: [
+                          const Icon(Icons.check_circle_rounded, color: Bt.greenBright, size: 16),
+                          const SizedBox(width: 6),
+                          Text('Payment settled', style: BtText.subhead(context, color: Bt.greenBright, weight: FontWeight.w600)),
+                        ])
+                      else
+                        Text.rich(TextSpan(children: [
+                          TextSpan(text: formatInr(due), style: BtText.num(BtText.subhead(context, color: due > 0 ? Bt.amberBright : Bt.greenBright, weight: FontWeight.w600))),
+                          TextSpan(text: ' to go', style: BtText.subhead(context, color: Bt.onNoir2)),
+                        ])),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ] else if (isSettled) ...[
+            const SizedBox(height: 12),
+            Row(children: [
+              const Icon(Icons.check_circle_rounded, color: Bt.greenBright, size: 16),
+              const SizedBox(width: 6),
+              Text('Payment settled', style: BtText.subhead(context, color: Bt.greenBright, weight: FontWeight.w600)),
+            ]),
+          ],
         ],
       ),
-      bottomNavigationBar: (canEdit || showPay)
-          ? EntryBottomBar(
+    );
+    return Scaffold(
+      resizeToAvoidBottomInset: true,
+      backgroundColor: Bt.ground,
+      body: BtHeroScroll(
+        hero: hero,
+        children: [
+          if (canEdit || showPay) ...[
+            BtReveal(
+              index: 4,
               child: Row(
                 children: [
+                  if (showPay)
+                    Expanded(
+                      flex: 2,
+                      child: BtButton(
+                        label: payLabel,
+                        icon: Icons.add_rounded,
+                        variant: BtButtonVariant.accent,
+                        onPressed: openPay,
+                      ),
+                    ),
+                  if (canEdit && showPay) const SizedBox(width: 10),
                   if (canEdit)
                     Expanded(
                       child: BtButton(
@@ -409,24 +428,64 @@ class _EntryDetailScreenState extends State<EntryDetailScreen> {
                         ),
                       ),
                     ),
-                  if (canEdit && showPay) const SizedBox(width: 12),
-                  if (showPay)
-                    Expanded(
-                      flex: 2,
-                      child: BtButton(
-                        label: payLabel,
-                        onPressed: () => _openRecordPayment(
-                          context,
-                          id: args['id']?.toString() ?? '',
-                          title: title,
-                          type: type,
-                        ),
-                      ),
-                    ),
                 ],
               ),
-            )
-          : null,
+            ),
+            const SizedBox(height: 24),
+          ],
+          if (_paymentHistory.isNotEmpty) ...[
+            BtReveal(index: 5, child: _buildPaymentHistoryCard()),
+            const SizedBox(height: 24),
+          ],
+          BtReveal(
+            index: 6,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const BtSectionHeader(title: 'Invoice / bill'),
+                if (invoiceList.isEmpty)
+                  const InvoiceAttachmentCard(attachment: null, fileName: null)
+                else
+                  ...invoiceList.map((url) => Padding(
+                        padding: const EdgeInsets.only(bottom: 8.0),
+                        child: InvoiceAttachmentCard(attachment: null, fileName: url),
+                      )),
+                const SizedBox(height: 24),
+                const BtSectionHeader(title: 'Payment receipt'),
+                if (receiptList.isEmpty)
+                  const PaymentReceiptCard(fileName: null)
+                else
+                  ...receiptList.map((url) => Padding(
+                        padding: const EdgeInsets.only(bottom: 8.0),
+                        child: PaymentReceiptCard(fileName: url),
+                      )),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+          BtReveal(
+            index: 7,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const BtSectionHeader(title: 'Details'),
+                BtGroup(
+                  children: [
+                    BtValueRow(label: 'Project', value: projectLabel),
+                    if (whereParts.isNotEmpty) BtValueRow(label: 'Where', value: whereParts),
+                    BtValueRow(label: 'Date', value: displayDate),
+                    BtValueRow(label: 'Quantity / value', value: amount, valueColor: isPositive ? null : Bt.red),
+                    BtValueRow(label: 'Reference', value: ref),
+                    if (supplier.isNotEmpty) BtValueRow(label: 'Supplier', value: supplier),
+                    if (method.isNotEmpty) BtValueRow(label: 'Payment method', value: method),
+                    if (_billAmount > 0 && lastUpdated.isNotEmpty) BtValueRow(label: 'Last updated', value: lastUpdated),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
   void _openRecordPayment(
@@ -527,12 +586,12 @@ class _EntryDetailScreenState extends State<EntryDetailScreen> {
                 final String method = item['method'] as String? ?? 'Cash';
                 final String note = item['note'] as String? ?? '';
                 return BtRow(
-                  leading: BtTile(icon: Icons.check_rounded, bg: Bt.greenSoft, fg: Bt.green),
+                  leading: BtTile(icon: Icons.payments_outlined, bg: Bt.greenSoft, fg: Bt.green),
                   title: method,
                   subtitle: note.isNotEmpty ? '$formattedDate · $note' : formattedDate,
                   subtitleMaxLines: 2,
                   minHeight: 64,
-                  trailing: Text(formatInr(amt), style: BtText.num(BtText.body(context, weight: FontWeight.w600))),
+                  trailing: Text(formatInr(amt), style: BtText.num(BtText.title(context, size: 16))),
                 );
               }),
           ],
@@ -540,76 +599,32 @@ class _EntryDetailScreenState extends State<EntryDetailScreen> {
       ],
     );
   }
-  void _showDeleteDialog(
+  Future<void> _showDeleteDialog(
     BuildContext context, {
     required String id,
     required String projectId,
-  }) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text(
-          'Delete Entry?',
-          style: TextStyle(fontWeight: FontWeight.w700),
-        ),
-        content: const Text(
-          'This action cannot be undone. The entry will be permanently removed.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text(
-              'Cancel',
-              style: TextStyle(color: textGray, fontWeight: FontWeight.w600),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(ctx);
-              if (id.isNotEmpty) {
-                final success = await ApiService.deleteTransaction(id);
-                if (success && context.mounted) {
-                  if (projectId.isNotEmpty) {
-                    context.read<InventoryProvider>().loadInventory(projectId);
-                  }
-                  context.read<ProjectProvider>().load();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Entry deleted successfully'),
-                      backgroundColor: Color(0xFFC01048),
-                    ),
-                  );
-                  Navigator.pop(context);
-                } else if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Failed to delete entry'),
-                      backgroundColor: Color(0xFFC01048),
-                    ),
-                  );
-                }
-              } else {
-                Navigator.pop(context);
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFC01048),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-            ),
-            child: const Text(
-              'Delete',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ],
-      ),
+  }) async {
+    final confirmed = await btConfirm(
+      context,
+      title: 'Delete entry?',
+      message: 'This action cannot be undone. The entry will be permanently removed.',
+      confirmLabel: 'Delete',
     );
+    if (!confirmed || !context.mounted) return;
+    if (id.isNotEmpty) {
+      final success = await ApiService.deleteTransaction(id);
+      if (success && context.mounted) {
+        if (projectId.isNotEmpty) {
+          context.read<InventoryProvider>().loadInventory(projectId);
+        }
+        context.read<ProjectProvider>().load();
+        btToast(context, 'Entry deleted successfully');
+        Navigator.pop(context);
+      } else if (context.mounted) {
+        btToast(context, 'Failed to delete entry', error: true);
+      }
+    } else {
+      Navigator.pop(context);
+    }
   }
 }

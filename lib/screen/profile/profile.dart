@@ -125,45 +125,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final hasPhoto =
         _avatarBytes != null ||
         (_user?.profilePhoto != null && _user!.profilePhoto!.isNotEmpty);
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 8),
-            ListTile(
-              leading: const Icon(Icons.photo_library_outlined),
-              title: const Text('Choose from Gallery'),
-              onTap: () {
-                Navigator.pop(ctx);
-                _pickImage();
-              },
-            ),
-            if (hasPhoto)
-              ListTile(
-                leading: const Icon(Icons.delete_outline, color: Color(0xFFC01048)),
-                title: const Text(
-                  'Remove Profile Photo',
-                  style: TextStyle(color: Color(0xFFC01048)),
-                ),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _removeProfilePhoto();
-                },
-              ),
-            ListTile(
-              leading: const Icon(Icons.close),
-              title: const Text('Cancel'),
-              onTap: () => Navigator.pop(ctx),
-            ),
-            const SizedBox(height: 8),
-          ],
+    showBtSheet(
+      context,
+      title: 'Profile photo',
+      builder: (ctx) => BtGroup(children: [
+        BtRow(
+          leading: const BtTile(icon: Icons.photo_library_outlined),
+          title: 'Choose from Gallery',
+          onTap: () {
+            Navigator.pop(ctx);
+            _pickImage();
+          },
         ),
-      ),
+        if (hasPhoto)
+          BtRow(
+            leading: const BtTile(icon: Icons.delete_outline, bg: Bt.redSoft, fg: Bt.red),
+            title: 'Remove Profile Photo',
+            titleColor: Bt.red,
+            onTap: () {
+              Navigator.pop(ctx);
+              _removeProfilePhoto();
+            },
+          ),
+        BtRow(
+          leading: const BtTile(icon: Icons.close),
+          title: 'Cancel',
+          onTap: () => Navigator.pop(ctx),
+        ),
+      ]),
     );
   }
   Future<void> _removeProfilePhoto() async {
@@ -290,136 +279,260 @@ class _ProfileScreenState extends State<ProfileScreen> {
           }
         });
         final sub = context.watch<SubscriptionProvider>();
+        if (_isLoadingProfile) {
+          return Scaffold(
+            backgroundColor: Bt.ground,
+            body: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              BtHero(child: _heroTopBar(context)),
+              const Expanded(child: BtSheet(child: BtSkeletonList(count: 4))),
+            ]),
+          );
+        }
         return Scaffold(
           backgroundColor: Bt.ground,
-          appBar: BtNavBar(
-            title: 'Account',
-            trailing: BtIconButton(
-              icon: Icons.help_outline_rounded,
-              semantic: 'App guidelines',
-              color: Bt.ink2,
-              onTap: () => ShowCaseWidget.of(context).startShowCase(_tourKeys),
+          body: BtHeroScroll(
+            hero: BtHero(
+              overlap: 26,
+              padding: EdgeInsets.fromLTRB(Bt.gutter, MediaQuery.paddingOf(context).top + 4, Bt.gutter, 24 + 26),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                _heroTopBar(context),
+                const SizedBox(height: 10),
+                _tour(ShowcaseKeys.profileFields, 'This is your profile summary and role.', BtReveal(child: _buildProfileCard(_user!, sub))),
+                const SizedBox(height: 20),
+                BtReveal(index: 1, child: _buildWorkspaceStrip()),
+              ]),
             ),
-          ),
-          body: _isLoadingProfile
-              ? const Padding(padding: EdgeInsets.all(16), child: BtSkeletonList(count: 4))
-              : ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-                  children: [
-                    if (_profileError != null) ...[
-                      _ErrorBanner(message: _profileError!),
-                      const SizedBox(height: 12),
-                    ],
-                    _tour(ShowcaseKeys.profileFields, 'This is your profile summary and role.', _buildProfileCard(_user!)),
-                    const SizedBox(height: 20),
-                    _tour(ShowcaseKeys.profileSubscription, 'View your current subscription plan and limits.', SubscriptionCard(showUpgradeButton: RoleManager.isAdmin)),
-                    const SizedBox(height: 24),
-                    // ── Workspace (was the side menu) ──
-                    BtSectionHeader(title: 'Workspace', caption: true),
-                    _tour(
-                      _teamAccessKey,
-                      'Assign roles and manage team access from here.',
-                      BtGroup(children: [
-                        BtRow(
-                          leading: const BtTile(icon: Icons.supervisor_account_outlined),
-                          title: 'Team Overview',
-                          showChevron: true,
-                          onTap: () => Navigator.pushNamed(context, '/admin-overview'),
-                        ),
-                        if (RoleManager.canViewTeamAccess)
-                          BtRow(
-                            leading: const BtTile(icon: Icons.manage_accounts_outlined),
-                            title: 'Assign Role',
-                            subtitle: 'Manage user roles, permissions, and project access.',
-                            showChevron: true,
-                            onTap: () => Navigator.pushNamed(context, '/assign-role'),
-                          ),
-                        BtRow(
-                          leading: const BtTile(icon: Icons.workspace_premium_outlined),
-                          title: 'Upgrade Plan',
-                          trailing: Text(sub.currentPlan.label, style: BtText.subhead(context)),
-                          showChevron: true,
-                          onTap: () => Navigator.pushNamed(context, '/subscription'),
-                        ),
-                        if (UserSession.isAdmin)
-                          BtRow(
-                            leading: const BtTile(icon: Icons.receipt_long_outlined),
-                            title: 'Transaction Logs',
-                            showChevron: true,
-                            onTap: () => Navigator.pushNamed(context, '/logs'),
-                          ),
-                        if (UserSession.isAdmin)
-                          BtRow(
-                            leading: const BtTile(icon: Icons.workspaces_outline),
-                            title: 'Create Workspace',
-                            showChevron: true,
-                            onTap: () => Navigator.pushNamed(context, '/create-workspace'),
-                          ),
-                      ]),
-                    ),
-                    if (RoleManager.canViewTeamAccess)
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
-                        child: Text('Assign Role is only available to Admins.', style: BtText.caption(context)),
-                      ),
-                    const SizedBox(height: 24),
-                    // ── Account settings ──
-                    BtSectionHeader(title: 'Account settings', caption: true),
-                    _tour(_settingsCardKey, 'Manage your profile and notification settings here.', _buildSettingsCard()),
-                    const SizedBox(height: 24),
-                    // ── Help ──
-                    BtSectionHeader(title: 'Help', caption: true),
+            children: [
+              if (_profileError != null) ...[
+                _ErrorBanner(message: _profileError!),
+                const SizedBox(height: 12),
+              ],
+              BtReveal(
+                index: 2,
+                child: _tour(ShowcaseKeys.profileSubscription, 'View your current subscription plan and limits.', SubscriptionCard(showUpgradeButton: RoleManager.isAdmin)),
+              ),
+              const SizedBox(height: 24),
+              // ── Workspace (was the side menu) ──
+              BtReveal(
+                index: 3,
+                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                  const BtSectionHeader(title: 'Workspace', caption: true),
+                  _tour(
+                    _teamAccessKey,
+                    'Assign roles and manage team access from here.',
                     BtGroup(children: [
                       BtRow(
-                        leading: const BtTile(icon: Icons.help_outline_rounded),
-                        title: 'App Guidelines',
-                        subtitle: 'Replay the guided tour',
+                        leading: const BtTile(icon: Icons.supervisor_account_outlined, size: 34),
+                        title: 'Team Overview',
+                        subtitle: 'People, roles and recent activity',
                         showChevron: true,
-                        onTap: () => ShowCaseWidget.of(context).startShowCase(_tourKeys),
+                        onTap: () => Navigator.pushNamed(context, '/admin-overview'),
                       ),
+                      if (RoleManager.canViewTeamAccess)
+                        BtRow(
+                          leading: const BtTile(icon: Icons.manage_accounts_outlined, size: 34),
+                          title: 'Assign Role',
+                          subtitle: 'Manage user roles, permissions, and project access.',
+                          showChevron: true,
+                          onTap: () => Navigator.pushNamed(context, '/assign-role'),
+                        ),
                       BtRow(
-                        leading: const BtTile(icon: Icons.language_rounded),
-                        title: 'Web Portal',
-                        trailing: const Icon(Icons.open_in_new_rounded, size: 18, color: Bt.placeholder),
-                        onTap: () async {
-                          final url = Uri.parse('https://buildtrack.nurofin.com');
-                          if (await canLaunchUrl(url)) {
-                            await launchUrl(url, mode: LaunchMode.externalApplication);
-                          }
-                        },
+                        leading: BtTile(icon: Icons.workspace_premium_outlined, size: 34, bg: context.bt.accentSoft, fg: context.bt.accentInk),
+                        title: 'Upgrade Plan',
+                        trailing: Text(sub.currentPlan.label, style: BtText.subhead(context)),
+                        showChevron: true,
+                        onTap: () => Navigator.pushNamed(context, '/subscription'),
                       ),
+                      if (UserSession.isAdmin)
+                        BtRow(
+                          leading: const BtTile(icon: Icons.receipt_long_outlined, size: 34),
+                          title: 'Transaction Logs',
+                          showChevron: true,
+                          onTap: () => Navigator.pushNamed(context, '/logs'),
+                        ),
+                      if (UserSession.isAdmin)
+                        BtRow(
+                          leading: const BtTile(icon: Icons.workspaces_outline, size: 34),
+                          title: 'Create Workspace',
+                          showChevron: true,
+                          onTap: () => Navigator.pushNamed(context, '/create-workspace'),
+                        ),
                     ]),
-                    const SizedBox(height: 24),
-                    _tour(_logoutKey, 'Click here to log out securely.', _buildActions()),
-                    const SizedBox(height: 20),
-                    Center(child: Text('BuildTrack Version 2.4.0 (2024)', style: BtText.caption(context))),
-                  ],
+                  ),
+                  if (RoleManager.canViewTeamAccess)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
+                      child: Text('Assign Role is only available to Admins.', style: BtText.caption(context)),
+                    ),
+                ]),
+              ),
+              const SizedBox(height: 24),
+              // ── You ──
+              BtReveal(
+                index: 4,
+                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                  const BtSectionHeader(title: 'You', caption: true),
+                  _tour(_settingsCardKey, 'Manage your profile and notification settings here.', _buildSettingsCard()),
+                ]),
+              ),
+              const SizedBox(height: 24),
+              // ── Help ──
+              BtReveal(
+                index: 5,
+                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                  const BtSectionHeader(title: 'Help', caption: true),
+                  BtGroup(children: [
+                    BtRow(
+                      leading: const BtTile(icon: Icons.help_outline_rounded, size: 34),
+                      title: 'App Guidelines',
+                      subtitle: 'Replay the guided tour',
+                      showChevron: true,
+                      onTap: () => ShowCaseWidget.of(context).startShowCase(_tourKeys),
+                    ),
+                    BtRow(
+                      leading: const BtTile(icon: Icons.language_rounded, size: 34),
+                      title: 'Web Portal',
+                      subtitle: 'buildtrack.nurofin.com',
+                      trailing: const Icon(Icons.open_in_new_rounded, size: 18, color: Bt.ink3),
+                      onTap: () async {
+                        final url = Uri.parse('https://buildtrack.nurofin.com');
+                        if (await canLaunchUrl(url)) {
+                          await launchUrl(url, mode: LaunchMode.externalApplication);
+                        }
+                      },
+                    ),
+                  ]),
+                ]),
+              ),
+              const SizedBox(height: 24),
+              _tour(_logoutKey, 'Click here to log out securely.', _buildActions()),
+              const SizedBox(height: 14),
+              Row(children: [
+                if (RoleManager.isAdmin)
+                  TextButton(
+                    onPressed: _onDeleteAccountPressed,
+                    style: TextButton.styleFrom(foregroundColor: Bt.red, minimumSize: const Size(44, 44), padding: const EdgeInsets.symmetric(horizontal: 4)),
+                    child: Text('Delete Account…', style: BtText.caption(context, color: Bt.red, weight: FontWeight.w500)),
+                  ),
+                const Spacer(),
+                Padding(
+                  padding: const EdgeInsets.only(right: 4),
+                  child: Text('BUILDTRACK VERSION 2.4.0 (2024)', style: BtText.mono(context)),
                 ),
+              ]),
+            ],
+          ),
         );
       },
     );
   }
-  Widget _buildProfileCard(ProfileUserData user) {
-    return BtCard(
+
+  /// Back · help (replay tour) · edit profile — glass buttons on the hero.
+  Widget _heroTopBar(BuildContext context) {
+    final glass = Colors.white.withValues(alpha: .09);
+    return Row(children: [
+      Transform.translate(
+        offset: const Offset(-6, 0),
+        child: BtIconButton(icon: Icons.arrow_back_ios_new_rounded, size: 18, color: Bt.bone, background: glass, semantic: 'Back', onTap: () => Navigator.of(context).maybePop()),
+      ),
+      Expanded(child: Center(child: Text('ACCOUNT', style: BtText.mono(context, color: Bt.onNoir2)))),
+      BtIconButton(
+        icon: Icons.help_outline_rounded,
+        size: 20,
+        color: Bt.bone,
+        background: glass,
+        semantic: 'App guidelines',
+        onTap: () => ShowCaseWidget.of(context).startShowCase(_tourKeys),
+      ),
+      const SizedBox(width: 8),
+      Transform.translate(
+        offset: const Offset(6, 0),
+        child: BtIconButton(
+          icon: Icons.edit_outlined,
+          size: 19,
+          color: Bt.bone,
+          background: glass,
+          semantic: 'Edit profile',
+          onTap: _user == null
+              ? null
+              : () async {
+                  await Navigator.pushNamed(context, '/edit-profile', arguments: _user);
+                  _fetchProfile();
+                },
+        ),
+      ),
+    ]);
+  }
+
+  Widget _buildProfileCard(ProfileUserData user, SubscriptionProvider sub) {
+    return BtPressable(
       onTap: () async {
         await Navigator.pushNamed(context, '/edit-profile', arguments: _user);
         _fetchProfile();
       },
       child: Row(children: [
         _buildAvatar(user.profilePhoto),
-        const SizedBox(width: 14),
+        const SizedBox(width: 16),
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(user.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.headline(context)),
-            Text(user.email, maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.subhead(context)),
-            const SizedBox(height: 6),
-            _buildRoleBadge(user.role),
+            Text(user.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.d2(context, color: Bt.bone)),
+            const SizedBox(height: 2),
+            Text(user.email, maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.subhead(context, color: Bt.onNoir2)),
+            const SizedBox(height: 8),
+            Wrap(spacing: 6, runSpacing: 6, children: [
+              _buildRoleBadge(user.role),
+              _heroPill('${sub.currentPlan.label} plan'),
+            ]),
           ]),
         ),
-        const Icon(Icons.chevron_right_rounded, color: Bt.placeholder),
       ]),
     );
   }
+
+  Widget _heroPill(String label) => Container(
+        height: 24,
+        padding: const EdgeInsets.symmetric(horizontal: 9),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(color: Colors.white.withValues(alpha: .10), borderRadius: BorderRadius.circular(12)),
+        child: Text(label, maxLines: 1, style: BtText.caption(context, color: Bt.bone.withValues(alpha: .8), weight: FontWeight.w600).copyWith(fontSize: 12)),
+      );
+
+  /// Glass strip with the workspace (company) name + logo.
+  Widget _buildWorkspaceStrip() {
+    final company = (_user?.companyName.isNotEmpty ?? false) ? _user!.companyName : UserSession.companyName;
+    if (company.isEmpty) return const SizedBox.shrink();
+    final logo = _user?.companyLogo ?? UserSession.companyLogo;
+    final logoImage = (logo != null && logo.isNotEmpty) ? getProfileImageProvider(logo) : null;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 12, 14, 12),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: .07),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white.withValues(alpha: .09)),
+      ),
+      child: Row(children: [
+        Container(
+          width: 34,
+          height: 34,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: Bt.bone,
+            borderRadius: BorderRadius.circular(11),
+            image: logoImage != null ? DecorationImage(image: logoImage, fit: BoxFit.contain) : null,
+          ),
+          child: logoImage == null ? Text(BtAvatar.initials(company), style: BtText.caption(context, color: Bt.noir, weight: FontWeight.w700)) : null,
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(company, maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.body(context, weight: FontWeight.w600, color: Bt.bone)),
+            Text('Workspace', style: BtText.caption(context, color: Bt.onNoir2).copyWith(fontSize: 12)),
+          ]),
+        ),
+      ]),
+    );
+  }
+
   Widget _buildAvatar(String? photoUrl) {
     ImageProvider? imageProvider;
     if (_avatarBytes != null) {
@@ -433,28 +546,43 @@ class _ProfileScreenState extends State<ProfileScreen> {
       child: GestureDetector(
         onTap: _showImageOptions,
         child: Stack(clipBehavior: Clip.none, children: [
-          BtAvatar(name: _user?.name ?? '', image: imageProvider, size: 60, self: true),
-          Positioned(
-            bottom: -2,
-            right: -2,
+          TweenAnimationBuilder<double>(
+            tween: Tween(begin: Bt.reduceMotion(context) ? 1 : .7, end: 1),
+            duration: Bt.slow,
+            curve: Bt.spring,
+            builder: (_, v, child) => Transform.scale(scale: v, child: child),
             child: Container(
-              width: 24,
-              height: 24,
-              decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, border: Border.all(color: Bt.line)),
-              child: Icon(Icons.photo_camera_outlined, color: context.bt.brand, size: 14),
+              decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.white.withValues(alpha: .08), width: 4)),
+              child: BtAvatar(name: _user?.name ?? '', image: imageProvider, size: 68, self: true),
+            ),
+          ),
+          Positioned(
+            bottom: 0,
+            right: 0,
+            child: Container(
+              width: 26,
+              height: 26,
+              decoration: BoxDecoration(color: Bt.bone, shape: BoxShape.circle, border: Border.all(color: Bt.noir, width: 2)),
+              child: const Icon(Icons.photo_camera_outlined, color: Bt.noir, size: 14),
             ),
           ),
         ]),
       ),
     );
   }
-  Widget _buildRoleBadge(String role) => BtBadge(label: role, tone: BtTone.brand);
+  Widget _buildRoleBadge(String role) => Container(
+        height: 24,
+        padding: const EdgeInsets.symmetric(horizontal: 9),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(color: context.bt.accent, borderRadius: BorderRadius.circular(12)),
+        child: Text(role, maxLines: 1, style: BtText.caption(context, color: context.bt.onAccent, weight: FontWeight.w700).copyWith(fontSize: 12)),
+      );
   Widget _buildSettingsCard() {
     final theme = context.watch<ThemeProvider>();
     const names = {BtPreset.brass: 'Brass', BtPreset.ember: 'Ember', BtPreset.cobalt: 'Cobalt', BtPreset.jade: 'Jade', BtPreset.custom: 'Custom colour'};
     return BtGroup(children: [
       BtRow(
-        leading: const BtTile(icon: Icons.person_outline),
+        leading: const BtTile(icon: Icons.person_outline, size: 34),
         title: 'Edit Profile',
         showChevron: true,
         onTap: () async {
@@ -463,74 +591,64 @@ class _ProfileScreenState extends State<ProfileScreen> {
         },
       ),
       BtRow(
-        leading: const BtTile(icon: Icons.lock_outline),
-        title: 'Change Password',
+        leading: const BtTile(icon: Icons.palette_outlined, size: 34),
+        title: 'App Theme',
+        trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+          AnimatedContainer(
+            duration: Bt.fast,
+            width: 12,
+            height: 12,
+            decoration: BoxDecoration(color: theme.btTheme.accent, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 6),
+          Text(names[theme.preset] ?? '', style: BtText.subhead(context)),
+        ]),
         showChevron: true,
-        onTap: () => Navigator.pushNamed(context, '/forgot-password'),
+        onTap: () => _showAppearance(context),
       ),
       BtRow(
-        leading: const BtTile(icon: Icons.notifications_outlined),
+        leading: const BtTile(icon: Icons.notifications_outlined, size: 34),
         title: 'Notifications',
         trailing: BtSwitch(value: _notificationsEnabled, onChanged: _setNotificationsEnabled),
         onTap: () => _setNotificationsEnabled(!_notificationsEnabled),
       ),
       BtRow(
-        leading: BtTile(icon: Icons.palette_outlined, bg: context.bt.brandSoft, fg: context.bt.brand),
-        title: 'App Theme',
-        trailing: Text(names[theme.preset] ?? '', style: BtText.subhead(context)),
+        leading: const BtTile(icon: Icons.lock_outline, size: 34),
+        title: 'Change Password',
         showChevron: true,
-        onTap: () => _showAppearance(context),
+        onTap: () => Navigator.pushNamed(context, '/forgot-password'),
       ),
     ]);
   }
   Widget _buildActions() {
-    return BtGroup(insetDividers: false, children: [
-      BtRow(
-        leading: const BtTile(icon: Icons.logout_rounded, bg: Bt.redSoft, fg: Bt.red),
-        title: 'Logout',
-        titleColor: Bt.red,
-        onTap: _onLogoutPressed,
+    return BtPressable(
+      onTap: _onLogoutPressed,
+      semanticLabel: 'Logout',
+      child: Container(
+        height: Bt.buttonH,
+        decoration: BoxDecoration(color: Bt.card, borderRadius: BorderRadius.circular(Bt.rButton), border: Border.all(color: Bt.inputBorder)),
+        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          const Icon(Icons.logout_rounded, color: Bt.red, size: 20),
+          const SizedBox(width: 8),
+          Text('Logout', style: BtText.button(context, color: Bt.red)),
+        ]),
       ),
-      if (RoleManager.isAdmin)
-        BtRow(
-          leading: const BtTile(icon: Icons.delete_outline, bg: Bt.redSoft, fg: Bt.red),
-          title: 'Delete Account…',
-          titleColor: Bt.red,
-          onTap: _onDeleteAccountPressed,
-        ),
-    ]);
+    );
   }
   void _showAppearance(BuildContext context) {
     showBtSheet(
       context,
-      title: 'App Theme',
-      subtitle: 'Applies to your whole workspace',
+      title: 'Appearance',
+      subtitle: 'App theme colour · applies to your whole workspace',
       builder: (ctx) => const _ThemePicker(),
     );
   }
   Future<void> _onDeleteAccountPressed() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Delete Account?'),
-        content: const Text(
-          'This will permanently delete your admin account and ALL data associated with it — projects, team members, transactions, and more. This cannot be undone.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text(
-              'Delete My Account',
-              style: TextStyle(color: Color(0xFFC01048), fontWeight: FontWeight.w700),
-            ),
-          ),
-        ],
-      ),
+    final confirmed = await btConfirm(
+      context,
+      title: 'Delete Account?',
+      message: 'This will permanently delete your admin account and ALL data associated with it — projects, team members, transactions, and more. This cannot be undone.',
+      confirmLabel: 'Delete My Account',
     );
     if (confirmed != true || !mounted) return;
     try {
@@ -604,127 +722,192 @@ class _ErrorBanner extends StatelessWidget {
 class _ThemePicker extends StatelessWidget {
   const _ThemePicker();
 
+  static const _presetNames = {BtPreset.brass: 'Brass', BtPreset.ember: 'Ember', BtPreset.cobalt: 'Cobalt', BtPreset.jade: 'Jade'};
+
   @override
   Widget build(BuildContext context) {
     return Consumer<ThemeProvider>(
       builder: (context, themeProvider, _) {
         final current = themeProvider.preset;
-        Widget preset(BtPreset p, String name, String note) {
-          final t = BtTheme.forPreset(p);
-          final selected = current == p;
-          return Expanded(
-            child: GestureDetector(
-              onTap: () => themeProvider.setPreset(p),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Bt.card,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: selected ? Bt.ink : Bt.line, width: selected ? 2 : 1),
-                ),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Container(
-                    height: 56,
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(color: Bt.ground, borderRadius: BorderRadius.circular(8)),
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Container(height: 6, width: 40, decoration: BoxDecoration(color: Bt.ink, borderRadius: BorderRadius.circular(3))),
-                      const Spacer(),
-                      Container(height: 16, decoration: BoxDecoration(gradient: t.signature, borderRadius: BorderRadius.circular(5))),
-                    ]),
+        final live = themeProvider.btTheme;
+
+        Widget swatch({required Color color, required bool selected, required String label, required VoidCallback onTap, Gradient? gradient, String? caption}) {
+          return Semantics(
+            button: true,
+            selected: selected,
+            label: label,
+            child: BtPressable(
+              onTap: onTap,
+              scale: .9,
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                AnimatedContainer(
+                  duration: Bt.fast,
+                  curve: Bt.ease,
+                  width: 48,
+                  height: 48,
+                  padding: const EdgeInsets.all(3),
+                  decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: selected ? Bt.ink : Colors.transparent, width: 2)),
+                  child: Container(
+                    decoration: BoxDecoration(color: gradient == null ? color : null, gradient: gradient, shape: BoxShape.circle),
+                    child: AnimatedSwitcher(
+                      duration: Bt.fast,
+                      child: selected ? Icon(Icons.check_rounded, key: const ValueKey(true), size: 20, color: gradient == null ? BtTheme.fromAccent(color).onAccent : Colors.white) : const SizedBox.shrink(),
+                    ),
                   ),
-                  const SizedBox(height: 8),
-                  Text(name, style: BtText.subhead(context, weight: FontWeight.w600, color: Bt.ink)),
-                  Text(note, style: BtText.caption(context)),
-                ]),
-              ),
+                ),
+                if (caption != null) ...[
+                  const SizedBox(height: 6),
+                  Text(caption, style: BtText.caption(context, color: selected ? Bt.ink : Bt.ink3, weight: selected ? FontWeight.w600 : FontWeight.w400).copyWith(fontSize: 12)),
+                ],
+              ]),
             ),
           );
         }
 
-        return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Row(children: [
-            preset(BtPreset.brass, 'Brass', 'Default'),
-            const SizedBox(width: 8),
-            preset(BtPreset.ember, 'Ember', ''),
-            const SizedBox(width: 8),
-            preset(BtPreset.cobalt, 'Cobalt', ''),
-            const SizedBox(width: 8),
-            preset(BtPreset.jade, 'Jade', ''),
-          ]),
-          const SizedBox(height: 20),
-          Text('Or pick a colour', style: BtText.subhead(context, weight: FontWeight.w500)),
-          const SizedBox(height: 10),
-          Wrap(spacing: 12, runSpacing: 12, children: [
-            for (final t in themeProvider.availableThemes)
-              Semantics(
-                button: true,
-                label: t['name'] as String,
-                child: GestureDetector(
-                  onTap: () => themeProvider.setTheme(t['color'] as Color),
-                  child: Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: t['color'] as Color,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: (themeProvider.currentColor.toARGB32() == (t['color'] as Color).toARGB32()) ? Bt.ink : Colors.white,
-                        width: 3,
-                      ),
-                      boxShadow: const [BoxShadow(color: Color(0x22101828), blurRadius: 2)],
-                    ),
+        void pickCustom() {
+          showDialog(
+            context: context,
+            barrierColor: Bt.scrim,
+            builder: (BuildContext context) {
+              Color tempColor = themeProvider.currentColor;
+              return AlertDialog(
+                backgroundColor: Bt.card,
+                surfaceTintColor: Colors.transparent,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
+                title: Text('Pick a color', style: BtText.d3(context)),
+                content: SingleChildScrollView(
+                  child: ColorPicker(
+                    pickerColor: tempColor,
+                    onColorChanged: (color) {
+                      tempColor = color;
+                    },
+                    pickerAreaHeightPercent: 0.8,
+                    enableAlpha: false,
                   ),
                 ),
-              ),
-          ]),
-          const SizedBox(height: 20),
-          BtButton(
-            label: 'Choose Custom Color',
-            icon: Icons.colorize_rounded,
-            variant: BtButtonVariant.secondary,
-            onPressed: () {
-              showDialog(
-                context: context,
-                builder: (BuildContext context) {
-                  Color tempColor = themeProvider.currentColor;
-                  return AlertDialog(
-                    title: const Text('Pick a color'),
-                    content: SingleChildScrollView(
-                      child: ColorPicker(
-                        pickerColor: tempColor,
-                        onColorChanged: (color) {
-                          tempColor = color;
-                        },
-                        pickerAreaHeightPercent: 0.8,
-                        enableAlpha: false,
-                      ),
-                    ),
-                    actions: <Widget>[
-                      TextButton(
-                        child: const Text('Cancel'),
+                actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                actions: <Widget>[
+                  Row(children: [
+                    Expanded(
+                      child: BtButton(
+                        label: 'Cancel',
+                        small: true,
+                        variant: BtButtonVariant.secondary,
                         onPressed: () {
                           Navigator.of(context).pop();
                         },
                       ),
-                      TextButton(
-                        child: const Text('Apply'),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: BtButton(
+                        label: 'Apply',
+                        small: true,
                         onPressed: () {
                           themeProvider.setTheme(tempColor);
                           Navigator.of(context).pop();
                         },
                       ),
-                    ],
-                  );
-                },
+                    ),
+                  ]),
+                ],
               );
             },
+          );
+        }
+
+        return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          // Live preview — noir mini card in the current accent.
+          _AccentPreview(theme: live),
+          const SizedBox(height: 24),
+          Text('APP THEME COLOUR', style: BtText.mono(context)),
+          const SizedBox(height: 12),
+          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            for (final p in _presetNames.keys)
+              swatch(
+                color: BtTheme.presetColors[p]!,
+                selected: current == p,
+                label: _presetNames[p]!,
+                caption: p == BtPreset.brass ? 'Brass ·  Default' : _presetNames[p],
+                onTap: () => themeProvider.setPreset(p),
+              ),
+            swatch(
+              color: themeProvider.currentColor,
+              selected: current == BtPreset.custom,
+              label: 'Choose Custom Color',
+              caption: 'Custom',
+              gradient: const SweepGradient(colors: [Color(0xFFE5484D), Color(0xFFF2A33A), Color(0xFF16B981), Color(0xFF4F6BFF), Color(0xFFE5484D)]),
+              onTap: pickCustom,
+            ),
+          ]),
+          const SizedBox(height: 24),
+          Text('OR PICK A COLOUR', style: BtText.mono(context)),
+          const SizedBox(height: 12),
+          Wrap(spacing: 10, runSpacing: 10, children: [
+            for (final t in themeProvider.availableThemes)
+              swatch(
+                color: t['color'] as Color,
+                selected: themeProvider.currentColor.toARGB32() == (t['color'] as Color).toARGB32(),
+                label: t['name'] as String,
+                onTap: () => themeProvider.setTheme(t['color'] as Color),
+              ),
+          ]),
+          const SizedBox(height: 24),
+          BtButton(
+            label: 'Choose Custom Color',
+            icon: Icons.colorize_rounded,
+            variant: BtButtonVariant.secondary,
+            onPressed: pickCustom,
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           Text('Very light colours are darkened automatically so buttons stay readable.', style: BtText.caption(context)),
         ]);
       },
+    );
+  }
+}
+
+/// Noir mini card: a total, an accent button and accent bricks — shows the
+/// chosen theme colour live (purely visual).
+class _AccentPreview extends StatelessWidget {
+  const _AccentPreview({required this.theme});
+  final BtTheme theme;
+  @override
+  Widget build(BuildContext context) {
+    return ExcludeSemantics(
+      child: AnimatedContainer(
+        duration: Bt.medium,
+        curve: Bt.ease,
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: Bt.noir,
+          borderRadius: BorderRadius.circular(Bt.rCard),
+          boxShadow: Bt.shadowLg,
+          gradient: RadialGradient(center: const Alignment(1.1, -1.2), radius: 1.2, colors: [theme.accent.withValues(alpha: .32), Bt.noir]),
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('PREVIEW', style: BtText.mono(context, color: Bt.onNoir2)),
+          const SizedBox(height: 12),
+          Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('Total cost so far', style: BtText.caption(context, color: Bt.onNoir2).copyWith(fontSize: 12)),
+                Text('₹1.81 Cr', style: BtText.num(BtText.d2(context, color: Bt.bone))),
+              ]),
+            ),
+            AnimatedContainer(
+              duration: Bt.medium,
+              height: 36,
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(color: theme.accent, borderRadius: BorderRadius.circular(12)),
+              child: Text('Log entry', style: BtText.button(context, size: 14, color: theme.onAccent)),
+            ),
+          ]),
+          const SizedBox(height: 14),
+          BtBricks(value: .65, onDark: true, color: theme.accent),
+        ]),
+      ),
     );
   }
 }

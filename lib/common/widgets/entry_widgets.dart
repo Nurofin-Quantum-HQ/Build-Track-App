@@ -121,7 +121,7 @@ class EntrySectionCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Bt.card,
         borderRadius: BorderRadius.circular(Bt.rCard),
-        border: Border.all(color: Bt.line),
+        boxShadow: Bt.shadow,
       ),
       child: child,
     );
@@ -162,10 +162,11 @@ class EntryFieldLabel extends StatelessWidget {
   final bool required;
   @override
   Widget build(BuildContext context) {
+    // V2: 13px medium ink2 label above the field, red star when required.
     return Text.rich(
       TextSpan(
         text: label,
-        style: BtText.subhead(context, weight: FontWeight.w500),
+        style: BtText.caption(context, color: Bt.ink2, weight: FontWeight.w500),
         children: required ? [const TextSpan(text: ' *', style: TextStyle(color: Bt.red))] : [],
       ),
     );
@@ -388,36 +389,39 @@ class _UnitPickerSheetState extends State<_UnitPickerSheet> {
     final ctrl = TextEditingController();
     final confirmed = await showDialog<bool>(
       context: ctx,
+      barrierColor: Bt.scrim,
       builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Bt.rCard)),
-        title: const Text(
-          'Add Custom Unit',
-          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17),
-        ),
+        backgroundColor: Bt.card,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
+        title: Text('Add custom unit', style: BtText.d3(ctx)),
         content: TextField(
           controller: ctrl,
           autofocus: true,
-          decoration: const InputDecoration(
-            hintText: 'e.g. coil, container, machine-hrs',
-            border: OutlineInputBorder(),
-          ),
+          style: BtText.body(ctx, weight: FontWeight.w500),
+          decoration: btInput(ctx, hint: 'e.g. coil, container, machine-hrs'),
           onSubmitted: (_) => Navigator.pop(ctx, true),
         ),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _kBlue,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
+          Row(children: [
+            Expanded(
+              child: BtButton(
+                label: 'Cancel',
+                variant: BtButtonVariant.secondary,
+                small: true,
+                onPressed: () => Navigator.pop(ctx, false),
               ),
             ),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Add', style: TextStyle(color: Colors.white)),
-          ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: BtButton(
+                label: 'Add',
+                small: true,
+                onPressed: () => Navigator.pop(ctx, true),
+              ),
+            ),
+          ]),
         ],
       ),
     );
@@ -432,84 +436,50 @@ class _UnitPickerSheetState extends State<_UnitPickerSheet> {
     final botPad = MediaQuery.of(context).viewInsets.bottom;
     return Container(
       decoration: const BoxDecoration(
-        color: Bt.card,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        color: Bt.ground,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(Bt.rSheet)),
       ),
       padding: EdgeInsets.only(bottom: botPad),
       child: SafeArea(
         top: false,
         child: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const SizedBox(height: 10),
             Center(
               child: Container(
-                width: 38,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Bt.inputBorder,
-                  borderRadius: BorderRadius.circular(16),
-                ),
+                width: 40,
+                height: 5,
+                decoration: BoxDecoration(color: Bt.inputBorder, borderRadius: BorderRadius.circular(3)),
               ),
             ),
-            const SizedBox(height: 6),
             Padding(
-              padding: const EdgeInsets.fromLTRB(18, 8, 18, 0),
+              padding: const EdgeInsets.fromLTRB(18, 14, 10, 4),
               child: Row(
                 children: [
-                  const Expanded(
-                    child: Text(
-                      'Select Unit',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: _kDark,
-                        letterSpacing: -0.2,
-                      ),
-                    ),
-                  ),
-                  TextButton.icon(
+                  Expanded(child: Text('Select unit', style: BtText.d3(context))),
+                  BtButton(
+                    label: 'Custom',
+                    icon: Icons.add_rounded,
+                    variant: BtButtonVariant.quiet,
+                    small: true,
+                    expand: false,
                     onPressed: () => _addCustom(context),
-                    icon: Icon(
-                      Icons.add_circle_outline,
-                      size: 18,
-                      color: _kBlue,
-                    ),
-                    label: Text(
-                      'Custom',
-                      style: TextStyle(
-                        color: _kBlue,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13,
-                      ),
-                    ),
                   ),
                 ],
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 6),
               child: TextField(
                 controller: _searchCtrl,
                 onChanged: (v) => setState(() => _query = v),
-                decoration: InputDecoration(
-                  hintText: 'Search units...',
-                  hintStyle: const TextStyle(color: _kGray, fontSize: 14),
-                  prefixIcon: const Icon(Icons.search, color: _kGray, size: 20),
-                  filled: true,
-                  fillColor: Bt.fill,
-                  contentPadding: const EdgeInsets.symmetric(
-                    vertical: 10,
-                    horizontal: 16,
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
+                style: BtText.body(context),
+                decoration: btInput(
+                  context,
+                  hint: 'Search units…',
+                  prefix: const Icon(Icons.search_rounded, color: Bt.ink3, size: 20),
                 ),
               ),
             ),
@@ -520,27 +490,17 @@ class _UnitPickerSheetState extends State<_UnitPickerSheet> {
                       padding: const EdgeInsets.all(24),
                       child: Column(
                         children: [
-                          const Icon(Icons.search_off, color: _kGray, size: 36),
-                          const SizedBox(height: 8),
-                          const Text(
-                            'No matching unit found.',
-                            style: TextStyle(color: _kGray),
-                          ),
+                          const BtTile(icon: Icons.search_off_rounded),
+                          const SizedBox(height: 10),
+                          Text('No matching unit found.', style: BtText.subhead(context)),
                           const SizedBox(height: 12),
-                          TextButton.icon(
+                          BtButton(
+                            label: 'Add custom unit',
+                            icon: Icons.add_rounded,
+                            variant: BtButtonVariant.secondary,
+                            small: true,
+                            expand: false,
                             onPressed: () => _addCustom(context),
-                            icon: Icon(
-                              Icons.add,
-                              color: _kBlue,
-                              size: 18,
-                            ),
-                            label: Text(
-                              'Add Custom Unit',
-                              style: TextStyle(
-                                color: _kBlue,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
                           ),
                         ],
                       ),
@@ -551,50 +511,19 @@ class _UnitPickerSheetState extends State<_UnitPickerSheet> {
                       children: [
                         for (final entry in filtered.entries) ...[
                           Padding(
-                            padding: const EdgeInsets.only(top: 14, bottom: 6),
-                            child: Text(
-                              entry.key,
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: _kGray,
-                              ),
-                            ),
+                            padding: const EdgeInsets.only(top: 16, bottom: 8),
+                            child: Text(entry.key.toUpperCase(), style: BtText.mono(context)),
                           ),
                           Wrap(
                             spacing: 8,
                             runSpacing: 8,
-                            children: entry.value.map((unit) {
-                              final isSelected = widget.currentValue == unit;
-                              return GestureDetector(
-                                onTap: () => _pick(context, unit),
-                                child: AnimatedContainer(
-                                  duration: const Duration(milliseconds: 150),
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 10,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: isSelected ? _kBlue : Colors.white,
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                                      color: isSelected
-                                          ? _kBlue
-                                          : const Color(0xFFE4E7EC),
-                                      width: 1.5,
-                                    ),
-                                  ),
-                                  child: Text(
-                                    unit,
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w700,
-                                      color: isSelected ? Colors.white : _kDark,
-                                    ),
-                                  ),
-                                ),
-                              );
-                            }).toList(),
+                            children: entry.value
+                                .map((unit) => BtChip(
+                                      label: unit,
+                                      selected: widget.currentValue == unit,
+                                      onTap: () => _pick(context, unit),
+                                    ))
+                                .toList(),
                           ),
                         ],
                       ],
@@ -1093,25 +1022,25 @@ class PaymentStatusChip extends StatelessWidget {
   Color get _fg {
     switch (status) {
       case PaymentStatus.paid:
-        return const Color(0xFF067647);
+        return Bt.green;
       case PaymentStatus.partial:
-        return const Color(0xFF0B63CE);
+        return Bt.ink;
       case PaymentStatus.pending:
-        return const Color(0xFFB54708);
+        return Bt.amber;
       case PaymentStatus.overdue:
-        return const Color(0xFFC01048);
+        return Bt.red;
     }
   }
   Color get _bg {
     switch (status) {
       case PaymentStatus.paid:
-        return const Color(0xFFE7F6EE);
+        return Bt.greenSoft;
       case PaymentStatus.partial:
-        return const Color(0xFFE8F1FC);
+        return Bt.fill;
       case PaymentStatus.pending:
-        return const Color(0xFFFEF3E7);
+        return Bt.amberSoft;
       case PaymentStatus.overdue:
-        return const Color(0xFFFDECEF);
+        return Bt.redSoft;
     }
   }
   IconData get _icon {
@@ -1133,7 +1062,7 @@ class PaymentStatusChip extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8),
       decoration: BoxDecoration(
         color: _bg,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(Bt.rChip),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -1142,11 +1071,7 @@ class PaymentStatusChip extends StatelessWidget {
           const SizedBox(width: 4),
           Text(
             _label,
-            style: TextStyle(
-              color: _fg,
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-            ),
+            style: BtText.caption(context, color: _fg, weight: FontWeight.w600),
           ),
         ],
       ),
@@ -1285,6 +1210,7 @@ Future<Map<String, dynamic>?> showPaymentSheet(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
+    barrierColor: Bt.scrim,
     enableDrag: true,
     builder: (ctx) => StatefulBuilder(
       builder: (ctx, ss) {
@@ -1315,156 +1241,108 @@ Future<Map<String, dynamic>?> showPaymentSheet(
               padding: EdgeInsets.only(bottom: inset),
               child: Container(
                 decoration: const BoxDecoration(
-                  color: Color(0xFFF4F5FF),
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+                  color: Bt.ground,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(Bt.rSheet)),
                 ),
                 child: SafeArea(
                   top: false,
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 10),
                       Center(
                         child: Container(
-                          width: 38,
-                          height: 4,
+                          width: 40,
+                          height: 5,
                           decoration: BoxDecoration(
                             color: Bt.inputBorder,
-                            borderRadius: BorderRadius.circular(16),
+                            borderRadius: BorderRadius.circular(3),
                           ),
                         ),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 10),
                       Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
                         child: Row(
                           children: [
-                            GestureDetector(
+                            BtIconButton(
+                              icon: Icons.arrow_back_ios_new_rounded,
+                              size: 18,
+                              semantic: 'Back',
                               onTap: () => Navigator.pop(ctx),
-                              child: Container(
-                                width: 34,
-                                height: 34,
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFE8F1FC),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: const Icon(
-                                  Icons.arrow_back_ios_new_rounded,
-                                  color: Color(0xFF0B63CE),
-                                  size: 15,
-                                ),
-                              ),
                             ),
-                            const SizedBox(width: 10),
-                            const Expanded(
+                            const SizedBox(width: 4),
+                            Expanded(
                               child: Text(
                                 'Fulfillment & Payment',
-                                style: TextStyle(
-                                  color: Color(0xFF101828),
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w700,
-                                ),
+                                style: BtText.navTitle(ctx),
                               ),
                             ),
                           ],
                         ),
                       ),
-                      const SizedBox(height: 12),
-                      Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 16),
-                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
-                        decoration: const BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [Color(0xFF0B63CE), Color(0xFF6B2FD9)],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          borderRadius: BorderRadius.all(Radius.circular(16)),
-                        ),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    'Fulfillment & payment',
-                                    style: TextStyle(
-                                      color: Colors.white54,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w700,
-                                      letterSpacing: 1.3,
+                      const SizedBox(height: 8),
+                      // Noir summary card — what is being paid and what's still due.
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: BtCard(
+                          variant: BtCardVariant.ink,
+                          padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'FULFILLMENT & PAYMENT',
+                                      style: BtText.mono(ctx, color: Bt.onNoir2),
                                     ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    entryTitle,
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w700,
-                                      letterSpacing: -0.3,
-                                      height: 1.2,
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      entryTitle,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: BtText.headline(ctx).copyWith(color: Bt.bone),
                                     ),
-                                  ),
-                                  if (category.isNotEmpty ||
-                                      vendorName.isNotEmpty)
-                                    Padding(
-                                      padding: const EdgeInsets.only(top: 2),
-                                      child: Text(
-                                        [category, vendorName]
-                                            .where((s) => s.isNotEmpty)
-                                            .join(' · '),
-                                        style: const TextStyle(
-                                          color: Colors.white54,
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w500,
+                                    if (category.isNotEmpty ||
+                                        vendorName.isNotEmpty)
+                                      Padding(
+                                        padding: const EdgeInsets.only(top: 2),
+                                        child: Text(
+                                          [category, vendorName]
+                                              .where((s) => s.isNotEmpty)
+                                              .join(' · '),
+                                          style: BtText.caption(ctx, color: Bt.onNoir2),
                                         ),
                                       ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Text(
+                                    'OUTSTANDING',
+                                    style: BtText.mono(ctx, color: Bt.onNoir2),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  BtCountUp(
+                                    value: outstanding > 0 ? outstanding : totalAmount,
+                                    format: (v) => formatCurrency(v),
+                                    style: BtText.d3(ctx, color: ctx.bt.accent),
+                                  ),
+                                  if (alreadyPaid > 0)
+                                    Text(
+                                      '${formatCurrency(alreadyPaid)} paid',
+                                      style: BtText.num(BtText.caption(ctx, color: Bt.onNoir2)),
                                     ),
                                 ],
                               ),
-                            ),
-                            const SizedBox(width: 12),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                const Text(
-                                  'Outstanding',
-                                  style: TextStyle(
-                                    color: Colors.white54,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
-                                    letterSpacing: 1.2,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  formatCurrency(
-                                    outstanding > 0 ? outstanding : totalAmount,
-                                  ),
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.w700,
-                                    letterSpacing: -0.5,
-                                  ),
-                                ),
-                                if (alreadyPaid > 0)
-                                  Text(
-                                    '${formatCurrency(alreadyPaid)} paid',
-                                    style: const TextStyle(
-                                      color: Colors.white60,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                       Flexible(
@@ -1472,7 +1350,7 @@ Future<Map<String, dynamic>?> showPaymentSheet(
                           physics: const ClampingScrollPhysics(),
                           padding: EdgeInsets.fromLTRB(
                             16,
-                            16,
+                            20,
                             16,
                             botPad > 0 ? 8 : 12,
                           ),
@@ -1481,60 +1359,67 @@ Future<Map<String, dynamic>?> showPaymentSheet(
                             children: [
                               const _SheetSectionLabel('PAYMENT STATUS'),
                               const SizedBox(height: 8),
-                              Row(
-                                children: [
-                                  _pStatusCard(
-                                    ss,
-                                    selectedStatus,
-                                    PaymentStatus.paid,
-                                    'Fully Paid',
-                                    const Color(0xFF067647),
-                                    const Color(0xFFE7F6EE),
-                                    (v) => ss(() {
-                                      selectedStatus = v;
-                                      amountError = null;
-                                      amountCtrl.text = outstanding > 0
-                                          ? outstanding.toStringAsFixed(0)
-                                          : totalAmount.toStringAsFixed(0);
-                                    }),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  _pStatusCard(
-                                    ss,
-                                    selectedStatus,
-                                    PaymentStatus.partial,
-                                    'Partial',
-                                    const Color(0xFFB54708),
-                                    const Color(0xFFFEF3E7),
-                                    (v) => ss(() {
-                                      selectedStatus = v;
-                                      amountError = null;
-                                      final tText = outstanding > 0
-                                          ? outstanding.toStringAsFixed(0)
-                                          : totalAmount.toStringAsFixed(0);
-                                      if (amountCtrl.text == '0' ||
-                                          amountCtrl.text == tText) {
-                                        amountCtrl.clear();
-                                      }
-                                    }),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  _pStatusCard(
-                                    ss,
-                                    selectedStatus,
-                                    PaymentStatus.pending,
-                                    'Not Paid',
-                                    const Color(0xFFC01048),
-                                    const Color(0xFFFDECEF),
-                                    (v) => ss(() {
-                                      selectedStatus = v;
-                                      amountError = null;
-                                      amountCtrl.text = '0';
-                                    }),
-                                  ),
-                                ],
+                              Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: BoxDecoration(
+                                  color: Bt.fill,
+                                  borderRadius: BorderRadius.circular(Bt.rInput),
+                                ),
+                                child: Row(
+                                  children: [
+                                    _pStatusCard(
+                                      ss,
+                                      selectedStatus,
+                                      PaymentStatus.paid,
+                                      'Fully Paid',
+                                      Bt.green,
+                                      Bt.card,
+                                      (v) => ss(() {
+                                        selectedStatus = v;
+                                        amountError = null;
+                                        amountCtrl.text = outstanding > 0
+                                            ? outstanding.toStringAsFixed(0)
+                                            : totalAmount.toStringAsFixed(0);
+                                      }),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    _pStatusCard(
+                                      ss,
+                                      selectedStatus,
+                                      PaymentStatus.partial,
+                                      'Partial',
+                                      Bt.amber,
+                                      Bt.card,
+                                      (v) => ss(() {
+                                        selectedStatus = v;
+                                        amountError = null;
+                                        final tText = outstanding > 0
+                                            ? outstanding.toStringAsFixed(0)
+                                            : totalAmount.toStringAsFixed(0);
+                                        if (amountCtrl.text == '0' ||
+                                            amountCtrl.text == tText) {
+                                          amountCtrl.clear();
+                                        }
+                                      }),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    _pStatusCard(
+                                      ss,
+                                      selectedStatus,
+                                      PaymentStatus.pending,
+                                      'Not Paid',
+                                      Bt.red,
+                                      Bt.card,
+                                      (v) => ss(() {
+                                        selectedStatus = v;
+                                        amountError = null;
+                                        amountCtrl.text = '0';
+                                      }),
+                                    ),
+                                  ],
+                                ),
                               ),
-                              const SizedBox(height: 16),
+                              const SizedBox(height: 20),
                               const _SheetSectionLabel(
                                 'ACTUAL AMOUNT PAID (₹)',
                               ),
@@ -1543,9 +1428,9 @@ Future<Map<String, dynamic>?> showPaymentSheet(
                                 opacity: selectedStatus == PaymentStatus.pending
                                     ? 0.4
                                     : 1.0,
-                                duration: const Duration(milliseconds: 180),
+                                duration: Bt.fast,
                                 child: SizedBox(
-                                  height: 60,
+                                  height: 76,
                                   child: TextField(
                                     controller: amountCtrl,
                                     keyboardType:
@@ -1589,63 +1474,41 @@ Future<Map<String, dynamic>?> showPaymentSheet(
                                       });
                                     },
                                     textAlignVertical: TextAlignVertical.center,
-                                    decoration: InputDecoration(
+                                    decoration: btInput(ctx, hint: '0.00').copyWith(
                                       prefixText: '₹ ',
-                                      prefixStyle: const TextStyle(
-                                        fontSize: 22,
-                                        fontWeight: FontWeight.w600,
-                                        color: _kGray,
+                                      prefixStyle: BtText.d2(ctx, color: Bt.ink3).copyWith(fontWeight: FontWeight.w500),
+                                      hintStyle: BtText.d2(ctx, color: Bt.placeholder),
+                                      contentPadding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: 18,
                                       ),
-                                      hintText: '0.00',
-                                      hintStyle: const TextStyle(color: _kGray),
-                                      filled: true,
-                                      fillColor: Colors.white,
-                                      contentPadding:
-                                          const EdgeInsets.symmetric(
-                                            horizontal: 16,
-                                            vertical: 14,
-                                          ),
                                       enabledBorder: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(12),
+                                        borderRadius: BorderRadius.circular(Bt.rInput),
                                         borderSide: BorderSide(
-                                          color: amountError != null
-                                              ? const Color(0xFFC01048)
-                                              : const Color(0xFFE4E7EC),
-                                          width: 1.0,
+                                          color: amountError != null ? Bt.red : Bt.inputBorder,
                                         ),
                                       ),
                                       focusedBorder: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(12),
+                                        borderRadius: BorderRadius.circular(Bt.rInput),
                                         borderSide: BorderSide(
-                                          color: amountError != null
-                                              ? const Color(0xFFC01048)
-                                              : const Color(0xFF0B63CE),
-                                          width: 1.5,
+                                          color: amountError != null ? Bt.red : Bt.ink,
+                                          width: 2,
                                         ),
                                       ),
                                     ),
-                                    style: const TextStyle(
-                                      fontSize: 22,
-                                      fontWeight: FontWeight.w700,
-                                      color: _kDark,
-                                    ),
+                                    style: BtText.num(BtText.d2(ctx)),
                                   ),
                                 ),
                               ),
                               Padding(
-                                padding: const EdgeInsets.only(top: 5, left: 2),
+                                padding: const EdgeInsets.only(top: 6, left: 2, bottom: 20),
                                 child: Text(
                                   amountError ?? helperText,
-                                  style: TextStyle(
-                                    color: amountError != null
-                                        ? const Color(0xFFC01048)
-                                        : const Color(0xFF667085),
-                                    fontSize: 13,
-                                    fontStyle: amountError != null
-                                        ? FontStyle.italic
-                                        : FontStyle.normal,
-                                    fontWeight: FontWeight.w500,
-                                  ),
+                                  style: BtText.num(BtText.caption(
+                                    ctx,
+                                    color: amountError != null ? Bt.red : Bt.ink2,
+                                    weight: FontWeight.w500,
+                                  )),
                                 ),
                               ),
                               const _SheetSectionLabel('PAYMENT METHOD'),
@@ -1663,7 +1526,7 @@ Future<Map<String, dynamic>?> showPaymentSheet(
                                       ico,
                                       sel,
                                       chipW,
-                                      46,
+                                      50,
                                       () => ss(() => selectedMethod = lbl),
                                     );
                                   }),
@@ -1677,7 +1540,7 @@ Future<Map<String, dynamic>?> showPaymentSheet(
                                         ico,
                                         sel,
                                         fullW,
-                                        46,
+                                        50,
                                         () => ss(() => selectedMethod = lbl),
                                       );
                                     },
@@ -1686,83 +1549,134 @@ Future<Map<String, dynamic>?> showPaymentSheet(
                               ),
                               if (selectedMethod == 'Cash') ...[
                                 const SizedBox(height: 16),
-                                CheckboxListTile(
-                                  title: const Text(
-                                    'Request E-Signature for Cash Receipt',
-                                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _kDark),
+                                Container(
+                                  decoration: BoxDecoration(
+                                    color: Bt.card,
+                                    borderRadius: BorderRadius.circular(Bt.rCard),
+                                    boxShadow: Bt.shadow,
                                   ),
-                                  value: requestEsign,
-                                  onChanged: (val) => ss(() => requestEsign = val ?? false),
-                                  controlAffinity: ListTileControlAffinity.leading,
-                                  contentPadding: EdgeInsets.zero,
-                                  activeColor: const Color(0xFF0B63CE),
-                                ),
-                                if (requestEsign)
-                                  Padding(
-                                    padding: const EdgeInsets.only(top: 8.0, bottom: 8.0),
-                                    child: TextField(
-                                      controller: emailCtrl,
-                                      keyboardType: TextInputType.emailAddress,
-                                      decoration: InputDecoration(
-                                        labelText: 'Client Email Address',
-                                        labelStyle: const TextStyle(color: _kGray, fontSize: 13),
-                                        prefixIcon: const Icon(Icons.email_outlined, color: _kGray, size: 20),
-                                        filled: true,
-                                        fillColor: Colors.white,
-                                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                                        enabledBorder: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(12),
-                                          borderSide: const BorderSide(color: Color(0xFFE4E7EC)),
-                                        ),
-                                        focusedBorder: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(12),
-                                          borderSide: const BorderSide(color: Color(0xFF0B63CE), width: 1.5),
+                                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                                    children: [
+                                      Semantics(
+                                        toggled: requestEsign,
+                                        label: 'Request E-Signature for Cash Receipt',
+                                        child: InkWell(
+                                          onTap: () => ss(() => requestEsign = !requestEsign),
+                                          child: ConstrainedBox(
+                                            constraints: const BoxConstraints(minHeight: 60),
+                                            child: Row(
+                                              children: [
+                                                BtTile(
+                                                  icon: Icons.draw_outlined,
+                                                  bg: ctx.bt.accentSoft,
+                                                  fg: ctx.bt.accentInk,
+                                                ),
+                                                const SizedBox(width: 12),
+                                                Expanded(
+                                                  child: Column(
+                                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                                    children: [
+                                                      Text('Request E-Signature for Cash Receipt', style: BtText.body(ctx, weight: FontWeight.w600)),
+                                                      Text('Client signs on their phone', style: BtText.caption(ctx)),
+                                                    ],
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 8),
+                                                BtSwitch(
+                                                  value: requestEsign,
+                                                  onChanged: (val) => ss(() => requestEsign = val),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
                                         ),
                                       ),
-                                      style: const TextStyle(fontSize: 14, color: _kDark, fontWeight: FontWeight.w500),
-                                    ),
+                                      if (requestEsign)
+                                        Padding(
+                                          padding: const EdgeInsets.only(top: 4.0, bottom: 12.0),
+                                          child: TextField(
+                                            controller: emailCtrl,
+                                            keyboardType: TextInputType.emailAddress,
+                                            style: BtText.body(ctx, weight: FontWeight.w500),
+                                            decoration: btInput(
+                                              ctx,
+                                              hint: 'Client Email Address',
+                                              prefix: const Icon(Icons.email_outlined, color: Bt.ink3, size: 20),
+                                            ),
+                                          ),
+                                        ),
+                                      if (requestEsign && !isEsignCompleted) ...[
+                                        BtButton(
+                                          label: isEsignPolling ? 'Cancel Polling' : 'Send for E-Signature',
+                                          icon: isEsignPolling ? Icons.close_rounded : Icons.send_rounded,
+                                          variant: isEsignPolling ? BtButtonVariant.destructive : BtButtonVariant.primary,
+                                          small: true,
+                                          onPressed: isEsignPolling
+                                              ? () {
+                                                  ss(() => isEsignPolling = false);
+                                                }
+                                              : () => startEsignFlow(ss),
+                                        ),
+                                        if (esignStatusText.isNotEmpty)
+                                          Padding(
+                                            padding: const EdgeInsets.only(top: 8),
+                                            child: Row(
+                                              children: [
+                                                if (isEsignPolling) ...[
+                                                  const SizedBox(
+                                                    width: 14,
+                                                    height: 14,
+                                                    child: CircularProgressIndicator(strokeWidth: 2, color: Bt.amber),
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                ],
+                                                Expanded(
+                                                  child: Text(
+                                                    esignStatusText,
+                                                    style: BtText.subhead(
+                                                      ctx,
+                                                      weight: FontWeight.w600,
+                                                      color: isEsignPolling ? Bt.amber : (isEsignCompleted ? Bt.green : Bt.red),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        const SizedBox(height: 12),
+                                      ],
+                                      if (isEsignCompleted) ...[
+                                        Container(
+                                          margin: const EdgeInsets.only(bottom: 12),
+                                          padding: const EdgeInsets.all(12),
+                                          decoration: BoxDecoration(
+                                            color: Bt.greenSoft,
+                                            borderRadius: BorderRadius.circular(Bt.rTile),
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              const Icon(Icons.check_circle_rounded, color: Bt.green, size: 20),
+                                              const SizedBox(width: 8),
+                                              Expanded(
+                                                child: Text(
+                                                  'Signature successfully captured!',
+                                                  style: BtText.subhead(ctx, color: Bt.green, weight: FontWeight.w600),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ],
                                   ),
-                            if (requestEsign && !isEsignCompleted) ...[
-                              const SizedBox(height: 8),
-                              SizedBox(
-                                width: double.infinity,
-                                child: ElevatedButton(
-                                  onPressed: isEsignPolling ? () {
-                                    ss(() => isEsignPolling = false);
-                                  } : () => startEsignFlow(ss),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: isEsignPolling ? const Color(0xFFC01048) : const Color(0xFF0B63CE),
-                                    padding: const EdgeInsets.symmetric(vertical: 14),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                  ),
-                                  child: Text(isEsignPolling ? 'Cancel Polling' : 'Send for E-Signature', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                                 ),
-                              ),
-                              if (esignStatusText.isNotEmpty)
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 8),
-                                  child: Text(esignStatusText, style: TextStyle(color: isEsignPolling ? const Color(0xFFB54708) : (isEsignCompleted ? const Color(0xFF067647) : const Color(0xFFC01048)), fontWeight: FontWeight.bold)),
-                                )
-                            ],
-                            if (isEsignCompleted) ...[
-                               const SizedBox(height: 8),
-                               Container(
-                                 padding: const EdgeInsets.all(12),
-                                 decoration: BoxDecoration(color: Colors.green.shade50, borderRadius: BorderRadius.circular(8), border: Border.all(color: const Color(0xFF067647))),
-                                 child: const Row(
-                                   children: [
-                                     Icon(Icons.check_circle, color: Color(0xFF067647)),
-                                     SizedBox(width: 8),
-                                     Text('Signature successfully captured!', style: TextStyle(color: Color(0xFF067647), fontWeight: FontWeight.bold)),
-                                   ]
-                                 )
-                               )
-                            ],
                               ],
-                              const SizedBox(height: 16),
+                              const SizedBox(height: 20),
                               const _SheetSectionLabel('PAYMENT RECEIPT'),
                               const SizedBox(height: 8),
-                              GestureDetector(
+                              BtPressable(
                                 onTap: () async {
                                   final attachment = await pickAttachmentDirect(
                                     ctx,
@@ -1776,108 +1690,86 @@ Future<Map<String, dynamic>?> showPaymentSheet(
                                   }
                                 },
                                 child: AnimatedContainer(
-                                  duration: const Duration(milliseconds: 180),
+                                  duration: Bt.fast,
+                                  curve: Bt.ease,
                                   width: double.infinity,
+                                  constraints: const BoxConstraints(minHeight: 64),
                                   padding: const EdgeInsets.symmetric(
-                                    vertical: 13,
-                                    horizontal: 16,
+                                    vertical: 11,
+                                    horizontal: 14,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: uploadedReceipt != null
-                                        ? const Color(0xFFE7F6EE)
-                                        : Colors.white,
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                                      color: uploadedReceipt != null
-                                          ? const Color(0xFF067647)
-                                          : const Color(0xFFD0D5DD),
-                                      width: 1.5,
-                                    ),
+                                    color: uploadedReceipt != null ? Bt.greenSoft : Bt.card,
+                                    borderRadius: BorderRadius.circular(Bt.rCard),
+                                    boxShadow: uploadedReceipt != null ? null : Bt.shadow,
                                   ),
                                   child: uploadedReceipt != null
                                       ? Row(
                                           children: [
-                                            const Icon(
-                                              Icons.check_circle_outline,
-                                              color: Color(0xFF067647),
-                                              size: 18,
+                                            const BtTile(
+                                              icon: Icons.check_circle_outline_rounded,
+                                              bg: Bt.card,
+                                              fg: Bt.green,
                                             ),
-                                            const SizedBox(width: 8),
-                                            Flexible(
-                                              child: Text(
-                                                uploadedReceipt!,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: const TextStyle(
-                                                  color: Color(0xFF067647),
-                                                  fontSize: 13,
-                                                  fontWeight: FontWeight.w700,
-                                                ),
+                                            const SizedBox(width: 12),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Text('Receipt attached', style: BtText.body(ctx, weight: FontWeight.w600, color: Bt.green)),
+                                                  Text(
+                                                    uploadedReceipt!,
+                                                    maxLines: 1,
+                                                    overflow: TextOverflow.ellipsis,
+                                                    style: BtText.caption(ctx, color: Bt.green),
+                                                  ),
+                                                ],
                                               ),
                                             ),
                                             const SizedBox(width: 8),
-                                            GestureDetector(
+                                            BtIconButton(
+                                              icon: Icons.close_rounded,
+                                              size: 18,
+                                              color: Bt.ink2,
+                                              semantic: 'Remove receipt',
                                               onTap: () => ss(() {
                                                 uploadedReceipt = null;
                                                 uploadedReceiptDataUri = null;
                                               }),
-                                              child: const Icon(
-                                                Icons.close,
-                                                color: Color(0xFF667085),
-                                                size: 15,
-                                              ),
                                             ),
                                           ],
                                         )
                                       : Row(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
                                           children: [
-                                            Container(
-                                              width: 34,
-                                              height: 34,
-                                              decoration: BoxDecoration(
-                                                color: const Color(0xFFE8F1FC),
-                                                borderRadius:
-                                                    BorderRadius.circular(9),
-                                              ),
-                                              child: const Icon(
-                                                Icons.upload_outlined,
-                                                color: Color(0xFF0B63CE),
-                                                size: 17,
+                                            const BtTile(icon: Icons.upload_outlined),
+                                            const SizedBox(width: 12),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    'Upload Payment Receipt',
+                                                    style: BtText.body(ctx, weight: FontWeight.w600),
+                                                  ),
+                                                  Text(
+                                                    'PNG, JPG, PDF — UPI / Bank / Cheque proof',
+                                                    style: BtText.caption(ctx),
+                                                  ),
+                                                ],
                                               ),
                                             ),
-                                            const SizedBox(width: 10),
-                                            const Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                Text(
-                                                  'Upload Payment Receipt',
-                                                  style: TextStyle(
-                                                    color: _kDark,
-                                                    fontSize: 13,
-                                                    fontWeight: FontWeight.w700,
-                                                  ),
-                                                ),
-                                                SizedBox(height: 1),
-                                                Text(
-                                                  'PNG, JPG, PDF — UPI / Bank / Cheque proof',
-                                                  style: TextStyle(
-                                                    color: _kGray,
-                                                    fontSize: 12,
-                                                    fontWeight: FontWeight.w500,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
+                                            const Icon(Icons.add_rounded, color: Bt.ink3, size: 20),
                                           ],
                                         ),
                                 ),
                               ),
-                              const SizedBox(height: 12),
+                              const SizedBox(height: 20),
                               const _SheetSectionLabel('PAYMENT DATE'),
                               const SizedBox(height: 8),
-                              GestureDetector(
+                              BtPickerField(
+                                text: '${selectedPaymentDate.day}/${selectedPaymentDate.month}/${selectedPaymentDate.year}',
+                                icon: Icons.calendar_today_outlined,
                                 onTap: () async {
                                   final picked = await showDatePicker(
                                     context: ctx,
@@ -1887,7 +1779,7 @@ Future<Map<String, dynamic>?> showPaymentSheet(
                                     builder: (c, child) => Theme(
                                       data: Theme.of(c).copyWith(
                                         colorScheme: const ColorScheme.light(
-                                          primary: Color(0xFF0B63CE),
+                                          primary: Bt.ink,
                                           onPrimary: Colors.white,
                                           onSurface: _kDark,
                                         ),
@@ -1899,39 +1791,6 @@ Future<Map<String, dynamic>?> showPaymentSheet(
                                     ss(() => selectedPaymentDate = picked);
                                   }
                                 },
-                                child: Container(
-                                  width: double.infinity,
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 13,
-                                    horizontal: 16,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                                      color: const Color(0xFFD0D5DD),
-                                      width: 1.5,
-                                    ),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      const Icon(
-                                        Icons.calendar_month_outlined,
-                                        color: Color(0xFF0B63CE),
-                                        size: 19,
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        '${selectedPaymentDate.day}/${selectedPaymentDate.month}/${selectedPaymentDate.year}',
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w700,
-                                          fontSize: 14,
-                                          color: _kDark,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
                               ),
                               const SizedBox(height: 12),
                               EntryNotesField(
@@ -1944,50 +1803,19 @@ Future<Map<String, dynamic>?> showPaymentSheet(
                           ),
                         ),
                       ),
-                      Container(
+                      Padding(
                         padding: EdgeInsets.fromLTRB(
                           16,
                           12,
                           16,
                           botPad > 0 ? botPad : 18,
                         ),
-                        decoration: const BoxDecoration(
-                          color: Colors.white,
-                          border: Border(
-                            top: BorderSide(color: Color(0xFFE8EAFF), width: 1),
-                          ),
-                        ),
-                        child: Row(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            Expanded(
-                              flex: 2,
-                              child: GestureDetector(
-                                onTap: () => Navigator.pop(ctx),
-                                child: Container(
-                                  height: 46,
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(11),
-                                    border: Border.all(color: Bt.line),
-                                  ),
-                                  child: const Center(
-                                    child: Text(
-                                      'Cancel',
-                                      style: TextStyle(
-                                        color: _kGray,
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: 13,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              flex: 5,
-                              child: GestureDetector(
-                                onTap: () {
+                            BtButton(
+                                label: 'Confirm Payment & Update Inventory',
+                                onPressed: () {
                                   if (selectedStatus != PaymentStatus.pending) {
                                     final raw = amountCtrl.text.trim();
                                     final amt = parseAmount(raw);
@@ -2033,41 +1861,12 @@ Future<Map<String, dynamic>?> showPaymentSheet(
                                     'clientEmail': emailCtrl.text.trim(),
                                   });
                                 },
-                                child: Container(
-                                  height: 46,
-                                  decoration: BoxDecoration(
-                                    gradient: const LinearGradient(
-                                      colors: [
-                                        Color(0xFF0B63CE),
-                                        Color(0xFF6B2FD9),
-                                      ],
-                                    ),
-                                    borderRadius: BorderRadius.circular(11),
-                                  ),
-                                  child: const Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(
-                                        Icons.check_circle_outline,
-                                        color: Colors.white,
-                                        size: 16,
-                                      ),
-                                      SizedBox(width: 6),
-                                      Flexible(
-                                        child: Text(
-                                          'Confirm Payment & Update Inventory',
-                                          textAlign: TextAlign.center,
-                                          style: TextStyle(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.w700,
-                                            fontSize: 13,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            BtButton(
+                              label: 'Cancel',
+                              variant: BtButtonVariant.quiet,
+                              onPressed: () => Navigator.pop(ctx),
                             ),
                           ],
                         ),
@@ -2087,16 +1886,9 @@ class _SheetSectionLabel extends StatelessWidget {
   const _SheetSectionLabel(this.label);
   final String label;
   @override
-  Widget build(BuildContext context) => Text(
-    label,
-    style: const TextStyle(
-      color: Color(0xFF667085),
-      fontSize: 12,
-      fontWeight: FontWeight.w700,
-      letterSpacing: 1.1,
-    ),
-  );
+  Widget build(BuildContext context) => Text(label, style: BtText.mono(context));
 }
+/// One segment of the 3-way payment status control (sliding-pill look).
 Widget _pStatusCard(
   StateSetter ss,
   PaymentStatus current,
@@ -2108,40 +1900,45 @@ Widget _pStatusCard(
 ) {
   final sel = current == value;
   return Expanded(
-    child: GestureDetector(
-      onTap: () => onSelect(value),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
-        height: 46,
-        decoration: BoxDecoration(
-          color: sel ? bgColor : Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: sel ? dotColor : const Color(0xFFE4E7EC),
-            width: 1.5,
+    child: Semantics(
+      button: true,
+      selected: sel,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => onSelect(value),
+        child: AnimatedContainer(
+          duration: Bt.fast,
+          curve: Bt.ease,
+          height: 44,
+          decoration: BoxDecoration(
+            color: sel ? bgColor : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: sel ? Bt.shadow : null,
           ),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 7,
-              height: 7,
-              decoration: BoxDecoration(
-                color: dotColor,
-                shape: BoxShape.circle,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 7,
+                height: 7,
+                decoration: BoxDecoration(
+                  color: dotColor,
+                  shape: BoxShape.circle,
+                ),
               ),
-            ),
-            const SizedBox(width: 5),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: sel ? dotColor : const Color(0xFF475467),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Builder(
+                  builder: (c) => Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: BtText.subhead(c, weight: FontWeight.w600, color: sel ? Bt.ink : Bt.ink2),
+                  ),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     ),
@@ -2155,50 +1952,116 @@ Widget _pMethodChip(
   double height,
   VoidCallback onTap,
 ) {
-  return GestureDetector(
-    onTap: onTap,
-    child: AnimatedContainer(
-      duration: const Duration(milliseconds: 160),
-      width: width,
-      height: height,
-      decoration: BoxDecoration(
-        color: selected ? const Color(0xFF0B63CE) : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: selected ? const Color(0xFF0B63CE) : const Color(0xFFE4E7EC),
-          width: 1.5,
+  return Semantics(
+    button: true,
+    selected: selected,
+    child: BtPressable(
+      onTap: onTap,
+      scale: .96,
+      child: AnimatedContainer(
+        duration: Bt.fast,
+        curve: Bt.ease,
+        width: width,
+        height: height,
+        decoration: BoxDecoration(
+          color: selected ? Bt.ink : Bt.card,
+          borderRadius: BorderRadius.circular(Bt.rTile),
+          border: Border.all(color: selected ? Bt.ink : Bt.inputBorder),
         ),
-        boxShadow: selected
-            ? [
-                BoxShadow(
-                  color: const Color(0xFF0B63CE).withValues(alpha: 0.18),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
-                ),
-              ]
-            : [],
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            icon,
-            color: selected ? Colors.white : const Color(0xFF667085),
-            size: 16,
-          ),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: selected ? Colors.white : const Color(0xFF475467),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              color: selected ? Bt.bone : Bt.ink2,
+              size: 18,
             ),
-          ),
-        ],
+            const SizedBox(width: 8),
+            Builder(
+              builder: (c) => Text(
+                label,
+                style: BtText.subhead(c, weight: FontWeight.w600, color: selected ? Bt.bone : Bt.ink),
+              ),
+            ),
+          ],
+        ),
       ),
     ),
   );
+}
+/// Shared shell for the attachment rows (white card, soft shadow, tile + text + trailing).
+class _AttachmentRow extends StatelessWidget {
+  const _AttachmentRow({
+    required this.tile,
+    required this.title,
+    required this.subtitle,
+    this.subtitleIcon,
+    this.subtitleColor = Bt.ink3,
+    this.trailing,
+    this.onTap,
+    this.background = Bt.card,
+  });
+  final Widget tile;
+  final String title;
+  final String subtitle;
+  final IconData? subtitleIcon;
+  final Color subtitleColor;
+  final Widget? trailing;
+  final VoidCallback? onTap;
+  final Color background;
+  @override
+  Widget build(BuildContext context) {
+    final body = Container(
+      width: double.infinity,
+      constraints: const BoxConstraints(minHeight: 68),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(Bt.rCard),
+        boxShadow: background == Bt.card ? Bt.shadow : null,
+      ),
+      child: Row(
+        children: [
+          tile,
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.body(context, weight: FontWeight.w600)),
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    if (subtitleIcon != null) ...[
+                      Icon(subtitleIcon, color: subtitleColor, size: 13),
+                      const SizedBox(width: 4),
+                    ],
+                    Flexible(
+                      child: Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.caption(context, color: subtitleColor, weight: FontWeight.w500)),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          if (trailing != null) ...[const SizedBox(width: 10), trailing!],
+        ],
+      ),
+    );
+    if (onTap == null) return body;
+    return BtPressable(onTap: onTap, scale: .98, child: body);
+  }
+}
+class _ViewPill extends StatelessWidget {
+  const _ViewPill();
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      decoration: BoxDecoration(color: Bt.fill, borderRadius: BorderRadius.circular(Bt.rChip)),
+      child: Text('View', style: BtText.caption(context, color: Bt.ink, weight: FontWeight.w600)),
+    );
+  }
 }
 class InvoiceAttachmentCard extends StatelessWidget {
   final PickedAttachment? attachment;
@@ -2209,61 +2072,15 @@ class InvoiceAttachmentCard extends StatelessWidget {
     final name = attachment?.name ?? fileName;
     final hasDoc = name != null && name.isNotEmpty;
     if (!hasDoc) {
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Bt.line),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: const Color(0xFFE8F1FC),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(
-                Icons.upload_file_outlined,
-                color: AppColors.textLight,
-                size: 22,
-              ),
-            ),
-            const SizedBox(width: 14),
-            const Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'No document attached',
-                    style: TextStyle(
-                      color: AppColors.textDark,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14,
-                    ),
-                  ),
-                  SizedBox(height: 3),
-                  Text(
-                    'Upload invoice or bill to view',
-                    style: TextStyle(
-                      color: AppColors.textLight,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+      return const _AttachmentRow(
+        tile: BtTile(icon: Icons.upload_file_outlined, fg: Bt.ink3),
+        title: 'No document attached',
+        subtitle: 'Upload invoice or bill to view',
       );
     }
     IconData iconData = Icons.insert_drive_file_outlined;
-    Color iconColor = const Color(0xFF546E7A);
-    Color iconBg = const Color(0xFFECEFF1);
+    Color iconColor = Bt.ink2;
+    Color iconBg = Bt.fill;
     final lowerName = name.toLowerCase();
     if (attachment != null) {
       iconData = attachment!.icon;
@@ -2272,25 +2089,47 @@ class InvoiceAttachmentCard extends StatelessWidget {
     } else {
       if (lowerName.endsWith('.pdf')) {
         iconData = Icons.picture_as_pdf_outlined;
-        iconColor = const Color(0xFFC01048);
-        iconBg = const Color(0xFFFDECEF);
+        iconColor = Bt.red;
+        iconBg = Bt.redSoft;
       } else if (lowerName.endsWith('.jpg') ||
           lowerName.endsWith('.jpeg') ||
           lowerName.endsWith('.png')) {
         iconData = Icons.image_outlined;
-        iconColor = const Color(0xFF0B63CE);
-        iconBg = const Color(0xFFE8F1FC);
+        iconColor = Bt.ink;
+        iconBg = Bt.fill;
       } else if (lowerName.endsWith('.doc') || lowerName.endsWith('.docx')) {
         iconData = Icons.description_outlined;
-        iconColor = const Color(0xFF1565C0);
-        iconBg = const Color(0xFFE3F2FD);
+        iconColor = Bt.ink;
+        iconBg = Bt.fill;
       } else if (lowerName.endsWith('.xls') || lowerName.endsWith('.xlsx')) {
         iconData = Icons.table_chart_outlined;
-        iconColor = const Color(0xFF067647);
-        iconBg = const Color(0xFFE7F6EE);
+        iconColor = Bt.green;
+        iconBg = Bt.greenSoft;
       }
     }
-    return GestureDetector(
+    final Widget tile = (attachment == null &&
+            (name.startsWith('http://') || name.startsWith('https://')) &&
+            (lowerName.contains('.jpg') ||
+                lowerName.contains('.jpeg') ||
+                lowerName.contains('.png')))
+        ? ClipRRect(
+            borderRadius: BorderRadius.circular(Bt.rTile),
+            child: Image.network(
+              name,
+              width: 42,
+              height: 42,
+              fit: BoxFit.cover,
+              errorBuilder: (_, _, _) => BtTile(icon: iconData, bg: iconBg, fg: iconColor),
+            ),
+          )
+        : BtTile(icon: iconData, bg: iconBg, fg: iconColor);
+    return _AttachmentRow(
+      tile: tile,
+      title: name,
+      subtitle: 'Successfully attached',
+      subtitleIcon: Icons.check_circle_rounded,
+      subtitleColor: Bt.green,
+      trailing: const _ViewPill(),
       onTap: () {
         if (hasDoc) {
           final String receiptData = attachment != null
@@ -2303,98 +2142,6 @@ class InvoiceAttachmentCard extends StatelessWidget {
           );
         }
       },
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Bt.line),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: iconBg,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child:
-                  (attachment == null &&
-                      (name.startsWith('http://') ||
-                          name.startsWith('https://')) &&
-                      (lowerName.contains('.jpg') ||
-                          lowerName.contains('.jpeg') ||
-                          lowerName.contains('.png')))
-                  ? ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: Image.network(
-                        name,
-                        width: 44,
-                        height: 44,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, _, _) =>
-                            Icon(iconData, color: iconColor, size: 22),
-                      ),
-                    )
-                  : Icon(iconData, color: iconColor, size: 22),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    name,
-                    style: const TextStyle(
-                      color: AppColors.textDark,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.check_circle,
-                        color: Colors.green.shade600,
-                        size: 12,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Successfully attached',
-                        style: TextStyle(
-                          color: Colors.green.shade700,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF5F7FF),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                'View',
-                style: TextStyle(
-                  color: AppColors.primary,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
@@ -2405,163 +2152,48 @@ class PaymentReceiptCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final hasDoc = fileName != null && fileName!.isNotEmpty;
     if (!hasDoc) {
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Bt.line),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: const Color(0xFFF0FFF4),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(
-                Icons.receipt_long_outlined,
-                color: Color(0xFF667085),
-                size: 22,
-              ),
-            ),
-            const SizedBox(width: 14),
-            const Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'No payment receipt attached',
-                    style: TextStyle(
-                      color: AppColors.textDark,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14,
-                    ),
-                  ),
-                  SizedBox(height: 3),
-                  Text(
-                    'Add one when you record a payment',
-                    style: TextStyle(
-                      color: AppColors.textLight,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+      return const _AttachmentRow(
+        tile: BtTile(icon: Icons.receipt_long_outlined, fg: Bt.ink3),
+        title: 'No payment receipt attached',
+        subtitle: 'Add one when you record a payment',
       );
     }
     final lowerName = fileName!.toLowerCase();
     IconData iconData = Icons.receipt_long_outlined;
-    Color iconColor = const Color(0xFF067647);
-    Color iconBg = const Color(0xFFE7F6EE);
+    Color iconColor = Bt.green;
+    Color iconBg = Bt.card;
     if (lowerName.endsWith('.pdf')) {
       iconData = Icons.picture_as_pdf_outlined;
-      iconColor = const Color(0xFFC01048);
-      iconBg = const Color(0xFFFDECEF);
+      iconColor = Bt.red;
+      iconBg = Bt.redSoft;
     } else if (lowerName.endsWith('.jpg') ||
         lowerName.endsWith('.jpeg') ||
         lowerName.endsWith('.png')) {
       iconData = Icons.image_outlined;
-      iconColor = const Color(0xFF067647);
-      iconBg = const Color(0xFFE7F6EE);
+      iconColor = Bt.green;
+      iconBg = Bt.card;
     }
-    return GestureDetector(
+    return _AttachmentRow(
+      background: Bt.greenSoft,
+      tile: BtTile(icon: iconData, bg: iconBg, fg: iconColor),
+      title: fileName!,
+      subtitle: 'Payment proof attached',
+      subtitleIcon: Icons.verified_rounded,
+      subtitleColor: Bt.green,
+      trailing: const _ViewPill(),
       onTap: () => Navigator.pushNamed(
         context,
         '/receipt-viewer',
         arguments: {'receipt': fileName},
       ),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: const Color(0xFFE7F6EE),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFF86EFAC), width: 1.5),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: iconBg,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(iconData, color: iconColor, size: 22),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    fileName!,
-                    style: const TextStyle(
-                      color: AppColors.textDark,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.verified,
-                        color: Colors.green.shade600,
-                        size: 12,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Payment proof attached',
-                        style: TextStyle(
-                          color: Colors.green.shade700,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: const Color(0xFFE7F6EE),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                'View',
-                style: TextStyle(
-                  color: Colors.green.shade800,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
 
+// ───────────────────────────────────────── form building blocks (Design V2 "Blueprint Noir")
 
-
-
-// ───────────────────────────────────────── redesigned form building blocks (B08–B10)
-
-/// Read-only "Where" summary at the top of an entry form (project · floor · phase · activity).
+/// Read-only context strip at the top of an entry form:
+/// "📍 **Project** · Floor · Phase · Activity" on a faint ink tint.
 class EntryWhereSummary extends StatelessWidget {
   const EntryWhereSummary({super.key, this.projectId, this.floor, this.phase, this.activity});
   final String? projectId;
@@ -2572,18 +2204,39 @@ class EntryWhereSummary extends StatelessWidget {
   Widget build(BuildContext context) {
     final projects = context.watch<ProjectProvider>().projects;
     final project = projects.where((p) => p.id == projectId).firstOrNull;
-    final parts = [phase, activity, floor].where((v) => v != null && v.trim().isNotEmpty).cast<String>().toList();
+    final parts = [floor, phase, activity].where((v) => v != null && v.trim().isNotEmpty).cast<String>().toList();
     if (project == null && parts.isEmpty) return const SizedBox.shrink();
+    final rest = parts.join(' · ');
     return Padding(
-      padding: const EdgeInsets.only(bottom: 20),
-      child: BtGroup(children: [
-        BtRow(
-          leading: const BtTile(icon: Icons.place_outlined),
-          title: parts.isEmpty ? (project?.name ?? '') : parts.join(' · '),
-          subtitle: parts.isEmpty ? null : project?.name,
-          minHeight: 60,
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Semantics(
+        label: 'Where: ${[if (project != null) project.name, ...parts].join(', ')}',
+        excludeSemantics: true,
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 44),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: Bt.ink.withValues(alpha: .05),
+            borderRadius: BorderRadius.circular(Bt.rTile),
+          ),
+          child: Row(children: [
+            const Icon(Icons.location_on_outlined, size: 16, color: Bt.ink2),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text.rich(
+                TextSpan(children: [
+                  if (project != null) TextSpan(text: project.name, style: BtText.subhead(context, color: Bt.ink, weight: FontWeight.w600)),
+                  if (project != null && rest.isNotEmpty) const TextSpan(text: ' · '),
+                  if (rest.isNotEmpty) TextSpan(text: rest),
+                ]),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: BtText.subhead(context, color: Bt.ink2),
+              ),
+            ),
+          ]),
         ),
-      ]),
+      ),
     );
   }
 }
@@ -2597,8 +2250,8 @@ class EntryNotice extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(color: Bt.amberSoft, borderRadius: BorderRadius.circular(Bt.rTile)),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(color: Bt.amberSoft, borderRadius: BorderRadius.circular(Bt.rInput)),
         child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
           const Icon(Icons.warning_amber_rounded, color: Bt.amber, size: 20),
           const SizedBox(width: 10),
@@ -2619,7 +2272,7 @@ class EntryFormSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 28),
+      padding: const EdgeInsets.only(bottom: 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -2628,10 +2281,10 @@ class EntryFormSection extends StatelessWidget {
               Expanded(
                 child: Text.rich(TextSpan(children: [
                   TextSpan(text: title, style: BtText.headline(context)),
-                  if (caption != null) TextSpan(text: '  $caption', style: BtText.caption(context)),
+                  if (caption != null) TextSpan(text: '  ·  $caption', style: BtText.caption(context)),
                 ])),
               ),
-              if (trailing != null) trailing!,
+              ?trailing,
             ]),
             const SizedBox(height: 12),
           ],
@@ -2655,7 +2308,7 @@ class EntryLabeled extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
       EntryFieldLabel(label, required: required),
-      const SizedBox(height: 8),
+      const SizedBox(height: 7),
       child,
     ]);
   }
@@ -2676,7 +2329,7 @@ class EntryDateField extends StatelessWidget {
   }
 }
 
-/// "Includes GST" switch + optional percentage field.
+/// "Includes GST" row in a white card: label + inline % field (when on) + switch.
 class EntryGstToggle extends StatelessWidget {
   const EntryGstToggle({super.key, required this.withGst, required this.onChanged, required this.gstCtrl, this.onPercentChanged});
   final bool withGst;
@@ -2685,40 +2338,75 @@ class EntryGstToggle extends StatelessWidget {
   final ValueChanged<String>? onPercentChanged;
   @override
   Widget build(BuildContext context) {
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
-      Semantics(
-        toggled: withGst,
-        label: 'Includes GST',
-        child: InkWell(
-          borderRadius: BorderRadius.circular(Bt.rTile),
-          onTap: () => onChanged(!withGst),
-          child: SizedBox(
-            height: Bt.touch,
-            child: Row(children: [
-              Expanded(child: Text('Includes GST', style: BtText.body(context))),
-              BtSwitch(value: withGst, onChanged: onChanged),
-            ]),
+    OutlineInputBorder b(Color c, [double w = 1]) => OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: c, width: w));
+    return Container(
+      decoration: BoxDecoration(color: Bt.card, borderRadius: BorderRadius.circular(Bt.rCard), boxShadow: Bt.shadow),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Row(children: [
+        Expanded(
+          child: Semantics(
+            toggled: withGst,
+            button: true,
+            label: 'Includes GST',
+            excludeSemantics: true,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => onChanged(!withGst),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: Bt.touch),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [
+                  Text('Includes GST', style: BtText.body(context, weight: FontWeight.w600)),
+                  Text(withGst ? 'Enter the GST percentage' : 'Bill includes tax', style: BtText.caption(context)),
+                ]),
+              ),
+            ),
           ),
         ),
-      ),
-      if (withGst) ...[
-        const SizedBox(height: 8),
-        EntryLabeled(
-          label: 'GST percentage',
-          child: EntryUnderlineField(
-            controller: gstCtrl,
-            hint: 'e.g. 18',
-            suffix: '%',
-            keyboardType: TextInputType.number,
-            onChanged: onPercentChanged,
-          ),
+        AnimatedSize(
+          duration: Bt.fast,
+          curve: Bt.ease,
+          child: withGst
+              ? Padding(
+                  padding: const EdgeInsets.only(left: 8, right: 10),
+                  child: SizedBox(
+                    width: 84,
+                    height: 44,
+                    child: Semantics(
+                      label: 'GST percentage',
+                      textField: true,
+                      child: TextField(
+                        controller: gstCtrl,
+                        keyboardType: TextInputType.number,
+                        onChanged: onPercentChanged,
+                        textAlign: TextAlign.left,
+                        style: BtText.num(BtText.body(context, weight: FontWeight.w600)),
+                        decoration: InputDecoration(
+                          hintText: '18',
+                          hintStyle: BtText.body(context, color: Bt.placeholder),
+                          suffixText: '%',
+                          suffixStyle: BtText.body(context, color: Bt.ink3),
+                          isDense: true,
+                          filled: true,
+                          fillColor: Bt.card,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+                          border: b(Bt.inputBorder),
+                          enabledBorder: b(Bt.inputBorder),
+                          focusedBorder: b(Bt.ink, 2),
+                        ),
+                      ),
+                    ),
+                  ),
+                )
+              : const SizedBox(width: 10),
         ),
-      ],
-    ]);
+        BtSwitch(value: withGst, onChanged: onChanged),
+      ]),
+    );
   }
 }
 
-/// Big total with the maths underneath (qty × rate, subtotal, GST).
+/// The total — noir "ink" card on a faint blueprint grid: the maths
+/// (qty × rate, GST…) on top and the total rolling up in the display face.
 class EntryTotalCard extends StatelessWidget {
   const EntryTotalCard({super.key, required this.total, required this.label, this.lines = const []});
   final double total;
@@ -2726,31 +2414,78 @@ class EntryTotalCard extends StatelessWidget {
   final List<(String, String)> lines;
   @override
   Widget build(BuildContext context) {
-    return BtCard(
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(label, style: BtText.subhead(context)),
-        const SizedBox(height: 2),
-        FittedBox(
-          fit: BoxFit.scaleDown,
-          alignment: Alignment.centerLeft,
-          child: Text(total > 0 ? formatInr(total) : '₹0', style: BtText.amount(context)),
-        ),
-        if (lines.isNotEmpty) ...[
-          const SizedBox(height: 10),
-          const Divider(height: 1, color: Bt.line),
-          const SizedBox(height: 8),
-          for (final l in lines)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 3),
-              child: Row(children: [
-                Expanded(child: Text(l.$1, style: BtText.subhead(context))),
-                Text(l.$2, style: BtText.num(BtText.subhead(context, color: Bt.ink, weight: FontWeight.w500))),
+    final bt = context.bt;
+    return Semantics(
+      label: '$label ${total > 0 ? formatInr(total) : '₹0'}',
+      container: true,
+      child: BtCard(
+        variant: BtCardVariant.ink,
+        padding: EdgeInsets.zero,
+        child: Stack(children: [
+          const Positioned.fill(child: CustomPaint(painter: _InkGridPainter())),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              for (final l in lines)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  child: Row(children: [
+                    Expanded(child: Text(l.$1, maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.subhead(context, color: Bt.onNoir2))),
+                    const SizedBox(width: 10),
+                    Text(l.$2, style: BtText.num(BtText.subhead(context, color: Bt.bone, weight: FontWeight.w500))),
+                  ]),
+                ),
+              if (lines.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Container(height: 1, color: Bt.noirLine),
+                const SizedBox(height: 12),
+              ],
+              Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Text(label, style: BtText.body(context, color: Bt.bone, weight: FontWeight.w600)),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Flexible(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerRight,
+                    child: BtCountUp(
+                      value: total > 0 ? total : 0,
+                      duration: const Duration(milliseconds: 700),
+                      format: (v) => v > 0 ? formatInr(v) : '₹0',
+                      style: BtText.d2(context, color: bt.accent),
+                    ),
+                  ),
+                ),
               ]),
-            ),
-        ],
-      ]),
+            ]),
+          ),
+        ]),
+      ),
     );
   }
+}
+
+/// Faint 18px blueprint grid behind the ink total card.
+class _InkGridPainter extends CustomPainter {
+  const _InkGridPainter();
+  @override
+  void paint(Canvas canvas, Size size) {
+    final p = Paint()
+      ..color = const Color(0x0BFFFFFF)
+      ..strokeWidth = 1;
+    for (double x = 0; x < size.width; x += 18) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), p);
+    }
+    for (double y = 0; y < size.height; y += 18) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), p);
+    }
+  }
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 /// Recent / repeat entries shortcut row.
@@ -2760,10 +2495,12 @@ class EntryRecentRow extends StatelessWidget {
   final VoidCallback onTap;
   @override
   Widget build(BuildContext context) {
+    final bt = context.bt;
     return BtGroup(children: [
       BtRow(
-        leading: const BtTile(icon: Icons.history_rounded),
+        leading: BtTile(icon: Icons.history_rounded, bg: bt.accentSoft, fg: bt.accentInk),
         title: 'Recent entries',
+        titleWeight: FontWeight.w600,
         subtitle: '$count similar entr${count == 1 ? "y" : "ies"} · tap to repeat one',
         showChevron: true,
         onTap: onTap,
@@ -2772,16 +2509,98 @@ class EntryRecentRow extends StatelessWidget {
   }
 }
 
-/// Sticky bottom action area for forms.
+/// Collapsible "More details" list row (white card + tile + chevron). The
+/// fields stay mounted-on-demand below it; [autoExpand] opens it when the
+/// optional fields already hold data (edit / repeat flows), so nothing the
+/// user entered is ever hidden behind a closed row.
+class EntryMoreDetails extends StatefulWidget {
+  const EntryMoreDetails({
+    super.key,
+    required this.title,
+    required this.children,
+    this.subtitle,
+    this.icon = Icons.notes_rounded,
+    this.autoExpand = false,
+  });
+  final String title;
+  final String? subtitle;
+  final IconData icon;
+  final bool autoExpand;
+  final List<Widget> children;
+  @override
+  State<EntryMoreDetails> createState() => _EntryMoreDetailsState();
+}
+class _EntryMoreDetailsState extends State<EntryMoreDetails> {
+  late bool _open = widget.autoExpand;
+  bool _touched = false;
+  @override
+  void didUpdateWidget(covariant EntryMoreDetails old) {
+    super.didUpdateWidget(old);
+    if (!_touched && widget.autoExpand && !_open) _open = true;
+  }
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 24),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        BtGroup(children: [
+          Semantics(
+            expanded: _open,
+            child: BtRow(
+              leading: BtTile(icon: widget.icon),
+              title: widget.title,
+              titleWeight: FontWeight.w600,
+              subtitle: widget.subtitle,
+              onTap: () => setState(() {
+                _touched = true;
+                _open = !_open;
+              }),
+              trailing: AnimatedRotation(
+                turns: _open ? .5 : 0,
+                duration: Bt.fast,
+                curve: Bt.ease,
+                child: const Icon(Icons.expand_more_rounded, color: Bt.ink3),
+              ),
+            ),
+          ),
+        ]),
+        AnimatedSize(
+          duration: Bt.medium,
+          curve: Bt.ease,
+          alignment: Alignment.topCenter,
+          child: !_open
+              ? const SizedBox(width: double.infinity)
+              : Padding(
+                  padding: const EdgeInsets.only(top: 16),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                    for (var i = 0; i < widget.children.length; i++) ...[
+                      if (i > 0) const SizedBox(height: 16),
+                      widget.children[i],
+                    ],
+                  ]),
+                ),
+        ),
+      ]),
+    );
+  }
+}
+
+/// Sticky bottom action area for forms — the page fades out under it
+/// (no hairline) so the CTA floats on the bone ground, like BtCtaBar.
 class EntryBottomBar extends StatelessWidget {
   const EntryBottomBar({super.key, required this.child});
   final Widget child;
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(color: Bt.card, border: Border(top: BorderSide(color: Bt.line))),
-      padding: EdgeInsets.fromLTRB(16, 12, 16, 12 + MediaQuery.of(context).padding.bottom),
-      child: child,
+    final bg = Theme.of(context).scaffoldBackgroundColor;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(begin: Alignment.bottomCenter, end: Alignment.topCenter, stops: const [.72, 1], colors: [bg, bg.withValues(alpha: 0)]),
+      ),
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(16, 14, 16, 12 + MediaQuery.of(context).padding.bottom),
+        child: child,
+      ),
     );
   }
 }

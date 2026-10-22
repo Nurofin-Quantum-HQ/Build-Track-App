@@ -2,7 +2,6 @@ import 'package:buildtrack_mobile/design/design.dart';
 import 'package:buildtrack_mobile/common/themes/app_colors.dart';
 import 'package:buildtrack_mobile/common/themes/app_theme.dart';
 import 'package:buildtrack_mobile/common/widgets/app_widgets.dart';
-import 'package:buildtrack_mobile/common/widgets/common_widgets.dart';
 import 'package:buildtrack_mobile/controller/project_provider.dart';
 import 'package:buildtrack_mobile/models/project_model.dart';
 import 'package:flutter/material.dart';
@@ -15,34 +14,19 @@ class ProjectReportScreen extends StatelessWidget {
     final provider = context.watch<ProjectProvider>();
     final project = provider.selectedProject;
     if (provider.isLoading) {
-      return Scaffold(
-        backgroundColor: AppColors.gradientStart,
-        body: Center(
-          child: CircularProgressIndicator(color: AppColors.primary),
-        ),
+      return const Scaffold(
+        backgroundColor: Bt.ground,
+        body: BtPageLoader(label: 'Loading project…'),
       );
     }
     if (project == null) {
       return Scaffold(
-        backgroundColor: AppColors.gradientStart,
-        body: SafeArea(
-          child: Column(
-            children: [
-              AppTopBar(
-                title: 'Project Activity',
-                isSubScreen: true,
-                leftIcon: Icons.arrow_back,
-                onLeftTap: () => Navigator.maybePop(context),
-              ),
-              const Expanded(
-                child: AppEmptyState(
-                  icon: Icons.folder_open_outlined,
-                  message:
-                      'No project selected.\nGo back and select a project.',
-                ),
-              ),
-            ],
-          ),
+        backgroundColor: Bt.ground,
+        appBar: BtNavBar(title: 'Project Activity', onBack: () => Navigator.maybePop(context)),
+        body: const BtEmpty(
+          icon: Icons.folder_open_outlined,
+          title: 'No project selected.',
+          message: 'Go back and select a project.',
         ),
       );
     }
@@ -54,17 +38,13 @@ class ProjectReportScreen extends StatelessWidget {
       ...all,
     ]..sort((a, b) => b.date.compareTo(a.date))).take(8).toList();
     return Scaffold(
-      backgroundColor: AppColors.gradientStart,
+      backgroundColor: Bt.ground,
+      appBar: BtNavBar(title: 'Project Activity', subtitle: project.name, onBack: () => Navigator.maybePop(context)),
       body: SafeArea(
+        top: false,
         bottom: false,
         child: Column(
           children: [
-            AppTopBar(
-              title: 'Project Activity',
-              isSubScreen: true,
-              leftIcon: Icons.arrow_back,
-              onLeftTap: () => Navigator.maybePop(context),
-            ),
             Expanded(
               child: SingleChildScrollView(
                 key: const PageStorageKey('project_report_scroll_key'),
@@ -73,14 +53,14 @@ class ProjectReportScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _SummaryCard(project: project),
+                    BtReveal(child: _SummaryCard(project: project)),
                     const SizedBox(height: 14),
-                    const AppSectionHeader(title: 'Financial Snapshot'),
+                    const BtSectionHeader(title: 'Financial Snapshot'),
                     _FinancialSnapshot(project: project),
                     const SizedBox(height: 14),
-                    AppSectionHeader(
+                    BtSectionHeader(
                       title: 'Labour',
-                      actionLabel: labour.isEmpty ? null : 'All',
+                      action: labour.isEmpty ? null : 'All',
                       onAction: () => Navigator.pushNamed(context, '/logs'),
                     ),
                     _EntrySection(
@@ -89,9 +69,9 @@ class ProjectReportScreen extends StatelessWidget {
                       emptyMsg: 'No labour entries logged yet.',
                     ),
                     const SizedBox(height: 14),
-                    AppSectionHeader(
+                    BtSectionHeader(
                       title: 'Materials',
-                      actionLabel: materials.isEmpty ? null : 'All',
+                      action: materials.isEmpty ? null : 'All',
                       onAction: () => Navigator.pushNamed(context, '/logs'),
                     ),
                     _EntrySection(
@@ -100,9 +80,9 @@ class ProjectReportScreen extends StatelessWidget {
                       emptyMsg: 'No material entries logged yet.',
                     ),
                     const SizedBox(height: 14),
-                    AppSectionHeader(
+                    BtSectionHeader(
                       title: 'Equipment',
-                      actionLabel: equipment.isEmpty ? null : 'All',
+                      action: equipment.isEmpty ? null : 'All',
                       onAction: () => Navigator.pushNamed(context, '/logs'),
                     ),
                     _EntrySection(
@@ -111,24 +91,24 @@ class ProjectReportScreen extends StatelessWidget {
                       emptyMsg: 'No equipment entries logged yet.',
                     ),
                     const SizedBox(height: 14),
-                    AppSectionHeader(
+                    BtSectionHeader(
                       title: 'Recent Activity',
-                      actionLabel: recent.isEmpty ? null : 'View All',
+                      action: recent.isEmpty ? null : 'View All',
                       onAction: () => Navigator.pushNamed(context, '/logs'),
                     ),
                     _ActivityTimeline(entries: recent),
                     const SizedBox(height: 20),
-                    AppButton(
+                    BtButton(
                       label: 'Update Progress',
                       icon: Icons.trending_up,
                       onPressed: () =>
                           Navigator.pushNamed(context, '/update-progress'),
                     ),
                     const SizedBox(height: 12),
-                    AppButton(
+                    BtButton(
                       label: 'View Full Logs',
                       icon: Icons.receipt_long_outlined,
-                      variant: AppButtonVariant.outline,
+                      variant: BtButtonVariant.secondary,
                       onPressed: () => Navigator.pushNamed(context, '/logs'),
                     ),
                   ],
@@ -160,12 +140,11 @@ class _SummaryCard extends StatelessWidget {
     final (stageBg, stageFg) = _stageMeta[project.stage]!;
     final pct = project.progress;
     final barColor = pct >= 0.9
-        ? AppColors.error
+        ? Bt.redBright
         : pct >= 0.6
-        ? AppColors.warning
-        : AppColors.primary;
-    return AppCard(
-      margin: EdgeInsets.zero,
+        ? Bt.amberBright
+        : context.bt.accent;
+    return BtCard(
       padding: const EdgeInsets.all(18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -177,7 +156,7 @@ class _SummaryCard extends StatelessWidget {
                   project.name,
                   style: AppTheme.heading2.copyWith(
                     fontSize: 17,
-                    color: AppColors.textDark,
+                    color: Bt.ink,
                     letterSpacing: -0.3,
                   ),
                 ),
@@ -209,7 +188,7 @@ class _SummaryCard extends StatelessWidget {
               const Icon(
                 Icons.location_on_outlined,
                 size: 13,
-                color: AppColors.textLight,
+                color: Bt.ink3,
               ),
               const SizedBox(width: 4),
               Text(
@@ -224,7 +203,7 @@ class _SummaryCard extends StatelessWidget {
               const Icon(
                 Icons.calendar_today_outlined,
                 size: 13,
-                color: AppColors.textLight,
+                color: Bt.ink3,
               ),
               const SizedBox(width: 4),
               Text(
@@ -240,7 +219,7 @@ class _SummaryCard extends StatelessWidget {
               Text(
                 'Overall Progress',
                 style: AppTheme.label.copyWith(
-                  color: AppColors.textLight,
+                  color: Bt.ink3,
                   letterSpacing: 0.3,
                 ),
               ),
@@ -297,17 +276,17 @@ class _FinancialSnapshot extends StatelessWidget {
     final remaining = budget - paidTotal;
     final u = budget > 0 ? paidTotal / budget : 0.0;
     final statusColor = u >= 0.9
-        ? AppColors.error
+        ? Bt.redBright
         : u >= 0.6
-        ? AppColors.warning
-        : AppColors.success;
+        ? Bt.amberBright
+        : Bt.greenBright;
     return Row(
       children: [
         _StatChip(
           label: 'Budget',
           value: project.formattedBudget,
           icon: Icons.account_balance_outlined,
-          color: AppColors.textDark,
+          color: Bt.ink,
         ),
         const SizedBox(width: 8),
         _StatChip(
@@ -373,7 +352,7 @@ class _StatChip extends StatelessWidget {
               label,
               style: AppTheme.caption.copyWith(
                 fontSize: 12,
-                color: AppColors.textLight,
+                color: Bt.ink3,
               ),
             ),
           ],
@@ -394,17 +373,17 @@ class _EntrySection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (entries.isEmpty) {
-      return AppCard(
-        margin: EdgeInsets.zero,
+      return BtCard(
+        padding: const EdgeInsets.all(16),
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 8),
           child: Row(
             children: [
-              Icon(_typeIcon(type), color: AppColors.textLight, size: 18),
+              Icon(_typeIcon(type), color: Bt.ink3, size: 18),
               const SizedBox(width: 8),
               Text(
                 emptyMsg,
-                style: AppTheme.body.copyWith(color: AppColors.textLight),
+                style: AppTheme.body.copyWith(color: Bt.ink3),
               ),
             ],
           ),
@@ -414,8 +393,7 @@ class _EntrySection extends StatelessWidget {
     final displayed = entries.take(3).toList();
     final total = entries.fold(0.0, (s, e) => s + e.amount);
     final color = _typeColor(type);
-    return AppCard(
-      margin: EdgeInsets.zero,
+    return BtCard(
       padding: const EdgeInsets.all(16),
       child: Column(
         children: [
@@ -434,7 +412,7 @@ class _EntrySection extends StatelessWidget {
               Expanded(
                 child: Text(
                   '${entries.length} ${_typeLabel(type)} entr${entries.length == 1 ? 'y' : 'ies'}',
-                  style: AppTheme.body.copyWith(color: AppColors.textMedium),
+                  style: AppTheme.body.copyWith(color: Bt.ink2),
                 ),
               ),
               Text(
@@ -448,7 +426,7 @@ class _EntrySection extends StatelessWidget {
             ],
           ),
           if (displayed.isNotEmpty) ...[
-            const Divider(color: Color(0xFFEEF1F5), height: 20),
+            const Divider(color: Bt.line, height: 20),
             ...displayed.map((e) => _entryRow(e, color)),
           ],
         ],
@@ -464,7 +442,7 @@ class _EntrySection extends StatelessWidget {
             child: Text(
               e.description.isEmpty ? _typeLabel(type) : e.description,
               overflow: TextOverflow.ellipsis,
-              style: AppTheme.body.copyWith(color: AppColors.textDark),
+              style: AppTheme.body.copyWith(color: Bt.ink),
             ),
           ),
           const SizedBox(width: 8),
@@ -517,16 +495,15 @@ class _ActivityTimeline extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (entries.isEmpty) {
-      return const AppCard(
-        margin: EdgeInsets.zero,
+      return const BtCard(
+        padding: EdgeInsets.all(16),
         child: AppEmptyState(
           icon: Icons.history_outlined,
           message: 'No activity yet.',
         ),
       );
     }
-    return AppCard(
-      margin: EdgeInsets.zero,
+    return BtCard(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Column(
         children: List.generate(entries.length, (idx) {
@@ -555,7 +532,7 @@ class _ActivityTimeline extends StatelessWidget {
                           child: Container(
                             width: 1.5,
                             margin: const EdgeInsets.symmetric(vertical: 3),
-                            color: const Color(0xFFE4E7EC),
+                            color: Bt.line,
                           ),
                         ),
                     ],
@@ -575,7 +552,7 @@ class _ActivityTimeline extends StatelessWidget {
                                 _entryTitle(e),
                                 style: AppTheme.bodyLarge.copyWith(
                                   fontWeight: FontWeight.w700,
-                                  color: AppColors.textDark,
+                                  color: Bt.ink,
                                   fontSize: 13,
                                 ),
                               ),
@@ -595,7 +572,7 @@ class _ActivityTimeline extends StatelessWidget {
                           _fmtDate(e.date),
                           style: AppTheme.caption.copyWith(
                             fontSize: 13,
-                            color: AppColors.textLight,
+                            color: Bt.ink3,
                           ),
                         ),
                       ],

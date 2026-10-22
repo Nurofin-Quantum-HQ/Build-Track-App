@@ -1,5 +1,4 @@
 import 'package:buildtrack_mobile/design/design.dart';
-import 'package:buildtrack_mobile/common/themes/app_colors.dart';
 import 'package:flutter/material.dart';
 class AutocompleteNameField extends StatefulWidget {
   const AutocompleteNameField({
@@ -148,66 +147,56 @@ class _AutocompleteNameFieldState extends State<AutocompleteNameField> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: widget.errorText != null ? AppColors.error : AppColors.inputBorder,
+        TextField(
+          controller: widget.controller,
+          focusNode: _focusNode,
+          onChanged: (v) {
+            widget.onChanged(v);
+          },
+          decoration: btInput(context, hint: widget.hint).copyWith(
+            enabledBorder: widget.errorText != null
+                ? OutlineInputBorder(borderRadius: BorderRadius.circular(Bt.rInput), borderSide: const BorderSide(color: Bt.red))
+                : null,
+            focusedBorder: widget.errorText != null
+                ? OutlineInputBorder(borderRadius: BorderRadius.circular(Bt.rInput), borderSide: const BorderSide(color: Bt.red, width: 2))
+                : null,
+            suffixIcon: widget.suggestions.isNotEmpty
+                ? Padding(
+                    padding: const EdgeInsets.only(right: 14),
+                    child: Icon(
+                      Icons.auto_awesome,
+                      size: 16,
+                      color: context.bt.accentInk,
+                    ),
+                  )
+                : null,
+            suffixIconConstraints: const BoxConstraints(
+              minWidth: 24,
+              minHeight: 24,
             ),
           ),
-          child: TextField(
-            controller: widget.controller,
-            focusNode: _focusNode,
-            onChanged: (v) {
-              widget.onChanged(v);
-            },
-            decoration: InputDecoration(
-              border: InputBorder.none,
-              enabledBorder: InputBorder.none,
-              focusedBorder: InputBorder.none,
-              hintText: widget.hint,
-              hintStyle: const TextStyle(color: AppColors.textLight),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 15),
-              isDense: true,
-              filled: false,
-              suffixIcon: widget.suggestions.isNotEmpty
-                  ? Padding(
-                      padding: EdgeInsets.only(right: 12),
-                      child: Icon(
-                        Icons.auto_awesome,
-                        size: 16,
-                        color: AppColors.primary,
-                      ),
-                    )
-                  : null,
-              suffixIconConstraints: const BoxConstraints(
-                minWidth: 24,
-                minHeight: 24,
-              ),
-            ),
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-              color: AppColors.textDark,
-            ),
-          ),
+          style: BtText.body(context, weight: FontWeight.w500),
         ),
         if (widget.errorText != null)
           Padding(
             padding: const EdgeInsets.only(top: 4),
             child: Text(
               widget.errorText!,
-              style: const TextStyle(
-                color: AppColors.error,
-                fontSize: 13,
-                fontStyle: FontStyle.italic,
-              ),
+              style: BtText.caption(context, color: Bt.red),
             ),
           ),
-        if (showDropdown) ...[
-          const SizedBox(height: 8),
-          _SuggestionDropdown(
+        AnimatedSwitcher(
+          duration: Bt.fast,
+          switchInCurve: Bt.ease,
+          transitionBuilder: (child, anim) => FadeTransition(
+            opacity: anim,
+            child: SizeTransition(sizeFactor: anim, axisAlignment: -1, child: child),
+          ),
+          child: !showDropdown
+              ? const SizedBox(width: double.infinity)
+              : Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: _SuggestionDropdown(
             items: items,
             query: query,
             showAddNew: showAddNew,
@@ -218,7 +207,8 @@ class _AutocompleteNameFieldState extends State<AutocompleteNameField> {
               });
             },
           ),
-        ],
+                ),
+        ),
       ],
     );
   }
@@ -274,48 +264,26 @@ class _SuggestionDropdown extends StatelessWidget {
     return Container(
       constraints: const BoxConstraints(maxHeight: 360),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Bt.line),
+        color: Bt.card,
+        borderRadius: BorderRadius.circular(Bt.rInput),
+        boxShadow: Bt.shadowLg,
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(Bt.rInput),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-              decoration: const BoxDecoration(
-                color: Color(0xFFF4F5FF),
-                border: Border(bottom: BorderSide(color: Color(0xFFE8F1FC))),
-              ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 6),
               child: Row(
                 children: [
-                  Icon(
-                    Icons.history_rounded,
-                    size: 14,
-                    color: AppColors.primary,
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Recent Entries',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.primary,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
+                  Text('RECENT ENTRIES', style: BtText.mono(context)),
                   const Spacer(),
                   Text(
                     items.isEmpty
                         ? 'No matches'
                         : '${items.length} match${items.length == 1 ? '' : 'es'}',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textLight,
-                    ),
+                    style: BtText.caption(context),
                   ),
                 ],
               ),
@@ -327,8 +295,8 @@ class _SuggestionDropdown extends StatelessWidget {
                 itemCount: items.length + (showAddNew ? 1 : 0),
                 separatorBuilder: (_, p1) => const Divider(
                   height: 1,
-                  color: Color(0xFFEEF1F5),
-                  indent: 14,
+                  color: Bt.line,
+                  indent: 62,
                   endIndent: 14,
                 ),
                 itemBuilder: (ctx, index) {
@@ -380,102 +348,70 @@ class _SuggestionRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: isCurrentProject
-                    ? const Color(0xFFE8F1FC)
-                    : const Color(0xFFF5F5F5),
-                borderRadius: BorderRadius.circular(10),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 56),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              BtTile(
+                icon: isCurrentProject ? Icons.inventory_2_outlined : Icons.history_rounded,
+                size: 36,
+                fg: isCurrentProject ? Bt.ink : Bt.ink3,
               ),
-              child: Icon(
-                isCurrentProject
-                    ? Icons.inventory_2_outlined
-                    : Icons.history_outlined,
-                size: 17,
-                color: isCurrentProject
-                    ? AppColors.primary
-                    : AppColors.textLight,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textDark,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: BtText.body(context, weight: FontWeight.w600),
                     ),
-                  ),
-                  if (rateLabel.isNotEmpty || dateLabel.isNotEmpty) ...[
-                    const SizedBox(height: 2),
-                    Row(
-                      children: [
-                        if (rateLabel.isNotEmpty)
-                          Text(
-                            rateLabel,
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF067647),
+                    if (rateLabel.isNotEmpty || dateLabel.isNotEmpty) ...[
+                      const SizedBox(height: 1),
+                      Row(
+                        children: [
+                          if (rateLabel.isNotEmpty)
+                            Text(
+                              rateLabel,
+                              style: BtText.num(BtText.caption(context, color: Bt.green, weight: FontWeight.w600)),
                             ),
-                          ),
-                        if (rateLabel.isNotEmpty && dateLabel.isNotEmpty)
-                          const Text(
-                            '  ·  ',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: AppColors.textLight,
-                            ),
-                          ),
-                        if (dateLabel.isNotEmpty)
-                          Flexible(
-                            child: Text(
-                              'Used $dateLabel',
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 13,
-                                color: AppColors.textLight,
+                          if (rateLabel.isNotEmpty && dateLabel.isNotEmpty)
+                            Text('  ·  ', style: BtText.caption(context)),
+                          if (dateLabel.isNotEmpty)
+                            Flexible(
+                              child: Text(
+                                'Used $dateLabel',
+                                overflow: TextOverflow.ellipsis,
+                                style: BtText.caption(context),
                               ),
                             ),
-                          ),
-                      ],
-                    ),
+                        ],
+                      ),
+                    ],
                   ],
-                ],
-              ),
-            ),
-            if (unit.isNotEmpty && unit != 'unit' && unit != 'units') ...[
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE8F1FC),
-                  borderRadius: BorderRadius.circular(Bt.rCard),
                 ),
-                child: Text(
-                  unit,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.primary,
+              ),
+              if (unit.isNotEmpty && unit != 'unit' && unit != 'units') ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Bt.fill,
+                    borderRadius: BorderRadius.circular(Bt.rChip),
+                  ),
+                  child: Text(
+                    unit,
+                    style: BtText.caption(context, color: Bt.ink, weight: FontWeight.w600),
                   ),
                 ),
-              ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
@@ -489,55 +425,43 @@ class _AddNewRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-        child: Row(
-          children: [
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: const Color(0xFFE7F6EE),
-                borderRadius: BorderRadius.circular(10),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 56),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+          child: Row(
+            children: [
+              const BtTile(
+                icon: Icons.add_rounded,
+                size: 36,
+                bg: Bt.greenSoft,
+                fg: Bt.green,
               ),
-              child: const Icon(
-                Icons.add_circle_outline_rounded,
-                size: 18,
-                color: Color(0xFF067647),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    query,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textDark,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      query,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: BtText.body(context, weight: FontWeight.w600),
                     ),
-                  ),
-                  const Text(
-                    'Add as new entry',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Color(0xFF067647),
-                      fontWeight: FontWeight.w600,
+                    Text(
+                      'Add as new entry',
+                      style: BtText.caption(context, color: Bt.green, weight: FontWeight.w500),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            const Icon(
-              Icons.arrow_forward_ios_rounded,
-              size: 13,
-              color: Color(0xFF067647),
-            ),
-          ],
+              const Icon(
+                Icons.chevron_right_rounded,
+                size: 20,
+                color: Bt.ink3,
+              ),
+            ],
+          ),
         ),
       ),
     );

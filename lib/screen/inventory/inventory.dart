@@ -2,7 +2,6 @@ import 'package:buildtrack_mobile/design/design.dart';
 import 'dart:async';
 import 'package:buildtrack_mobile/common/themes/app_colors.dart';
 import 'package:buildtrack_mobile/controller/nav_controller.dart';
-import 'package:buildtrack_mobile/common/themes/app_gradients.dart';
 import 'package:buildtrack_mobile/common/utils/currency_formatter.dart';
 import 'package:buildtrack_mobile/common/widgets/common_widgets.dart';
 import 'package:buildtrack_mobile/common/widgets/entry_widgets.dart';
@@ -36,7 +35,7 @@ class InventoryScreen extends StatelessWidget {
         ), 
         TooltipActionButton(
           type: TooltipDefaultActionType.next, 
-          backgroundColor: AppColors.primary, 
+          backgroundColor: Bt.ink,
           textStyle: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)
         )
       ], 
@@ -65,9 +64,7 @@ class _InventoryScreenContent extends StatefulWidget {
 
 class _InventoryScreenContentState extends State<_InventoryScreenContent> {
   final GlobalKey _helpKey = GlobalKey();
-  static Color _blue = AppColors.primary;
-  static const Color _dark = AppColors.textDark;
-  static const Color _gray = AppColors.textLight;
+  static final Color _blue = AppColors.primary;
   final _pageController = PageController();
   int _tabIndex = 0;
   final _searchCtrl = TextEditingController();
@@ -488,91 +485,113 @@ class _InventoryScreenContentState extends State<_InventoryScreenContent> {
   }
   @override
   Widget build(BuildContext context) {
+    final top = MediaQuery.paddingOf(context).top;
     return Scaffold(
       backgroundColor: Bt.ground,
-      body: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            BtLargeHeader(
-              title: 'Inventory',
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Showcase(
-                    key: _helpKey,
-                    description: 'Tap here anytime to replay this tour and get help.',
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          BtHero(
+            padding: EdgeInsets.fromLTRB(Bt.gutter, top + 10, Bt.gutter, 22 + 26),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('STOCK & PURCHASES', style: BtText.mono(context, color: Bt.onNoir2)),
+                          const SizedBox(height: 4),
+                          BtReveal(child: Text('Inventory', style: BtText.d1(context, color: Bt.bone))),
+                        ],
+                      ),
+                    ),
+                    Showcase(
+                      key: _helpKey,
+                      description: 'Tap here anytime to replay this tour and get help.',
+                      tooltipBackgroundColor: Bt.ink,
+                      textColor: Colors.white,
+                      tooltipBorderRadius: BorderRadius.circular(16),
+                      tooltipPadding: const EdgeInsets.all(16),
+                      child: BtIconButton(
+                        icon: Icons.help_outline_rounded,
+                        semantic: 'App guidelines',
+                        color: Bt.bone,
+                        background: Colors.white.withValues(alpha: .09),
+                        onTap: () {
+                          ShowCaseWidget.of(context).startShowCase([
+                            ShowcaseKeys.inventoryProjectContext,
+                            ShowcaseKeys.inventoryFilters,
+                            ShowcaseKeys.inventoryAdd,
+                            _helpKey,
+                          ]);
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Semantics(
+                      button: true,
+                      label: 'Account',
+                      child: BtPressable(
+                        scale: .92,
+                        onTap: () => Navigator.pushNamed(context, '/profile'),
+                        child: const Padding(padding: EdgeInsets.all(4), child: ProfileAvatar(radius: 18)),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                BtReveal(
+                  index: 1,
+                  child: Showcase(
+                    key: ShowcaseKeys.inventoryProjectContext,
+                    description: 'Select a project to view its specific materials, equipment, and updates.',
                     tooltipBackgroundColor: Bt.ink,
                     textColor: Colors.white,
                     tooltipBorderRadius: BorderRadius.circular(16),
                     tooltipPadding: const EdgeInsets.all(16),
-                    child: BtIconButton(
-                      icon: Icons.help_outline_rounded,
-                      semantic: 'App guidelines',
-                      color: Bt.ink2,
-                      onTap: () {
-                        ShowCaseWidget.of(context).startShowCase([
-                          ShowcaseKeys.inventoryProjectContext,
-                          ShowcaseKeys.inventoryFilters,
-                          ShowcaseKeys.inventoryAdd,
-                          _helpKey,
-                        ]);
-                      },
-                    ),
+                    child: _buildProjectSelector(),
                   ),
-                  Semantics(
-                    button: true,
-                    label: 'Account',
-                    child: InkWell(
-                      customBorder: const CircleBorder(),
-                      onTap: () => Navigator.pushNamed(context, '/profile'),
-                      child: const Padding(padding: EdgeInsets.all(4), child: ProfileAvatar(radius: 18)),
+                ),
+                const SizedBox(height: 14),
+                BtReveal(index: 2, child: _buildTabBar()),
+              ],
+            ),
+          ),
+          Expanded(
+            child: Transform.translate(
+              offset: const Offset(0, -26),
+              child: Container(
+                decoration: const BoxDecoration(
+                  color: Bt.ground,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(Bt.rSheet)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 18, 16, 10),
+                      child: BtReveal(index: 3, child: _buildSearchBar()),
                     ),
-                  ),
-                ],
+                    Expanded(
+                      child: PageView(
+                        controller: _pageController,
+                        onPageChanged: (i) => setState(() => _tabIndex = i),
+                        children: [
+                          _buildMaterialsTab(context),
+                          _buildLabourTab(context),
+                          _buildEquipmentTab(context),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-                    child: Column(
-                      children: [
-                        Showcase(
-                          key: ShowcaseKeys.inventoryProjectContext,
-                          description: 'Select a project to view its specific materials, equipment, and updates.',
-                          tooltipBackgroundColor: const Color(0xFF1E1E2C),
-                          textColor: Colors.white,
-                          tooltipBorderRadius: BorderRadius.circular(16),
-                          tooltipPadding: const EdgeInsets.all(16),
-                          child: _buildProjectSelector(),
-                        ),
-                        const SizedBox(height: 10),
-                        _buildSearchBar(),
-                        const SizedBox(height: 10),
-                        _buildTabBar(),
-                        const SizedBox(height: 4),
-                      ],
-                    ),
-                  ),
-                  Expanded(
-                    child: PageView(
-                      controller: _pageController,
-                      onPageChanged: (i) => setState(() => _tabIndex = i),
-                      children: [
-                        _buildMaterialsTab(context),
-                        _buildLabourTab(context),
-                        _buildEquipmentTab(context),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
       bottomNavigationBar: AppBottomNav(),
     );
@@ -586,14 +605,15 @@ class _InventoryScreenContentState extends State<_InventoryScreenContent> {
             orElse: () => null,
           );
     final label = sel?.name ?? 'All Active Projects';
-    return GestureDetector(
+    return BtPressable(
       onTap: () => _showProjectSelector(context),
+      semanticLabel: 'Project context: $label',
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Bt.line),
+          color: Colors.white.withValues(alpha: .07),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: Colors.white.withValues(alpha: .09)),
         ),
         child: Row(
           children: [
@@ -601,43 +621,28 @@ class _InventoryScreenContentState extends State<_InventoryScreenContent> {
               width: 34,
               height: 34,
               decoration: BoxDecoration(
-                color: _blue.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(9),
+                color: context.bt.accent.withValues(alpha: .16),
+                borderRadius: BorderRadius.circular(10),
               ),
-              child: Icon(Icons.folder_outlined, color: _blue, size: 17),
+              child: Icon(Icons.folder_outlined, color: context.bt.accent, size: 17),
             ),
             const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Project context',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: _gray,
-                      letterSpacing: 1.1,
-                    ),
-                  ),
+                  Text('PROJECT CONTEXT', style: BtText.mono(context, color: Bt.onNoir2, size: 9.5)),
                   const SizedBox(height: 2),
                   Text(
                     label,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: _dark,
-                    ),
+                    style: BtText.headline(context).copyWith(color: Bt.bone, fontSize: 15),
+                    maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
             ),
-            const Icon(
-              Icons.keyboard_arrow_down_rounded,
-              color: _gray,
-              size: 22,
-            ),
+            const Icon(Icons.keyboard_arrow_down_rounded, color: Bt.onNoir2, size: 22),
           ],
         ),
       ),
@@ -654,45 +659,45 @@ class _InventoryScreenContentState extends State<_InventoryScreenContent> {
     }
   }
   Widget _buildSearchBar() {
-    return SizedBox(
-      height: 48,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        decoration: BoxDecoration(
-          color: Bt.fill,
-          borderRadius: BorderRadius.circular(Bt.rInput),
-        ),
-        child: Row(
-          children: [
-            const Icon(Icons.search_rounded, color: Bt.ink3, size: 22),
-            const SizedBox(width: 10),
-            Expanded(
-              child: TextField(
-                controller: _searchCtrl,
-                onChanged: (_) {
-                  if (_debounce?.isActive ?? false) {
-                    _debounce!.cancel();
-                  }
-                  _debounce = Timer(
-                    const Duration(milliseconds: 400),
-                    () => setState(() {}),
-                  );
-                },
-                decoration: InputDecoration(
-                  hintText: _searchHint,
-                  hintStyle: const TextStyle(color: _gray, fontSize: 13.5),
-                  border: InputBorder.none,
-                  enabledBorder: InputBorder.none,
-                  focusedBorder: InputBorder.none,
-                  isDense: true,
-                  filled: false,
-                  contentPadding: EdgeInsets.zero,
-                ),
-                style: const TextStyle(color: _dark, fontSize: 14),
+    return Container(
+      height: 50,
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      decoration: BoxDecoration(
+        color: Bt.card,
+        borderRadius: BorderRadius.circular(Bt.rInput),
+        boxShadow: Bt.shadow,
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.search_rounded, color: Bt.ink3, size: 22),
+          const SizedBox(width: 10),
+          Expanded(
+            child: TextField(
+              controller: _searchCtrl,
+              onChanged: (_) {
+                if (_debounce?.isActive ?? false) {
+                  _debounce!.cancel();
+                }
+                _debounce = Timer(
+                  const Duration(milliseconds: 400),
+                  () => setState(() {}),
+                );
+              },
+              cursorColor: Bt.ink,
+              decoration: InputDecoration(
+                hintText: _searchHint,
+                hintStyle: BtText.subhead(context, color: Bt.placeholder),
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                isDense: true,
+                filled: false,
+                contentPadding: EdgeInsets.zero,
               ),
+              style: BtText.body(context).copyWith(fontSize: 15),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -704,81 +709,96 @@ class _InventoryScreenContentState extends State<_InventoryScreenContent> {
     ];
     const labels = ['Materials', 'Labour', 'Equipment'];
     return Container(
-      padding: const EdgeInsets.all(3),
+      height: 44,
+      padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: Bt.fill,
-        borderRadius: BorderRadius.circular(12),
+        color: Colors.white.withValues(alpha: .07),
+        borderRadius: BorderRadius.circular(16),
       ),
-      child: Row(
-        children: List.generate(3, (i) {
-          final active = i == _tabIndex;
-          final textColor = active ? Bt.ink : Bt.ink2;
-          final iconColor = active ? Bt.ink : Bt.ink3;
-          Widget tabChild = InkWell(
-            onTap: () {
-              setState(() => _tabIndex = i);
-              _pageController.animateToPage(
-                i,
-                duration: const Duration(milliseconds: 250),
-                curve: Curves.easeInOut,
-              );
-            },
-            borderRadius: BorderRadius.circular(10),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.symmetric(vertical: 9),
-              decoration: BoxDecoration(
-                color: active ? Bt.card : null,
-                borderRadius: BorderRadius.circular(9),
-                boxShadow: active ? const [BoxShadow(color: Color(0x1F101828), blurRadius: 2, offset: Offset(0, 1))] : null,
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(icons[i], color: iconColor, size: 16),
-                  const SizedBox(width: 6),
-                  Text(
-                    labels[i],
-                    style: TextStyle(
-                      color: textColor,
-                      fontWeight: active ? FontWeight.w700 : FontWeight.w600,
-                      fontSize: 13,
-                    ),
-                  ),
-                ],
+      child: Stack(
+        children: [
+          AnimatedAlign(
+            duration: Bt.medium,
+            curve: Bt.ease,
+            alignment: Alignment(-1 + _tabIndex.toDouble(), 0),
+            child: FractionallySizedBox(
+              widthFactor: 1 / 3,
+              heightFactor: 1,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Bt.bone,
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
             ),
-          );
-          if (i == 0) {
-            tabChild = Showcase(
-              key: ShowcaseKeys.inventoryMaterials,
-              description: 'View your materials inventory here',
-              tooltipBackgroundColor: const Color(0xFF1E1E2C),
-              textColor: Colors.white,
-              tooltipBorderRadius: BorderRadius.circular(16),
-              tooltipPadding: const EdgeInsets.all(16),
-              child: tabChild,
-            );
-          } else if (i == 2) {
-            tabChild = Showcase(
-              key: ShowcaseKeys.inventoryTools,
-              description: 'View your equipment and tools inventory here',
-              tooltipBackgroundColor: const Color(0xFF1E1E2C),
-              textColor: Colors.white,
-              tooltipBorderRadius: BorderRadius.circular(16),
-              tooltipPadding: const EdgeInsets.all(16),
-              child: tabChild,
-            );
-          }
-          return Expanded(child: tabChild);
-        }),
+          ),
+          Row(
+            children: List.generate(3, (i) {
+              final active = i == _tabIndex;
+              final color = active ? Bt.ink : Bt.onNoir2;
+              Widget tabChild = Semantics(
+                button: true,
+                selected: active,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () {
+                    setState(() => _tabIndex = i);
+                    _pageController.animateToPage(
+                      i,
+                      duration: const Duration(milliseconds: 250),
+                      curve: Curves.easeInOut,
+                    );
+                  },
+                  child: Center(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(icons[i], color: color, size: 16),
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: AnimatedDefaultTextStyle(
+                            duration: Bt.fast,
+                            style: BtText.subhead(context, color: color, weight: active ? FontWeight.w600 : FontWeight.w500),
+                            child: Text(labels[i], maxLines: 1, overflow: TextOverflow.ellipsis),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+              if (i == 0) {
+                tabChild = Showcase(
+                  key: ShowcaseKeys.inventoryMaterials,
+                  description: 'View your materials inventory here',
+                  tooltipBackgroundColor: Bt.ink,
+                  textColor: Colors.white,
+                  tooltipBorderRadius: BorderRadius.circular(16),
+                  tooltipPadding: const EdgeInsets.all(16),
+                  child: tabChild,
+                );
+              } else if (i == 2) {
+                tabChild = Showcase(
+                  key: ShowcaseKeys.inventoryTools,
+                  description: 'View your equipment and tools inventory here',
+                  tooltipBackgroundColor: Bt.ink,
+                  textColor: Colors.white,
+                  tooltipBorderRadius: BorderRadius.circular(16),
+                  tooltipPadding: const EdgeInsets.all(16),
+                  child: tabChild,
+                );
+              }
+              return Expanded(child: tabChild);
+            }),
+          ),
+        ],
       ),
     );
   }
   Widget _buildMaterialsTab(BuildContext ctx) {
     final provider = ctx.watch<InventoryProvider>();
     if (provider.isLoading) {
-      return Center(child: CircularProgressIndicator(color: _blue));
+      return const BtPageLoader(label: 'Loading inventory…');
     }
     final all = provider.materialInventory;
     final flat = _flatten(all);
@@ -813,7 +833,7 @@ class _InventoryScreenContentState extends State<_InventoryScreenContent> {
   Widget _buildLabourTab(BuildContext ctx) {
     final provider = ctx.watch<InventoryProvider>();
     if (provider.isLoading) {
-      return Center(child: CircularProgressIndicator(color: _blue));
+      return const BtPageLoader(label: 'Loading inventory…');
     }
     final all = provider.labourInventory;
     final flat = _flatten(all);
@@ -848,7 +868,7 @@ class _InventoryScreenContentState extends State<_InventoryScreenContent> {
   Widget _buildEquipmentTab(BuildContext ctx) {
     final provider = ctx.watch<InventoryProvider>();
     if (provider.isLoading) {
-      return Center(child: CircularProgressIndicator(color: _blue));
+      return const BtPageLoader(label: 'Loading inventory…');
     }
     final all = provider.equipmentInventory;
     final flat = _flatten(all);
@@ -987,7 +1007,7 @@ class _TimelineTabContentState extends State<_TimelineTabContent> {
               ? Showcase(
                   key: ShowcaseKeys.inventoryStats,
                   description: 'Track total loads, equipment count, and overall inventory metrics for this project.',
-                  tooltipBackgroundColor: const Color(0xFF1E1E2C),
+                  tooltipBackgroundColor: Bt.ink,
                   textColor: Colors.white,
                   tooltipBorderRadius: BorderRadius.circular(16),
                   tooltipPadding: const EdgeInsets.all(16),
@@ -1002,7 +1022,7 @@ class _TimelineTabContentState extends State<_TimelineTabContent> {
           child: Showcase(
             key: ShowcaseKeys.inventoryFilters,
             description: 'Filter your inventory by categories or dates to quickly find what you need.',
-            tooltipBackgroundColor: const Color(0xFF1E1E2C),
+            tooltipBackgroundColor: Bt.ink,
             textColor: Colors.white,
             tooltipBorderRadius: BorderRadius.circular(16),
             tooltipPadding: const EdgeInsets.all(16),
@@ -1102,55 +1122,37 @@ class _DateGroupHeaderDelegate extends SliverPersistentHeaderDelegate {
     double shrinkOffset,
     bool overlapsContent,
   ) {
-    return Material(
-      color: overlapsContent ? Colors.white : const Color(0xFFF2F0FB),
-      elevation: overlapsContent ? 2 : 0,
-      child: InkWell(
+    return Semantics(
+      button: true,
+      expanded: !collapsed,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
         onTap: onToggle,
-        child: Container(
+        child: AnimatedContainer(
+          duration: Bt.fast,
           height: 46,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 18),
+          decoration: BoxDecoration(
+            color: Bt.ground,
+            boxShadow: overlapsContent ? const [BoxShadow(color: Color(0x140C0E12), blurRadius: 10, offset: Offset(0, 4))] : null,
+          ),
           child: Row(
             children: [
-              const Icon(
-                Icons.calendar_today_outlined,
-                size: 14,
-                color: AppColors.primaryBlue,
-              ),
+              Text(label.toUpperCase(), style: BtText.mono(context, color: Bt.ink2)),
               const SizedBox(width: 8),
               Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textDark,
-                  letterSpacing: -0.2,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: AppColors.primaryBlue.withValues(alpha: 0.10),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  '$count ${count == 1 ? "Item" : "Items"}',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.primaryBlue,
-                  ),
-                ),
+                '$count ${count == 1 ? "Item" : "Items"}',
+                style: BtText.caption(context),
               ),
               const Spacer(),
               AnimatedRotation(
                 turns: collapsed ? 0.5 : 0,
-                duration: const Duration(milliseconds: 200),
+                duration: Bt.fast,
+                curve: Bt.ease,
                 child: const Icon(
                   Icons.keyboard_arrow_up_rounded,
                   size: 20,
-                  color: AppColors.textLight,
+                  color: Bt.ink3,
                 ),
               ),
             ],
@@ -1233,62 +1235,6 @@ class _PurchaseCard extends StatelessWidget {
     }
     return Icons.inventory_2_outlined;
   }
-  Color get _iconBg {
-    if (record.type == 'labour') {
-      return const Color(0xFFE8F1FC);
-    }
-    if (record.type == 'equipment') {
-      return const Color(0xFFE7F6EE);
-    }
-    final cat = record.categoryName.toLowerCase();
-    if (cat.contains('cement')) {
-      return const Color(0xFFE7F6EE);
-    }
-    if (cat.contains('steel') || cat.contains('iron')) {
-      return const Color(0xFFE3F2FD);
-    }
-    if (cat.contains('sand') || cat.contains('aggregate')) {
-      return const Color(0xFFFFF8E1);
-    }
-    if (cat.contains('brick') || cat.contains('block')) {
-      return const Color(0xFFFBE9E7);
-    }
-    if (cat.contains('electric')) {
-      return const Color(0xFFF3E5F5);
-    }
-    if (cat.contains('plumb') || cat.contains('pipe')) {
-      return const Color(0xFFEEF1F5);
-    }
-    return const Color(0xFFE8F1FC);
-  }
-  Color get _iconColor {
-    if (record.type == 'labour') {
-      return AppColors.primaryBlue;
-    }
-    if (record.type == 'equipment') {
-      return const Color(0xFF067647);
-    }
-    final cat = record.categoryName.toLowerCase();
-    if (cat.contains('cement')) {
-      return const Color(0xFF067647);
-    }
-    if (cat.contains('steel') || cat.contains('iron')) {
-      return const Color(0xFF1565C0);
-    }
-    if (cat.contains('sand') || cat.contains('aggregate')) {
-      return const Color(0xFFF59E0B);
-    }
-    if (cat.contains('brick') || cat.contains('block')) {
-      return const Color(0xFFE64A19);
-    }
-    if (cat.contains('electric')) {
-      return const Color(0xFF7B1FA2);
-    }
-    if (cat.contains('plumb') || cat.contains('pipe')) {
-      return const Color(0xFF3949AB);
-    }
-    return AppColors.primaryBlue;
-  }
   String _formatQty() {
     final q = record.quantity;
     final s = q % 1 == 0 ? q.toInt().toString() : q.toStringAsFixed(1);
@@ -1298,127 +1244,92 @@ class _PurchaseCard extends StatelessWidget {
     }
     return '$s ${record.unit}';
   }
-  Icon _vendorIcon() {
-    if (record.type == 'labour') {
-      return const Icon(
-        Icons.person_outline,
-        size: 11,
-        color: AppColors.textLight,
-      );
-    }
-    if (record.type == 'equipment') {
-      return const Icon(
-        Icons.engineering_outlined,
-        size: 11,
-        color: AppColors.textLight,
-      );
-    }
-    return const Icon(
-      Icons.store_outlined,
-      size: 11,
-      color: AppColors.textLight,
-    );
-  }
   @override
   Widget build(BuildContext context) {
     final pending = (record.billAmount - record.paidAmount).clamp(
       0.0,
       double.infinity,
     );
-    return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        onTap: () => Navigator.pushNamed(
-          context,
-          '/logs',
-          arguments: {
-            'type': record.type,
-            'name': record.itemName,
-            'projectId': selectedProjectId,
-          },
-        ),
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+    final String statusLabel;
+    final BtTone statusTone;
+    switch (record.payStatus) {
+      case PaymentStatus.paid:
+        statusLabel = 'Paid';
+        statusTone = BtTone.green;
+        break;
+      case PaymentStatus.partial:
+        statusLabel = 'Partial';
+        statusTone = BtTone.amber;
+        break;
+      case PaymentStatus.overdue:
+        statusLabel = 'Overdue';
+        statusTone = BtTone.red;
+        break;
+      default:
+        statusLabel = 'Pending';
+        statusTone = BtTone.red;
+    }
+    return BtCard(
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+      onTap: () => Navigator.pushNamed(
+        context,
+        '/logs',
+        arguments: {
+          'type': record.type,
+          'name': record.itemName,
+          'projectId': selectedProjectId,
+        },
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _StackBars(icon: _icon, type: record.type),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: _iconBg,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(_icon, color: _iconColor, size: 22),
+                    Text(
+                      record.itemName,
+                      style: BtText.headline(context).copyWith(fontSize: 16),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            record.itemName,
-                            style: const TextStyle(
-                              fontSize: 14.5,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.textDark,
-                              letterSpacing: -0.2,
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 3),
-                          Row(
-                            children: [
-                              _vendorIcon(),
-                              const SizedBox(width: 4),
-                              Expanded(
-                                child: Text(
-                                  record.vendor.isNotEmpty
-                                      ? '$_vendorLabel: ${record.vendor}'
-                                      : '$_vendorLabel: —',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: record.vendor.isNotEmpty
-                                        ? AppColors.textLight
-                                        : AppColors.textLight.withValues(
-                                            alpha: 0.5,
-                                          ),
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
+                    const SizedBox(height: 2),
+                    Text(
+                      record.vendor.isNotEmpty
+                          ? '$_vendorLabel: ${record.vendor}'
+                          : '$_vendorLabel: —',
+                      style: BtText.caption(context, color: record.vendor.isNotEmpty ? Bt.ink3 : Bt.placeholder),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(width: 6),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        PaymentStatusChip(status: record.payStatus),
-                        const SizedBox(height: 8),
-                        PopupMenuButton<String>(
-                          padding: EdgeInsets.zero,
-                          iconSize: 18,
-                          icon: const Icon(
-                            Icons.more_vert,
-                            color: AppColors.textLight,
-                            size: 18,
-                          ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 6),
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: BtBadge(label: statusLabel, tone: statusTone),
+              ),
+              SizedBox(
+                width: 32,
+                height: 28,
+                child: PopupMenuButton<String>(
+                  padding: EdgeInsets.zero,
+                  iconSize: 18,
+                  tooltip: 'More actions',
+                  color: Bt.card,
+                  surfaceTintColor: Colors.transparent,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  icon: const Icon(
+                    Icons.more_vert_rounded,
+                    color: Bt.ink3,
+                    size: 18,
+                  ),
                           onSelected: (val) {
                             if (val == 'edit') {
                               final editArgs = Map<String, dynamic>.from(
@@ -1441,109 +1352,81 @@ class _PurchaseCard extends StatelessWidget {
                               );
                             }
                           },
-                          itemBuilder: (_) => const [
-                            PopupMenuItem(
-                              value: 'edit',
-                              child: Text('Edit Entry'),
-                            ),
-                            PopupMenuItem(
-                              value: 'history',
-                              child: Text('View History'),
-                            ),
-                          ],
-                        ),
-                      ],
+                  itemBuilder: (_) => [
+                    PopupMenuItem(
+                      value: 'edit',
+                      child: Text('Edit Entry', style: BtText.body(context)),
+                    ),
+                    PopupMenuItem(
+                      value: 'history',
+                      child: Text('View History', style: BtText.body(context)),
                     ),
                   ],
                 ),
-                if (record.payStatus == PaymentStatus.partial) ...[
-                  const SizedBox(height: 10),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF0F7FF),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.check_circle_outline,
-                          size: 13,
-                          color: Color(0xFF067647),
-                        ),
-                        const SizedBox(width: 5),
-                        Text(
-                          '${formatCurrency(record.paidAmount)} Paid',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF067647),
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        const Icon(
-                          Icons.schedule,
-                          size: 13,
-                          color: Color(0xFFC01048),
-                        ),
-                        const SizedBox(width: 5),
-                        Text(
-                          '${formatCurrency(pending)} Pending',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFFC01048),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 10),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 10,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF8F7FF),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(child: _MetricCell(_qtyLabel, _formatQty())),
-                      _vertDivider(),
-                      Expanded(
-                        child: _MetricCell(
-                          'Rate',
-                          record.rate > 0 ? formatCurrency(record.rate) : '—',
-                        ),
-                      ),
-                      _vertDivider(),
-                      Expanded(
-                        child: _MetricCell(
-                          'Total',
-                          formatCurrency(record.billAmount),
-                          highlight: true,
-                        ),
-                      ),
-                    ],
+              ),
+            ],
+          ),
+          if (record.payStatus == PaymentStatus.partial) ...[
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                const Icon(Icons.check_circle_outline_rounded, size: 14, color: Bt.green),
+                const SizedBox(width: 5),
+                Text(
+                  '${formatCurrency(record.paidAmount)} Paid',
+                  style: BtText.num(BtText.caption(context, color: Bt.green, weight: FontWeight.w600)),
+                ),
+                const SizedBox(width: 14),
+                const Icon(Icons.schedule_rounded, size: 14, color: Bt.red),
+                const SizedBox(width: 5),
+                Flexible(
+                  child: Text(
+                    '${formatCurrency(pending)} Pending',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: BtText.num(BtText.caption(context, color: Bt.red, weight: FontWeight.w600)),
                   ),
                 ),
-                const SizedBox(height: 10),
-                const Divider(height: 1, color: Color(0xFFEEF1F5)),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _PurchaseActionBtn(
-                        label: 'Add More',
-                        icon: Icons.add_circle_outline,
-                        style: _ActionStyle.primary,
-                        onTap: () {
+              ],
+            ),
+          ],
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+            decoration: BoxDecoration(
+              color: Bt.fill,
+              borderRadius: BorderRadius.circular(Bt.rTile),
+            ),
+            child: Row(
+              children: [
+                Expanded(child: _MetricCell(_qtyLabel, _formatQty())),
+                _vertDivider(),
+                Expanded(
+                  child: _MetricCell(
+                    'Rate',
+                    record.rate > 0 ? formatCurrency(record.rate) : '—',
+                  ),
+                ),
+                _vertDivider(),
+                Expanded(
+                  child: _MetricCell(
+                    'Total',
+                    formatCurrency(record.billAmount),
+                    highlight: true,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _PurchaseActionBtn(
+                  label: 'Add More',
+                  icon: Icons.add_rounded,
+                  style: _ActionStyle.primary,
+                  onTap: () {
                           debugPrint('ADD MORE PAYLOAD');
                           debugPrint(record.rawTx.toString());
                           final dupArgs = Map<String, dynamic>.from(
@@ -1553,15 +1436,15 @@ class _PurchaseCard extends StatelessWidget {
                           dupArgs['sourceTransactionId'] = record.txId;
                           onNavigate(_addRoute, dupArgs);
                         },
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _PurchaseActionBtn(
-                        label: 'Record Payment',
-                        icon: Icons.credit_card_outlined,
-                        style: _ActionStyle.secondary,
-                        onTap: () {
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _PurchaseActionBtn(
+                  label: 'Record Payment',
+                  icon: Icons.credit_card_outlined,
+                  style: _ActionStyle.secondary,
+                  onTap: () {
                           final projectProvider = context
                               .read<ProjectProvider>();
                           String pName = 'Unknown Project';
@@ -1629,38 +1512,92 @@ class _PurchaseCard extends StatelessWidget {
                             }
                           });
                         },
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    _PurchaseActionBtn(
-                      label: 'History',
-                      icon: Icons.history_rounded,
-                      style: _ActionStyle.tertiary,
-                      onTap: () => Navigator.pushNamed(
-                        context,
-                        '/logs',
-                        arguments: {
-                          'type': record.type,
-                          'name': record.itemName,
-                          'projectId': selectedProjectId,
-                        },
-                      ),
-                    ),
-                  ],
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(width: 4),
+              _PurchaseActionBtn(
+                label: 'History',
+                icon: Icons.history_rounded,
+                style: _ActionStyle.tertiary,
+                onTap: () => Navigator.pushNamed(
+                  context,
+                  '/logs',
+                  arguments: {
+                    'type': record.type,
+                    'name': record.itemName,
+                    'projectId': selectedProjectId,
+                  },
+                ),
+              ),
+            ],
           ),
-        ),
+        ],
       ),
     );
   }
   Widget _vertDivider() => Container(
     width: 1,
     height: 28,
-    color: const Color(0xFFE4E7EC),
+    color: Bt.line,
     margin: const EdgeInsets.symmetric(horizontal: 4),
   );
+}
+/// Three little bars that rise once (Inventory board "stack3") with the item icon.
+class _StackBars extends StatelessWidget {
+  const _StackBars({required this.icon, required this.type});
+  final IconData icon;
+  final String type;
+  @override
+  Widget build(BuildContext context) {
+    final series = context.bt.series;
+    final color = type == 'labour'
+        ? (series.length > 1 ? series[1] : Bt.steel)
+        : type == 'equipment'
+            ? (series.length > 2 ? series[2] : Bt.slate)
+            : (series.isNotEmpty ? series[0] : context.bt.accent);
+    final reduce = Bt.reduceMotion(context);
+    return Container(
+      width: 44,
+      height: 44,
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: .14),
+        borderRadius: BorderRadius.circular(Bt.rTile),
+      ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Positioned(
+            left: 9,
+            right: 9,
+            bottom: 8,
+            height: 12,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                for (final (i, h) in const [(0, .55), (1, 1.0), (2, .75)])
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 1.5),
+                      child: TweenAnimationBuilder<double>(
+                        tween: Tween(begin: reduce ? h : 0, end: h),
+                        duration: Duration(milliseconds: reduce ? 0 : 700 + i * 100),
+                        curve: Bt.ease,
+                        builder: (_, v, _) => FractionallySizedBox(
+                          heightFactor: v,
+                          alignment: Alignment.bottomCenter,
+                          child: DecoratedBox(decoration: BoxDecoration(color: color.withValues(alpha: .55), borderRadius: BorderRadius.circular(1.5))),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          Positioned(top: 7, child: Icon(icon, size: 17, color: Bt.ink)),
+        ],
+      ),
+    );
+  }
 }
 class _MetricCell extends StatelessWidget {
   final String label, value;
@@ -1672,24 +1609,15 @@ class _MetricCell extends StatelessWidget {
       children: [
         Text(
           value,
-          style: TextStyle(
-            fontSize: highlight ? 14 : 12.5,
-            fontWeight: highlight ? FontWeight.w700 : FontWeight.w700,
-            color: highlight ? AppColors.primaryBlue : Color(0xFF101828),
-            letterSpacing: -0.2,
-          ),
+          style: BtText.num(highlight ? BtText.title(context, size: 15) : BtText.subhead(context, color: Bt.ink, weight: FontWeight.w600)),
           textAlign: TextAlign.center,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
         const SizedBox(height: 3),
         Text(
-          label,
-          style: const TextStyle(
-            fontSize: 12,
-            color: AppColors.textLight,
-            fontWeight: FontWeight.w600,
-          ),
+          label.toUpperCase(),
+          style: BtText.mono(context, size: 9.5),
           textAlign: TextAlign.center,
         ),
       ],
@@ -1712,46 +1640,45 @@ class _PurchaseActionBtn extends StatelessWidget {
   Widget build(BuildContext context) {
     BoxDecoration deco;
     Color color;
+    bool showIcon = false;
     switch (style) {
       case _ActionStyle.primary:
-        deco = BoxDecoration(
-          gradient: AppGradients.primaryButton,
-          borderRadius: BorderRadius.circular(10),
-        );
-        color = Colors.white;
+        deco = BoxDecoration(color: Bt.ink, borderRadius: BorderRadius.circular(12));
+        color = Bt.bone;
         break;
       case _ActionStyle.secondary:
         deco = BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: AppColors.primaryBlue, width: 1.2),
+          color: Bt.card,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Bt.inputBorder),
         );
-        color = AppColors.primaryBlue;
+        color = Bt.ink;
         break;
       case _ActionStyle.tertiary:
         deco = const BoxDecoration();
-        color = AppColors.textLight;
+        color = Bt.ink2;
+        showIcon = true;
         break;
     }
-    return GestureDetector(
+    return BtPressable(
       onTap: onTap,
+      semanticLabel: label,
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+        height: 40,
+        padding: const EdgeInsets.symmetric(horizontal: 6),
         decoration: deco,
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 12, color: color),
-            const SizedBox(width: 4),
+            if (showIcon) ...[
+              Icon(icon, size: 15, color: color),
+              const SizedBox(width: 4),
+            ],
             Flexible(
               child: Text(
                 label,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: color,
-                ),
+                style: BtText.caption(context, color: color, weight: FontWeight.w600).copyWith(fontSize: 13.5),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -1778,55 +1705,21 @@ class _FiltersRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (chips.length > 1)
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
+            clipBehavior: Clip.none,
             child: Row(
               children: chips.map((cat) {
                 final isActive = cat == activeChip;
                 return Padding(
                   padding: const EdgeInsets.only(right: 8),
-                  child: GestureDetector(
+                  child: BtChip(
+                    label: cat,
+                    selected: isActive,
                     onTap: () => onChip(cat),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 180),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        gradient: isActive ? AppGradients.primaryButton : null,
-                        color: isActive ? null : Colors.white,
-                        borderRadius: BorderRadius.circular(Bt.rCard),
-                        border: Border.all(
-                          color: isActive
-                              ? Colors.transparent
-                              : const Color(0xFFE4E7EC),
-                          width: 1.2,
-                        ),
-                        boxShadow: isActive
-                            ? [
-                                BoxShadow(
-                                  color: AppColors.primaryBlue.withValues(
-                                    alpha: 0.2,
-                                  ),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ]
-                            : null,
-                      ),
-                      child: Text(
-                        cat,
-                        style: TextStyle(
-                          color: isActive ? Colors.white : AppColors.textLight,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ),
                   ),
                 );
               }).toList(),
@@ -1836,7 +1729,11 @@ class _FiltersRow extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
-            GestureDetector(
+            BtChip(
+              label: dateFilter == 'All' ? 'All Time' : dateFilter,
+              icon: Icons.calendar_today_rounded,
+              trailingIcon: Icons.keyboard_arrow_down_rounded,
+              selected: dateFilter != 'All',
               onTap: () {
                 showModalBottomSheet<void>(
                   context: context,
@@ -1851,46 +1748,93 @@ class _FiltersRow extends StatelessWidget {
                   ),
                 );
               },
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 7,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(Bt.rCard),
-                  border: Border.all(color: Bt.line),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.calendar_today_rounded,
-                      size: 13,
-                      color: AppColors.primaryBlue,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      dateFilter == 'All' ? 'All Time' : dateFilter,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textDark,
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    const Icon(
-                      Icons.keyboard_arrow_down_rounded,
-                      size: 16,
-                      color: AppColors.textLight,
-                    ),
-                  ],
-                ),
-              ),
             ),
           ],
         ),
       ],
+    );
+  }
+}
+/// Bone sheet chrome shared by the two pickers below.
+class _PickerSheetFrame extends StatelessWidget {
+  const _PickerSheetFrame({required this.title, required this.child});
+  final String title;
+  final Widget child;
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+      decoration: BoxDecoration(
+        color: Bt.card,
+        borderRadius: BorderRadius.circular(Bt.rSheet),
+        boxShadow: Bt.shadowLg,
+      ),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 10, 18, 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: Bt.inputBorder,
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(title, style: BtText.d3(context)),
+              const SizedBox(height: 8),
+              Flexible(child: child),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+class _PickerOption extends StatelessWidget {
+  const _PickerOption({required this.label, required this.icon, required this.selected, required this.onTap});
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      selected: selected,
+      child: BtPressable(
+        onTap: onTap,
+        scale: .98,
+        child: AnimatedContainer(
+          duration: Bt.fast,
+          curve: Bt.ease,
+          margin: const EdgeInsets.only(bottom: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          decoration: BoxDecoration(
+            color: selected ? Bt.fill : Colors.transparent,
+            borderRadius: BorderRadius.circular(Bt.rTile),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, size: 20, color: selected ? Bt.ink : Bt.ink3),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  label,
+                  style: BtText.body(context, weight: selected ? FontWeight.w600 : FontWeight.w400),
+                ),
+              ),
+              if (selected) Icon(Icons.check_circle_rounded, color: context.bt.accentInk, size: 20),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -1910,137 +1854,44 @@ class _DateRangeSheet extends StatelessWidget {
   ];
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(Bt.rCard),
-      ),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 36,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE4E7EC),
-                    borderRadius: BorderRadius.circular(4),
+    return _PickerSheetFrame(
+      title: 'Filter by Date',
+      child: SingleChildScrollView(
+        child: Column(
+          children: [
+            ..._options.map(((String, IconData) opt) {
+              final (label, icon) = opt;
+              return _PickerOption(
+                label: label,
+                icon: icon,
+                selected: activeFilter == label,
+                onTap: () => onSelect(label, null),
+              );
+            }),
+            _PickerOption(
+              label: 'Custom Range',
+              icon: Icons.date_range_outlined,
+              selected: activeFilter == 'Custom',
+              onTap: () async {
+                final range = await showDateRangePicker(
+                  context: context,
+                  firstDate: DateTime(2020),
+                  lastDate: DateTime.now().add(
+                    const Duration(days: 365),
                   ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Filter by Date',
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textDark,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Flexible(
-                child: SingleChildScrollView(
-                  child: Column(
-                    children: [
-                      ..._options.map(((String, IconData) opt) {
-                        final (label, icon) = opt;
-                        final isActive = activeFilter == label;
-                        return ListTile(
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 4,
-                            vertical: 1,
-                          ),
-                          leading: Icon(
-                            icon,
-                            color: isActive
-                                ? AppColors.primaryBlue
-                                : AppColors.textLight,
-                            size: 20,
-                          ),
-                          title: Text(
-                            label,
-                            style: TextStyle(
-                              color: isActive
-                                  ? AppColors.primaryBlue
-                                  : AppColors.textDark,
-                              fontWeight: isActive
-                                  ? FontWeight.w700
-                                  : FontWeight.w500,
-                              fontSize: 14,
-                            ),
-                          ),
-                          trailing: isActive
-                              ? const Icon(
-                                  Icons.check_circle,
-                                  color: AppColors.primaryBlue,
-                                  size: 18,
-                                )
-                              : null,
-                          onTap: () => onSelect(label, null),
-                        );
-                      }),
-                      ListTile(
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 4,
-                          vertical: 1,
-                        ),
-                        leading: Icon(
-                          Icons.date_range_outlined,
-                          color: activeFilter == 'Custom'
-                              ? AppColors.primaryBlue
-                              : AppColors.textLight,
-                          size: 20,
-                        ),
-                        title: Text(
-                          'Custom Range',
-                          style: TextStyle(
-                            color: activeFilter == 'Custom'
-                                ? AppColors.primaryBlue
-                                : AppColors.textDark,
-                            fontWeight: activeFilter == 'Custom'
-                                ? FontWeight.w700
-                                : FontWeight.w500,
-                            fontSize: 14,
-                          ),
-                        ),
-                        trailing: activeFilter == 'Custom'
-                            ? const Icon(
-                                Icons.check_circle,
-                                color: AppColors.primaryBlue,
-                                size: 18,
-                              )
-                            : null,
-                        onTap: () async {
-                          final range = await showDateRangePicker(
-                            context: context,
-                            firstDate: DateTime(2020),
-                            lastDate: DateTime.now().add(
-                              const Duration(days: 365),
-                            ),
-                            initialDateRange: DateTimeRange(
-                              start: DateTime.now().subtract(
-                                const Duration(days: 30),
-                              ),
-                              end: DateTime.now(),
-                            ),
-                          );
-                          if (range != null) {
-                            onSelect('Custom', range);
-                          }
-                        },
-                      ),
-                    ],
+                  initialDateRange: DateTimeRange(
+                    start: DateTime.now().subtract(
+                      const Duration(days: 30),
+                    ),
+                    end: DateTime.now(),
                   ),
-                ),
-              ),
-              const SizedBox(height: 8),
-            ],
-          ),
+                );
+                if (range != null) {
+                  onSelect('Custom', range);
+                }
+              },
+            ),
+          ],
         ),
       ),
     );
@@ -2086,57 +1937,38 @@ class _KpiCard extends StatelessWidget {
   const _KpiCard({required this.data});
   @override
   Widget build(BuildContext context) {
+    final alert = data.isAlert;
     return Container(
-      padding: const EdgeInsets.all(13),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: data.isAlert
-              ? data.color.withValues(alpha: 0.35)
-              : const Color(0xFFEEF1F5),
-          width: data.isAlert ? 1.5 : 1,
-        ),
+        color: alert ? Bt.redSoft : Bt.card,
+        borderRadius: BorderRadius.circular(Bt.rTile + 4),
+        boxShadow: alert ? null : Bt.shadow,
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 30,
-            height: 30,
-            decoration: BoxDecoration(
-              color: data.color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(9),
-            ),
-            child: Icon(data.icon, color: data.color, size: 15),
-          ),
+          Icon(data.icon, color: alert ? Bt.red : Bt.ink3, size: 18),
           const SizedBox(width: 10),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                data.value,
-                style: TextStyle(
-                  fontSize: 14.5,
-                  fontWeight: FontWeight.w700,
-                  color: data.isAlert ? data.color : const Color(0xFF101828),
-                  letterSpacing: -0.3,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  data.label.toUpperCase(),
+                  style: BtText.mono(context, color: alert ? Bt.red : Bt.ink3, size: 9.5),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 2),
-              Text(
-                data.label,
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: AppColors.textLight,
-                  fontWeight: FontWeight.w600,
+                const SizedBox(height: 4),
+                Text(
+                  data.value,
+                  style: BtText.num(BtText.title(context, size: 17).copyWith(color: alert ? Bt.red : Bt.ink)),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
@@ -2155,76 +1987,32 @@ class _EmptyState extends StatelessWidget {
   });
   @override
   Widget build(BuildContext context) {
+    final bt = context.bt;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 76,
-              height: 76,
-              decoration: BoxDecoration(
-                color: AppColors.primaryBlue.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(Bt.rCard),
-              ),
-              child: Icon(icon, color: AppColors.primaryBlue, size: 34),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textDark,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              subtitle,
-              style: const TextStyle(
-                fontSize: 13,
-                color: AppColors.textLight,
-                height: 1.5,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
+            BtTile(icon: icon, size: 64, bg: bt.accentSoft, fg: bt.accentInk),
+            const SizedBox(height: 18),
+            Text(title, style: BtText.title(context, size: 19), textAlign: TextAlign.center),
+            const SizedBox(height: 6),
+            Text(subtitle, style: BtText.subhead(context), textAlign: TextAlign.center),
+            const SizedBox(height: 22),
             Showcase(
               key: ShowcaseKeys.inventoryAdd,
               description: 'Tap here to add your first inventory entry.',
-              tooltipBackgroundColor: const Color(0xFF1E1E2C),
+              tooltipBackgroundColor: Bt.ink,
               textColor: Colors.white,
               tooltipBorderRadius: BorderRadius.circular(16),
               tooltipPadding: const EdgeInsets.all(16),
-              child: GestureDetector(
-                onTap: onAdd,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 13,
-                  ),
-                  decoration: BoxDecoration(
-                    gradient: AppGradients.primaryButton,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.add, color: Colors.white, size: 17),
-                      SizedBox(width: 8),
-                      Text(
-                        'Add First Entry',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+              child: BtButton(
+                label: 'Add First Entry',
+                icon: Icons.add_rounded,
+                small: true,
+                expand: false,
+                onPressed: onAdd,
               ),
             ),
           ],
@@ -2246,108 +2034,23 @@ class _ProjectSelectorSheet extends StatelessWidget {
   });
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(Bt.rCard),
-      ),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 36,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE4E7EC),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Select Project',
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textDark,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Flexible(
-                child: ListView(
-                  shrinkWrap: true,
-                  children: allItems.map((label) {
-                    final id = label == 'All Active Projects'
-                        ? null
-                        : idMap[label];
-                    final isSel = selectedId == id;
-                    return InkWell(
-                      onTap: () => onSelect(id),
-                      borderRadius: BorderRadius.circular(12),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 150),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 13,
-                        ),
-                        margin: const EdgeInsets.only(bottom: 6),
-                        decoration: BoxDecoration(
-                          color: isSel
-                              ? AppColors.primaryBlue.withValues(alpha: 0.08)
-                              : Colors.transparent,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: isSel
-                                ? AppColors.primaryBlue
-                                : Colors.transparent,
-                            width: 1.5,
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              isSel
-                                  ? Icons.radio_button_checked
-                                  : Icons.radio_button_off,
-                              size: 18,
-                              color: isSel
-                                  ? AppColors.primaryBlue
-                                  : AppColors.textLight,
-                            ),
-                            const SizedBox(width: 12),
-                            Flexible(
-                              child: Text(
-                                label,
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  color: isSel
-                                      ? AppColors.primaryBlue
-                                      : AppColors.textDark,
-                                  fontWeight: isSel
-                                      ? FontWeight.w700
-                                      : FontWeight.w500,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-              ),
-              const SizedBox(height: 8),
-            ],
-          ),
-        ),
+    return _PickerSheetFrame(
+      title: 'Select Project',
+      child: ListView(
+        shrinkWrap: true,
+        children: allItems.map((label) {
+          final id = label == 'All Active Projects'
+              ? null
+              : idMap[label];
+          final isSel = selectedId == id;
+          return _PickerOption(
+            label: label,
+            icon: id == null ? Icons.layers_outlined : Icons.folder_outlined,
+            selected: isSel,
+            onTap: () => onSelect(id),
+          );
+        }).toList(),
       ),
     );
   }
 }
-
