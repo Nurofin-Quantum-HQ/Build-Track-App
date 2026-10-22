@@ -834,24 +834,17 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _sectionLabel('Update date'),
-              GestureDetector(
-                onTap: () async {
-                  final picked = await showDatePicker(
-                    context: context,
-                    initialDate: _selectedDate,
-                    firstDate: DateTime(2020),
-                    lastDate: DateTime(2100),
-                    builder: pickerTheme,
-                  );
-                  if (picked != null) setState(() => _selectedDate = picked);
-                },
-                child: IgnorePointer(
-                  child: BtPickerField(
-                    text: updateDateStr,
-                    placeholder: updateDateStr == 'Select date',
-                    icon: Icons.calendar_today_outlined,
-                    onTap: () {},
-                  ),
+              // The field handles the tap itself. Before, it sat inside
+              // IgnorePointer under a GestureDetector: IgnorePointer removes the
+              // child from hit-testing, so the (deferToChild) detector never
+              // received the tap and the picker never opened.
+              BtPickerField(
+                text: updateDateStr,
+                icon: Icons.calendar_today_outlined,
+                onTap: () => _pickDate(
+                  initial: _selectedDate,
+                  theme: pickerTheme,
+                  onPicked: (d) => _selectedDate = d,
                 ),
               ),
             ],
@@ -863,24 +856,14 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _sectionLabel('Completion date'),
-              GestureDetector(
-                onTap: () async {
-                  final picked = await showDatePicker(
-                    context: context,
-                    initialDate: _completionDate ?? DateTime.now(),
-                    firstDate: DateTime(2020),
-                    lastDate: DateTime(2100),
-                    builder: pickerTheme,
-                  );
-                  if (picked != null) setState(() => _completionDate = picked);
-                },
-                child: IgnorePointer(
-                  child: BtPickerField(
-                    text: completionDateStr,
-                    placeholder: completionDateStr == 'Select date',
-                    icon: Icons.calendar_today_outlined,
-                    onTap: () {},
-                  ),
+              BtPickerField(
+                text: completionDateStr,
+                placeholder: _completionDate == null,
+                icon: Icons.calendar_today_outlined,
+                onTap: () => _pickDate(
+                  initial: _completionDate ?? DateTime.now(),
+                  theme: pickerTheme,
+                  onPicked: (d) => _completionDate = d,
                 ),
               ),
             ],
@@ -888,6 +871,33 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
         ),
       ],
     );
+  }
+  static final DateTime _firstPickable = DateTime(2020);
+  static final DateTime _lastPickable = DateTime(2100);
+
+  /// Opens the date picker. The initial date is clamped into the picker's
+  /// range (an activity's stored completedAt can be outside it, which made
+  /// showDatePicker throw), and any failure is shown instead of swallowed.
+  Future<void> _pickDate({
+    required DateTime initial,
+    required Widget Function(BuildContext, Widget?) theme,
+    required void Function(DateTime) onPicked,
+  }) async {
+    try {
+      final safeInitial = initial.isBefore(_firstPickable)
+          ? _firstPickable
+          : (initial.isAfter(_lastPickable) ? _lastPickable : initial);
+      final picked = await showDatePicker(
+        context: context,
+        initialDate: safeInitial,
+        firstDate: _firstPickable,
+        lastDate: _lastPickable,
+        builder: theme,
+      );
+      if (picked != null && mounted) setState(() => onPicked(picked));
+    } catch (e) {
+      if (mounted) btToast(context, 'Could not open the date picker: $e', error: true);
+    }
   }
   Future<void> _addPhoto() async {
     final result = await pickAttachmentDirect(context);
@@ -1107,38 +1117,39 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
       loading: _submitting,
       onPressed: () async {
         if (_submitting) return;
+        // Validate up front so a tap never silently does nothing.
+        if (_selectedProjectId == null || _selectedProjectId!.isEmpty) {
+          btToast(context, 'Select a project first.', error: true);
+          return;
+        }
         setState(() => _submitting = true);
         try {
-        final project =
-            provider.selectedProject ??
-            provider.projects.cast<ProjectModel?>().firstWhere(
+        // Resolve the project being updated by its id. (Before, this used
+        // provider.selectedProject first — when that was a different project
+        // than the one on this screen, the activity was never found, so it was
+        // never marked done.)
+        final project = provider.projects.cast<ProjectModel?>().firstWhere(
               (p) => p?.id == _selectedProjectId,
               orElse: () => null,
-            );
-        String? targetActivityId = _prefillActivityId;
-        if (targetActivityId == null &&
-            _selectedActivityName != null &&
-            project != null) {
-          final matchedAct = project.selectedPhases
-              ?.expand((ph) => ph.activities)
-              .cast<ProjectActivity?>()
-              .firstWhere(
+            ) ??
+            (provider.selectedProject?.id == _selectedProjectId ? provider.selectedProject : null);
+        final allActivities = project?.selectedPhases
+                ?.expand((ph) => ph.activities)
+                .toList() ??
+            const <ProjectActivity>[];
+        String? targetActivityId;
+        if (_prefillActivityId != null &&
+            allActivities.any((a) => a.id == _prefillActivityId)) {
+          targetActivityId = _prefillActivityId;
+        } else if (_selectedActivityName != null) {
+          final matchedAct = allActivities.cast<ProjectActivity?>().firstWhere(
                 (act) => act?.name == _selectedActivityName,
                 orElse: () => null,
               );
-          if (matchedAct != null) {
-            targetActivityId = matchedAct.id;
-          }
+          targetActivityId = matchedAct?.id;
         }
-        final targetProjectId = _selectedProjectId ?? project?.id;
+        final targetProjectId = _selectedProjectId!;
         bool success = false;
-        if (_prefillActivityId != null) {
-          await provider.markActivityComplete(
-            _selectedProjectId!,
-            _prefillActivityId!,
-            _selectedDate,
-          );
-        }
         for (final taskId in _completedTaskIds) {
           try {
             await TaskService.updateTaskStatus(taskId, 'Completed');
@@ -1147,7 +1158,10 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
           }
         }
         if (!mounted) return;
-        if (targetProjectId != null && targetActivityId != null) {
+        if (targetActivityId != null) {
+          // One save marks the activity done with its date, notes, photos and
+          // progress. (A separate markActivityComplete() call before this sent
+          // the same project twice; it is the same call without the details.)
           success = await provider.toggleActivityCompletion(
             targetProjectId,
             targetActivityId,
@@ -1159,7 +1173,7 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
             photos: _attachments.map((a) => a.dataUri).toList(),
             manualProgress: _completionProgress,
           );
-        } else if (targetProjectId != null) {
+        } else {
           success = await provider.updateProjectProgress(
             targetProjectId,
             _completionProgress,
@@ -1195,9 +1209,14 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
             if (!context.mounted) return;
             Navigator.maybePop(context);
           } else {
-            btToast(context, 'Failed to save progress details. Please check network connection and try again.', error: true);
+            btToast(context, 'Could not save this update. Check your connection, or ask an admin for "Submit daily update" access to this project.', error: true);
           }
         }
+        } catch (e) {
+          debugPrint('Progress update failed: $e');
+          if (context.mounted) {
+            btToast(context, 'Could not save this update: $e', error: true);
+          }
         } finally {
           if (mounted) setState(() => _submitting = false);
         }

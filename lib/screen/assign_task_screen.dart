@@ -34,8 +34,14 @@ class _AssignTaskScreenContent extends StatefulWidget {
 class _AssignTaskScreenContentState extends State<_AssignTaskScreenContent> {
   final GlobalKey _helpKey = GlobalKey();
   final _formKey = GlobalKey<FormState>();
-  String _title = '';
-  String _description = '';
+  // Controllers keep the typed text in State. The form lives in a lazily-built
+  // ListView: when the keyboard opens, the field scrolled out of view was
+  // disposed and an uncontrolled TextFormField lost its text (title went blank
+  // while typing details, and vice versa).
+  final TextEditingController _titleCtrl = TextEditingController();
+  final TextEditingController _descriptionCtrl = TextEditingController();
+  String get _title => _titleCtrl.text.trim();
+  String get _description => _descriptionCtrl.text.trim();
   String? _selectedProjectId;
   String? _selectedFloor;
   String? _selectedFloorId;
@@ -70,6 +76,12 @@ class _AssignTaskScreenContentState extends State<_AssignTaskScreenContent> {
         ShowCaseWidget.of(context).startShowCase([_helpKey]);
       }
     });
+  }
+  @override
+  void dispose() {
+    _titleCtrl.dispose();
+    _descriptionCtrl.dispose();
+    super.dispose();
   }
   Future<void> _fetchUsers() async {
     try {
@@ -140,9 +152,13 @@ class _AssignTaskScreenContentState extends State<_AssignTaskScreenContent> {
         valid = false;
       }
     });
+    if (_title.isEmpty) {
+      btToast(context, 'Please enter a task title', error: true);
+      _formKey.currentState?.validate();
+      return;
+    }
     if (!valid) return;
-    if (!_formKey.currentState!.validate()) return;
-    _formKey.currentState!.save();
+    if (!(_formKey.currentState?.validate() ?? true)) return;
     setState(() => _isLoading = true);
     try {
       final phaseId = _selectedPhaseId ?? _derivePhaseId(_selectedPhase);
@@ -192,10 +208,11 @@ class _AssignTaskScreenContentState extends State<_AssignTaskScreenContent> {
         label: 'Task title',
         required: true,
         child: TextFormField(
+          controller: _titleCtrl,
+          textInputAction: TextInputAction.next,
           style: BtText.body(context, weight: FontWeight.w600).copyWith(fontSize: 18),
           decoration: btInput(context, hint: 'e.g. Cast slab — first floor'),
-          validator: (val) => val == null || val.isEmpty ? 'Required' : null,
-          onSaved: (val) => _title = val ?? '',
+          validator: (val) => val == null || val.trim().isEmpty ? 'Required' : null,
         ),
       ),
       ExecutionContextCard(
@@ -308,11 +325,11 @@ class _AssignTaskScreenContentState extends State<_AssignTaskScreenContent> {
       EntryLabeled(
         label: 'Details',
         child: TextFormField(
+          controller: _descriptionCtrl,
           maxLines: 4,
           minLines: 3,
           style: BtText.body(context),
           decoration: btInput(context, hint: 'Anything the team should know (optional)'),
-          onSaved: (val) => _description = val ?? '',
         ),
       ),
     ];

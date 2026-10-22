@@ -23,6 +23,10 @@ class _ExecutionContextScreenState extends State<ExecutionContextScreen> {
   String? _phaseError;
   String? _activityError;
   bool _argsLoaded = false;
+  /// Phase/activity came from the caller's prefill (e.g. "Add entry" on an
+  /// activity). Picking the floor then keeps them — phases aren't per-floor —
+  /// so the user only has to choose the floor.
+  bool _phasePrefilled = false;
   /// Which numbered pick row is expanded (0 project · 1 floor · 2 phase · 3 activity).
   int? _open;
   bool _openInit = false;
@@ -43,15 +47,62 @@ class _ExecutionContextScreenState extends State<ExecutionContextScreen> {
     _selectedPhaseId = provider.selectedPhaseId;
     _selectedActivity = provider.selectedActivity;
     _selectedActivityId = provider.selectedActivityId;
+    // Optional prefill (e.g. "Add entry" on a project's activity): projectId,
+    // floor, phase, phaseId, activity, activityId. Callers that only pass
+    // {'type'} keep the provider-based behaviour above.
+    if (args is Map) {
+      String? str(String k) {
+        final v = args[k]?.toString().trim();
+        return (v == null || v.isEmpty) ? null : v;
+      }
+      final pid = str('projectId');
+      if (pid != null) {
+        if (pid != _selectedProjectId) {
+          _selectedFloor = null;
+          _selectedFloorId = null;
+          _selectedPhase = null;
+          _selectedPhaseId = null;
+          _selectedActivity = null;
+          _selectedActivityId = null;
+        }
+        _selectedProjectId = pid;
+        if (args.containsKey('floor')) {
+          _selectedFloor = str('floor');
+          _selectedFloorId = str('floorId') ?? _selectedFloor;
+        }
+        if (str('phase') != null) {
+          _phasePrefilled = true;
+          _selectedPhase = str('phase');
+          _selectedPhaseId = str('phaseId');
+          _selectedActivity = null;
+          _selectedActivityId = null;
+        }
+        if (str('activity') != null) {
+          _selectedActivity = str('activity');
+          _selectedActivityId = str('activityId');
+        }
+      }
+    }
     if (_selectedProjectId != null && _selectedProjectId!.isNotEmpty) {
       provider.refreshProject(_selectedProjectId!);
     }
   }
+  /// Floors are only required when the selected project has floors (same rule
+  /// as [_onContinue]). Previously a floor was always required here, so the
+  /// Continue button stayed disabled for projects without floors.
+  bool get _projectHasFloors {
+    final provider = Provider.of<ProjectProvider>(context, listen: false);
+    final project = provider.projects.cast<ProjectModel?>().firstWhere(
+      (p) => p?.id == _selectedProjectId,
+      orElse: () => null,
+    );
+    return project?.floors != null && project!.floors!.isNotEmpty;
+  }
   bool get _canContinue =>
       _selectedProjectId != null &&
       _selectedProjectId!.isNotEmpty &&
-      _selectedFloor != null &&
-      _selectedFloor!.isNotEmpty &&
+      (!_projectHasFloors ||
+          (_selectedFloor != null && _selectedFloor!.isNotEmpty)) &&
       _selectedPhase != null &&
       _selectedPhase!.isNotEmpty &&
       _selectedActivity != null &&
@@ -126,9 +177,14 @@ class _ExecutionContextScreenState extends State<ExecutionContextScreen> {
         _selectedActivityId ?? _deriveActivityId(_selectedActivity);
     final provider = Provider.of<ProjectProvider>(context, listen: false);
     if (_selectedProjectId != provider.selectedProject?.id) {
-      final project = provider.projects.firstWhere(
-        (p) => p.id == _selectedProjectId,
+      final project = provider.projects.cast<ProjectModel?>().firstWhere(
+        (p) => p?.id == _selectedProjectId,
+        orElse: () => null,
       );
+      if (project == null) {
+        btToast(context, 'This project is not loaded yet. Go back, refresh projects and try again.', error: true);
+        return;
+      }
       provider.selectProject(project);
     }
     final effectiveFloor = (_selectedFloor != null &&
@@ -239,6 +295,7 @@ class _ExecutionContextScreenState extends State<ExecutionContextScreen> {
 
   // ── handlers (unchanged behaviour; called by the chips) ──
   void _onProjectChanged(String? v) {
+    _phasePrefilled = false;
     setState(() {
       _selectedProjectId = v;
       _selectedFloor = null;
@@ -262,19 +319,27 @@ class _ExecutionContextScreenState extends State<ExecutionContextScreen> {
   }
 
   void _onFloorChanged(String? v) {
+    final keep = _phasePrefilled;
     setState(() {
       _selectedFloor = v;
       _selectedFloorId = v;
-      _selectedPhase = null;
-      _selectedPhaseId = null;
-      _selectedActivity = null;
-      _selectedActivityId = null;
+      if (!keep) {
+        _selectedPhase = null;
+        _selectedPhaseId = null;
+        _selectedActivity = null;
+        _selectedActivityId = null;
+      }
       _floorError = null;
     });
-    Provider.of<ProjectProvider>(
+    final provider = Provider.of<ProjectProvider>(
       context,
       listen: false,
-    ).selectFloor(v);
+    );
+    provider.selectFloor(v);
+    if (keep) {
+      provider.selectPhase(_selectedPhase, _selectedPhaseId);
+      provider.selectActivity(_selectedActivity, _selectedActivityId);
+    }
   }
 
   void _onPhaseChanged(dynamic v) {

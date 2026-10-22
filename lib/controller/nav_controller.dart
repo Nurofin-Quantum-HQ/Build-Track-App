@@ -31,7 +31,8 @@ class NavController extends ChangeNotifier {
     if (route == '/inventory') return RoleManager.canManageInventory;
     if (route == '/reports') return RoleManager.canViewReports;
     // Insights uses the same permission as the project insights entry point.
-    if (route == '/insights') return RoleManager.canViewReports;
+    // Insights is budget analytics: needs reports AND budget access.
+    if (route == '/insights') return RoleManager.canViewReports && RoleManager.canViewProjectBudget;
     if (route == '/inbox') return true;
     if (route == '/logs') return RoleManager.canNavigate('/logs');
     return false;
@@ -46,7 +47,7 @@ class NavController extends ChangeNotifier {
     final items = <String>['/home'];
     if (RoleManager.canViewProjects) items.add('/projects');
     if (RoleManager.canAddEntries) items.add('/add-entry');
-    if (RoleManager.canViewReports) items.add('/insights');
+    if (RoleManager.canViewReports && RoleManager.canViewProjectBudget) items.add('/insights');
     if (RoleManager.canViewReports) items.add('/reports');
     return items;
   }

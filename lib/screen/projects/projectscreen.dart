@@ -102,8 +102,8 @@ class ProjectsScreen extends StatelessWidget {
         if (UserSession.globalTourActive) {
           Future.delayed(const Duration(milliseconds: 300), () {
             if (context.mounted) {
-              final nav = Provider.of<NavController>(context, listen: false);
-              nav.setRoute('/add-entry', context);
+              // Next tab this user can open (skips disabled tabs, ends the tour at the end).
+              context.read<NavController>().continueTour(context, from: '/projects');
             }
           });
         }
@@ -131,7 +131,10 @@ class _ProjectsScreenContentState extends State<_ProjectsScreenContent> {
     } else {
       keys.add(ShowcaseKeys.projectsCard);
     }
-    return keys;
+    // Only showcase widgets that are actually on screen for this user/state
+    // (e.g. the project card isn't mounted while loading or on an error),
+    // otherwise the tour jumps or stalls.
+    return keys.where((k) => k.currentContext != null).toList();
   }
 
   @override
@@ -380,7 +383,7 @@ class _ProjectsScreenContentState extends State<_ProjectsScreenContent> {
                     ),
                     const SizedBox(height: 8),
                     BtBricks(value: progress, height: 9),
-                    if (UserSession.isAdmin) ...[
+                    if (RoleManager.canViewProjectBudget) ...[
                       const SizedBox(height: 12),
                       Text.rich(
                         TextSpan(children: [
@@ -421,7 +424,7 @@ class _ProjectsScreenContentState extends State<_ProjectsScreenContent> {
   Widget _miniCard(BuildContext context, ProjectModel p, ProjectProvider provider) {
     final pct = (p.progress * 100).toStringAsFixed(0);
     final status = _ProjectStatus.fromString(p.projectStatus);
-    final sub = UserSession.isAdmin ? (p.totalBudget > 0 ? '$pct% · ${p.formattedSpent} of ${p.formattedBudget}' : '$pct% · ${p.formattedSpent} spent') : '$pct% · ${status.label}';
+    final sub = RoleManager.canViewProjectBudget ? (p.totalBudget > 0 ? '$pct% · ${p.formattedSpent} of ${p.formattedBudget}' : '$pct% · ${p.formattedSpent} spent') : '$pct% · ${status.label}';
     return Semantics(
       button: true,
       label: '${p.name}, $pct percent done. View details',
