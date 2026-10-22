@@ -364,8 +364,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         BtRow(
                           leading: const BtTile(icon: Icons.workspaces_outline, size: 34),
                           title: 'Create Workspace',
+                          subtitle: 'A separate company account',
                           showChevron: true,
-                          onTap: () => Navigator.pushNamed(context, '/create-workspace'),
+                          onTap: () async {
+                            // Testers read this as "create a team". It actually signs up a
+                            // brand-new company (own admin, projects, billing) — say so first.
+                            final go = await btConfirm(
+                              context,
+                              title: 'Create a new workspace?',
+                              message: 'A workspace is a separate company account with its own admin login, '
+                                  'projects, team and plan. Nothing is shared with ${UserSession.companyName.isNotEmpty ? UserSession.companyName : 'this workspace'}.\n\n'
+                                  'To add people to your current team, use Assign Role instead.',
+                              confirmLabel: 'Continue',
+                              destructive: false,
+                            );
+                            if (go && context.mounted) Navigator.pushNamed(context, '/create-workspace');
+                          },
                         ),
                     ]),
                   ),

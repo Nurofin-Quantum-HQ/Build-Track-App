@@ -85,7 +85,7 @@ keys compared before/after) and screenshot-tested against a local backend with s
 | By Type / Entries layout | By type defaults to the 3-column card grid (list is a toggle); Entries already defaults to the sheet |
 | Reports guidelines should explain all options | Fixed — tour walks every control |
 | Remove Efficiency Report | Removed from Reports |
-| Create Workspace unclear | Explained below — not changed (product decision) |
+| Create Workspace unclear | Fixed — row says "A separate company account"; tapping it first explains a workspace is a separate company (own admin, projects, team, plan) and points to Assign Role for adding people |
 | App Guidelines option doesn't work | Fixed — restarts the whole app tour from Home |
 | Tour shows Inventory after login | Fixed |
 | CSV templates differ between Add Entry and Reports | One template, one column picker, one parser (`csv_import_helper.dart`); accepts old templates and Reports exports, dd/mm/yyyy dates, Excel BOM |
