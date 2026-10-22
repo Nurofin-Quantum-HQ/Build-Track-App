@@ -14,6 +14,14 @@ class AuthService {
     aOptions: AndroidOptions(encryptedSharedPreferences: true),
   );
   static const _kTokenKey = 'token';
+
+  /// True from the moment a logout starts until the next successful login.
+  /// Responses that come back 401 after that (requests that were in flight
+  /// when the user tapped Logout, or screens refreshing while they unmount)
+  /// are not a "session expired" event — the session was ended on purpose —
+  /// so [handleUnauthorized] ignores them. It also makes a real expiry show
+  /// its alert once, not once per concurrent 401.
+  static bool _sessionEnded = false;
   static Future<Map<String, dynamic>?> login(
     String email,
     String password,
@@ -33,6 +41,7 @@ class AuthService {
           throw Exception('Token not found in login response');
         }
         await _secure.write(key: _kTokenKey, value: token); // [BT-SEC-05]
+        _sessionEnded = false;
         final prefs = await SharedPreferences.getInstance();
         final roleStr = user['role']?.toString() ?? 'Mason';
         await prefs.setString('user_role', roleStr);
@@ -55,7 +64,23 @@ class AuthService {
       rethrow;
     }
   }
+  /// Called by ApiService for every 401. Logs out with the "Session expired"
+  /// alert only when a signed-in session was actually rejected by the server:
+  /// - not after an intentional logout (in-flight requests coming back 401),
+  /// - not when no token is stored (e.g. a wrong password on the login screen),
+  /// - and only once when several requests fail together.
+  static Future<void> handleUnauthorized() async {
+    if (_sessionEnded) return;
+    final token = await getToken();
+    if (token == null || token.isEmpty) return;
+    if (_sessionEnded) return; // a logout started while we were reading the token
+    await logout(sessionExpired: true);
+  }
+
   static Future<void> logout({bool sessionExpired = false}) async {
+    // Set synchronously, before any await, so 401s that race with this logout
+    // are recognised as part of it.
+    _sessionEnded = true;
     await _secure.delete(key: _kTokenKey); // [BT-SEC-05]
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('token');       // clear any pre-migration plaintext token

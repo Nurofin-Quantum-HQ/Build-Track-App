@@ -25,10 +25,16 @@ class _AssignRolesScreenState extends State<AssignRolesScreen> {
     {
       'type': 'table',
       'label': 'Project Status',
-      'desc': 'View progress, budget, and project details',
+      'desc': 'View progress and project details',
       'view': 'view_assigned_project',
       'edit': 'edit_project',
       'delete': null,
+    },
+    {
+      'type': 'toggle',
+      'label': 'Project budget',
+      'desc': 'See budgets, budget used and remaining',
+      'key': RoleManager.viewProjectBudgetKey,
     },
     {
       'type': 'table',
@@ -100,6 +106,9 @@ class _AssignRolesScreenState extends State<AssignRolesScreen> {
   final Map<String, bool> _permissions = {
     'view_assigned_project': false,
     'edit_project': false,
+    // Off by default for every preset (Supervisor / Mason / custom); an Admin
+    // turns it on per person. Read by RoleManager.canViewProjectBudget.
+    RoleManager.viewProjectBudgetKey: false,
     'delete_entry': false,
     'manage_expenses': false,
     'manage_equipment_master': false,

@@ -108,6 +108,20 @@ class UserSession extends ChangeNotifier {
     _instance.notifyListeners();
   }
 
+  /// "App Guidelines" (Account page): replay the guided app tour from the
+  /// start. Clears the visited-module flags so every tab's tour runs again,
+  /// marks the tour prompt as answered (no "take the tour?" dialog — the user
+  /// just asked for it) and switches the cross-tab tour on. The caller then
+  /// takes the user to Home, where the tour starts.
+  static Future<void> restartAppTour() async {
+    _hasSkippedTour = false;
+    _visitedModules = [];
+    _appTourPrompted = true;
+    _globalTourActive = true;
+    await _persist();
+    _instance.notifyListeners();
+  }
+
   static Future<void> setGlobalTourActive(bool active) async {
     _globalTourActive = active;
     await _persist();

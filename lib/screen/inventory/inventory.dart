@@ -1,7 +1,6 @@
 import 'package:buildtrack_mobile/design/design.dart';
 import 'dart:async';
 import 'package:buildtrack_mobile/common/themes/app_colors.dart';
-import 'package:buildtrack_mobile/controller/nav_controller.dart';
 import 'package:buildtrack_mobile/common/utils/currency_formatter.dart';
 import 'package:buildtrack_mobile/common/widgets/common_widgets.dart';
 import 'package:buildtrack_mobile/common/widgets/entry_widgets.dart';
@@ -40,17 +39,10 @@ class InventoryScreen extends StatelessWidget {
         )
       ], 
       enableAutoScroll: true,
-      onFinish: () {
-        UserSession.markModuleVisited('InventoryScreen');
-        if (UserSession.globalTourActive) {
-          Future.delayed(const Duration(milliseconds: 300), () {
-            if (context.mounted) {
-              final nav = Provider.of<NavController>(context, listen: false);
-              nav.setRoute('/reports', context);
-            }
-          });
-        }
-      },
+      // Inventory is no longer part of the guided app tour (NavController.tourOrder),
+      // so finishing its own tour only marks it visited — it must not chain to
+      // another tab (that used to pull an active app tour through Inventory).
+      onFinish: () => UserSession.markModuleVisited('InventoryScreen'),
       builder: (context) => const _InventoryScreenContent(),
     );
   }

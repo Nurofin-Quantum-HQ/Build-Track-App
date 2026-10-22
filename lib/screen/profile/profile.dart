@@ -5,6 +5,7 @@ import 'package:buildtrack_mobile/common/themes/app_theme.dart';
 import 'package:buildtrack_mobile/common/widgets/subscription_card.dart';
 import 'package:buildtrack_mobile/controller/role_manager.dart';
 import 'package:buildtrack_mobile/controller/user_session.dart';
+import 'package:buildtrack_mobile/controller/nav_controller.dart';
 import 'package:buildtrack_mobile/controller/project_provider.dart';
 import 'package:buildtrack_mobile/controller/inventory_provider.dart';
 import 'package:buildtrack_mobile/controller/subscription_provider.dart';
@@ -94,7 +95,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _profileError = null;
     });
     try {
-      final response = await ApiService.get('/users/profile');
+      // Don't leave the page on its loading skeleton for ApiService's 90 s
+      // timeout on a slow/unreachable network — fall back to the cached
+      // session data (the catch below) after 20 s.
+      final response = await ApiService.get('/users/profile').timeout(const Duration(seconds: 20));
       if (!mounted) return;
       if (response.statusCode == 200) {
         final decoded = json.decode(response.body);
@@ -272,6 +276,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       globalTooltipActions: [TooltipActionButton(type: TooltipDefaultActionType.skip, backgroundColor: Colors.transparent, textStyle: const TextStyle(color: Colors.white70, fontWeight: FontWeight.bold)), TooltipActionButton(type: TooltipDefaultActionType.next, backgroundColor: AppColors.primary, textStyle: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))], enableAutoScroll: true,
       builder: (context) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
+          // The tour targets only exist once the profile has loaded; starting
+          // earlier marked the module visited and ended the tour at step 1.
+          if (!mounted || _isLoadingProfile) return;
           final projProvider = Provider.of<ProjectProvider>(context, listen: false);
           if (projProvider.projectsLoaded && projProvider.projects.isEmpty && !UserSession.hasSkippedTour && !UserSession.visitedModules.contains('profile')) {
             UserSession.markModuleVisited('profile');
@@ -312,7 +319,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 child: _tour(ShowcaseKeys.profileSubscription, 'View your current subscription plan and limits.', SubscriptionCard(showUpgradeButton: RoleManager.isAdmin)),
               ),
               const SizedBox(height: 24),
-              // ── Workspace (was the side menu) ──
+              // ── Workspace (was the side menu) ── Admin only: Team Overview is
+              // admin-gated (non-admins hit a lock screen), the plan is
+              // "managed by your admin", and the other rows were already admin-only.
+              if (RoleManager.isAdmin) ...[
               BtReveal(
                 index: 3,
                 child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -367,6 +377,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ]),
               ),
               const SizedBox(height: 24),
+              ],
               // ── You ──
               BtReveal(
                 index: 4,
@@ -387,7 +398,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       title: 'App Guidelines',
                       subtitle: 'Replay the guided tour',
                       showChevron: true,
-                      onTap: () => ShowCaseWidget.of(context).startShowCase(_tourKeys),
+                      onTap: _replayAppTour,
                     ),
                     BtRow(
                       leading: const BtTile(icon: Icons.language_rounded, size: 34),
@@ -441,7 +452,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         size: 20,
         color: Bt.bone,
         background: glass,
-        semantic: 'App guidelines',
+        semantic: 'Tour this page',
         onTap: () => ShowCaseWidget.of(context).startShowCase(_tourKeys),
       ),
       const SizedBox(width: 8),
@@ -651,12 +662,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final response = await ApiService.delete('/auth/account');
       if (!mounted) return;
       if (response.statusCode == 200 || response.statusCode == 204) {
-        await AuthService.logout();
-        if (!mounted) return;
-        context.read<ProjectProvider>().clear();
-        context.read<InventoryProvider>().clear();
-        context.read<SubscriptionProvider>().clear();
-        Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+        final projects = context.read<ProjectProvider>();
+        final inventory = context.read<InventoryProvider>();
+        final subscription = context.read<SubscriptionProvider>();
+        await AuthService.logout(); // navigates to /login
+        projects.clear();
+        inventory.clear();
+        subscription.clear();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -675,14 +687,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
     }
   }
+  /// App Guidelines: restart the whole guided app tour (all tabs) from Home.
+  Future<void> _replayAppTour() async {
+    await UserSession.restartAppTour();
+    if (!mounted) return;
+    context.read<NavController>().setRoute('/home', context);
+  }
+
   void _onLogoutPressed() async {
+    // Read the providers before the await — this page is removed by the
+    // navigation inside AuthService.logout().
+    final projects = context.read<ProjectProvider>();
+    final inventory = context.read<InventoryProvider>();
+    final subscription = context.read<SubscriptionProvider>();
+    // Intentional logout: AuthService clears the session, ignores any 401s from
+    // requests still in flight (no "Session expired" alert) and returns to
+    // /login itself, so no second navigation here.
     await AuthService.logout();
-    if (mounted) {
-      context.read<ProjectProvider>().clear();
-      context.read<InventoryProvider>().clear();
-      context.read<SubscriptionProvider>().clear();
-      Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
-    }
+    projects.clear();
+    inventory.clear();
+    subscription.clear();
   }
 }
 class _ErrorBanner extends StatelessWidget {

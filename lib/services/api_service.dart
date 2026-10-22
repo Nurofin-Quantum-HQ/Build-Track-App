@@ -54,7 +54,7 @@ class ApiService {
 
   static void _checkUnauthorized(http.Response response) {
     if (response.statusCode == 401) {
-      AuthService.logout(sessionExpired: true);
+      AuthService.handleUnauthorized();
       throw Exception('Unauthorized');
     }
   }
