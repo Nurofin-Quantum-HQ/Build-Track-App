@@ -9,7 +9,7 @@ import 'package:buildtrack_mobile/controller/report_provider.dart';
 import 'package:buildtrack_mobile/models/project_model.dart';
 import 'package:buildtrack_mobile/screen/reports/report_export_helper.dart';
 import 'package:buildtrack_mobile/screen/reports/csv_import_helper.dart';
-import 'package:buildtrack_mobile/screen/reports/report_widgets.dart' show EfficiencyBanner, ReportQuickTile;
+import 'package:buildtrack_mobile/screen/reports/report_widgets.dart' show ReportQuickTile;
 import 'package:buildtrack_mobile/screen/reports/report_sheet.dart';
 import 'package:buildtrack_mobile/services/api_service.dart';
 import 'package:flutter/material.dart';
@@ -49,7 +49,8 @@ class ReportsScreen extends StatelessWidget {
             )
           ],
           onFinish: () {
-            UserSession.markModuleVisited('ReportScreen');
+            UserSession.markModuleVisited('ReportsScreen');
+            // Reports is the last tab of the app tour: finishing here ends it.
             if (UserSession.globalTourActive) {
               UserSession.setGlobalTourActive(false);
             }
@@ -83,8 +84,10 @@ class ReportFilterState {
   static int currentPage = 1;
   static String? lastKnownProjectProviderId;
   static bool hasSavedFilters = false;
-  /// Entries show as a spreadsheet (true) or as the card list (false).
+  /// Entries show as a spreadsheet (true, default) or as the card list (false).
   static bool tableView = true;
+  /// "By type" shows the 3-column cost-card grid (true, default) or the list.
+  static bool byTypeGrid = true;
 
   static void reset() {
     selectedProjectId = 'all';
@@ -119,6 +122,28 @@ class _ReportsView extends StatefulWidget {
 
 class _ReportsViewState extends State<_ReportsView> {
   final GlobalKey _chartsKey = GlobalKey();
+  // Guided tour: one key per control, walked in visual order (see _tourKeys).
+  final _kAccount = GlobalKey();
+  final _kHeaderExport = GlobalKey();
+  final _kProject = GlobalKey();
+  final _kPeriod = GlobalKey();
+  final _kTabs = GlobalKey();
+  final _kSearch = GlobalKey();
+  final _kItem = GlobalKey();
+  final _kEditColumns = GlobalKey();
+  final _kSort = GlobalKey();
+  final _kExport = GlobalKey();
+  final _kFullScreen = GlobalKey();
+  final _kViewToggle = GlobalKey();
+  final _kSheet = GlobalKey();
+  final _kSheetHeader = GlobalKey();
+  final _kSheetScroll = GlobalKey();
+  final _kList = GlobalKey();
+  final _kPager = GlobalKey();
+  final _kQuickTiles = GlobalKey();
+  final _kByType = GlobalKey();
+  final _kByTypeToggle = GlobalKey();
+  final _kCsvRevert = GlobalKey();
   final ScrollController _scrollController = ScrollController();
 
   bool _linked = false;
@@ -145,6 +170,7 @@ class _ReportsViewState extends State<_ReportsView> {
   int _currentPage = ReportFilterState.currentPage;
   int _rowsPerPage = 10;
   bool _tableView = ReportFilterState.tableView;
+  bool _byTypeGrid = ReportFilterState.byTypeGrid;
   List<String> _activeColumnsAll = [
     'Purchased Date',
     'Project',
@@ -203,18 +229,68 @@ class _ReportsViewState extends State<_ReportsView> {
   void initState() {
     super.initState();
     _loadActiveColumns();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!UserSession.hasSkippedTour && !UserSession.visitedModules.contains('ReportsScreen')) {
-        ShowCaseWidget.of(context).startShowCase([
-          ShowcaseKeys.reportAskAI,
-          ShowcaseKeys.reportFilters,
-          _chartsKey,
-          ShowcaseKeys.reportCSV,
-          ShowcaseKeys.helpButton,
-        ]);
+        // Let the first entries arrive so the sheet steps can be shown too.
+        await Future.delayed(const Duration(milliseconds: 600));
+        if (!mounted) return;
+        _startTour();
         UserSession.markModuleVisited('ReportsScreen');
       }
     });
+  }
+
+  /// Every Reports control in visual order (top to bottom, left to right).
+  /// Only keys whose widgets are on screen right now are used.
+  List<GlobalKey> _tourKeys() => [
+        _kProject,
+        _kPeriod,
+        ShowcaseKeys.reportFilters,
+        _kHeaderExport,
+        _kAccount,
+        _kTabs,
+        _kSearch,
+        _kItem,
+        _kEditColumns,
+        _kSort,
+        _kExport,
+        _kFullScreen,
+        _kViewToggle,
+        _chartsKey,
+        _kSheet,
+        _kSheetHeader,
+        _kSheetScroll,
+        _kList,
+        _kPager,
+        ShowcaseKeys.reportAskAI,
+        _kQuickTiles,
+        _kByType,
+        _kByTypeToggle,
+        ShowcaseKeys.reportCSV,
+        _kCsvRevert,
+        ShowcaseKeys.helpButton,
+      ].where((k) => k.currentContext != null).toList();
+
+  void _startTour() {
+    final keys = _tourKeys();
+    if (keys.isNotEmpty) ShowCaseWidget.of(context).startShowCase(keys);
+  }
+
+  /// One tour step: a short title and a plain explanation.
+  Widget _tour(GlobalKey key, String title, String description, Widget child, {double radius = 14}) {
+    return Showcase(
+      key: key,
+      title: title,
+      description: description,
+      tooltipBackgroundColor: Bt.ink,
+      textColor: Colors.white,
+      titleTextStyle: BtText.body(context, color: Colors.white, weight: FontWeight.w700),
+      descTextStyle: BtText.subhead(context, color: Colors.white.withValues(alpha: .85)),
+      tooltipBorderRadius: BorderRadius.circular(16),
+      tooltipPadding: const EdgeInsets.all(16),
+      targetBorderRadius: BorderRadius.circular(radius),
+      child: child,
+    );
   }
 
   Future<void> _loadActiveColumns() async {
@@ -831,15 +907,10 @@ class _ReportsViewState extends State<_ReportsView> {
     }
   }
 
-  Future<void> _handleDownloadImportTemplate(
-    String quickCategoryTab,
-    List<String> activeCols,
-  ) async {
+  /// Same template as Add Entry (shared generator in csv_import_helper.dart).
+  Future<void> _handleDownloadImportTemplate() async {
     try {
-      await CsvImportHelper.downloadTemplate(
-        quickCategoryTab: quickCategoryTab,
-        activeColumns: activeCols,
-      );
+      await CsvImportHelper.downloadTemplate();
       if (mounted) {
         btToast(context, 'Import template downloaded!');
       }
@@ -847,6 +918,13 @@ class _ReportsViewState extends State<_ReportsView> {
       if (mounted) {
         btToast(context, 'Template download failed: $e', error: true);
       }
+    }
+  }
+
+  Future<void> _openTemplateColumns() async {
+    final cols = await CsvTemplate.openColumnsSheet(context);
+    if (cols != null && mounted) {
+      btToast(context, 'Template columns saved · ${cols.length} columns');
     }
   }
 
@@ -884,15 +962,13 @@ class _ReportsViewState extends State<_ReportsView> {
     try {
       final result = await CsvImportHelper.importCsv(
         projects: projectProvider.projects,
-        selectedProjectId: _selectedProjectId == 'all'
+        defaultProject: _selectedProjectId == 'all'
             ? null
-            : _selectedProjectId,
+            : projectProvider.projects.where((p) => p.id == _selectedProjectId).firstOrNull,
       );
-      if (!mounted) return;
-      final activeProjId = projectProvider.selectedProject?.id;
-      if (activeProjId != null) {
-        context.read<ProjectProvider>().load();
-      }
+      if (result == null || !mounted) return; // picker cancelled
+      context.read<ProjectProvider>().load();
+      context.read<ReportProvider>().refresh();
       showDialog(
         context: context,
         barrierColor: Bt.scrim,
@@ -970,50 +1046,62 @@ class _ReportsViewState extends State<_ReportsView> {
     }
   }
 
-  Widget _buildCsvImportCard(String quickCategoryTab, List<String> activeCols) {
-    final tab = quickCategoryTab.isEmpty ? 'All' : quickCategoryTab;
+  /// Bulk import — same template and parser as Add Entry (csv_import_helper.dart).
+  Widget _buildCsvImportCard() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const BtSectionHeader(title: 'Import from a spreadsheet'),
-        BtGroup(
-          children: [
-            BtRow(
-              leading: const BtTile(icon: Icons.download_rounded),
-              title: 'Download template',
-              subtitle: 'CSV with your chosen columns',
-              showChevron: true,
-              onTap: _isImportingCsv ? null : () => _handleDownloadImportTemplate(tab, activeCols),
-            ),
-            BtRow(
-              leading: const BtTile(icon: Icons.view_column_outlined),
-              title: 'Customize columns',
-              subtitle: 'Pick and reorder template columns',
-              showChevron: true,
-              onTap: _isImportingCsv ? null : () => _showCustomizeColumnsDialog(context, tab),
-            ),
-            BtRow(
-              leading: _isImportingCsv
-                  ? const SizedBox(width: 40, height: 40, child: Padding(padding: EdgeInsets.all(10), child: CircularProgressIndicator(strokeWidth: 2)))
-                  : const BtTile(icon: Icons.upload_file_rounded),
-              title: _isImportingCsv ? 'Importing…' : 'Upload CSV file',
-              subtitle: 'Adds every row as an entry',
-              titleColor: context.bt.brand,
-              titleWeight: FontWeight.w600,
-              onTap: _isImportingCsv ? null : _handleUploadCsv,
-            ),
-          ],
+        _tour(
+          ShowcaseKeys.reportCSV,
+          'Import many entries',
+          'Download the template (the same one as on Add Entry), choose its columns, fill one row per entry, then upload the CSV — each row becomes an entry.',
+          BtGroup(
+            children: [
+              BtRow(
+                leading: const BtTile(icon: Icons.download_rounded),
+                title: 'Download template',
+                subtitle: 'Same template as Add Entry',
+                showChevron: true,
+                onTap: _isImportingCsv ? null : _handleDownloadImportTemplate,
+              ),
+              BtRow(
+                leading: const BtTile(icon: Icons.view_column_outlined),
+                title: 'Customize columns',
+                subtitle: 'Pick and reorder template columns',
+                showChevron: true,
+                onTap: _isImportingCsv ? null : _openTemplateColumns,
+              ),
+              BtRow(
+                leading: _isImportingCsv
+                    ? const SizedBox(width: 40, height: 40, child: Padding(padding: EdgeInsets.all(10), child: CircularProgressIndicator(strokeWidth: 2)))
+                    : const BtTile(icon: Icons.upload_file_rounded),
+                title: _isImportingCsv ? 'Importing…' : 'Upload CSV file',
+                subtitle: 'Adds every row as an entry',
+                titleColor: context.bt.brand,
+                titleWeight: FontWeight.w600,
+                onTap: _isImportingCsv ? null : _handleUploadCsv,
+              ),
+            ],
+          ),
+          radius: Bt.rCard,
         ),
         const SizedBox(height: 12),
-        BtGroup(
-          children: [
-            BtRow(
-              leading: BtTile(icon: Icons.undo_rounded, bg: Bt.redSoft, fg: Bt.red),
-              title: 'Revert last CSV import…',
-              titleColor: Bt.red,
-              onTap: _isImportingCsv ? null : _handleRevertCsv,
-            ),
-          ],
+        _tour(
+          _kCsvRevert,
+          'Undo an import',
+          'Made a mistake in the file? This puts back what was there before your last CSV upload.',
+          BtGroup(
+            children: [
+              BtRow(
+                leading: BtTile(icon: Icons.undo_rounded, bg: Bt.redSoft, fg: Bt.red),
+                title: 'Revert last CSV import…',
+                titleColor: Bt.red,
+                onTap: _isImportingCsv ? null : _handleRevertCsv,
+              ),
+            ],
+          ),
+          radius: Bt.rCard,
         ),
       ],
     );
@@ -1520,64 +1608,63 @@ class _ReportsViewState extends State<_ReportsView> {
                   ],
                 ),
               ),
-              Showcase(
-                key: ShowcaseKeys.helpButton,
-                description: 'Tap here anytime to replay this tour and get help.',
-                tooltipBackgroundColor: Bt.ink,
-                textColor: Colors.white,
-                tooltipBorderRadius: BorderRadius.circular(16),
-                tooltipPadding: const EdgeInsets.all(16),
-                child: BtIconButton(
+              _tour(
+                ShowcaseKeys.helpButton,
+                'Guidelines',
+                'Tap here anytime to replay this tour of every Reports control.',
+                BtIconButton(
                   icon: Icons.help_outline_rounded,
                   semantic: 'App guidelines',
                   color: Bt.bone,
                   size: 21,
                   background: glass,
-                  onTap: () {
-                    ShowCaseWidget.of(context).startShowCase([
-                      ShowcaseKeys.reportAskAI,
-                      ShowcaseKeys.reportFilters,
-                      _chartsKey,
-                      ShowcaseKeys.reportCSV,
-                      ShowcaseKeys.helpButton,
-                    ]);
-                  },
+                  onTap: _startTour,
                 ),
+                radius: 22,
               ),
               const SizedBox(width: 6),
-              BtIconButton(
-                icon: Icons.ios_share_rounded,
-                semantic: 'Export report',
-                color: Bt.bone,
-                size: 20,
-                background: glass,
-                onTap: openExport,
+              _tour(
+                _kHeaderExport,
+                'Share the report',
+                'Download the entries you are looking at as a CSV (spreadsheet) or PDF file, with the current filters applied.',
+                BtIconButton(
+                  icon: Icons.ios_share_rounded,
+                  semantic: 'Export report',
+                  color: Bt.bone,
+                  size: 20,
+                  background: glass,
+                  onTap: openExport,
+                ),
+                radius: 22,
               ),
               const SizedBox(width: 4),
-              Semantics(
-                button: true,
-                label: 'Account',
-                child: InkWell(
-                  customBorder: const CircleBorder(),
-                  onTap: () => Navigator.pushNamed(context, '/profile'),
-                  child: const Padding(padding: EdgeInsets.all(4), child: ProfileAvatar(radius: 18)),
+              _tour(
+                _kAccount,
+                'Your account',
+                'Open your profile, settings and sign out.',
+                Semantics(
+                  button: true,
+                  label: 'Account',
+                  child: InkWell(
+                    customBorder: const CircleBorder(),
+                    onTap: () => Navigator.pushNamed(context, '/profile'),
+                    child: const Padding(padding: EdgeInsets.all(4), child: ProfileAvatar(radius: 18)),
+                  ),
                 ),
+                radius: 24,
               ),
             ],
           ),
           const SizedBox(height: 12),
-          Showcase(
-            key: ShowcaseKeys.reportFilters,
-            description: 'Filter your reports by project, date, status and more.',
-            tooltipBackgroundColor: Bt.ink,
-            textColor: Colors.white,
-            tooltipBorderRadius: BorderRadius.circular(16),
-            tooltipPadding: const EdgeInsets.all(16),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              clipBehavior: Clip.none,
-              child: Row(
-                children: [
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            clipBehavior: Clip.none,
+            child: Row(
+              children: [
+                _tour(
+                  _kProject,
+                  'Project',
+                  'Pick one project, or "All projects" to see every active project together. Everything below follows this choice.',
                   BtChip(
                     label: projectChip,
                     onDark: true,
@@ -1585,7 +1672,13 @@ class _ReportsViewState extends State<_ReportsView> {
                     selected: _selectedProjectId != 'all',
                     onTap: () => _pickProject(context, projectProvider),
                   ),
-                  const SizedBox(width: 8),
+                  radius: Bt.rChip,
+                ),
+                const SizedBox(width: 8),
+                _tour(
+                  _kPeriod,
+                  'Period',
+                  'Choose the dates to report on: All time, this week, this month… or a custom From–To range.',
                   BtChip(
                     label: periodChip,
                     onDark: true,
@@ -1593,7 +1686,13 @@ class _ReportsViewState extends State<_ReportsView> {
                     selected: _datePreset != 'All Time',
                     onTap: () => _pickPeriod(context),
                   ),
-                  const SizedBox(width: 8),
+                  radius: Bt.rChip,
+                ),
+                const SizedBox(width: 8),
+                _tour(
+                  ShowcaseKeys.reportFilters,
+                  'More filters',
+                  'Narrow the report by floor, phase, activity and payment status (paid, partial, not paid). The number shows how many filters are on.',
                   BtChip(
                     label: extraFilters == 0 ? 'Filter' : 'Filter · $extraFilters',
                     onDark: true,
@@ -1601,8 +1700,9 @@ class _ReportsViewState extends State<_ReportsView> {
                     selected: extraFilters > 0,
                     onTap: () => _openFilterSheet(context, projectProvider),
                   ),
-                ],
-              ),
+                  radius: Bt.rChip,
+                ),
+              ],
             ),
           ),
         ],
@@ -1618,59 +1718,94 @@ class _ReportsViewState extends State<_ReportsView> {
             clipBehavior: Clip.hardEdge,
             child: Row(
               children: [
-                _ToolChip(
-                  icon: Icons.search_rounded,
-                  semantic: searchVisible ? 'Hide search' : 'Search entries',
-                  selected: _searchQuery.isNotEmpty,
-                  onTap: () => setState(() {
-                    if (_searchQuery.isNotEmpty) {
-                      _searchOpen = true;
-                    } else {
-                      _searchOpen = !_searchOpen;
-                    }
-                  }),
+                _tour(
+                  _kSearch,
+                  'Search',
+                  quickCategoryTab == 'All'
+                      ? 'Find entries by name, brand, project and more. Tap again to hide the search box.'
+                      : 'Find ${quickCategoryTab.toLowerCase()} entries by name. Tap again to hide the search box.',
+                  _ToolChip(
+                    icon: Icons.search_rounded,
+                    semantic: searchVisible ? 'Hide search' : 'Search entries',
+                    selected: _searchQuery.isNotEmpty,
+                    onTap: () => setState(() {
+                      if (_searchQuery.isNotEmpty) {
+                        _searchOpen = true;
+                      } else {
+                        _searchOpen = !_searchOpen;
+                      }
+                    }),
+                  ),
+                  radius: Bt.rChip,
                 ),
                 if (quickCategoryTab != 'All') ...[
                   const SizedBox(width: 8),
                   ..._categoryToolbarChips(context, quickCategoryTab, allEntries),
                 ],
                 const SizedBox(width: 8),
-                _ToolChip(icon: Icons.view_column_outlined, label: 'Edit columns', onTap: openEditColumns),
-                const SizedBox(width: 8),
-                _ToolChip(
-                  icon: _sortAscending ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
-                  label: sortLabel,
-                  semantic: 'Sort, columns, table and export',
-                  onTap: openEntriesMenu,
+                _tour(
+                  _kEditColumns,
+                  'Edit columns',
+                  'Choose which columns the sheet shows and drag them into the order you like. Each tab remembers its own columns.',
+                  _ToolChip(icon: Icons.view_column_outlined, label: 'Edit columns', onTap: openEditColumns),
+                  radius: Bt.rChip,
                 ),
                 const SizedBox(width: 8),
-                _ToolChip(icon: Icons.file_download_outlined, label: 'Export', onTap: openExport),
+                _tour(
+                  _kSort,
+                  'Sort',
+                  'Order entries by date, project or amount, newest/highest or oldest/lowest first. The label shows the current order.',
+                  _ToolChip(
+                    icon: _sortAscending ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
+                    label: sortLabel,
+                    semantic: 'Sort, columns, table and export',
+                    onTap: openEntriesMenu,
+                  ),
+                  radius: Bt.rChip,
+                ),
                 const SizedBox(width: 8),
-                _ToolChip(icon: Icons.open_in_full_rounded, semantic: 'Full screen, can rotate', onTap: openFullScreen),
+                _tour(
+                  _kExport,
+                  'Export',
+                  'Save these entries as a CSV or PDF file to share or print.',
+                  _ToolChip(icon: Icons.file_download_outlined, label: 'Export', onTap: openExport),
+                  radius: Bt.rChip,
+                ),
+                const SizedBox(width: 8),
+                _tour(
+                  _kFullScreen,
+                  'Full screen',
+                  'Open the sheet on its own screen. Turn your phone sideways to see more columns at once.',
+                  _ToolChip(icon: Icons.open_in_full_rounded, semantic: 'Full screen, can rotate', onTap: openFullScreen),
+                  radius: Bt.rChip,
+                ),
               ],
             ),
           ),
         ),
         const SizedBox(width: 8),
-        ReportViewToggle(
-          table: _tableView,
-          onChanged: (v) => setState(() {
-            _tableView = v;
-            ReportFilterState.tableView = v;
-          }),
+        _tour(
+          _kViewToggle,
+          'Sheet or list',
+          'Left: spreadsheet view, one row per entry in columns (default). Right: card list grouped by date. Your choice is remembered.',
+          ReportViewToggle(
+            table: _tableView,
+            onChanged: (v) => setState(() {
+              _tableView = v;
+              ReportFilterState.tableView = v;
+            }),
+          ),
+          radius: Bt.rChip,
         ),
       ],
     );
 
     // ── summary strip: Total billed · Paid · Remaining
-    final summary = Showcase(
-      key: _chartsKey,
-      description: 'View a quick financial summary based on your filters.',
-      tooltipBackgroundColor: Bt.ink,
-      textColor: Colors.white,
-      tooltipBorderRadius: BorderRadius.circular(16),
-      tooltipPadding: const EdgeInsets.all(16),
-      child: _SummaryStrip(total: grandTotal, paid: grandPaid, remaining: grandRemaining),
+    final summary = _tour(
+      _chartsKey,
+      'Totals',
+      'Total billed, how much is paid and what is still to pay, for exactly the entries matching your project, period and filters.',
+      _SummaryStrip(total: grandTotal, paid: grandPaid, remaining: grandRemaining),
     );
 
     return Scaffold(
@@ -1699,9 +1834,14 @@ class _ReportsViewState extends State<_ReportsView> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      _CategoryTabs(
-                        activeTab: quickCategoryTab,
-                        onTabChanged: _selectCategoryTab,
+                      _tour(
+                        _kTabs,
+                        'Entry types',
+                        'Switch between All entries, Materials, Labour and Equipment. Each tab has its own columns and an item picker.',
+                        _CategoryTabs(
+                          activeTab: quickCategoryTab,
+                          onTabChanged: _selectCategoryTab,
+                        ),
                       ),
                       const SizedBox(height: 12),
                       toolbar,
@@ -1737,7 +1877,14 @@ class _ReportsViewState extends State<_ReportsView> {
                           ),
                         )
                       else if (showSheet)
-                        ReportSheet(
+                        _tour(
+                          _kSheet,
+                          'The sheet',
+                          'One row per entry. Tap a row to see all its details and to add more, record a payment or edit it.',
+                          ReportSheet(
+                          tourWrap: (part, child) => part == 'header'
+                              ? _tour(_kSheetHeader, 'Sort by a column', 'Tap the DATE, PROJECT or AMOUNT heading to sort by it; tap it again to flip the order.', child, radius: 0)
+                              : _tour(_kSheetScroll, 'Scroll sideways', 'Swipe the sheet left and right to see every column — the first column stays pinned. This bar shows where you are.', child),
                           entries: paginatedEntries,
                           columns: activeCols,
                           maxHeight: sheetMax,
@@ -1751,57 +1898,70 @@ class _ReportsViewState extends State<_ReportsView> {
                           onAddMore: (e) => _ReportActions.addMore(context, e),
                           onRecordPayment: (e) => _ReportActions.recordPayment(context, e, getProjectName(e.projectId)),
                           onEdit: (e) => _ReportActions.editEntry(context, e),
+                          ),
                         )
                       else
-                        ..._buildEntryGroups(context, paginatedEntries, getProjectName),
+                        _tour(
+                          _kList,
+                          'Entry list',
+                          'Entries grouped by date. Tap one to see its details and to add more, record a payment or edit it.',
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: _buildEntryGroups(context, paginatedEntries, getProjectName),
+                          ),
+                        ),
                       if (!notGenerated && paginatedEntries.isNotEmpty && (showSheet || totalCount > _rowsPerPage || _rowsPerPage != 10))
-                        _buildPager(context, safeCurrentPage, totalPages),
+                        _tour(
+                          _kPager,
+                          'Pages',
+                          'Choose how many rows to show per page (10, 20 or 50) and move between pages with the arrows.',
+                          _buildPager(context, safeCurrentPage, totalPages),
+                        ),
                       const SizedBox(height: 24),
-                      Showcase(
-                        key: ShowcaseKeys.reportAskAI,
-                        description: 'Ask AI about costs, missing entries, or anything related to this report.',
-                        tooltipBackgroundColor: Bt.ink,
-                        textColor: Colors.white,
-                        tooltipBorderRadius: BorderRadius.circular(16),
-                        tooltipPadding: const EdgeInsets.all(16),
-                        child: _AskAiBanner(projectName: provider.selectedProjectName),
+                      _tour(
+                        ShowcaseKeys.reportAskAI,
+                        'Ask AI',
+                        'Ask questions in plain words — costs, missing entries, stock — about this report and get an answer.',
+                        _AskAiBanner(projectName: provider.selectedProjectName),
+                        radius: Bt.rCard,
                       ),
                       const SizedBox(height: 10),
-                      IntrinsicHeight(
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Expanded(
-                              child: EfficiencyBanner(
-                                note: 'Budget vs spend',
-                                isExceeded: grandRemaining > 0,
+                      _tour(
+                        _kQuickTiles,
+                        'Shortcuts',
+                        'Table view opens the sheet full screen (rotate for more columns). Export saves the report as CSV or PDF.',
+                        IntrinsicHeight(
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Expanded(
+                                child: ReportQuickTile(
+                                  icon: Icons.screen_rotation_rounded,
+                                  title: 'Table view',
+                                  subtitle: 'Full screen',
+                                  onTap: openFullScreen,
+                                ),
                               ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: ReportQuickTile(
-                                icon: Icons.screen_rotation_rounded,
-                                title: 'Table view',
-                                subtitle: 'Full screen',
-                                onTap: openFullScreen,
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: ReportQuickTile(
+                                  icon: Icons.ios_share_rounded,
+                                  title: 'Export',
+                                  subtitle: 'CSV or PDF',
+                                  onTap: openExport,
+                                ),
                               ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: ReportQuickTile(
-                                icon: Icons.ios_share_rounded,
-                                title: 'Export',
-                                subtitle: 'CSV or PDF',
-                                onTap: openExport,
-                              ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
+                        radius: 20,
                       ),
                       const SizedBox(height: 28),
                       _buildByType(
                         context,
                         total: grandTotal,
+                        paid: grandPaid,
+                        remaining: grandRemaining,
                         material: materialTotal,
                         labour: labourTotal,
                         equipment: equipmentTotal,
@@ -1813,15 +1973,7 @@ class _ReportsViewState extends State<_ReportsView> {
                         },
                       ),
                       const SizedBox(height: 28),
-                      Showcase(
-                        key: ShowcaseKeys.reportCSV,
-                        description: 'Use this to export data to CSV or import bulk entries from a CSV file.',
-                        tooltipBackgroundColor: Bt.ink,
-                        textColor: Colors.white,
-                        tooltipBorderRadius: BorderRadius.circular(16),
-                        tooltipPadding: const EdgeInsets.all(16),
-                        child: _buildCsvImportCard(quickCategoryTab, activeCols),
-                      ),
+                      _buildCsvImportCard(),
                     ],
                   ),
                 ),
@@ -2188,22 +2340,26 @@ class _ReportsViewState extends State<_ReportsView> {
     );
   }
 
-  /// Totals per entry type (tap a row to open that tab).
+  /// "By type": 3-column cost-card grid (default, as in the original app) or
+  /// the per-type list. Tap a type to open its tab.
   Widget _buildByType(
     BuildContext context, {
     required double total,
+    required double paid,
+    required double remaining,
     required double material,
     required double labour,
     required double equipment,
     required ValueChanged<String> onType,
   }) {
     final bt = context.bt;
-    Widget type(String label, String tab, String typeName, double v, Color c) {
-      final share = total > 0 ? (v / total).clamp(0.0, 1.0) : 0.0;
+    double share(double v) => total > 0 ? (v / total).clamp(0.0, 1.0) : 0.0;
+
+    Widget listRow(String label, String tab, String typeName, double v, Color c) {
       return BtRow(
         leading: BtTypeTile(type: typeName),
         title: label,
-        subtitle: '${(share * 100).round()}% of billed',
+        subtitle: '${(share(v) * 100).round()}% of billed',
         minHeight: 64,
         onTap: () => onType(tab),
         trailing: Row(mainAxisSize: MainAxisSize.min, children: [
@@ -2215,7 +2371,7 @@ class _ReportsViewState extends State<_ReportsView> {
               children: [
                 Text(formatInr(v, compact: true), style: BtText.num(BtText.body(context, weight: FontWeight.w600))),
                 const SizedBox(height: 6),
-                BtProgress(value: share, color: c, thin: true),
+                BtProgress(value: share(v), color: c, thin: true),
               ],
             ),
           ),
@@ -2225,15 +2381,97 @@ class _ReportsViewState extends State<_ReportsView> {
       );
     }
 
+    Widget gridRow(List<Widget> cards) => IntrinsicHeight(
+          child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            for (var i = 0; i < cards.length; i++) ...[
+              if (i > 0) const SizedBox(width: 8),
+              Expanded(child: cards[i]),
+            ],
+          ]),
+        );
+
+    final body = _byTypeGrid
+        ? Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              gridRow([
+                _CostCard(title: 'Total billed', value: total, icon: Icons.account_balance_wallet_outlined, featured: true),
+                _CostCard(title: 'Paid', value: paid, icon: Icons.check_circle_outline_rounded, color: Bt.green),
+                _CostCard(
+                  title: 'Remaining',
+                  value: remaining,
+                  icon: Icons.pending_outlined,
+                  color: remaining > 0 ? Bt.red : Bt.green,
+                ),
+              ]),
+              const SizedBox(height: 8),
+              gridRow([
+                _CostCard(
+                  title: 'Material',
+                  value: material,
+                  icon: BtTypeTile.iconFor('material'),
+                  color: bt.series[0],
+                  share: share(material),
+                  onTap: () => onType('Materials'),
+                ),
+                _CostCard(
+                  title: 'Labour',
+                  value: labour,
+                  icon: BtTypeTile.iconFor('labour'),
+                  color: bt.series[1],
+                  share: share(labour),
+                  onTap: () => onType('Labour'),
+                ),
+                _CostCard(
+                  title: 'Equipment',
+                  value: equipment,
+                  icon: BtTypeTile.iconFor('equipment'),
+                  color: bt.series[2],
+                  share: share(equipment),
+                  onTap: () => onType('Equipment'),
+                ),
+              ]),
+            ],
+          )
+        : BtGroup(children: [
+            listRow('Material', 'Materials', 'material', material, bt.series[0]),
+            listRow('Labour', 'Labour', 'labour', labour, bt.series[1]),
+            listRow('Equipment', 'Equipment', 'equipment', equipment, bt.series[2]),
+          ]);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const BtSectionHeader(title: 'By type', caption: true),
-        BtGroup(children: [
-          type('Material', 'Materials', 'material', material, bt.series[0]),
-          type('Labour', 'Labour', 'labour', labour, bt.series[1]),
-          type('Equipment', 'Equipment', 'equipment', equipment, bt.series[2]),
-        ]),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: Row(children: [
+            Expanded(child: Text('BY TYPE', style: BtText.mono(context))),
+            _tour(
+              _kByTypeToggle,
+              'Cards or list',
+              'Left: cost cards in three columns (default). Right: one row per type with its share of the total. Your choice is remembered.',
+              ReportViewToggle(
+                table: _byTypeGrid,
+                tableIcon: Icons.grid_view_rounded,
+                tableLabel: 'Cards',
+                listIcon: Icons.view_list_rounded,
+                listLabel: 'List',
+                onChanged: (v) => setState(() {
+                  _byTypeGrid = v;
+                  ReportFilterState.byTypeGrid = v;
+                }),
+              ),
+              radius: Bt.rChip,
+            ),
+          ]),
+        ),
+        _tour(
+          _kByType,
+          'By type',
+          'What you spent, paid and still owe, then the split between Material, Labour and Equipment. Tap a type to open its tab.',
+          body,
+          radius: 16,
+        ),
       ],
     );
   }
@@ -2319,7 +2557,12 @@ class _ReportsViewState extends State<_ReportsView> {
     final uniqueNames = _uniqueItemNames(meta.type, allEntries);
     final itemLabel = _selectedItemName ?? 'All';
     return [
-      BtChip(
+      _tour(
+        _kItem,
+        '$dropdownLabel picker',
+        'Show only one ${dropdownLabel.toLowerCase()} — the totals and the sheet follow it. Pick "All" to see every one again.',
+        radius: Bt.rChip,
+        BtChip(
         label: '$dropdownLabel: ${itemLabel.length > 16 ? '${itemLabel.substring(0, 15).trimRight()}…' : itemLabel}',
         trailingIcon: Icons.expand_more_rounded,
         selected: _selectedItemName != null,
@@ -2340,6 +2583,7 @@ class _ReportsViewState extends State<_ReportsView> {
             _currentPage = 1;
           });
         },
+      ),
       ),
       if (!_reportGenerated) ...[
         const SizedBox(width: 8),
@@ -2622,6 +2866,79 @@ class _ReportsViewState extends State<_ReportsView> {
 }
 
 /// Noir "Ask AI about your costs" card (Reports board).
+/// Cost card in the "By type" grid (V2 version of the original app's cards).
+class _CostCard extends StatelessWidget {
+  const _CostCard({
+    required this.title,
+    required this.value,
+    required this.icon,
+    this.color,
+    this.featured = false,
+    this.share,
+    this.onTap,
+  });
+  final String title;
+  final double value;
+  final IconData icon;
+  final Color? color;
+  final bool featured;
+  /// Share of the total billed (type cards only).
+  final double? share;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = featured ? Bt.bone : (color ?? Bt.ink);
+    final label = featured ? Bt.onNoir2 : Bt.ink2;
+    final card = Container(
+      padding: const EdgeInsets.fromLTRB(11, 11, 11, 11),
+      decoration: BoxDecoration(
+        color: featured ? Bt.ink : Bt.card,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: featured ? null : Bt.shadow,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(
+              color: featured ? Colors.white.withValues(alpha: .1) : (color ?? Bt.ink).withValues(alpha: .12),
+              borderRadius: BorderRadius.circular(9),
+            ),
+            child: Icon(icon, size: 16, color: featured ? Bt.bone : (color ?? Bt.ink)),
+          ),
+          const SizedBox(height: 10),
+          Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.caption(context, color: label).copyWith(fontSize: 12)),
+          const SizedBox(height: 2),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              formatInr(value, compact: true),
+              maxLines: 1,
+              style: BtText.num(BtText.body(context, weight: FontWeight.w700, color: featured ? Bt.bone : Bt.ink)).copyWith(fontSize: 15),
+            ),
+          ),
+          if (share != null) ...[
+            const SizedBox(height: 8),
+            BtProgress(value: share!, color: fg, thin: true),
+          ],
+        ],
+      ),
+    );
+    if (onTap == null) return Semantics(label: '$title ${formatInr(value)}', excludeSemantics: true, child: card);
+    return BtPressable(
+      onTap: onTap!,
+      scale: .96,
+      semanticLabel: '$title ${formatInr(value)}. Open $title tab',
+      child: card,
+    );
+  }
+}
+
 class _AskAiBanner extends StatelessWidget {
   const _AskAiBanner({required this.projectName});
   final String projectName;

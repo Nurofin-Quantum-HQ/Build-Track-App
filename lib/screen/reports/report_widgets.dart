@@ -767,37 +767,3 @@ class ReportQuickTile extends StatelessWidget {
     );
   }
 }
-
-class EfficiencyBanner extends StatelessWidget {
-  const EfficiencyBanner({
-    super.key,
-    required this.note,
-    required this.isExceeded,
-  });
-  final String note;
-  final bool isExceeded;
-  @override
-  Widget build(BuildContext context) {
-    void open() {
-      final selectedProjectName = context
-          .read<ReportProvider>()
-          .selectedProjectName;
-      Navigator.pushNamed(
-        context,
-        '/report-insights',
-        arguments: {'projectName': selectedProjectName},
-      );
-    }
-
-    final bt = context.bt;
-    return ReportQuickTile(
-      icon: Icons.bar_chart,
-      title: 'Efficiency Report',
-      subtitle: note,
-      subtitleMaxLines: 2,
-      tileBg: isExceeded ? Bt.redSoft : bt.accent,
-      tileFg: isExceeded ? Bt.red : bt.onAccent,
-      onTap: open,
-    );
-  }
-}

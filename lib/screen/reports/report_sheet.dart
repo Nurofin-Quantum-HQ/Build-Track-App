@@ -30,7 +30,12 @@ class ReportSheet extends StatefulWidget {
     this.maxHeight = 420,
     this.firstRowNumber = 1,
     this.pinnedWidth = 132,
+    this.tourWrap,
   });
+
+  /// Lets the screen wrap the header row ('header') and the scroll hint
+  /// ('footer') in guided-tour steps. Identity when null.
+  final Widget Function(String part, Widget child)? tourWrap;
 
   final List<EntryModel> entries;
 
@@ -246,6 +251,7 @@ class _ReportSheetState extends State<ReportSheet> {
     final bodyHeight = (rows.length * ReportSheet.rowHeight).clamp(ReportSheet.rowHeight, maxBody).toDouble();
     final innerScroll = rows.length * ReportSheet.rowHeight > bodyHeight + .5;
     final vPhysics = innerScroll ? const ClampingScrollPhysics() : const NeverScrollableScrollPhysics();
+    Widget wrap(String part, Widget child) => widget.tourWrap?.call(part, child) ?? child;
 
     return ScrollConfiguration(
       // Let mouse and trackpad drag the sheet too (web / desktop).
@@ -269,7 +275,7 @@ class _ReportSheetState extends State<ReportSheet> {
                     Positioned.fill(
                       left: pinned == null ? 0 : pinW,
                       child: Column(children: [
-                        SingleChildScrollView(
+                        wrap('header', SingleChildScrollView(
                           controller: _hHead,
                           scrollDirection: Axis.horizontal,
                           physics: const ClampingScrollPhysics(),
@@ -278,7 +284,7 @@ class _ReportSheetState extends State<ReportSheet> {
                             decoration: const BoxDecoration(color: _headBg, border: Border(bottom: BorderSide(color: _line2))),
                             child: Row(children: [for (final c in scrollCols) _headerCell(c, ReportSheet.widthOf(c), s)]),
                           ),
-                        ),
+                        )),
                         Expanded(
                           child: SingleChildScrollView(
                             controller: _hBody,
@@ -375,11 +381,11 @@ class _ReportSheetState extends State<ReportSheet> {
               height: ReportSheet.footerHeight,
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(2, 10, 2, 0),
-                child: Row(children: [
+                child: wrap('footer', Row(children: [
                   Text('Tap a row for details', style: BtText.caption(context).copyWith(fontSize: 12)),
                   const SizedBox(width: 12),
                   Expanded(child: _ScrollTrack(controller: _hBody)),
-                ]),
+                ])),
               ),
             ),
           ],
@@ -682,11 +688,23 @@ class _ScrollTrack extends StatelessWidget {
   }
 }
 
-/// Table / List switch in the Reports toolbar.
+/// Table / List switch in the Reports toolbar (also Cards / List under "By type").
 class ReportViewToggle extends StatelessWidget {
-  const ReportViewToggle({super.key, required this.table, required this.onChanged});
+  const ReportViewToggle({
+    super.key,
+    required this.table,
+    required this.onChanged,
+    this.tableIcon = Icons.table_chart_outlined,
+    this.tableLabel = 'Table',
+    this.listIcon = Icons.view_agenda_outlined,
+    this.listLabel = 'List',
+  });
   final bool table;
   final ValueChanged<bool> onChanged;
+  final IconData tableIcon;
+  final String tableLabel;
+  final IconData listIcon;
+  final String listLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -721,8 +739,8 @@ class ReportViewToggle extends StatelessWidget {
       padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(color: Bt.ink.withValues(alpha: .06), borderRadius: BorderRadius.circular(Bt.rChip)),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
-        option(true, Icons.table_chart_outlined, 'Table'),
-        option(false, Icons.view_agenda_outlined, 'List'),
+        option(true, tableIcon, tableLabel),
+        option(false, listIcon, listLabel),
       ]),
     );
   }
