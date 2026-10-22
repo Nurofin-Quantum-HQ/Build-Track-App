@@ -161,16 +161,19 @@ class _AssignTaskScreenContentState extends State<_AssignTaskScreenContent> {
         'activityName': _selectedActivity,
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Task assigned successfully')),
+        await showBtSuccess(
+          context,
+          kind: BtSuccessKind.check,
+          title: 'Task assigned successfully',
+          message: _title,
+          label: 'ASSIGN TASK',
         );
+        if (!mounted) return;
         Navigator.pop(context, true);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+        btToast(context, 'Error: $e', error: true);
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -179,14 +182,145 @@ class _AssignTaskScreenContentState extends State<_AssignTaskScreenContent> {
   @override
   Widget build(BuildContext context) {
     final users = _users;
-    String? userLabel;
+    String? userName;
     for (final u in users) {
-      if (u['_id'].toString() == _selectedUserId) userLabel = '${u['name']} (${u['role']})';
+      if (u['_id'].toString() == _selectedUserId) userName = '${u['name']}';
     }
+    final firstName = userName?.trim().split(RegExp(r'\s+')).first;
+    final sections = <Widget>[
+      EntryLabeled(
+        label: 'Task title',
+        required: true,
+        child: TextFormField(
+          style: BtText.body(context, weight: FontWeight.w600).copyWith(fontSize: 18),
+          decoration: btInput(context, hint: 'e.g. Cast slab — first floor'),
+          validator: (val) => val == null || val.isEmpty ? 'Required' : null,
+          onSaved: (val) => _title = val ?? '',
+        ),
+      ),
+      ExecutionContextCard(
+        selectedProjectId: _selectedProjectId,
+        selectedFloor: _selectedFloor,
+        selectedPhase: _selectedPhase,
+        selectedActivity: _selectedActivity,
+        projectError: _projectError,
+        floorError: _floorError,
+        phaseError: _phaseError,
+        activityError: _activityError,
+        onProjectChanged: (v) {
+          setState(() {
+            _selectedProjectId = v;
+            _selectedFloor = null;
+            _selectedFloorId = null;
+            _selectedPhase = null;
+            _selectedPhaseId = null;
+            _selectedActivity = null;
+            _selectedActivityId = null;
+            _projectError = null;
+          });
+          final provider = Provider.of<ProjectProvider>(
+            context,
+            listen: false,
+          );
+          if (v != null) {
+            final project = provider.projects.firstWhere(
+              (p) => p.id == v,
+            );
+            provider.selectProject(project);
+          }
+        },
+        onFloorChanged: (v) {
+          setState(() {
+            _selectedFloor = v;
+            _selectedFloorId = v;
+            _selectedPhase = null;
+            _selectedPhaseId = null;
+            _selectedActivity = null;
+            _selectedActivityId = null;
+            _floorError = null;
+          });
+          Provider.of<ProjectProvider>(
+            context,
+            listen: false,
+          ).selectFloor(v);
+        },
+        onPhaseChanged: (v) {
+          final phaseName = v?.toString();
+          final phaseId = phaseName != null
+              ? _derivePhaseId(phaseName)
+              : null;
+          setState(() {
+            _selectedPhase = phaseName;
+            _selectedPhaseId = phaseId;
+            _selectedActivity = null;
+            _selectedActivityId = null;
+            _phaseError = null;
+          });
+          Provider.of<ProjectProvider>(
+            context,
+            listen: false,
+          ).selectPhase(phaseName, phaseId);
+        },
+        onActivityChanged: (v) {
+          final activityName = v?.toString();
+          final activityId = activityName != null
+              ? _deriveActivityId(activityName)
+              : null;
+          setState(() {
+            _selectedActivity = activityName;
+            _selectedActivityId = activityId;
+            _activityError = null;
+          });
+          Provider.of<ProjectProvider>(
+            context,
+            listen: false,
+          ).selectActivity(activityName, activityId);
+        },
+      ),
+      EntryLabeled(
+        label: 'Assign to',
+        child: users.isEmpty
+            ? const BtCard(
+                padding: EdgeInsets.zero,
+                child: BtEmpty(icon: Icons.group_outlined, title: 'No team members yet'),
+              )
+            : SizedBox(
+                height: 118,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  clipBehavior: Clip.none,
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  itemCount: users.length,
+                  separatorBuilder: (_, _) => const SizedBox(width: 6),
+                  itemBuilder: (context, i) {
+                    final u = users[i];
+                    final id = u['_id'].toString();
+                    return _PersonChip(
+                      name: '${u['name']}',
+                      role: '${u['role']}',
+                      selected: id == _selectedUserId,
+                      onTap: () => setState(() => _selectedUserId = id),
+                    );
+                  },
+                ),
+              ),
+      ),
+      EntryLabeled(
+        label: 'Details',
+        child: TextFormField(
+          maxLines: 4,
+          minLines: 3,
+          style: BtText.body(context),
+          decoration: btInput(context, hint: 'Anything the team should know (optional)'),
+          onSaved: (val) => _description = val ?? '',
+        ),
+      ),
+    ];
     return Scaffold(
       backgroundColor: Bt.ground,
       appBar: BtNavBar(
         title: 'Assign task',
+        close: true,
         trailing: Showcase(
           key: _helpKey,
           description: 'Get help and understand how this screen works.',
@@ -200,156 +334,95 @@ class _AssignTaskScreenContentState extends State<_AssignTaskScreenContent> {
           ),
         ),
       ),
-      body: _isLoading
-          ? const Padding(padding: EdgeInsets.all(16), child: BtSkeletonList(count: 4))
-          : Form(
-              key: _formKey,
-              child: ListView(
-                physics: const ClampingScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+      body: AbsorbPointer(
+        absorbing: _isLoading,
+        child: Form(
+          key: _formKey,
+          child: ListView(
+            physics: const ClampingScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(16, 6, 16, 32),
+            children: [
+              for (var i = 0; i < sections.length; i++) ...[
+                if (i > 0) const SizedBox(height: 24),
+                BtReveal(index: i, child: sections[i]),
+              ],
+            ],
+          ),
+        ),
+      ),
+      bottomNavigationBar: BtCtaBar(
+        children: [
+          Expanded(
+            child: BtButton(
+              label: firstName != null && firstName.isNotEmpty ? 'Assign to $firstName' : 'Assign Task',
+              loading: _isLoading,
+              onPressed: _submit,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Avatar + name chip for picking who gets the task.
+class _PersonChip extends StatelessWidget {
+  const _PersonChip({required this.name, required this.role, required this.selected, required this.onTap});
+  final String name, role;
+  final bool selected;
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) {
+    final bt = context.bt;
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: '$name, $role',
+      excludeSemantics: true,
+      child: BtPressable(
+        onTap: onTap,
+        scale: .94,
+        child: SizedBox(
+          width: 76,
+          child: Column(
+            children: [
+              Stack(
+                clipBehavior: Clip.none,
                 children: [
-                  EntryLabeled(
-                    label: 'Task title',
-                    required: true,
-                    child: TextFormField(
-                      style: BtText.body(context),
-                      decoration: btInput(context, hint: 'e.g. Cast slab — first floor'),
-                      validator: (val) => val == null || val.isEmpty ? 'Required' : null,
-                      onSaved: (val) => _title = val ?? '',
+                  AnimatedContainer(
+                    duration: Bt.fast,
+                    curve: Bt.ease,
+                    padding: const EdgeInsets.all(3),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: selected ? bt.accent : Colors.transparent, width: 2),
                     ),
+                    child: BtAvatar(name: name, size: 52),
                   ),
-                  const SizedBox(height: 24),
-                            ExecutionContextCard(
-                    selectedProjectId: _selectedProjectId,
-                    selectedFloor: _selectedFloor,
-                    selectedPhase: _selectedPhase,
-                    selectedActivity: _selectedActivity,
-                    projectError: _projectError,
-                    floorError: _floorError,
-                    phaseError: _phaseError,
-                    activityError: _activityError,
-                    onProjectChanged: (v) {
-                      setState(() {
-                        _selectedProjectId = v;
-                        _selectedFloor = null;
-                        _selectedFloorId = null;
-                        _selectedPhase = null;
-                        _selectedPhaseId = null;
-                        _selectedActivity = null;
-                        _selectedActivityId = null;
-                        _projectError = null;
-                      });
-                      final provider = Provider.of<ProjectProvider>(
-                        context,
-                        listen: false,
-                      );
-                      if (v != null) {
-                        final project = provider.projects.firstWhere(
-                          (p) => p.id == v,
-                        );
-                        provider.selectProject(project);
-                      }
-                    },
-                    onFloorChanged: (v) {
-                      setState(() {
-                        _selectedFloor = v;
-                        _selectedFloorId = v;
-                        _selectedPhase = null;
-                        _selectedPhaseId = null;
-                        _selectedActivity = null;
-                        _selectedActivityId = null;
-                        _floorError = null;
-                      });
-                      Provider.of<ProjectProvider>(
-                        context,
-                        listen: false,
-                      ).selectFloor(v);
-                    },
-                    onPhaseChanged: (v) {
-                      final phaseName = v?.toString();
-                      final phaseId = phaseName != null
-                          ? _derivePhaseId(phaseName)
-                          : null;
-                      setState(() {
-                        _selectedPhase = phaseName;
-                        _selectedPhaseId = phaseId;
-                        _selectedActivity = null;
-                        _selectedActivityId = null;
-                        _phaseError = null;
-                      });
-                      Provider.of<ProjectProvider>(
-                        context,
-                        listen: false,
-                      ).selectPhase(phaseName, phaseId);
-                    },
-                    onActivityChanged: (v) {
-                      final activityName = v?.toString();
-                      final activityId = activityName != null
-                          ? _deriveActivityId(activityName)
-                          : null;
-                      setState(() {
-                        _selectedActivity = activityName;
-                        _selectedActivityId = activityId;
-                        _activityError = null;
-                      });
-                      Provider.of<ProjectProvider>(
-                        context,
-                        listen: false,
-                      ).selectActivity(activityName, activityId);
-                    },
-                  ),
-                  const SizedBox(height: 24),
-                  EntryLabeled(
-                    label: 'Assign to',
-                    child: BtPickerField(
-                      text: userLabel ?? 'Select a person',
-                      placeholder: userLabel == null,
-                      icon: Icons.expand_more_rounded,
-                      leading: Icons.person_outline_rounded,
-                      onTap: () async {
-                        final picked = await showBtSheet<String>(
-                          context,
-                          title: 'Assign to',
-                          builder: (sheetCtx) => users.isEmpty
-                              ? const BtEmpty(icon: Icons.group_outlined, title: 'No team members yet')
-                              : BtGroup(
-                                  children: [
-                                    for (final u in users)
-                                      BtRow(
-                                        leading: BtAvatar(name: '${u['name']}', size: 36),
-                                        title: '${u['name']}',
-                                        subtitle: '${u['role']}',
-                                        trailing: u['_id'].toString() == _selectedUserId
-                                            ? Icon(Icons.check_rounded, color: sheetCtx.bt.brand)
-                                            : null,
-                                        onTap: () => Navigator.pop(sheetCtx, u['_id'].toString()),
-                                      ),
-                                  ],
-                                ),
-                        );
-                        if (picked != null) setState(() => _selectedUserId = picked);
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  EntryLabeled(
-                    label: 'Details',
-                    child: TextFormField(
-                      maxLines: 4,
-                      minLines: 3,
-                      style: BtText.body(context),
-                      decoration: btInput(context, hint: 'Anything the team should know (optional)'),
-                      onSaved: (val) => _description = val ?? '',
+                  Positioned(
+                    right: -1,
+                    bottom: -1,
+                    child: AnimatedScale(
+                      scale: selected ? 1 : 0,
+                      duration: Bt.medium,
+                      curve: Bt.spring,
+                      child: Container(
+                        width: 22,
+                        height: 22,
+                        decoration: BoxDecoration(color: bt.accent, shape: BoxShape.circle, border: Border.all(color: Bt.ground, width: 2)),
+                        child: Icon(Icons.check_rounded, size: 13, color: bt.onAccent),
+                      ),
                     ),
                   ),
                 ],
               ),
-            ),
-      bottomNavigationBar: _isLoading
-          ? null
-          : EntryBottomBar(
-              child: BtButton(label: 'Assign Task', onPressed: _submit),
-            ),
+              const SizedBox(height: 6),
+              Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.caption(context, color: selected ? Bt.ink : Bt.ink2, weight: selected ? FontWeight.w600 : FontWeight.w500)),
+              Text(role, maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.caption(context).copyWith(fontSize: 11)),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

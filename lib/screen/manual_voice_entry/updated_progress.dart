@@ -1,6 +1,4 @@
 import 'package:buildtrack_mobile/design/design.dart';
-import 'package:buildtrack_mobile/common/themes/app_colors.dart';
-import 'package:buildtrack_mobile/common/widgets/entry_widgets.dart';
 import 'package:buildtrack_mobile/controller/project_provider.dart';
 import 'package:buildtrack_mobile/controller/user_session.dart';
 import 'package:buildtrack_mobile/models/construction_models.dart';
@@ -17,9 +15,6 @@ class UpdateProgressScreen extends StatefulWidget {
   State<UpdateProgressScreen> createState() => _UpdateProgressScreenState();
 }
 class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
-  static var primaryBlue = AppColors.primary;
-  static const textDark = AppColors.textDark;
-  static const textGray = AppColors.textLight;
   String? _selectedProjectId;
   String? _selectedFloor;
   String? _selectedPhaseName;
@@ -36,6 +31,7 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
   List<TaskModel> _dailyTasks = [];
   bool _isLoadingTasks = true;
   final Set<String> _completedTaskIds = {};
+  bool _submitting = false;
   static const _months = [
     'January',
     'February',
@@ -91,52 +87,33 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
         return StatefulBuilder(
           builder: (ctx, setDialogState) {
             return AlertDialog(
-              title: const Text('Edit Task'),
+              backgroundColor: Bt.ground,
+              surfaceTintColor: Colors.transparent,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Bt.rCard)),
+              title: Text('Edit task', style: BtText.title(ctx, size: 20)),
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Title',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: AppColors.textLight,
-                      ),
-                    ),
+                    Text('Title', style: BtText.subhead(ctx, weight: FontWeight.w500)),
                     const SizedBox(height: 4),
                     TextField(
                       controller: titleCtrl,
-                      decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
-                        isDense: true,
-                      ),
+                      style: BtText.body(ctx),
+                      decoration: btInput(ctx),
                     ),
                     const SizedBox(height: 12),
-                    const Text(
-                      'Description',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: AppColors.textLight,
-                      ),
-                    ),
+                    Text('Description', style: BtText.subhead(ctx, weight: FontWeight.w500)),
                     const SizedBox(height: 4),
                     TextField(
                       controller: descCtrl,
                       maxLines: 3,
-                      decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
-                        isDense: true,
-                      ),
+                      style: BtText.body(ctx),
+                      decoration: btInput(ctx),
                     ),
                     const SizedBox(height: 12),
-                    const Text(
-                      'Status',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: AppColors.textLight,
-                      ),
-                    ),
+                    Text('Status', style: BtText.subhead(ctx, weight: FontWeight.w500)),
                     const SizedBox(height: 4),
                     DropdownButtonFormField<String>(
                       initialValue:
@@ -157,10 +134,8 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
                           updatedStatus = v;
                         });
                       },
-                      decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
-                        isDense: true,
-                      ),
+                      style: BtText.body(ctx),
+                      decoration: btInput(ctx),
                     ),
                   ],
                 ),
@@ -168,9 +143,16 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
               actions: [
                 TextButton(
                   onPressed: saving ? null : () => Navigator.pop(ctx),
+                  style: TextButton.styleFrom(foregroundColor: Bt.ink2, minimumSize: const Size(64, 44)),
                   child: const Text('Cancel'),
                 ),
-                ElevatedButton(
+                FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Bt.ink,
+                    foregroundColor: Bt.bone,
+                    minimumSize: const Size(88, 44),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
                   onPressed: saving
                       ? null
                       : () async {
@@ -193,7 +175,7 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
                       ? const SizedBox(
                           width: 16,
                           height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Bt.bone),
                         )
                       : const Text('Save'),
                 ),
@@ -343,12 +325,17 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
     return match.allActivities.map((a) => a.name).toList();
   }
   Widget _sectionLabel(String text) => Padding(
-    padding: const EdgeInsets.only(bottom: 8),
+    padding: const EdgeInsets.only(left: 2, bottom: 8),
     child: Text(text, style: BtText.subhead(context, weight: FontWeight.w500)),
   );
-  Widget _sectionTitle(String text) => Padding(
-    padding: const EdgeInsets.only(bottom: 12),
-    child: Text(text, style: BtText.headline(context)),
+  Widget _sectionTitle(String text, {Widget? trailing}) => Padding(
+    padding: const EdgeInsets.only(left: 2, bottom: 10),
+    child: Row(
+      children: [
+        Expanded(child: Text(text, style: BtText.headline(context))),
+        ?trailing,
+      ],
+    ),
   );
   Widget _dropdownCard<T>({
     required T? value,
@@ -359,43 +346,29 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
   }) {
     final bool hasValue = items.any((i) => i.value == value);
     final T? safe = hasValue ? value : null;
-    return Opacity(
+    return AnimatedOpacity(
+      duration: Bt.fast,
       opacity: enabled ? 1.0 : 0.45,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: Bt.inputBorder,
-            width: 1,
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<T>(
+          value: safe,
+          isExpanded: true,
+          borderRadius: BorderRadius.circular(Bt.rInput),
+          dropdownColor: Bt.card,
+          icon: Icon(
+            Icons.keyboard_arrow_down_rounded,
+            color: enabled ? Bt.ink2 : Bt.placeholder,
+            size: 22,
           ),
-        ),
-        child: DropdownButtonHideUnderline(
-          child: DropdownButton<T>(
-            value: safe,
-            isExpanded: true,
-            icon: Icon(
-              Icons.keyboard_arrow_down_rounded,
-              color: enabled ? primaryBlue : textGray,
-              size: 22,
-            ),
-            hint: Text(
-              hint,
-              style: const TextStyle(
-                color: textGray,
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            style: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              color: textDark,
-            ),
-            items: enabled ? items : <DropdownMenuItem<T>>[],
-            onChanged: enabled ? onChanged : null,
+          hint: Text(
+            hint,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: BtText.body(context, color: Bt.placeholder),
           ),
+          style: BtText.body(context, weight: FontWeight.w500),
+          items: enabled ? items : <DropdownMenuItem<T>>[],
+          onChanged: enabled ? onChanged : null,
         ),
       ),
     );
@@ -421,6 +394,24 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
         }
         final phaseNames = _phasesFor(selProject);
         final activityNames = _activitiesFor(_selectedPhaseName);
+        final sections = <Widget>[
+          if (_launchedFromTracker) _buildTrackerContextBanner(projects),
+          _buildContextCard(
+            projects: projects,
+            floors: floors,
+            phaseNames: phaseNames,
+            activityNames: activityNames,
+          ),
+          if (_selectedPhaseName != null &&
+              (floors.isEmpty || _selectedFloor != null))
+            _buildStageSummaryCard(),
+          _buildTaskChecklist(),
+          _buildExecutionNotes(),
+          _buildPhotoUpload(),
+          _buildMaterialConsumption(context, provider),
+          _buildDateField(),
+        ];
+        final visible = sections.where((w) => w is! SizedBox).toList();
         return Scaffold(
           backgroundColor: Bt.ground,
           appBar: BtNavBar(
@@ -428,316 +419,261 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
           ),
           body: ListView(
             physics: const ClampingScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
             children: [
-              if (_launchedFromTracker) ...[
-                _buildTrackerContextBanner(),
-                const SizedBox(height: 20),
+              for (var i = 0; i < visible.length; i++) ...[
+                if (i > 0) const SizedBox(height: 24),
+                BtReveal(index: i, child: visible[i]),
               ],
-              _buildContextCard(
-                projects: projects,
-                floors: floors,
-                phaseNames: phaseNames,
-                activityNames: activityNames,
-              ),
-              const SizedBox(height: 28),
-              if (_selectedPhaseName != null &&
-                  (floors.isEmpty || _selectedFloor != null)) ...[
-                _buildStageSummaryCard(),
-                const SizedBox(height: 28),
-              ],
-              _buildTaskChecklist(),
-              const SizedBox(height: 28),
-              _buildExecutionNotes(),
-              const SizedBox(height: 28),
-              _buildPhotoUpload(),
-              const SizedBox(height: 28),
-              _buildMaterialConsumption(context, provider),
-              const SizedBox(height: 28),
-              _buildDateField(),
             ],
           ),
-          bottomNavigationBar: EntryBottomBar(child: _buildSaveButton(context, provider)),
+          bottomNavigationBar: BtCtaBar(children: [Expanded(child: _buildSaveButton(context, provider))]),
         );
       },
     );
   }
-  Widget _buildTrackerContextBanner() {
-    return BtGroup(children: [
-      BtRow(
-        leading: const BtTile(icon: Icons.place_outlined),
-        title: [_selectedPhaseName, _selectedActivityName].where((v) => v != null && v.isNotEmpty).join(' · '),
-        subtitle: 'Update for ${formatDate(_selectedDate)}',
-        minHeight: 60,
+  Widget _buildTrackerContextBanner(List<ProjectModel> projects) {
+    final projectName = projects
+        .cast<ProjectModel?>()
+        .firstWhere((p) => p?.id == _selectedProjectId, orElse: () => null)
+        ?.name;
+    final where = [projectName, _selectedFloor, _selectedPhaseName, _selectedActivityName]
+        .where((v) => v != null && v.isNotEmpty)
+        .cast<String>()
+        .toList();
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+      decoration: BoxDecoration(color: Bt.ink.withValues(alpha: .05), borderRadius: BorderRadius.circular(Bt.rTile)),
+      child: Row(
+        children: [
+          const Icon(Icons.place_outlined, size: 16, color: Bt.ink2),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text.rich(
+              TextSpan(children: [
+                if (where.isNotEmpty) TextSpan(text: where.first, style: BtText.subhead(context, weight: FontWeight.w600, color: Bt.ink)),
+                if (where.length > 1) TextSpan(text: ' · ${where.skip(1).join(' · ')}', style: BtText.subhead(context)),
+              ]),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(formatDate(_selectedDate), style: BtText.num(BtText.caption(context))),
+        ],
       ),
-    ]);
+    );
   }
+
+  /// One "Where" picker row: label on the left, picker on the right.
+  Widget _whereRow(String label, Widget child) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 56),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Row(
+          children: [
+            SizedBox(width: 84, child: Text(label, style: BtText.subhead(context))),
+            Expanded(child: child),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildContextCard({
     required List<ProjectModel> projects,
     required List<String> floors,
     required List<String> phaseNames,
     required List<String> activityNames,
   }) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(Bt.rCard),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 34,
-                height: 34,
-                decoration: BoxDecoration(
-                  color: primaryBlue.withValues(alpha: 0.10),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(
-                  Icons.tune_rounded,
-                  color: primaryBlue,
-                  size: 17,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Text('Where', style: BtText.headline(context)),
-            ],
-          ),
-          const SizedBox(height: 20),
-          _sectionLabel('Project'),
-          _launchedFromTracker
-              ? _lockedField(
-                  projects
-                          .cast<ProjectModel?>()
-                          .firstWhere(
-                            (p) => p?.id == _selectedProjectId,
-                            orElse: () => null,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _sectionLabel('Where'),
+        BtGroup(
+          insetDividers: false,
+          children: [
+            _whereRow(
+              'Project',
+              _launchedFromTracker
+                  ? _lockedField(
+                      projects
+                              .cast<ProjectModel?>()
+                              .firstWhere(
+                                (p) => p?.id == _selectedProjectId,
+                                orElse: () => null,
+                              )
+                              ?.name ??
+                          'Project',
+                    )
+                  : _dropdownCard<String>(
+                      value: _selectedProjectId,
+                      hint: 'Select project',
+                      items: projects
+                          .map(
+                            (p) => DropdownMenuItem<String>(
+                              value: p.id,
+                              child: Text(p.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+                            ),
                           )
-                          ?.name ??
-                      'Project',
-                )
-              : _dropdownCard<String>(
-                  value: _selectedProjectId,
-                  hint: 'Select project',
-                  items: projects
-                      .map(
-                        (p) => DropdownMenuItem<String>(
-                          value: p.id,
-                          child: Text(p.name),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (val) => setState(() {
-                    _selectedProjectId = val;
-                    _selectedFloor = null;
-                    _selectedPhaseName = null;
-                    _selectedActivityName = null;
-                    final p = projects.cast<ProjectModel?>().firstWhere(
-                      (x) => x?.id == val,
-                      orElse: () => null,
-                    );
-                    _completionProgress = p?.progress ?? 0.0;
-                  }),
-                ),
-          const SizedBox(height: 16),
-          _sectionLabel('Floor / Zone'),
-          _dropdownCard<String>(
-            value: floors.isEmpty ? null : _selectedFloor,
-            hint: _selectedProjectId == null
-                ? 'Select project first'
-                : (floors.isEmpty ? '' : 'Select floor or zone'),
-            enabled: _selectedProjectId != null && floors.isNotEmpty,
-            items: floors.isEmpty
-                ? <DropdownMenuItem<String>>[]
-                : floors
-                    .map((f) => DropdownMenuItem<String>(value: f, child: Text(f)))
-                    .toList(),
-            onChanged: (_selectedProjectId == null || floors.isEmpty)
-                ? null
-                : (val) => setState(() {
-                    _selectedFloor = val;
-                    if (!_launchedFromTracker) {
-                      _selectedPhaseName = null;
-                      _selectedActivityName = null;
-                    }
-                  }),
-          ),
-          const SizedBox(height: 16),
-          _sectionLabel('Phase'),
-          _launchedFromTracker
-              ? _lockedField(_selectedPhaseName ?? 'Phase')
-              : _dropdownCard<String>(
-                  value: _selectedPhaseName,
-                  hint: _selectedProjectId == null
-                      ? 'Select project first'
-                      : (floors.isNotEmpty && _selectedFloor == null
-                          ? 'Select floor first'
-                          : 'Select phase'),
-                  enabled: _selectedProjectId != null &&
-                      (floors.isEmpty || _selectedFloor != null),
-                  items: phaseNames
-                      .map(
-                        (n) =>
-                            DropdownMenuItem<String>(value: n, child: Text(n)),
-                      )
-                      .toList(),
-                  onChanged: (_selectedProjectId == null ||
-                          (floors.isNotEmpty && _selectedFloor == null))
-                      ? null
-                      : (val) => setState(() {
-                          _selectedPhaseName = val;
+                          .toList(),
+                      onChanged: (val) => setState(() {
+                        _selectedProjectId = val;
+                        _selectedFloor = null;
+                        _selectedPhaseName = null;
+                        _selectedActivityName = null;
+                        final p = projects.cast<ProjectModel?>().firstWhere(
+                          (x) => x?.id == val,
+                          orElse: () => null,
+                        );
+                        _completionProgress = p?.progress ?? 0.0;
+                      }),
+                    ),
+            ),
+            _whereRow(
+              'Floor / Zone',
+              _dropdownCard<String>(
+                value: floors.isEmpty ? null : _selectedFloor,
+                hint: _selectedProjectId == null
+                    ? 'Select project first'
+                    : (floors.isEmpty ? '' : 'Select floor or zone'),
+                enabled: _selectedProjectId != null && floors.isNotEmpty,
+                items: floors.isEmpty
+                    ? <DropdownMenuItem<String>>[]
+                    : floors
+                        .map((f) => DropdownMenuItem<String>(value: f, child: Text(f)))
+                        .toList(),
+                onChanged: (_selectedProjectId == null || floors.isEmpty)
+                    ? null
+                    : (val) => setState(() {
+                        _selectedFloor = val;
+                        if (!_launchedFromTracker) {
+                          _selectedPhaseName = null;
                           _selectedActivityName = null;
-                        }),
-                ),
-          const SizedBox(height: 16),
-          _sectionLabel('Activity'),
-          _launchedFromTracker
-              ? _lockedField(_selectedActivityName ?? 'Activity')
-              : _dropdownCard<String>(
-                  value: _selectedActivityName,
-                  hint: _selectedPhaseName == null
-                      ? 'Select phase first'
-                      : 'Select activity',
-                  enabled:
-                      _selectedPhaseName != null && activityNames.isNotEmpty,
-                  items: activityNames.isEmpty && _selectedPhaseName != null
-                      ? [
-                          const DropdownMenuItem<String>(
-                            value: '__none',
-                            child: Text('No activities configured'),
-                          ),
-                        ]
-                      : activityNames
-                            .map(
-                              (a) => DropdownMenuItem<String>(
-                                value: a,
-                                child: Text(a),
+                        }
+                      }),
+              ),
+            ),
+            _whereRow(
+              'Phase',
+              _launchedFromTracker
+                  ? _lockedField(_selectedPhaseName ?? 'Phase')
+                  : _dropdownCard<String>(
+                      value: _selectedPhaseName,
+                      hint: _selectedProjectId == null
+                          ? 'Select project first'
+                          : (floors.isNotEmpty && _selectedFloor == null
+                              ? 'Select floor first'
+                              : 'Select phase'),
+                      enabled: _selectedProjectId != null &&
+                          (floors.isEmpty || _selectedFloor != null),
+                      items: phaseNames
+                          .map(
+                            (n) =>
+                                DropdownMenuItem<String>(value: n, child: Text(n, maxLines: 1, overflow: TextOverflow.ellipsis)),
+                          )
+                          .toList(),
+                      onChanged: (_selectedProjectId == null ||
+                              (floors.isNotEmpty && _selectedFloor == null))
+                          ? null
+                          : (val) => setState(() {
+                              _selectedPhaseName = val;
+                              _selectedActivityName = null;
+                            }),
+                    ),
+            ),
+            _whereRow(
+              'Activity',
+              _launchedFromTracker
+                  ? _lockedField(_selectedActivityName ?? 'Activity')
+                  : _dropdownCard<String>(
+                      value: _selectedActivityName,
+                      hint: _selectedPhaseName == null
+                          ? 'Select phase first'
+                          : 'Select activity',
+                      enabled:
+                          _selectedPhaseName != null && activityNames.isNotEmpty,
+                      items: activityNames.isEmpty && _selectedPhaseName != null
+                          ? [
+                              const DropdownMenuItem<String>(
+                                value: '__none',
+                                child: Text('No activities configured'),
                               ),
-                            )
-                            .toList(),
-                  onChanged:
-                      (_selectedPhaseName == null || activityNames.isEmpty)
-                      ? null
-                      : (val) => setState(() => _selectedActivityName = val),
-                ),
-        ],
-      ),
+                            ]
+                          : activityNames
+                                .map(
+                                  (a) => DropdownMenuItem<String>(
+                                    value: a,
+                                    child: Text(a, maxLines: 1, overflow: TextOverflow.ellipsis),
+                                  ),
+                                )
+                                .toList(),
+                      onChanged:
+                          (_selectedPhaseName == null || activityNames.isEmpty)
+                          ? null
+                          : (val) => setState(() => _selectedActivityName = val),
+                    ),
+            ),
+          ],
+        ),
+      ],
     );
   }
   Widget _lockedField(String value) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-      decoration: BoxDecoration(
-        color: Bt.fill,
-        borderRadius: BorderRadius.circular(Bt.rInput),
-      ),
-      child: Row(
-        children: [
-          Expanded(child: Text(value, style: BtText.body(context, color: Bt.ink2))),
-          const Icon(Icons.lock_outline_rounded, size: 16, color: Bt.ink3),
-        ],
-      ),
+    return Row(
+      children: [
+        Expanded(child: Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.body(context, weight: FontWeight.w500, color: Bt.ink2))),
+        const Icon(Icons.lock_outline_rounded, size: 16, color: Bt.ink3),
+      ],
     );
   }
 
   Widget _buildStageSummaryCard() {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(Bt.rCard),
-        border: Border.all(color: Bt.line),
-      ),
+    final bt = context.bt;
+    return BtCard(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: primaryBlue.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(Bt.rCard),
-            ),
-            child: Text(
-              'Current activity',
-              style: TextStyle(
-                color: primaryBlue,
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.9,
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            _selectedPhaseName ?? '',
-            style: const TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w700,
-              color: textDark,
-              letterSpacing: -0.4,
-              height: 1.2,
-            ),
-          ),
+          Text('CURRENT ACTIVITY', style: BtText.mono(context)),
+          const SizedBox(height: 8),
+          Text(_selectedPhaseName ?? '', style: BtText.d3(context)),
           if (_selectedActivityName != null) ...[
+            const SizedBox(height: 2),
+            Text(_selectedActivityName!, style: BtText.subhead(context, weight: FontWeight.w600, color: bt.accentInk)),
+          ],
+          if (_selectedFloor != null && _selectedFloor!.isNotEmpty) ...[
             const SizedBox(height: 4),
-            Text(
-              _selectedActivityName!,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                color: primaryBlue,
-              ),
+            Row(
+              children: [
+                const Icon(Icons.location_on_outlined, color: Bt.ink3, size: 14),
+                const SizedBox(width: 4),
+                Text(_selectedFloor!, style: BtText.caption(context)),
+              ],
             ),
           ],
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              const Icon(Icons.location_on_outlined, color: textGray, size: 13),
-              const SizedBox(width: 4),
-              Text(
-                _selectedFloor ?? '',
-                style: const TextStyle(
-                  color: textGray,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-          ),
           const SizedBox(height: 16),
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              const Text(
-                'Overall completion',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: textGray,
-                  letterSpacing: 0.6,
-                ),
-              ),
+              Expanded(child: Text('Overall completion', style: BtText.subhead(context, weight: FontWeight.w600, color: Bt.ink))),
               Text(
                 '${(_completionProgress * 100).toInt()}%',
-                style: TextStyle(
-                  color: primaryBlue,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 14,
-                ),
+                style: BtText.num(BtText.d3(context, color: bt.accentInk)),
               ),
             ],
           ),
           SliderTheme(
             data: SliderTheme.of(context).copyWith(
-              trackHeight: 7,
-              activeTrackColor: primaryBlue,
-              inactiveTrackColor: const Color(0xFFEEF1F5),
-              thumbColor: primaryBlue,
-              overlayColor: primaryBlue.withValues(alpha: 0.10),
-              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
+              trackHeight: 6,
+              activeTrackColor: bt.accent,
+              inactiveTrackColor: Bt.ink.withValues(alpha: .09),
+              thumbColor: Colors.white,
+              overlayColor: bt.accent.withValues(alpha: 0.22),
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 12, elevation: 3),
+              overlayShape: const RoundSliderOverlayShape(overlayRadius: 20),
+              trackShape: const RoundedRectSliderTrackShape(),
             ),
             child: Slider(
               value: _completionProgress,
@@ -750,9 +686,9 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
   }
   Widget _buildTaskChecklist() {
     if (_isLoadingTasks) {
-      return Padding(
-        padding: EdgeInsets.symmetric(vertical: 24),
-        child: Center(child: CircularProgressIndicator(color: primaryBlue)),
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 8),
+        child: BtSkeletonList(count: 2),
       );
     }
     final relevantTasks = _dailyTasks.where((task) {
@@ -774,25 +710,24 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
     if (relevantTasks.isEmpty) {
       return const SizedBox.shrink();
     }
+    final bt = context.bt;
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _sectionTitle('Your tasks'),
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: Bt.line),
-          ),
-          child: Column(
-            children: relevantTasks.map((task) {
+        _sectionTitle('Your tasks', trailing: Text('${relevantTasks.length}', style: BtText.num(BtText.subhead(context)))),
+        BtGroup(
+          insetDividers: false,
+          children: relevantTasks.map((task) {
               final isCompleted = _completedTaskIds.contains(task.id);
               return CheckboxListTile(
                 value: isCompleted,
                 secondary: task.status != 'Completed'
-                    ? IconButton(
-                        icon: const Icon(Icons.edit, size: 20),
-                        onPressed: () => _showEditTaskDialog(context, task, () {
+                    ? BtIconButton(
+                        icon: Icons.edit_outlined,
+                        size: 20,
+                        semantic: 'Edit task',
+                        color: Bt.ink2,
+                        onTap: () => _showEditTaskDialog(context, task, () {
                           if (context.mounted) _fetchDailyTasks();
                         }),
                       )
@@ -816,7 +751,7 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
                           task.activityName!.isNotEmpty) {
                         _selectedActivityName = task.activityName;
                       }
-                      
+
                       final provider = context.read<ProjectProvider>();
                       final project = provider.projects.cast<ProjectModel?>().firstWhere(
                         (p) => p?.id == _selectedProjectId,
@@ -833,20 +768,22 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
                 },
                 title: Text(
                   task.title,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                    color: isCompleted ? textGray : textDark,
+                  style: BtText.body(context, weight: FontWeight.w600, color: isCompleted ? Bt.ink3 : Bt.ink).copyWith(
+                    fontSize: 15,
                     decoration: isCompleted ? TextDecoration.lineThrough : null,
                   ),
                 ),
                 subtitle: task.description.isNotEmpty
                     ? Text(
                         task.description,
-                        style: const TextStyle(fontSize: 13),
+                        style: BtText.caption(context),
                       )
                     : null,
-                activeColor: primaryBlue,
+                activeColor: Bt.greenBright,
+                checkColor: Colors.white,
+                checkboxShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                side: const BorderSide(color: Bt.inputBorder, width: 1.5),
+                overlayColor: WidgetStatePropertyAll(bt.accent.withValues(alpha: .12)),
                 controlAffinity: ListTileControlAffinity.leading,
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: 8,
@@ -854,16 +791,15 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
                 ),
               );
             }).toList(),
-          ),
         ),
       ],
     );
   }
   Widget _buildExecutionNotes() {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _sectionTitle('What got done today?'),
+        _sectionLabel('What got done today?'),
         TextField(
           controller: _notesCtrl,
           maxLines: 5,
@@ -880,11 +816,22 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
     final completionDateStr = _completionDate != null
         ? '${_months[_completionDate!.month - 1]} ${_completionDate!.day}, ${_completionDate!.year}'
         : 'Select date';
+    Theme pickerTheme(BuildContext ctx, Widget? child) => Theme(
+          data: Theme.of(ctx).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: Bt.ink,
+              onPrimary: Bt.bone,
+              onSurface: Bt.ink,
+            ),
+          ),
+          child: child!,
+        );
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _sectionLabel('Update date'),
               GestureDetector(
@@ -894,16 +841,7 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
                     initialDate: _selectedDate,
                     firstDate: DateTime(2020),
                     lastDate: DateTime(2100),
-                    builder: (ctx, child) => Theme(
-                      data: Theme.of(ctx).copyWith(
-                        colorScheme: ColorScheme.light(
-                          primary: primaryBlue,
-                          onPrimary: Colors.white,
-                          onSurface: textDark,
-                        ),
-                      ),
-                      child: child!,
-                    ),
+                    builder: pickerTheme,
                   );
                   if (picked != null) setState(() => _selectedDate = picked);
                 },
@@ -922,7 +860,7 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
         const SizedBox(width: 12),
         Expanded(
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _sectionLabel('Completion date'),
               GestureDetector(
@@ -932,16 +870,7 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
                     initialDate: _completionDate ?? DateTime.now(),
                     firstDate: DateTime(2020),
                     lastDate: DateTime(2100),
-                    builder: (ctx, child) => Theme(
-                      data: Theme.of(ctx).copyWith(
-                        colorScheme: ColorScheme.light(
-                          primary: primaryBlue,
-                          onPrimary: Colors.white,
-                          onSurface: textDark,
-                        ),
-                      ),
-                      child: child!,
-                    ),
+                    builder: pickerTheme,
                   );
                   if (picked != null) setState(() => _completionDate = picked);
                 },
@@ -960,163 +889,106 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
       ],
     );
   }
+  Future<void> _addPhoto() async {
+    final result = await pickAttachmentDirect(context);
+    if (result != null) {
+      setState(() {
+        _attachments.add(PhotoAttachment.local(result));
+      });
+    }
+  }
   Widget _buildPhotoUpload() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _sectionTitle('Photos · up to 4'),
-        if (_attachments.isEmpty)
-          GestureDetector(
-            onTap: () async {
-              final result = await pickAttachmentDirect(context);
-              if (result != null) {
-                setState(() {
-                  _attachments.add(PhotoAttachment.local(result));
-                });
-              }
-            },
-            child: Container(
-              width: double.infinity,
-              height: 120,
-              decoration: BoxDecoration(
-                color: const Color(0xFFF6F7F9),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFFD0D5DD), width: 1.5),
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: primaryBlue.withValues(alpha: 0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      Icons.cloud_upload_outlined,
-                      color: primaryBlue,
-                      size: 22,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Tap to add site photos (Up to 4)',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14,
-                      color: Color(0xFF1A1D3B),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'PNG, JPG, jpeg',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Color(0xFF8A90A8),
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
+    Widget addTile({bool faded = false}) => Semantics(
+          button: true,
+          label: 'Add photo',
+          excludeSemantics: true,
+          child: BtPressable(
+            onTap: _addPhoto,
+            scale: .94,
+            child: Opacity(
+              opacity: faded ? .5 : 1,
+              child: CustomPaint(
+                painter: const _DashedBorderPainter(color: Bt.inputBorder, radius: Bt.rTile),
+                child: const Center(child: Icon(Icons.add_a_photo_outlined, color: Bt.ink3, size: 24)),
               ),
             ),
-          )
-        else
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: [
-              ..._attachments.asMap().entries.map((entry) {
-                final index = entry.key;
-                final att = entry.value;
-                return Stack(
-                  children: [
-                    Container(
-                      width: 90,
-                      height: 90,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Bt.line),
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(10),
-                        child: att.isImage
-                            ? Image(
-                                image: att.imageProvider,
-                                width: 90,
-                                height: 90,
-                                fit: BoxFit.cover,
-                              )
-                            : Container(
-                                color: att.iconBg,
-                                child: Center(
-                                  child: Icon(
-                                    att.icon,
-                                    color: att.iconColor,
-                                    size: 28,
-                                  ),
-                                ),
-                              ),
-                      ),
-                    ),
-                    Positioned(
-                      top: 4,
-                      right: 4,
-                      child: GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            _attachments.removeAt(index);
-                          });
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: const BoxDecoration(
-                            color: Color(0xFF475467),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.close,
-                            color: Colors.white,
-                            size: 14,
-                          ),
+          ),
+        );
+    final tiles = <Widget>[
+      for (var index = 0; index < _attachments.length; index++)
+        Stack(
+          fit: StackFit.expand,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(Bt.rTile),
+              child: _attachments[index].isImage
+                  ? Image(
+                      image: _attachments[index].imageProvider,
+                      fit: BoxFit.cover,
+                      gaplessPlayback: true,
+                    )
+                  : Container(
+                      color: _attachments[index].iconBg,
+                      child: Center(
+                        child: Icon(
+                          _attachments[index].icon,
+                          color: _attachments[index].iconColor,
+                          size: 28,
                         ),
                       ),
                     ),
-                  ],
-                );
-              }),
-              if (_attachments.length < 4)
-                GestureDetector(
-                  onTap: () async {
-                    final result = await pickAttachmentDirect(context);
-                    if (result != null) {
-                      setState(() {
-                        _attachments.add(PhotoAttachment.local(result));
-                      });
-                    }
+            ),
+            Positioned(
+              top: 0,
+              right: 0,
+              child: Semantics(
+                button: true,
+                label: 'Remove photo ${index + 1}',
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () {
+                    setState(() {
+                      _attachments.removeAt(index);
+                    });
                   },
-                  child: Container(
-                    width: 90,
-                    height: 90,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF6F7F9),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: const Color(0xFFD0D5DD),
-                        width: 1.5,
+                  child: Padding(
+                    padding: const EdgeInsets.all(5),
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(
+                        color: Color(0xB30C0E12),
+                        shape: BoxShape.circle,
                       ),
-                    ),
-                    child: Center(
-                      child: Icon(
-                        Icons.add_a_photo_outlined,
-                        color: primaryBlue,
-                        size: 28,
-                      ),
+                      child: const Icon(Icons.close, color: Colors.white, size: 14),
                     ),
                   ),
                 ),
-            ],
-          ),
+              ),
+            ),
+          ],
+        ),
+      if (_attachments.length < 4) addTile(),
+      if (_attachments.length < 3) addTile(faded: true),
+    ];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _sectionTitle(
+          'Photos',
+          trailing: Text('${_attachments.length} of 4', style: BtText.num(BtText.caption(context))),
+        ),
+        GridView.count(
+          crossAxisCount: 4,
+          mainAxisSpacing: 8,
+          crossAxisSpacing: 8,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          children: tiles,
+        ),
+        if (_attachments.isEmpty) ...[
+          const SizedBox(height: 8),
+          Text('Tap to add site photos (up to 4) · PNG, JPG, jpeg', style: BtText.caption(context)),
+        ],
       ],
     );
   }
@@ -1142,65 +1014,51 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
           )
           .toList();
     }
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-      ),
+    final bt = context.bt;
+    return BtCard(
+      padding: const EdgeInsets.fromLTRB(16, 14, 10, 14),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Material consumption',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: textGray,
-                  letterSpacing: 0.7,
+              BtTile(icon: Icons.inventory_2_outlined, bg: bt.accentSoft, fg: bt.accentInk),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Material consumption', style: BtText.body(context, weight: FontWeight.w600)),
+                    Text(
+                      materials.isEmpty ? 'No materials logged for this location yet.' : '${materials.length} logged here',
+                      maxLines: 2,
+                      style: BtText.caption(context),
+                    ),
+                  ],
                 ),
               ),
-              GestureDetector(
-                onTap: () => Navigator.pushNamed(
+              TextButton(
+                onPressed: () => Navigator.pushNamed(
                   context,
                   '/add-material',
                   arguments: {'type': 'material'},
                 ),
-                child: Text(
-                  'Add material',
-                  style: TextStyle(
-                    color: primaryBlue,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13,
-                    letterSpacing: 0.5,
-                  ),
-                ),
+                style: TextButton.styleFrom(minimumSize: const Size(44, 44), padding: const EdgeInsets.symmetric(horizontal: 10)),
+                child: Text('Add material', style: BtText.subhead(context, weight: FontWeight.w600, color: bt.accentInk)),
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          if (materials.isEmpty)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 8),
-              child: Text(
-                'No materials logged for this location yet.',
-                style: TextStyle(
-                  color: textGray,
-                  fontStyle: FontStyle.italic,
-                  fontSize: 13,
-                ),
-              ),
-            )
-          else
+          if (materials.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            const Divider(height: 1, color: Bt.line),
+            const SizedBox(height: 4),
             ...materials.map(
               (m) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.only(top: 8, right: 6),
                 child: _materialTag(m.description, m.amount.toString()),
               ),
             ),
+          ],
         ],
       ),
     );
@@ -1212,7 +1070,7 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
           width: 7,
           height: 7,
           decoration: BoxDecoration(
-            color: primaryBlue,
+            color: context.bt.accent,
             shape: BoxShape.circle,
           ),
         ),
@@ -1220,26 +1078,18 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
         Expanded(
           child: Text(
             label,
-            style: const TextStyle(
-              fontWeight: FontWeight.w700,
-              fontSize: 14,
-              color: textDark,
-            ),
+            style: BtText.subhead(context, weight: FontWeight.w500, color: Bt.ink),
           ),
         ),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
           decoration: BoxDecoration(
-            color: const Color(0xFFE8F1FC),
-            borderRadius: BorderRadius.circular(7),
+            color: Bt.fill,
+            borderRadius: BorderRadius.circular(8),
           ),
           child: Text(
             qty,
-            style: TextStyle(
-              color: primaryBlue,
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-            ),
+            style: BtText.num(BtText.caption(context, color: Bt.ink, weight: FontWeight.w600)),
           ),
         ),
       ],
@@ -1251,8 +1101,14 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
             _selectedActivityName != null
         ? 'Mark as Done & Submit'
         : 'Submit Progress Update';
-    return GestureDetector(
-      onTap: () async {
+    return BtButton(
+      label: label,
+      icon: _launchedFromTracker ? Icons.check_circle_rounded : Icons.check_circle_outline,
+      loading: _submitting,
+      onPressed: () async {
+        if (_submitting) return;
+        setState(() => _submitting = true);
+        try {
         final project =
             provider.selectedProject ??
             provider.projects.cast<ProjectModel?>().firstWhere(
@@ -1327,68 +1183,52 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
             ];
             final dateLabel =
                 '${_selectedDate.day} ${months[_selectedDate.month - 1]} ${_selectedDate.year}';
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Row(
-                  children: [
-                    const Icon(
-                      Icons.check_circle_rounded,
-                      color: Colors.white,
-                      size: 18,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        _launchedFromTracker && _selectedActivityName != null
-                            ? '${_selectedActivityName!} marked done · $dateLabel'
-                            : 'Progress updated · $dateLabel',
-                        style: const TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                    ),
-                  ],
-                ),
-                backgroundColor: AppColors.success,
-                behavior: SnackBarBehavior.floating,
-                duration: const Duration(seconds: 3),
-              ),
+            await showBtSuccess(
+              context,
+              kind: BtSuccessKind.bags,
+              title: _launchedFromTracker && _selectedActivityName != null
+                  ? '${_selectedActivityName!} marked done'
+                  : 'Progress updated',
+              message: dateLabel,
+              label: 'DAILY UPDATE',
             );
+            if (!context.mounted) return;
             Navigator.maybePop(context);
           } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Row(
-                  children: [
-                    Icon(
-                      Icons.error_outline_rounded,
-                      color: Colors.white,
-                      size: 18,
-                    ),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Failed to save progress details. Please check network connection and try again.',
-                        style: TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                    ),
-                  ],
-                ),
-                backgroundColor: AppColors.error,
-                behavior: SnackBarBehavior.floating,
-                duration: Duration(seconds: 4),
-              ),
-            );
+            btToast(context, 'Failed to save progress details. Please check network connection and try again.', error: true);
           }
         }
+        } finally {
+          if (mounted) setState(() => _submitting = false);
+        }
       },
-      child: IgnorePointer(
-        child: BtButton(
-          label: label,
-          icon: _launchedFromTracker ? Icons.check_circle_rounded : Icons.check_circle_outline,
-          onPressed: () {},
-        ),
-      ),
     );
   }
+}
+
+/// Dashed rounded outline for the "add photo" tiles.
+class _DashedBorderPainter extends CustomPainter {
+  const _DashedBorderPainter({required this.color, required this.radius});
+  final Color color;
+  final double radius;
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+    final path = Path()..addRRect(RRect.fromRectAndRadius(Offset.zero & size, Radius.circular(radius)).deflate(.75));
+    for (final m in path.computeMetrics()) {
+      var d = 0.0;
+      while (d < m.length) {
+        canvas.drawPath(m.extractPath(d, d + 6), paint);
+        d += 11;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DashedBorderPainter old) => old.color != color || old.radius != radius;
 }
 class PhotoAttachment {
   final PickedAttachment? localAttachment;

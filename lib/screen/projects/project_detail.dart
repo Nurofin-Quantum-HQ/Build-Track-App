@@ -1,8 +1,5 @@
 import 'package:buildtrack_mobile/design/design.dart';
 import 'package:buildtrack_mobile/common/themes/app_colors.dart';
-import 'package:buildtrack_mobile/common/themes/app_theme.dart';
-import 'package:buildtrack_mobile/common/widgets/app_widgets.dart';
-import 'package:buildtrack_mobile/common/widgets/common_widgets.dart';
 import 'package:buildtrack_mobile/controller/project_provider.dart';
 import 'package:buildtrack_mobile/controller/role_manager.dart';
 import 'package:buildtrack_mobile/controller/user_session.dart';
@@ -29,8 +26,9 @@ class ProjectDetailScreen extends StatefulWidget {
 enum _DetailTab { overview, phases, money, details }
 
 class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
-  // Phases start open (as before); tapping a phase header folds it.
-  final Set<String> _collapsed = {};
+  // Phases start folded (as in the original) except the one being worked on,
+  // which opens automatically; tapping a phase header folds/unfolds it.
+  final Set<String> _toggled = {};
   _DetailTab _tab = _DetailTab.overview;
   @override
   void initState() {
@@ -46,7 +44,21 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
     });
   }
 
-  static const _gap = SizedBox(height: 20);
+  static const _gap = SizedBox(height: 26);
+
+  /// First phase that still has open activities (the "now" phase).
+  static String? _activePhaseId(List<ProjectPhase>? phases) {
+    if (phases == null) return null;
+    for (final p in phases) {
+      if (p.activities.any((a) => !a.completed)) return p.id;
+    }
+    return null;
+  }
+
+  bool _isExpanded(ProjectPhase phase, String? activeId) {
+    final byDefault = phase.id == activeId;
+    return _toggled.contains(phase.id) ? !byDefault : byDefault;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -74,6 +86,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
     final double progress = trackerTotal > 0
         ? trackerDone / trackerTotal
         : project.progress;
+    final activeId = _activePhaseId(selectedPhases);
 
     List<Widget> overview() => [
           _SummaryCard(
@@ -82,40 +95,60 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
             doneCount: trackerDone,
             totalCount: trackerTotal,
           ),
-          if (RoleManager.canViewReports) ...[
-            const SizedBox(height: 12),
-            _InsightsEntryCard(project: project),
-          ],
-          _gap,
-          const BtSectionHeader(title: 'Timeline & status'),
+          const SizedBox(height: 12),
           _ProjectTimelineCard(project: project),
+          const SizedBox(height: 18),
+          _ActionButtons(project: project),
+          if (hasNewTracker && activeId != null) ...[
+            _gap,
+            BtSectionHeader(
+              title: 'Active phase',
+              action: 'All ${selectedPhases.length}',
+              onAction: () => setState(() => _tab = _DetailTab.phases),
+            ),
+            _ActivePhaseCard(
+              phase: selectedPhases.firstWhere((p) => p.id == activeId),
+              onTap: () => setState(() => _tab = _DetailTab.phases),
+            ),
+          ],
           _gap,
           _RecentEntriesSection(
             project: project,
             provider: provider,
             currentUserId: UserSession.userId,
           ),
-          _gap,
-          const BtSectionHeader(title: 'Actions'),
-          _ActionButtons(project: project),
         ];
 
     List<Widget> phases() => [
-          BtSectionHeader(
-            title: 'Execution tracker',
-            action: hasNewTracker ? '$trackerDone of $trackerTotal done' : null,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(2, 0, 2, 12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    hasNewTracker ? 'Execution tracker · ${selectedPhases.length} ${selectedPhases.length == 1 ? 'phase' : 'phases'}' : 'Execution tracker',
+                    style: BtText.subhead(context),
+                  ),
+                ),
+                if (hasNewTracker)
+                  Text('$trackerDone / $trackerTotal done', style: BtText.num(BtText.subhead(context, weight: FontWeight.w600, color: Bt.ink))),
+              ],
+            ),
           ),
           if (hasNewTracker)
-            ...selectedPhases.map(
-              (phase) => _TrackerPhaseCard(
-                phase: phase,
+            for (var i = 0; i < selectedPhases.length; i++)
+              _TrackerPhaseCard(
+                index: i,
+                phase: selectedPhases[i],
                 project: project,
-                isExpanded: !_collapsed.contains(phase.id),
+                isActive: selectedPhases[i].id == activeId,
+                isExpanded: _isExpanded(selectedPhases[i], activeId),
                 onToggleExpand: () => setState(() {
-                  if (_collapsed.contains(phase.id)) {
-                    _collapsed.remove(phase.id);
+                  final id = selectedPhases[i].id;
+                  if (_toggled.contains(id)) {
+                    _toggled.remove(id);
                   } else {
-                    _collapsed.add(phase.id);
+                    _toggled.add(id);
                   }
                 }),
                 onToggleActivity: (activityId) {
@@ -126,8 +159,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                         activityId,
                       );
                 },
-              ),
-            )
+              )
           else
             const BtCard(
               child: BtEmpty(
@@ -139,8 +171,11 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
         ];
 
     List<Widget> money() => [
-          const BtSectionHeader(title: 'Financial overview'),
           _FinancialCard(project: project),
+          if (RoleManager.canViewReports) ...[
+            const SizedBox(height: 12),
+            _InsightsEntryCard(project: project),
+          ],
           _gap,
           _CsvImportExportCard(project: project),
         ];
@@ -156,7 +191,10 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
         0;
 
     List<Widget> details() => [
-          const BtSectionHeader(title: 'Project information'),
+          if (project.photo != null && project.photo!.isNotEmpty) ...[
+            _SitePhotoCard(photoUrl: project.photo!),
+            _gap,
+          ],
           _ProjectInfoCard(project: project),
           _gap,
           if (project.projectType != null &&
@@ -167,7 +205,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
           ],
           if ((project.landArea != null && project.landArea!.isNotEmpty) ||
               (project.floors != null && project.floors!.isNotEmpty)) ...[
-            const BtSectionHeader(title: 'Land & floor configuration'),
+            const BtSectionHeader(title: 'Land & floors'),
             _LandFloorsCard(project: project),
             _gap,
           ],
@@ -179,18 +217,13 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
           if (project.selectedFeatures != null &&
               project.selectedFeatures!.isNotEmpty)
             ..._buildConfigSections(project.selectedFeatures!),
-          if (project.photo != null && project.photo!.isNotEmpty) ...[
-            const BtSectionHeader(title: 'Site photo'),
-            _SitePhotoCard(photoUrl: project.photo!),
-            _gap,
-          ],
           if (project.scope != null && project.scope!.isNotEmpty) ...[
             const BtSectionHeader(title: 'Project scope'),
             _ProjectScopeCard(scope: project.scope!),
             _gap,
           ],
           if (project.documents != null && project.documents!.isNotEmpty) ...[
-            const BtSectionHeader(title: 'Documents & blueprints'),
+            BtSectionHeader(title: 'Documents & blueprints', action: '${project.documents!.length}'),
             _DocumentsCard(documents: project.documents!),
             _gap,
           ],
@@ -214,43 +247,33 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
 
     return Scaffold(
       backgroundColor: Bt.ground,
-      appBar: BtNavBar(
-        title: project.name,
-        subtitle: project.location.isNotEmpty ? project.location : null,
-        trailing: RoleManager.canAssignTasks
-            ? BtIconButton(
-                icon: Icons.assignment_outlined,
-                semantic: 'Assign task',
-                color: Bt.ink2,
-                onTap: () => Navigator.pushNamed(context, '/assign-task'),
-              )
-            : null,
-      ),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(Bt.gutter, 4, Bt.gutter, 12),
-            child: BtSegmented<_DetailTab>(
-              segments: const {
-                _DetailTab.overview: 'Overview',
-                _DetailTab.phases: 'Phases',
-                _DetailTab.money: 'Money',
-                _DetailTab.details: 'Details',
-              },
-              value: _tab,
-              onChanged: (t) => setState(() => _tab = t),
+      body: SingleChildScrollView(
+        key: const PageStorageKey('project-detail'),
+        physics: const ClampingScrollPhysics(),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _DetailHero(
+              project: project,
+              progress: progress,
+              tab: _tab,
+              onTab: (t) => setState(() => _tab = t),
             ),
-          ),
-          Expanded(
-            child: ListView(
-              key: PageStorageKey('project-detail-${_tab.name}'),
-              physics: const ClampingScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(Bt.gutter, 0, Bt.gutter, 48),
-              children: body,
+            BtSheet(
+              padding: const EdgeInsets.fromLTRB(Bt.gutter, 20, Bt.gutter, 48),
+              child: KeyedSubtree(
+                key: ValueKey(_tab),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (var i = 0; i < body.length; i++)
+                      i < 8 && body[i] is! SizedBox ? BtReveal(index: i, child: body[i]) : body[i],
+                  ],
+                ),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -271,15 +294,12 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
     ];
     final unknown = features.where((f) => !allKnown.contains(f)).toList();
     final addlAll = [...addl, ...unknown];
-    Widget sec(String t, List<String> items, IconData icon) => Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        BtSectionHeader(title: t),
-        _FeatureGroupCard(icon: icon, title: t, features: items),
-        _gap,
-      ],
+    Widget sec(String t, List<String> items, IconData icon) => Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: _FeatureGroupCard(icon: icon, title: t, features: items),
     );
     return [
+      const BtSectionHeader(title: 'Configuration & features'),
       if (addlAll.isNotEmpty)
         sec('Additional Configuration', addlAll, Icons.tune_rounded),
       if (utility.isNotEmpty)
@@ -292,19 +312,278 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
         sec('Electrical & Plumbing', electrical, Icons.bolt_rounded),
       if (terrace.isNotEmpty)
         sec('Terrace & Interior', terrace, Icons.roofing_rounded),
+      const SizedBox(height: 16),
     ];
+  }
+}
+
+// ─────────────────────────────────────────────────────────────── hero
+
+/// Noir header: back / assign, status pill + code · location, project name,
+/// money stats on the Money tab, and the four section tabs.
+class _DetailHero extends StatelessWidget {
+  const _DetailHero({required this.project, required this.progress, required this.tab, required this.onTab});
+  final ProjectModel project;
+  final double progress;
+  final _DetailTab tab;
+  final ValueChanged<_DetailTab> onTab;
+
+  @override
+  Widget build(BuildContext context) {
+    final rawStatus = project.projectStatus;
+    final statusLabel = (rawStatus != null && rawStatus.isNotEmpty)
+        ? rawStatus
+        : (progress >= 1.0
+              ? 'Completed'
+              : progress >= 0.3
+              ? 'In Progress'
+              : 'Planning');
+    final caption = [
+      if (project.projectCode?.isNotEmpty == true) project.projectCode!,
+      if (project.location.isNotEmpty) project.location,
+    ].join(' · ');
+    final glass = Colors.white.withValues(alpha: .08);
+    return BtHero(
+      padding: EdgeInsets.fromLTRB(Bt.gutter, MediaQuery.paddingOf(context).top + 6, Bt.gutter, 36),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              BtIconButton(
+                icon: Icons.arrow_back_ios_new_rounded,
+                size: 18,
+                semantic: 'Back',
+                color: Bt.bone,
+                background: glass,
+                onTap: () => Navigator.of(context).maybePop(),
+              ),
+              const Spacer(),
+              if (RoleManager.canAssignTasks)
+                BtIconButton(
+                  icon: Icons.assignment_outlined,
+                  size: 20,
+                  semantic: 'Assign task',
+                  color: Bt.bone,
+                  background: glass,
+                  onTap: () => Navigator.pushNamed(context, '/assign-task'),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          BtReveal(
+            child: Wrap(
+              spacing: 10,
+              runSpacing: 6,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                _HeroPill(label: statusLabel, tone: BtBadge.toneFor(statusLabel)),
+                if (caption.isNotEmpty) Text(caption.toUpperCase(), style: BtText.mono(context, color: Bt.onNoir2)),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+          BtReveal(
+            index: 1,
+            child: Text(project.name, style: BtText.d2(context, color: Bt.bone)),
+          ),
+          AnimatedSize(
+            duration: Bt.medium,
+            curve: Bt.ease,
+            alignment: Alignment.topCenter,
+            child: tab == _DetailTab.money
+                ? Padding(
+                    padding: const EdgeInsets.only(top: 18),
+                    child: Row(
+                      children: [
+                        Expanded(child: _HeroStat(label: 'Total budget', value: project.totalBudget, color: Bt.bone)),
+                        Expanded(child: _HeroStat(label: 'Spent', value: project.spentAmount, color: project.spentAmount > project.totalBudget ? Bt.redBright : context.bt.accent)),
+                        Expanded(child: _HeroStat(label: 'Remaining', value: project.remainingBudget, color: project.remainingBudget >= 0 ? const Color(0xFF4ADBA4) : Bt.redBright)),
+                      ],
+                    ),
+                  )
+                : const SizedBox(width: double.infinity),
+          ),
+          const SizedBox(height: 18),
+          _HeroTabs(value: tab, onChanged: onTab),
+        ],
+      ),
+    );
+  }
+}
+
+class _HeroStat extends StatelessWidget {
+  const _HeroStat({required this.label, required this.value, required this.color});
+  final String label;
+  final double value;
+  final Color color;
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: BtText.caption(context, color: Bt.onNoir2).copyWith(fontSize: 12)),
+        const SizedBox(height: 2),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: BtCountUp(
+            value: value,
+            format: (v) => formatCurrency(v),
+            style: BtText.num(BtText.headline(context).copyWith(color: color, fontWeight: FontWeight.w700)),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Status pill for the noir hero.
+class _HeroPill extends StatelessWidget {
+  const _HeroPill({required this.label, required this.tone});
+  final String label;
+  final BtTone tone;
+  @override
+  Widget build(BuildContext context) {
+    final Color dot;
+    switch (tone) {
+      case BtTone.green:
+        dot = const Color(0xFF4ADBA4);
+        break;
+      case BtTone.amber:
+        dot = Bt.amberBright;
+        break;
+      case BtTone.red:
+        dot = Bt.redBright;
+        break;
+      case BtTone.brand:
+        dot = context.bt.accent;
+        break;
+      case BtTone.neutral:
+        dot = Bt.slate;
+        break;
+    }
+    return Container(
+      height: 26,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: .08),
+        borderRadius: BorderRadius.circular(13),
+        border: Border.all(color: Colors.white.withValues(alpha: .10)),
+      ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Container(width: 6, height: 6, decoration: BoxDecoration(color: dot, shape: BoxShape.circle)),
+        const SizedBox(width: 6),
+        Text(label, style: BtText.caption(context, color: Bt.bone, weight: FontWeight.w600).copyWith(fontSize: 12)),
+      ]),
+    );
+  }
+}
+
+/// Underline tabs on the noir hero (accent indicator slides between tabs).
+class _HeroTabs extends StatelessWidget {
+  const _HeroTabs({required this.value, required this.onChanged});
+  final _DetailTab value;
+  final ValueChanged<_DetailTab> onChanged;
+  static const _labels = {
+    _DetailTab.overview: 'Overview',
+    _DetailTab.phases: 'Phases',
+    _DetailTab.money: 'Money',
+    _DetailTab.details: 'Details',
+  };
+  @override
+  Widget build(BuildContext context) {
+    final accent = context.bt.accent;
+    return Container(
+      decoration: BoxDecoration(border: Border(bottom: BorderSide(color: Colors.white.withValues(alpha: .10)))),
+      child: Row(
+        children: [
+          for (final e in _labels.entries)
+            Expanded(
+              child: Semantics(
+                button: true,
+                selected: e.key == value,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => onChanged(e.key),
+                  child: SizedBox(
+                    height: Bt.touch,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        AnimatedDefaultTextStyle(
+                          duration: Bt.fast,
+                          style: BtText.subhead(context, weight: FontWeight.w500, color: e.key == value ? Bt.bone : Bt.onNoir3).copyWith(fontSize: 15),
+                          child: Text(e.value, maxLines: 1),
+                        ),
+                        Positioned(
+                          left: 6,
+                          right: 6,
+                          bottom: 0,
+                          child: AnimatedScale(
+                            scale: e.key == value ? 1 : 0,
+                            duration: Bt.medium,
+                            curve: Bt.ease,
+                            child: Container(height: 2, decoration: BoxDecoration(color: accent, borderRadius: BorderRadius.circular(2))),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Overview shortcut to the phase being worked on.
+class _ActivePhaseCard extends StatelessWidget {
+  const _ActivePhaseCard({required this.phase, required this.onTap});
+  final ProjectPhase phase;
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) {
+    final done = phase.completedCount;
+    final total = phase.totalCount;
+    final pct = total > 0 ? done / total : 0.0;
+    return BtCard(
+      onTap: onTap,
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(child: Text(phase.phaseName, maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.body(context, weight: FontWeight.w600))),
+              Text('${(pct * 100).toStringAsFixed(0)}%', style: BtText.num(BtText.subhead(context, weight: FontWeight.w600, color: Bt.ink))),
+            ],
+          ),
+          const SizedBox(height: 8),
+          BtProgress(value: pct, thin: true),
+          const SizedBox(height: 6),
+          Text('$done of $total activities done', style: BtText.caption(context)),
+        ],
+      ),
+    );
   }
 }
 class _TrackerPhaseCard extends StatelessWidget {
   const _TrackerPhaseCard({
+    required this.index,
     required this.phase,
     required this.project,
+    required this.isActive,
     required this.isExpanded,
     required this.onToggleExpand,
     required this.onToggleActivity,
   });
+  final int index;
   final ProjectPhase phase;
   final ProjectModel project;
+  final bool isActive;
   final bool isExpanded;
   final VoidCallback onToggleExpand;
   final void Function(String activityId) onToggleActivity;
@@ -316,81 +595,133 @@ class _TrackerPhaseCard extends StatelessWidget {
     final complete = pct >= 1.0;
     final bt = context.bt;
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
         color: Bt.card,
         borderRadius: BorderRadius.circular(Bt.rCard),
-        border: Border.all(color: Bt.line),
+        boxShadow: Bt.shadow,
+        border: isActive ? Border.all(color: bt.accent, width: 1.5) : null,
       ),
       clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Semantics(
-            button: true,
-            expanded: isExpanded,
-            label: '${phase.phaseName}, $done of $total activities done',
-            child: InkWell(
-              onTap: onToggleExpand,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Row(
-                      children: [
-                        BtTile(
-                          icon: phase.isCustom ? Icons.star_rounded : Icons.construction_rounded,
-                          size: 36,
+      child: Material(
+        color: Colors.transparent,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Semantics(
+              button: true,
+              expanded: isExpanded,
+              label: '${phase.phaseName}, $done of $total activities done',
+              child: InkWell(
+                onTap: onToggleExpand,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 14, 10, 14),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 26,
+                        child: Text(
+                          (index + 1).toString().padLeft(2, '0'),
+                          style: BtText.mono(context, size: 11, color: isActive ? bt.accentInk : Bt.ink3),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(phase.phaseName, style: BtText.headline(context)),
-                              const SizedBox(height: 2),
-                              Text('$done of $total activities done', style: BtText.caption(context)),
-                            ],
-                          ),
-                        ),
-                        Text(
-                          '${(pct * 100).toStringAsFixed(0)}%',
-                          style: BtText.num(BtText.subhead(context, weight: FontWeight.w600, color: complete ? Bt.green : Bt.ink)),
-                        ),
-                        const SizedBox(width: 4),
-                        AnimatedRotation(
-                          turns: isExpanded ? 0.5 : 0,
-                          duration: const Duration(milliseconds: 180),
-                          child: const Icon(Icons.keyboard_arrow_down_rounded, color: Bt.ink3, size: 22),
-                        ),
+                      ),
+                      if (phase.isCustom) ...[
+                        Icon(Icons.star_rounded, size: 16, color: bt.accentInk),
+                        const SizedBox(width: 6),
                       ],
-                    ),
-                    if (total > 0) ...[
-                      const SizedBox(height: 12),
-                      BtProgress(value: pct, thin: true, color: complete ? Bt.green : bt.brand),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    phase.phaseName,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: BtText.body(context, weight: FontWeight.w600, color: total > 0 && done == 0 && !isActive ? Bt.ink2 : Bt.ink),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                if (complete && total > 0)
+                                  const BtBadge(label: 'Done', tone: BtTone.green, dot: false)
+                                else
+                                  Text(
+                                    '${(pct * 100).toStringAsFixed(0)}%',
+                                    style: BtText.num(BtText.subhead(context, weight: FontWeight.w600, color: done == 0 ? Bt.ink3 : Bt.ink)),
+                                  ),
+                              ],
+                            ),
+                            if (total > 0) ...[
+                              const SizedBox(height: 8),
+                              BtProgress(value: pct, thin: true, color: complete ? Bt.greenBright : bt.accent),
+                            ],
+                            const SizedBox(height: 6),
+                            Text('$done of $total activities done', style: BtText.caption(context)),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      AnimatedRotation(
+                        turns: isExpanded ? 0.5 : 0,
+                        duration: Bt.fast,
+                        curve: Bt.ease,
+                        child: const Icon(Icons.keyboard_arrow_down_rounded, color: Bt.ink3, size: 22),
+                      ),
                     ],
-                  ],
+                  ),
                 ),
               ),
             ),
-          ),
-          if (isExpanded) ...[
-            const Divider(height: 1, color: Bt.line),
-            for (var i = 0; i < phase.activities.length; i++) ...[
-              if (i > 0) const Divider(height: 1, indent: 60, color: Bt.line),
-              _TrackerActivityRow(
-                activity: phase.activities[i],
-                project: project,
-                phaseName: phase.phaseName,
-                onToggle: () => onToggleActivity(phase.activities[i].id),
-              ),
-            ],
+            AnimatedSize(
+              duration: Bt.medium,
+              curve: Bt.ease,
+              alignment: Alignment.topCenter,
+              child: isExpanded
+                  ? Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          for (var i = 0; i < phase.activities.length; i++)
+                            _TrackerActivityRow(
+                              activity: phase.activities[i],
+                              project: project,
+                              phaseName: phase.phaseName,
+                              isFirst: i == 0,
+                              isLast: i == phase.activities.length - 1,
+                              onToggle: () => onToggleActivity(phase.activities[i].id),
+                            ),
+                        ],
+                      ),
+                    )
+                  : const SizedBox(width: double.infinity),
+            ),
           ],
-        ],
+        ),
       ),
     );
   }
+}
+
+/// Vertical rail + status node drawn behind an activity row.
+class _RailPainter extends CustomPainter {
+  const _RailPainter({required this.color, required this.top, required this.bottom});
+  final Color color;
+  final bool top, bottom;
+  @override
+  void paint(Canvas canvas, Size size) {
+    final p = Paint()
+      ..color = color
+      ..strokeWidth = 1.5;
+    const x = 30.0, y = 28.0;
+    if (top) canvas.drawLine(const Offset(x, 0), const Offset(x, y), p);
+    if (bottom) canvas.drawLine(const Offset(x, y), Offset(x, size.height), p);
+  }
+
+  @override
+  bool shouldRepaint(covariant _RailPainter old) => old.color != color || old.top != top || old.bottom != bottom;
 }
 class _TrackerActivityRow extends StatefulWidget {
   const _TrackerActivityRow({
@@ -398,16 +729,20 @@ class _TrackerActivityRow extends StatefulWidget {
     required this.project,
     required this.phaseName,
     required this.onToggle,
+    this.isFirst = false,
+    this.isLast = false,
   });
   final ProjectActivity activity;
   final ProjectModel project;
   final String phaseName;
   final VoidCallback onToggle;
+  final bool isFirst, isLast;
   @override
   State<_TrackerActivityRow> createState() => _TrackerActivityRowState();
 }
 class _TrackerActivityRowState extends State<_TrackerActivityRow> {
-  bool _isBudgetExpanded = true;
+  // Budget breakdown starts folded, as in the original.
+  bool _isBudgetExpanded = false;
   static const _months = [
     'Jan',
     'Feb',
@@ -481,7 +816,8 @@ class _TrackerActivityRowState extends State<_TrackerActivityRow> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Bt.card,
+      backgroundColor: Bt.ground,
+      barrierColor: Bt.scrim,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(Bt.rSheet)),
       ),
@@ -490,8 +826,8 @@ class _TrackerActivityRowState extends State<_TrackerActivityRow> {
           padding: EdgeInsets.only(
             left: 20,
             right: 20,
-            top: 12,
-            bottom: MediaQuery.of(modalContext).viewInsets.bottom + 20,
+            top: 10,
+            bottom: MediaQuery.of(modalContext).viewInsets.bottom + MediaQuery.of(modalContext).padding.bottom + 16,
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -499,22 +835,19 @@ class _TrackerActivityRowState extends State<_TrackerActivityRow> {
             children: [
               Center(
                 child: Container(
-                  width: 40,
-                  height: 4,
+                  width: 38,
+                  height: 5,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFE4E7EC),
-                    borderRadius: BorderRadius.circular(16),
+                    color: Bt.ink.withValues(alpha: .14),
+                    borderRadius: BorderRadius.circular(3),
                   ),
                 ),
               ),
               const SizedBox(height: 20),
-              Text(
-                'Budget allocation',
-                style: BtText.title(modalContext, size: 20),
-              ),
-              const SizedBox(height: 2),
-              Text(currentActivity.name, style: BtText.subhead(modalContext, weight: FontWeight.w500, color: Bt.ink)),
-              const SizedBox(height: 4),
+              Text('BUDGET ALLOCATION', style: BtText.mono(modalContext)),
+              const SizedBox(height: 6),
+              Text(currentActivity.name, style: BtText.d3(modalContext)),
+              const SizedBox(height: 6),
               Text(
                 'Allocate activity budgets under Materials, Labour, and Equipment categories.',
                 style: BtText.caption(modalContext),
@@ -530,7 +863,7 @@ class _TrackerActivityRowState extends State<_TrackerActivityRow> {
               ),
               const SizedBox(height: 24),
               BtButton(
-                label: 'Save Budget Allocation',
+                label: 'Save budget allocation',
                 onPressed: () async {
                   final mat = double.tryParse(materialController.text) ?? 0.0;
                   final lab = double.tryParse(labourController.text) ?? 0.0;
@@ -667,8 +1000,8 @@ class _TrackerActivityRowState extends State<_TrackerActivityRow> {
 
     final bt = context.bt;
     return Container(
-      margin: const EdgeInsets.fromLTRB(60, 0, 16, 14),
-      padding: const EdgeInsets.all(14),
+      margin: const EdgeInsets.fromLTRB(58, 0, 14, 14),
+      padding: const EdgeInsets.fromLTRB(14, 8, 14, 14),
       decoration: BoxDecoration(
         color: Bt.ground,
         borderRadius: BorderRadius.circular(Bt.rTile),
@@ -679,17 +1012,17 @@ class _TrackerActivityRowState extends State<_TrackerActivityRow> {
           Row(
             children: [
               Expanded(
-                child: Text('Activity budget', style: BtText.subhead(context, weight: FontWeight.w600, color: Bt.ink)),
+                child: Text('ACTIVITY BUDGET', style: BtText.mono(context)),
               ),
               TextButton.icon(
                 onPressed: () => _openUpdateBudgetDialog(context),
                 style: TextButton.styleFrom(
-                  foregroundColor: bt.brand,
-                  minimumSize: const Size(44, 36),
+                  foregroundColor: bt.accentInk,
+                  minimumSize: const Size(44, 40),
                   padding: const EdgeInsets.symmetric(horizontal: 8),
                 ),
                 icon: const Icon(Icons.edit_outlined, size: 16),
-                label: Text('Update budget', style: BtText.subhead(context, weight: FontWeight.w600, color: bt.brand)),
+                label: Text('Update budget', style: BtText.subhead(context, weight: FontWeight.w600, color: bt.accentInk)),
               ),
             ],
           ),
@@ -733,66 +1066,49 @@ class _TrackerActivityRowState extends State<_TrackerActivityRow> {
     final remaining = category.remaining;
     final pct = category.progress;
     final isOver = spent > allocated && allocated > 0;
-    final barColor = isOver ? const Color(0xFFC01048) : color;
+    final barColor = isOver ? Bt.redBright : color;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: isBold ? FontWeight.w700 : FontWeight.w500,
-                color: isBold
-                    ? const Color(0xFF101828)
-                    : const Color(0xFF475467),
+            if (!isBold) ...[
+              Container(width: 8, height: 8, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2))),
+              const SizedBox(width: 6),
+            ],
+            Expanded(
+              child: Text(
+                label,
+                style: BtText.caption(context, color: isBold ? Bt.ink : Bt.ink2, weight: isBold ? FontWeight.w600 : FontWeight.w500),
               ),
             ),
-            Text(
-              '${formatCurrency(spent)} / ${formatCurrency(allocated)}',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: isBold ? FontWeight.w700 : FontWeight.w600,
-                color: isOver
-                    ? const Color(0xFFC01048)
-                    : (isBold
-                          ? const Color(0xFF101828)
-                          : const Color(0xFF475467)),
-              ),
+            Text.rich(
+              TextSpan(children: [
+                TextSpan(
+                  text: formatCurrency(spent),
+                  style: BtText.num(BtText.caption(context, color: isOver ? Bt.red : Bt.ink, weight: FontWeight.w600)),
+                ),
+                TextSpan(
+                  text: ' / ${formatCurrency(allocated)}',
+                  style: BtText.num(BtText.caption(context, color: Bt.ink3)),
+                ),
+              ]),
             ),
           ],
         ),
-        const SizedBox(height: 4),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(4),
-          child: LinearProgressIndicator(
-            value: pct,
-            minHeight: 4,
-            backgroundColor: const Color(0xFFE4E7EC),
-            valueColor: AlwaysStoppedAnimation<Color>(barColor),
-          ),
-        ),
+        const SizedBox(height: 5),
+        BtProgress(value: pct, thin: true, color: barColor),
         if (isOver) ...[
           const SizedBox(height: 3),
           Text(
             'Exceeded by ${formatCurrency(spent - allocated)}',
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFFC01048),
-            ),
+            style: BtText.caption(context, color: Bt.red, weight: FontWeight.w600).copyWith(fontSize: 12),
           ),
         ] else if (allocated > 0 && spent > 0) ...[
           const SizedBox(height: 3),
           Text(
             '${formatCurrency(remaining)} remaining',
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: Color(0xFF667085),
-            ),
+            style: BtText.caption(context).copyWith(fontSize: 12),
           ),
         ],
       ],
@@ -803,92 +1119,108 @@ class _TrackerActivityRowState extends State<_TrackerActivityRow> {
     final done = widget.activity.completed;
     final dateLabel = _completedDateLabel();
     final bt = context.bt;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        InkWell(
-          onTap: () => setState(() => _isBudgetExpanded = !_isBudgetExpanded),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(4, 6, 8, 6),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Semantics(
-                  checked: done,
-                  label: done ? 'Mark ${widget.activity.name} as not done' : 'Mark ${widget.activity.name} as done',
-                  child: GestureDetector(
-                    onTap: widget.onToggle,
-                    behavior: HitTestBehavior.opaque,
-                    child: SizedBox(
-                      width: 56,
-                      height: Bt.touch,
-                      child: Center(
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 180),
-                          width: 24,
-                          height: 24,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(7),
-                            color: done ? Bt.green : Bt.card,
-                            border: Border.all(color: done ? Bt.green : Bt.inputBorder, width: 1.5),
+    return CustomPaint(
+      painter: _RailPainter(color: Bt.line, top: !widget.isFirst, bottom: !widget.isLast),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          InkWell(
+            onTap: () => setState(() => _isBudgetExpanded = !_isBudgetExpanded),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(8, 6, 6, 6),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Semantics(
+                    checked: done,
+                    label: done ? 'Mark ${widget.activity.name} as not done' : 'Mark ${widget.activity.name} as done',
+                    child: GestureDetector(
+                      onTap: widget.onToggle,
+                      behavior: HitTestBehavior.opaque,
+                      child: SizedBox(
+                        width: 44,
+                        height: Bt.touch,
+                        child: Center(
+                          child: AnimatedContainer(
+                            duration: Bt.fast,
+                            curve: Bt.ease,
+                            width: 22,
+                            height: 22,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: done ? Bt.greenBright : Bt.card,
+                              border: done ? null : Border.all(color: Bt.inputBorder, width: 2),
+                            ),
+                            child: done ? const Icon(Icons.check_rounded, size: 14, color: Colors.white) : null,
                           ),
-                          child: done ? const Icon(Icons.check_rounded, size: 16, color: Colors.white) : null,
                         ),
                       ),
                     ),
                   ),
-                ),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: 11),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          widget.activity.name,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: BtText.body(context, weight: FontWeight.w500, color: done ? Bt.ink2 : Bt.ink),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          done ? 'Done · ${dateLabel ?? ''}' : 'Pending',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: BtText.caption(context, color: done ? Bt.green : Bt.amber, weight: FontWeight.w500),
-                        ),
-                        const SizedBox(height: 6),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 6,
-                          children: [
-                            _rowAction(context, Icons.add_rounded, 'Add update', bt.brand, () => _openUpdateProgress(context)),
-                            if (done) _rowAction(context, Icons.visibility_outlined, 'View', Bt.ink2, () => _showActivityDetails(context)),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                      ],
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 10),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            widget.activity.name,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: BtText.body(context, weight: FontWeight.w500, color: done ? Bt.ink2 : Bt.ink).copyWith(fontSize: 15),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            done ? 'Done · ${dateLabel ?? ''}' : 'Pending',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: BtText.caption(context, color: done ? Bt.green : Bt.amber, weight: FontWeight.w500),
+                          ),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 6,
+                            children: [
+                              _rowAction(context, Icons.add_rounded, 'Add update', bt.accentInk, () => _openUpdateProgress(context)),
+                              if (done) _rowAction(context, Icons.visibility_outlined, 'View', Bt.ink2, () => _showActivityDetails(context)),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-                Semantics(
-                  label: _isBudgetExpanded ? 'Hide budget' : 'Show budget',
-                  child: SizedBox(
-                    width: 36,
-                    height: Bt.touch,
-                    child: AnimatedRotation(
-                      turns: _isBudgetExpanded ? 0.5 : 0,
-                      duration: const Duration(milliseconds: 180),
-                      child: const Icon(Icons.keyboard_arrow_down_rounded, color: Bt.ink3, size: 22),
+                  Semantics(
+                    label: _isBudgetExpanded ? 'Hide budget' : 'Show budget',
+                    child: SizedBox(
+                      width: 40,
+                      height: Bt.touch,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          AnimatedRotation(
+                            turns: _isBudgetExpanded ? 0.5 : 0,
+                            duration: Bt.fast,
+                            curve: Bt.ease,
+                            child: const Icon(Icons.keyboard_arrow_down_rounded, color: Bt.ink3, size: 22),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
-        ),
-        if (_isBudgetExpanded) _buildBudgetSection(context),
-      ],
+          AnimatedSize(
+            duration: Bt.medium,
+            curve: Bt.ease,
+            alignment: Alignment.topCenter,
+            child: _isBudgetExpanded ? _buildBudgetSection(context) : const SizedBox(width: double.infinity),
+          ),
+        ],
+      ),
     );
   }
 
@@ -897,22 +1229,21 @@ class _TrackerActivityRowState extends State<_TrackerActivityRow> {
       button: true,
       label: '$label, ${widget.activity.name}',
       excludeSemantics: true,
-      child: InkWell(
+      child: BtPressable(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(Bt.rChip),
+        scale: .95,
         child: Container(
-          constraints: const BoxConstraints(minHeight: 32),
-          padding: const EdgeInsets.symmetric(horizontal: 10),
+          constraints: const BoxConstraints(minHeight: 34),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(Bt.rChip),
-            border: Border.all(color: Bt.line),
-            color: Bt.card,
+            color: Bt.fill,
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(icon, size: 16, color: color),
-              const SizedBox(width: 4),
+              const SizedBox(width: 5),
               Text(label, style: BtText.caption(context, color: color, weight: FontWeight.w600)),
             ],
           ),
@@ -924,250 +1255,148 @@ class _TrackerActivityRowState extends State<_TrackerActivityRow> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: Bt.ground,
+      barrierColor: Bt.scrim,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(Bt.rSheet)),
       ),
-      builder: (_) {
-        final maxH = MediaQuery.of(context).size.height * 0.75;
+      builder: (sheetContext) {
+        final maxH = MediaQuery.of(context).size.height * 0.85;
         final formattedDate = _completedDateLabel() ?? 'Completed';
+        final notes = widget.activity.notes;
+        final hasNotes = notes != null && notes.trim().isNotEmpty;
+        final hasPhotos = (widget.activity.photos != null && widget.activity.photos!.isNotEmpty) ||
+            (widget.activity.photo != null && widget.activity.photo!.isNotEmpty);
+        final photoCount = (widget.activity.photos != null && widget.activity.photos!.isNotEmpty) ? widget.activity.photos!.length : 1;
         return SafeArea(
           top: false,
           child: ConstrainedBox(
             constraints: BoxConstraints(maxHeight: maxH),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE4E7EC),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    margin: const EdgeInsets.only(top: 10),
+                    width: 38,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: Bt.ink.withValues(alpha: .14),
+                      borderRadius: BorderRadius.circular(3),
                     ),
                   ),
-                  const SizedBox(height: 20),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 10, 8, 0),
+                  child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              widget.activity.name,
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.textDark,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppColors.primary.withValues(
-                                  alpha: 0.08,
-                                ),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Text(
-                                widget.phaseName,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.primary,
-                                ),
-                              ),
-                            ),
-                          ],
+                        child: Padding(
+                          padding: const EdgeInsets.only(top: 10),
+                          child: Wrap(
+                            spacing: 8,
+                            runSpacing: 6,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              BtBadge(label: widget.phaseName, tone: BtTone.brand),
+                              Text('Completed on $formattedDate'.toUpperCase(), style: BtText.mono(context, color: Bt.green)),
+                            ],
+                          ),
                         ),
                       ),
-                      IconButton(
-                        onPressed: () => Navigator.pop(context),
-                        icon: const Icon(
-                          Icons.close_rounded,
-                          color: Color(0xFF667085),
-                        ),
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
+                      BtIconButton(
+                        icon: Icons.close_rounded,
+                        semantic: 'Close',
+                        color: Bt.ink2,
+                        onTap: () => Navigator.pop(context),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 20),
-                  Expanded(
-                    child: SingleChildScrollView(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(
-                                Icons.calendar_today_outlined,
-                                size: 16,
-                                color: AppColors.success,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Completed on $formattedDate',
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.success,
-                                ),
-                              ),
-                            ],
+                ),
+                Flexible(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(20, 6, 20, 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        BtReveal(child: Text(widget.activity.name, style: BtText.d2(context))),
+                        if (hasPhotos) ...[
+                          const SizedBox(height: 22),
+                          BtReveal(
+                            index: 1,
+                            child: BtSectionHeader(title: 'Progress photos', action: '$photoCount'),
                           ),
-                          if (widget.activity.notes != null &&
-                              widget.activity.notes!.trim().isNotEmpty) ...[
-                            const SizedBox(height: 20),
-                            Text(
-                              'Notes & Remarks',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.primary,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF6F7F9),
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                  color: const Color(0xFFE4E7EC),
-                                ),
-                              ),
-                              child: Text(
-                                widget.activity.notes!,
-                                style: const TextStyle(
-                                  fontSize: 13.5,
-                                  height: 1.5,
-                                  color: AppColors.textDark,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ),
-                          ],
-                          if ((widget.activity.photos != null &&
-                                  widget.activity.photos!.isNotEmpty) ||
-                              (widget.activity.photo != null &&
-                                  widget.activity.photo!.isNotEmpty)) ...[
-                            const SizedBox(height: 20),
-                            Text(
-                              'Progress Photos',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.primary,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            _buildProgressPhotosList(context, widget.activity),
-                          ],
-                          if ((widget.activity.notes == null ||
-                                  widget.activity.notes!.trim().isEmpty) &&
-                              (widget.activity.photo == null ||
-                                  widget.activity.photo!.isEmpty) &&
-                              (widget.activity.photos == null ||
-                                  widget.activity.photos!.isEmpty)) ...[
-                            const SizedBox(height: 20),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                vertical: 24,
-                                horizontal: 16,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF6F7F9),
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                  color: const Color(0xFFE4E7EC),
-                                ),
-                              ),
-                              child: const Center(
-                                child: Column(
-                                  children: [
-                                    Icon(
-                                      Icons.info_outline_rounded,
-                                      color: Color(0xFF667085),
-                                      size: 28,
-                                    ),
-                                    SizedBox(height: 8),
-                                    Text(
-                                      'No additional notes or photos recorded for this activity.',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        color: Color(0xFF667085),
-                                        fontStyle: FontStyle.italic,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
+                          BtReveal(index: 2, child: _buildProgressPhotosList(context, widget.activity)),
                         ],
-                      ),
+                        if (hasNotes) ...[
+                          const SizedBox(height: 22),
+                          const BtReveal(index: 3, child: BtSectionHeader(title: 'Notes & remarks')),
+                          BtReveal(
+                            index: 4,
+                            child: BtCard(
+                              padding: const EdgeInsets.all(16),
+                              child: Text(notes, style: BtText.subhead(context, color: Bt.ink).copyWith(height: 1.5)),
+                            ),
+                          ),
+                        ],
+                        if (!hasNotes && !hasPhotos) ...[
+                          const SizedBox(height: 18),
+                          const BtCard(
+                            child: BtEmpty(
+                              icon: Icons.info_outline_rounded,
+                              title: 'Nothing recorded yet',
+                              message: 'No additional notes or photos recorded for this activity.',
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
-                ],
-              ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+                  child: BtButton(
+                    label: 'Add update',
+                    icon: Icons.edit_outlined,
+                    onPressed: () {
+                      Navigator.pop(sheetContext);
+                      _openUpdateProgress(context);
+                    },
+                  ),
+                ),
+              ],
             ),
           ),
         );
       },
     );
   }
-  Widget _buildThumbnailImage(String photoUrl) {
+  Widget _buildThumbnailImage(String photoUrl, {double? width, double? height}) {
+    Widget broken() => Container(
+          color: Bt.fill,
+          child: const Center(child: Icon(Icons.broken_image_outlined, color: Bt.ink3, size: 24)),
+        );
     Widget img;
     if (photoUrl.startsWith('data:image/') && photoUrl.contains(';base64,')) {
       try {
         final base64String = photoUrl.split(';base64,').last;
         final bytes = base64.decode(base64String);
-        img = Image.memory(bytes, fit: BoxFit.cover, width: 80, height: 80);
+        img = Image.memory(bytes, fit: BoxFit.cover, width: width, height: height, gaplessPlayback: true);
       } catch (e) {
-        img = Container(
-          color: const Color(0xFFEEF1F5),
-          child: const Icon(
-            Icons.broken_image_outlined,
-            color: Color(0xFF667085),
-            size: 24,
-          ),
-        );
+        img = broken();
       }
     } else {
       img = Image.network(
         photoUrl,
         fit: BoxFit.cover,
-        width: 80,
-        height: 80,
-        errorBuilder: (context, error, stackTrace) {
-          return Container(
-            color: const Color(0xFFEEF1F5),
-            child: const Icon(
-              Icons.broken_image_outlined,
-              color: Color(0xFF667085),
-              size: 24,
-            ),
-          );
-        },
+        width: width,
+        height: height,
+        errorBuilder: (context, error, stackTrace) => broken(),
       );
     }
-    return ClipRRect(borderRadius: BorderRadius.circular(10), child: img);
+    return ClipRRect(borderRadius: BorderRadius.circular(Bt.rTile), child: img);
   }
   Widget _buildProgressPhotosList(
     BuildContext context,
@@ -1176,25 +1405,59 @@ class _TrackerActivityRowState extends State<_TrackerActivityRow> {
     final photos = (activity.photos != null && activity.photos!.isNotEmpty)
         ? activity.photos!
         : [activity.photo!];
-    return Wrap(
-      spacing: 10,
-      runSpacing: 10,
-      children: photos.asMap().entries.map((entry) {
-        final idx = entry.key;
-        final url = entry.value;
-        return GestureDetector(
-          onTap: () => _openPhotoGallery(context, photos, idx),
-          child: Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Bt.line),
+    Widget tile(int idx, {Widget? overlay}) => Semantics(
+          button: true,
+          label: 'Open photo ${idx + 1} of ${photos.length}',
+          child: BtPressable(
+            scale: .97,
+            onTap: () => _openPhotoGallery(context, photos, idx),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                _buildThumbnailImage(photos[idx]),
+                ?overlay,
+              ],
             ),
-            child: _buildThumbnailImage(url),
           ),
         );
-      }).toList(),
+    if (photos.length == 1) {
+      return SizedBox(height: 198, child: tile(0));
+    }
+    if (photos.length == 2) {
+      return SizedBox(
+        height: 160,
+        child: Row(children: [Expanded(child: tile(0)), const SizedBox(width: 6), Expanded(child: tile(1))]),
+      );
+    }
+    final extra = photos.length - 3;
+    return SizedBox(
+      height: 198,
+      child: Row(
+        children: [
+          Expanded(flex: 2, child: tile(0)),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Column(
+              children: [
+                Expanded(child: tile(1)),
+                const SizedBox(height: 6),
+                Expanded(
+                  child: tile(
+                    2,
+                    overlay: extra > 0
+                        ? Container(
+                            decoration: BoxDecoration(color: const Color(0x8C0C0E12), borderRadius: BorderRadius.circular(Bt.rTile)),
+                            alignment: Alignment.center,
+                            child: Text('+$extra', style: BtText.title(context, size: 18).copyWith(color: Bt.bone)),
+                          )
+                        : null,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
   void _openPhotoGallery(
@@ -1220,47 +1483,17 @@ class _SummaryCard extends StatelessWidget {
   final ProjectModel project;
   final double progress;
   final int doneCount, totalCount;
-  static const _months = [
-    'Jan',
-    'Feb',
-    'Mar',
-    'Apr',
-    'May',
-    'Jun',
-    'Jul',
-    'Aug',
-    'Sep',
-    'Oct',
-    'Nov',
-    'Dec',
-  ];
-  String _fmt(DateTime d) => '${d.day} ${_months[d.month - 1]} ${d.year}';
-  static Color _statusColor(String? status) {
-    switch (status) {
-      case 'Completed':
-        return Bt.green;
-      case 'In Progress':
-        return AppColors.primary;
-      case 'On Hold':
-        return Bt.amber;
-      case 'Cancelled':
-        return Bt.red;
-      default:
-        return Bt.ink3;
-    }
-  }
   @override
   Widget build(BuildContext context) {
     final pct = (progress * 100).toStringAsFixed(1);
     final rawStatus = project.projectStatus;
-    final statusLabel = (rawStatus != null && rawStatus.isNotEmpty)
-        ? rawStatus
-        : (progress >= 1.0
-              ? 'Completed'
-              : progress >= 0.3
-              ? 'In Progress'
-              : 'Planning');
-    final statusColor = _statusColor(rawStatus);
+    final statusColor = rawStatus == 'Completed'
+        ? Bt.greenBright
+        : rawStatus == 'On Hold'
+        ? Bt.amberBright
+        : rawStatus == 'Cancelled'
+        ? Bt.redBright
+        : context.bt.accent;
     final allPhases = buildDefaultPhases();
     final selectedNames = project.selectedPhaseNames;
     final phases = (selectedNames == null || selectedNames.isEmpty)
@@ -1284,228 +1517,226 @@ class _SummaryCard extends StatelessWidget {
         }
       }
     }
-    return BtCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(project.name, style: BtText.title(context)),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: [
-              BtBadge(label: statusLabel, tone: BtBadge.toneFor(statusLabel)),
-              if (activePhase != null)
-                BtBadge(label: 'Now: $activePhase', tone: BtTone.brand),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text('$pct%', style: BtText.amount(context, size: 28)),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: Text(
-                    'Overall completion · $doneCount/$totalCount activities',
-                    style: BtText.caption(context),
-                    maxLines: 2,
-                  ),
-                ),
+    final util = project.budgetUtilization;
+    final utilColor = util >= 1.0
+        ? Bt.redBright
+        : util >= 0.8
+        ? Bt.amberBright
+        : Bt.ink;
+    final hasClient = project.clientName != null && project.clientName!.isNotEmpty;
+    final hasFloors = project.floors != null && project.floors!.isNotEmpty;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: _RingStat(
+                value: progress.clamp(0.0, 1.0).toDouble(),
+                color: statusColor,
+                center: '${(progress * 100).toStringAsFixed(0)}%',
+                title: 'Work done',
+                subtitle: totalCount > 0 ? '$doneCount of $totalCount' : '$pct% complete',
               ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          BtProgress(value: progress.clamp(0.0, 1.0).toDouble(), color: statusColor),
-          const SizedBox(height: 16),
-          const Divider(color: Bt.line, height: 1),
-          const SizedBox(height: 12),
-          if (project.location.isNotEmpty) _infoRow(context, Icons.location_on_outlined, project.location),
-          _infoRow(context, Icons.calendar_today_outlined, 'Started ${_fmt(project.startDate)}'),
-          if (project.expectedEndDate != null)
-            _infoRow(context, Icons.event_available_outlined, 'Due ${_fmt(project.expectedEndDate!)}'),
-          if (project.clientName != null && project.clientName!.isNotEmpty)
-            _infoRow(context, Icons.person_outline, project.clientName!),
-          if (project.projectCode != null && project.projectCode!.isNotEmpty)
-            _infoRow(context, Icons.qr_code_scanner_outlined, project.projectCode!),
-          if (project.floors != null && project.floors!.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: project.floors!.map((f) => BtBadge(label: f)).toList(),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _RingStat(
+                value: util.clamp(0.0, 1.0).toDouble(),
+                color: utilColor,
+                center: '${(util * 100).toStringAsFixed(0)}%',
+                title: 'Budget used',
+                subtitle: project.formattedSpent,
+              ),
             ),
           ],
+        ),
+        if (activePhase != null || hasClient || hasFloors) ...[
+          const SizedBox(height: 10),
+          BtCard(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Overall completion · $pct% · $doneCount/$totalCount activities',
+                  style: BtText.num(BtText.caption(context)),
+                ),
+                if (activePhase != null || hasClient) ...[
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      if (activePhase != null) BtBadge(label: 'Now: $activePhase', tone: BtTone.brand),
+                      if (hasClient) BtBadge(label: 'Client · ${project.clientName!}'),
+                    ],
+                  ),
+                ],
+                if (hasFloors) ...[
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: project.floors!.map((f) => BtBadge(label: f, dot: false)).toList(),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+/// Small card with an animated ring + label (Overview "Work done" / "Budget used").
+class _RingStat extends StatelessWidget {
+  const _RingStat({required this.value, required this.color, required this.center, required this.title, required this.subtitle});
+  final double value;
+  final Color color;
+  final String center, title, subtitle;
+  @override
+  Widget build(BuildContext context) {
+    return BtCard(
+      padding: const EdgeInsets.all(14),
+      child: Row(
+        children: [
+          BtRing(
+            value: value,
+            size: 56,
+            stroke: 6,
+            color: color,
+            child: Text(center, style: BtText.num(BtText.caption(context, color: Bt.ink, weight: FontWeight.w700).copyWith(fontSize: 12))),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.subhead(context, weight: FontWeight.w600, color: Bt.ink)),
+                Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.num(BtText.caption(context))),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
-  Widget _infoRow(BuildContext context, IconData icon, String text) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 3),
-    child: Row(
-      children: [
-        Icon(icon, color: Bt.ink3, size: 16),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            text,
-            style: BtText.subhead(context),
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-      ],
-    ),
-  );
 }
+
+/// Compact label/value tile used across the Details tab.
+class _StatTile extends StatelessWidget {
+  const _StatTile({required this.label, required this.value, this.icon});
+  final String label, value;
+  final IconData? icon;
+  @override
+  Widget build(BuildContext context) {
+    return BtCard(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              if (icon != null) ...[Icon(icon, size: 14, color: Bt.ink3), const SizedBox(width: 5)],
+              Expanded(child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.caption(context).copyWith(fontSize: 12))),
+            ],
+          ),
+          const SizedBox(height: 2),
+          Text(value, maxLines: 2, overflow: TextOverflow.ellipsis, style: BtText.num(BtText.body(context, weight: FontWeight.w600).copyWith(fontSize: 15))),
+        ],
+      ),
+    );
+  }
+}
+
+/// Lays tiles out two per row.
+class _TileGrid extends StatelessWidget {
+  const _TileGrid({required this.children});
+  final List<Widget> children;
+  @override
+  Widget build(BuildContext context) {
+    final rows = <Widget>[];
+    for (var i = 0; i < children.length; i += 2) {
+      if (i > 0) rows.add(const SizedBox(height: 10));
+      rows.add(IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(child: children[i]),
+            const SizedBox(width: 10),
+            Expanded(child: i + 1 < children.length ? children[i + 1] : const SizedBox.shrink()),
+          ],
+        ),
+      ));
+    }
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: rows);
+  }
+}
+
 class _ProjectInfoCard extends StatelessWidget {
   const _ProjectInfoCard({required this.project});
   final ProjectModel project;
   @override
   Widget build(BuildContext context) {
-    final rows = <_InfoRow>[
-      if (project.projectCode?.isNotEmpty == true)
-        _InfoRow(
-          Icons.qr_code_scanner_outlined,
-          'Project Code',
-          project.projectCode!,
-        ),
+    final people = <_InfoRow>[
       if (project.clientName?.isNotEmpty == true)
         _InfoRow(Icons.person_outline, 'Client', project.clientName!),
       if (project.contractorName?.isNotEmpty == true)
-        _InfoRow(
-          Icons.engineering_outlined,
-          'Contractor',
-          project.contractorName!,
-        ),
+        _InfoRow(Icons.engineering_outlined, 'Contractor', project.contractorName!),
       if (project.siteEngineer?.isNotEmpty == true)
-        _InfoRow(
-          Icons.construction_outlined,
-          'Engineer',
-          project.siteEngineer!,
-        ),
-      if (project.contactNumber?.isNotEmpty == true)
-        _InfoRow(Icons.phone_outlined, 'Contact', project.contactNumber!),
-      if (project.mapAddress?.isNotEmpty == true)
-        _InfoRow(Icons.place_outlined, 'Map Address', project.mapAddress!),
-      if (project.projectStatus?.isNotEmpty == true)
-        _InfoRow(Icons.flag_outlined, 'Status', project.projectStatus!),
-      _InfoRow(Icons.location_on_outlined, 'Location', project.location),
+        _InfoRow(Icons.construction_outlined, 'Engineer', project.siteEngineer!),
     ];
-    if (rows.isEmpty) return const SizedBox.shrink();
-    return AppCard(
-      margin: EdgeInsets.zero,
-      child: Column(
-        children: [
-          if (project.projectCode?.isNotEmpty == true) ...[
-            _buildProjectCodeChip(project.projectCode!),
-            AppDivider(verticalPadding: 10),
+    final hasContact = project.contactNumber?.isNotEmpty == true;
+    final status = project.projectStatus;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (people.isNotEmpty || hasContact) ...[
+          const BtSectionHeader(title: 'People'),
+          BtGroup(
+            children: [
+              for (final r in people)
+                BtRow(
+                  leading: BtAvatar(name: r.value, size: 40),
+                  title: r.value,
+                  subtitle: r.label,
+                  titleWeight: FontWeight.w600,
+                ),
+              if (hasContact)
+                BtRow(
+                  leading: const BtTile(icon: Icons.phone_outlined, size: 40),
+                  title: project.contactNumber!,
+                  subtitle: 'Contact',
+                  titleWeight: FontWeight.w600,
+                ),
+            ],
+          ),
+          const SizedBox(height: 26),
+        ],
+        const BtSectionHeader(title: 'Project information'),
+        BtGroup(
+          insetDividers: false,
+          children: [
+            if (project.projectCode?.isNotEmpty == true)
+              BtValueRow(
+                label: 'Project code',
+                value: '',
+                trailing: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(color: Bt.noir, borderRadius: BorderRadius.circular(10)),
+                  child: Text(project.projectCode!.toUpperCase(), style: BtText.mono(context, color: Bt.bone, size: 12)),
+                ),
+              ),
+            if (project.mapAddress?.isNotEmpty == true)
+              BtValueRow(label: 'Map address', value: project.mapAddress!),
+            if (status?.isNotEmpty == true)
+              BtValueRow(label: 'Status', value: '', trailing: BtBadge(label: status!, tone: BtBadge.toneFor(status))),
+            BtValueRow(label: 'Location', value: project.location),
           ],
-          ...rows
-              .where((r) => r.label != 'Project Code')
-              .map(
-                (r) => Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 32,
-                        height: 32,
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Icon(r.icon, color: AppColors.primary, size: 16),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              r.label,
-                              style: AppTheme.caption.copyWith(
-                                fontSize: 12,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                            Text(
-                              r.value,
-                              style: AppTheme.body.copyWith(
-                                color: AppColors.textDark,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-        ],
-      ),
-    );
-  }
-  Widget _buildProjectCodeChip(String code) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF3F4FF),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: AppColors.primary.withValues(alpha: 0.18),
-          width: 1.5,
         ),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            Icons.qr_code_scanner_rounded,
-            color: AppColors.primary,
-            size: 18,
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Project Code',
-                  style: AppTheme.caption.copyWith(
-                    fontSize: 12,
-                    letterSpacing: 0.4,
-                  ),
-                ),
-                Text(
-                  'Auto-generated',
-                  style: AppTheme.caption.copyWith(
-                    fontSize: 12,
-                    color: AppColors.textLight,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-            decoration: BoxDecoration(
-              color: AppColors.primary,
-              borderRadius: BorderRadius.circular(Bt.rCard),
-            ),
-            child: Text(
-              code,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
-                letterSpacing: 0.5,
-              ),
-            ),
-          ),
-        ],
-      ),
+      ],
     );
   }
 }
@@ -1524,112 +1755,11 @@ class _BuildingTypeCard extends StatelessWidget {
     final mainType = parts.isNotEmpty ? parts[0].trim() : raw;
     final subType = parts.length > 1 ? parts[1].trim() : null;
     final IconData mainIcon = _iconForType(mainType);
-    return AppCard(
-      margin: EdgeInsets.zero,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(mainIcon, color: AppColors.primary, size: 20),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Main Type',
-                      style: AppTheme.caption.copyWith(
-                        fontSize: 12,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                    Text(
-                      mainType,
-                      style: AppTheme.body.copyWith(
-                        color: AppColors.textDark,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (subType != null)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(Bt.rCard),
-                    border: Border.all(
-                      color: AppColors.primary.withValues(alpha: 0.2),
-                    ),
-                  ),
-                  child: Text(
-                    subType,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          if (subType != null) ...[
-            AppDivider(verticalPadding: 10),
-            Row(
-              children: [
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.06),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(
-                    Icons.category_outlined,
-                    color: AppColors.primary,
-                    size: 16,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Sub Type',
-                        style: AppTheme.caption.copyWith(
-                          fontSize: 12,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                      Text(
-                        subType,
-                        style: AppTheme.body.copyWith(
-                          color: AppColors.textDark,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ],
-      ),
+    return _TileGrid(
+      children: [
+        _StatTile(label: 'Main type', value: mainType, icon: mainIcon),
+        if (subType != null) _StatTile(label: 'Sub type', value: subType, icon: Icons.category_outlined),
+      ],
     );
   }
   IconData _iconForType(String type) {
@@ -1654,89 +1784,28 @@ class _LandFloorsCard extends StatelessWidget {
   final ProjectModel project;
   @override
   Widget build(BuildContext context) {
-    return AppCard(
-      margin: EdgeInsets.zero,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (project.landArea != null && project.landArea!.isNotEmpty) ...[
-            Row(
-              children: [
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(
-                    Icons.landscape_outlined,
-                    color: AppColors.primary,
-                    size: 16,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Total Land Area',
-                      style: AppTheme.caption.copyWith(fontSize: 12),
-                    ),
-                    Text(
-                      '${project.landArea} ${project.landUnit ?? ""}',
-                      style: AppTheme.bodyLarge.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textDark,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
+    final hasLand = project.landArea != null && project.landArea!.isNotEmpty;
+    final hasFloors = project.floors != null && project.floors!.isNotEmpty;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _TileGrid(
+          children: [
+            if (hasLand)
+              _StatTile(label: 'Total land area', value: '${project.landArea} ${project.landUnit ?? ""}'.trim(), icon: Icons.landscape_outlined),
+            if (hasFloors)
+              _StatTile(label: 'Floors included', value: '${project.floors!.length}', icon: Icons.layers_outlined),
           ],
-          if (project.floors != null && project.floors!.isNotEmpty) ...[
-            Text(
-              'Floors Included',
-              style: AppTheme.caption.copyWith(
-                fontSize: 12,
-                letterSpacing: 0.5,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: project.floors!
-                  .map(
-                    (f) => Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(Bt.rCard),
-                        border: Border.all(
-                          color: AppColors.primary.withValues(alpha: 0.2),
-                        ),
-                      ),
-                      child: Text(
-                        f,
-                        style: TextStyle(
-                          color: AppColors.primary,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  )
-                  .toList(),
-            ),
-          ],
+        ),
+        if (hasFloors) ...[
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: project.floors!.map((f) => BtBadge(label: f, dot: false)).toList(),
+          ),
         ],
-      ),
+      ],
     );
   }
 }
@@ -1757,69 +1826,40 @@ class _RoomsBathsCard extends StatelessWidget {
       'Common': project.bathCommon,
       'Attached': project.bathAttached,
     };
-    Widget tile(String label, int? count, Color c) => Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+    Widget tile(String label, int? count) => Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
       decoration: BoxDecoration(
-        color: c.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: c.withValues(alpha: 0.15)),
+        color: Bt.fill,
+        borderRadius: BorderRadius.circular(Bt.rChip),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            '$label ',
-            style: AppTheme.caption.copyWith(
-              fontSize: 13,
-              color: AppColors.textMedium,
-            ),
-          ),
-          Text(
-            '${count ?? 0}',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-              color: c,
-            ),
-          ),
+          Text('$label ', style: BtText.caption(context, color: Bt.ink2)),
+          Text('${count ?? 0}', style: BtText.num(BtText.title(context, size: 16))),
         ],
       ),
     );
     final roomTiles = rooms.entries
         .where((e) => (e.value ?? 0) > 0)
-        .map((e) => tile(e.key, e.value, AppColors.primary))
+        .map((e) => tile(e.key, e.value))
         .toList();
     final bathTiles = baths.entries
         .where((e) => (e.value ?? 0) > 0)
-        .map((e) => tile(e.key, e.value, const Color(0xFF00838F)))
+        .map((e) => tile(e.key, e.value))
         .toList();
-    return AppCard(
-      margin: EdgeInsets.zero,
+    return BtCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (roomTiles.isNotEmpty) ...[
-            Text(
-              'Rooms',
-              style: AppTheme.caption.copyWith(
-                fontSize: 12,
-                letterSpacing: 1.2,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
+            Text('ROOMS', style: BtText.mono(context)),
             const SizedBox(height: 8),
             Wrap(spacing: 8, runSpacing: 8, children: roomTiles),
             if (bathTiles.isNotEmpty) const SizedBox(height: 16),
           ],
           if (bathTiles.isNotEmpty) ...[
-            Text(
-              'Bathrooms',
-              style: AppTheme.caption.copyWith(
-                fontSize: 12,
-                letterSpacing: 1.2,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
+            Text('BATHROOMS', style: BtText.mono(context)),
             const SizedBox(height: 8),
             Wrap(spacing: 8, runSpacing: 8, children: bathTiles),
           ],
@@ -1910,100 +1950,64 @@ class _FeatureGroupCardState extends State<_FeatureGroupCard> {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Bt.line),
+        color: Bt.card,
+        borderRadius: BorderRadius.circular(Bt.rCard),
+        boxShadow: Bt.shadow,
       ),
-      child: Column(
-        children: [
-          GestureDetector(
-            onTap: () => setState(() => _open = !_open),
-            child: Container(
-              color: Colors.transparent,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              child: Row(
-                children: [
-                  Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Icon(
-                      widget.icon,
-                      color: AppColors.primary,
-                      size: 16,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          widget.title,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textDark,
-                          ),
-                        ),
-                        Text(
-                          '${widget.features.length} selected',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: AppColors.textLight,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Icon(
-                    _open ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-                    color: AppColors.textLight,
-                  ),
-                ],
-              ),
-            ),
-          ),
-          if (_open) ...[
-            const Divider(height: 1, color: Color(0xFFEEF1F5)),
-            Padding(
-              padding: const EdgeInsets.all(14),
-              child: Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: widget.features
-                    .map(
-                      (f) => Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 5,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.07),
-                          borderRadius: BorderRadius.circular(Bt.rCard),
-                          border: Border.all(
-                            color: AppColors.primary.withValues(alpha: 0.18),
-                          ),
-                        ),
-                        child: Text(
-                          f,
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.primary,
-                          ),
+      clipBehavior: Clip.antiAlias,
+      child: Material(
+        color: Colors.transparent,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Semantics(
+              button: true,
+              expanded: _open,
+              child: InkWell(
+                onTap: () => setState(() => _open = !_open),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: Row(
+                    children: [
+                      BtTile(icon: widget.icon, size: 36),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(widget.title, style: BtText.subhead(context, weight: FontWeight.w600, color: Bt.ink)),
+                            Text('${widget.features.length} selected', style: BtText.caption(context)),
+                          ],
                         ),
                       ),
-                    )
-                    .toList(),
+                      AnimatedRotation(
+                        turns: _open ? 0.5 : 0,
+                        duration: Bt.fast,
+                        curve: Bt.ease,
+                        child: const Icon(Icons.keyboard_arrow_down_rounded, color: Bt.ink3, size: 22),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
+            AnimatedSize(
+              duration: Bt.medium,
+              curve: Bt.ease,
+              alignment: Alignment.topCenter,
+              child: _open
+                  ? Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                      child: Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: widget.features.map((f) => BtBadge(label: f, dot: false)).toList(),
+                      ),
+                    )
+                  : const SizedBox(width: double.infinity),
+            ),
           ],
-        ],
+        ),
       ),
     );
   }
@@ -2029,28 +2033,93 @@ class _ProjectTimelineCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final status = project.projectStatus;
-    return BtGroup(
-      children: [
-        if (status != null)
-          BtValueRow(
-            label: 'Project status',
-            value: '',
-            trailing: BtBadge(label: status, tone: BtBadge.toneFor(status)),
+    final start = project.startDate;
+    final end = project.expectedEndDate;
+    final now = DateTime.now();
+    double? elapsed;
+    int? daysLeft;
+    if (end != null && end.isAfter(start)) {
+      final total = end.difference(start).inMinutes;
+      elapsed = (now.difference(start).inMinutes / total).clamp(0.0, 1.0).toDouble();
+      daysLeft = end.difference(DateTime(now.year, now.month, now.day)).inDays;
+    }
+    final accent = context.bt.accent;
+    return BtCard(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(child: Text('Timeline & status', style: BtText.subhead(context, weight: FontWeight.w600, color: Bt.ink))),
+              if (status != null) BtBadge(label: status, tone: BtBadge.toneFor(status)),
+            ],
           ),
-        BtValueRow(label: 'Start date', value: _fmt(project.startDate)),
-        if (project.expectedEndDate != null)
-          BtValueRow(label: 'Expected end', value: _fmt(project.expectedEndDate!)),
-        if (project.actualEndDate != null)
-          BtValueRow(label: 'Actual end date', value: _fmt(project.actualEndDate!), valueColor: Bt.green),
-      ],
+          if (elapsed != null) ...[
+            const SizedBox(height: 24),
+            SizedBox(
+              height: 30,
+              child: LayoutBuilder(
+                builder: (context, c) {
+                  final x = c.maxWidth * elapsed!;
+                  return Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        top: 12,
+                        child: BtProgress(value: elapsed, thin: true, color: Bt.ink),
+                      ),
+                      Positioned(
+                        left: (x - 1).clamp(0.0, c.maxWidth - 2),
+                        top: 0,
+                        child: Container(width: 2, height: 30, color: accent),
+                      ),
+                      Positioned(
+                        left: (x - 20).clamp(0.0, c.maxWidth - 40),
+                        top: -18,
+                        child: Text('TODAY', style: BtText.mono(context, color: context.bt.accentInk, size: 9.5)),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 4),
+            if (daysLeft != null && project.actualEndDate == null)
+              Text(
+                daysLeft >= 0 ? '$daysLeft ${daysLeft == 1 ? 'day' : 'days'} left' : '${-daysLeft} ${daysLeft == -1 ? 'day' : 'days'} past expected end',
+                style: BtText.num(BtText.caption(context, color: daysLeft >= 0 ? Bt.ink3 : Bt.red)),
+              ),
+          ],
+          const SizedBox(height: 8),
+          const Divider(height: 1, color: Bt.line),
+          _row(context, 'Start date', _fmt(start)),
+          if (end != null) _row(context, 'Expected end', _fmt(end)),
+          if (project.actualEndDate != null) _row(context, 'Actual end date', _fmt(project.actualEndDate!), color: Bt.green),
+        ],
+      ),
     );
   }
+
+  Widget _row(BuildContext context, String label, String value, {Color? color}) => Padding(
+        padding: const EdgeInsets.only(top: 10),
+        child: Row(
+          children: [
+            Text(label, style: BtText.subhead(context)),
+            const Spacer(),
+            Text(value, style: BtText.num(BtText.subhead(context, weight: FontWeight.w600, color: color ?? Bt.ink))),
+          ],
+        ),
+      );
 }
 class _FinancialCard extends StatelessWidget {
   const _FinancialCard({required this.project});
   final ProjectModel project;
   @override
   Widget build(BuildContext context) {
+    final bt = context.bt;
     final util = project.budgetUtilization;
     final over = project.spentAmount > project.totalBudget;
     final bMat = project.budgetMaterial ?? 0;
@@ -2058,222 +2127,104 @@ class _FinancialCard extends StatelessWidget {
     final bEq = project.budgetEquipment ?? 0;
     final bMisc = project.budgetMisc ?? 0;
     final hasBrk = bMat + bLab + bEq + bMisc > 0;
-    return AppCard(
-      margin: EdgeInsets.zero,
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.06),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: AppColors.primary.withValues(alpha: 0.15),
+    final utilColor = util >= 1.0
+        ? Bt.redBright
+        : util >= 0.8
+        ? Bt.amberBright
+        : bt.accent;
+    final brkTotal = bMat + bLab + bEq + bMisc;
+    Widget cat(String label, double amount, Color c, IconData icon) => Padding(
+          padding: const EdgeInsets.only(top: 14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Container(width: 8, height: 8, decoration: BoxDecoration(color: c, borderRadius: BorderRadius.circular(2))),
+                  const SizedBox(width: 8),
+                  Icon(icon, size: 15, color: Bt.ink3),
+                  const SizedBox(width: 6),
+                  Expanded(child: Text(label, style: BtText.subhead(context))),
+                  Text(formatCurrency(amount), style: BtText.num(BtText.subhead(context, weight: FontWeight.w600, color: Bt.ink))),
+                ],
               ),
-            ),
-            child: Row(
+              const SizedBox(height: 6),
+              BtProgress(value: brkTotal > 0 ? amount / brkTotal : 0, thin: true, color: c),
+            ],
+          ),
+        );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        BtCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('FINANCIAL OVERVIEW', style: BtText.mono(context)),
+              const SizedBox(height: 10),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Budget used', style: BtText.caption(context)),
+                        BtCountUp(
+                          value: util * 100,
+                          format: (v) => '${v.toStringAsFixed(0)}%',
+                          style: BtText.num(BtText.d2(context, color: util >= 1.0 ? Bt.red : Bt.ink)),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Text.rich(
+                    TextSpan(children: [
+                      TextSpan(text: project.formattedSpent, style: BtText.num(BtText.subhead(context, weight: FontWeight.w600, color: over ? Bt.red : Bt.ink))),
+                      TextSpan(text: ' of ${project.formattedBudget}', style: BtText.num(BtText.subhead(context))),
+                    ]),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              BtBricks(value: util.clamp(0.0, 1.0).toDouble(), color: utilColor),
+              const SizedBox(height: 14),
+              const Divider(height: 1, color: Bt.line),
+              const SizedBox(height: 4),
+              _frow(context, 'Total budget', project.formattedBudget, Bt.ink),
+              _frow(context, 'Spent amount', project.formattedSpent, over ? Bt.red : Bt.ink),
+              _frow(context, 'Remaining', project.formattedRemaining, project.remainingBudget >= 0 ? Bt.green : Bt.red),
+            ],
+          ),
+        ),
+        if (hasBrk) ...[
+          const SizedBox(height: 12),
+          BtCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(
-                    Icons.account_balance_wallet_rounded,
-                    color: AppColors.primary,
-                    size: 18,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Total budget',
-                        style: AppTheme.caption.copyWith(
-                          fontSize: 12,
-                          letterSpacing: 1.0,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textLight,
-                        ),
-                      ),
-                      Text(
-                        project.formattedBudget,
-                        style: AppTheme.heading2.copyWith(
-                          color: AppColors.primary,
-                          letterSpacing: -0.3,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                Text('Budget breakdown', style: BtText.subhead(context, weight: FontWeight.w600, color: Bt.ink)),
+                if (bMat > 0) cat('Material', bMat, bt.series[0], Icons.inventory_2_outlined),
+                if (bLab > 0) cat('Labour', bLab, bt.series[1], Icons.groups_outlined),
+                if (bEq > 0) cat('Equipment', bEq, bt.series[2], Icons.local_shipping_outlined),
+                if (bMisc > 0) cat('Miscellaneous', bMisc, Bt.amberBright, Icons.more_horiz_rounded),
               ],
             ),
           ),
-          AppDivider(verticalPadding: 12),
-          _frow(
-            'Spent Amount',
-            project.formattedSpent,
-            over ? AppColors.error : AppColors.primary,
-            Icons.payments_outlined,
-          ),
-          AppDivider(verticalPadding: 8),
-          _frow(
-            'Remaining',
-            project.formattedRemaining,
-            project.remainingBudget >= 0 ? AppColors.success : AppColors.error,
-            Icons.savings_outlined,
-          ),
-          if (hasBrk) ...[
-            const SizedBox(height: 14),
-            const Divider(color: Color(0xFFEEF1F5), height: 1),
-            const SizedBox(height: 10),
-            Text(
-              'Budget breakdown',
-              style: AppTheme.caption.copyWith(
-                fontSize: 12,
-                letterSpacing: 1.1,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 10),
-            if (bMat > 0) ...[
-              _catRow(
-                'Material',
-                bMat,
-                AppColors.primary,
-                Icons.category_outlined,
-              ),
-              AppDivider(verticalPadding: 6),
-            ],
-            if (bLab > 0) ...[
-              _catRow(
-                'Labour',
-                bLab,
-                AppColors.info,
-                Icons.people_outline_rounded,
-              ),
-              AppDivider(verticalPadding: 6),
-            ],
-            if (bEq > 0) ...[
-              _catRow(
-                'Equipment',
-                bEq,
-                const Color(0xFF0B63CE),
-                Icons.precision_manufacturing_outlined,
-              ),
-              AppDivider(verticalPadding: 6),
-            ],
-            if (bMisc > 0)
-              _catRow(
-                'Miscellaneous',
-                bMisc,
-                AppColors.warning,
-                Icons.more_horiz_rounded,
-              ),
-          ],
-          const SizedBox(height: 14),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Budget Used',
-                style: AppTheme.label.copyWith(
-                  color: AppColors.textLight,
-                  letterSpacing: 0.3,
-                ),
-              ),
-              Text(
-                '${(util * 100).toStringAsFixed(0)}%',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: util >= 1.0
-                      ? AppColors.error
-                      : util >= 0.8
-                      ? AppColors.warning
-                      : AppColors.primary,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(16),
-            child: LinearProgressIndicator(
-              value: util.clamp(0.0, 1.0),
-              minHeight: 8,
-              backgroundColor: const Color(0xFFEEF1F5),
-              valueColor: AlwaysStoppedAnimation<Color>(
-                util >= 1.0
-                    ? AppColors.error
-                    : util >= 0.8
-                    ? AppColors.warning
-                    : AppColors.primary,
-              ),
-            ),
-          ),
         ],
-      ),
+      ],
     );
   }
-  Widget _frow(String label, String value, Color color, IconData icon) => Row(
-    children: [
-      Container(
-        width: 34,
-        height: 34,
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.10),
-          borderRadius: BorderRadius.circular(9),
+  Widget _frow(BuildContext context, String label, String value, Color color) => Padding(
+        padding: const EdgeInsets.only(top: 10),
+        child: Row(
+          children: [
+            Text(label, style: BtText.subhead(context)),
+            const Spacer(),
+            Text(value, style: BtText.num(BtText.body(context, weight: FontWeight.w600, color: color))),
+          ],
         ),
-        child: Icon(icon, color: color, size: 17),
-      ),
-      const SizedBox(width: 8),
-      Expanded(
-        child: Text(
-          label,
-          style: AppTheme.body.copyWith(color: AppColors.textMedium),
-        ),
-      ),
-      Text(
-        value,
-        style: AppTheme.bodyLarge.copyWith(
-          fontWeight: FontWeight.w700,
-          color: color,
-        ),
-      ),
-    ],
-  );
-  Widget _catRow(String label, double amount, Color c, IconData icon) => Row(
-    children: [
-      Container(
-        width: 30,
-        height: 30,
-        decoration: BoxDecoration(
-          color: c.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Icon(icon, color: c, size: 15),
-      ),
-      const SizedBox(width: 10),
-      Expanded(
-        child: Text(
-          label,
-          style: AppTheme.body.copyWith(
-            color: AppColors.textMedium,
-            fontSize: 13,
-          ),
-        ),
-      ),
-      Text(
-        formatCurrency(amount),
-        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: c),
-      ),
-    ],
-  );
+      );
 }
 class _RecentEntriesSection extends StatelessWidget {
   const _RecentEntriesSection({
@@ -2396,14 +2347,14 @@ class _EntryTile extends StatelessWidget {
     final (_, icon) = _style(entry.type);
     final d = entry.date;
     final dateStr = '${d.day} ${_months[d.month - 1]} ${d.year}';
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
+    return BtPressable(
+      scale: .98,
       onTap: () async {
         showDialog(
           context: context,
           barrierDismissible: false,
-          builder: (lCtx) => Center(
-            child: CircularProgressIndicator(color: AppColors.primary),
+          builder: (lCtx) => const Center(
+            child: CircularProgressIndicator(color: Bt.bone),
           ),
         );
         try {
@@ -2535,7 +2486,7 @@ class _EntryTile extends StatelessWidget {
         }
       },
       child: Padding(
-        padding: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.only(bottom: 10),
         child: BtCard(
           padding: const EdgeInsets.fromLTRB(14, 12, 16, 12),
           child: Row(
@@ -2577,23 +2528,37 @@ class _InsightsEntryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BtGroup(
-      children: [
-        BtRow(
-          leading: const BtTile(icon: Icons.insights_rounded),
-          title: 'Project insights',
-          subtitle: 'Phase budgets, forecast, spend & cash',
-          titleWeight: FontWeight.w600,
-          showChevron: true,
-          minHeight: 64,
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => ProjectInsightsScreen(projectId: project.id, projectName: project.name),
-            ),
+    final bt = context.bt;
+    return Semantics(
+      button: true,
+      label: 'Project insights. Phase budgets, forecast, spend & cash',
+      excludeSemantics: true,
+      child: BtCard(
+        variant: BtCardVariant.ink,
+        padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ProjectInsightsScreen(projectId: project.id, projectName: project.name),
           ),
         ),
-      ],
+        child: Row(
+          children: [
+            BtTile(icon: Icons.insights_rounded, bg: Colors.white.withValues(alpha: .08), fg: bt.accent),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Project insights', style: BtText.body(context, weight: FontWeight.w600, color: Bt.bone)),
+                  Text('Phase budgets, forecast, spend & cash', style: BtText.caption(context, color: Bt.onNoir2)),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right_rounded, color: Bt.onNoir3, size: 22),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -2606,32 +2571,33 @@ class _ActionButtons extends StatelessWidget {
     final canAddEntry = RoleManager.canManageExpenses;
     final canEdit = RoleManager.canEditProject;
     if (!canAddEntry && !canEdit) {
-      return const BtCard(
+      return BtCard(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         child: Row(
           children: [
-            Icon(Icons.lock_outline, color: Bt.ink3, size: 18),
-            SizedBox(width: 10),
-            Text('No project actions permitted', style: TextStyle(color: Bt.ink3, fontSize: 14)),
+            const Icon(Icons.lock_outline, color: Bt.ink3, size: 18),
+            const SizedBox(width: 10),
+            Text('No project actions permitted', style: BtText.subhead(context, color: Bt.ink3)),
           ],
         ),
       );
     }
-    return Column(
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (canAddEntry) ...[
-          BtButton(
-            label: 'Add Entry',
+        if (canAddEntry)
+          _QuickAction(
             icon: Icons.add_rounded,
-            onPressed: () => Navigator.pushNamed(context, '/add-entry'),
+            label: 'Add entry',
+            highlight: true,
+            onTap: () => Navigator.pushNamed(context, '/add-entry'),
           ),
-          const SizedBox(height: 10),
-        ],
-        if (canEdit) ...[
-          BtButton(
-            label: 'Edit Project',
+        if (canEdit)
+          _QuickAction(
             icon: Icons.edit_outlined,
-            variant: BtButtonVariant.secondary,
-            onPressed: () {
+            label: 'Edit project',
+            onTap: () {
               Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -2640,8 +2606,48 @@ class _ActionButtons extends StatelessWidget {
               ).then((_) => context.read<ProjectProvider>().load());
             },
           ),
-        ],
       ],
+    );
+  }
+}
+
+/// Round-square quick action with a label underneath (Overview).
+class _QuickAction extends StatelessWidget {
+  const _QuickAction({required this.icon, required this.label, required this.onTap, this.highlight = false});
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final bool highlight;
+  @override
+  Widget build(BuildContext context) {
+    final bt = context.bt;
+    return Semantics(
+      button: true,
+      label: label,
+      excludeSemantics: true,
+      child: BtPressable(
+        onTap: onTap,
+        scale: .94,
+        child: SizedBox(
+          width: 96,
+          child: Column(
+            children: [
+              Container(
+                width: 58,
+                height: 58,
+                decoration: BoxDecoration(
+                  color: highlight ? Bt.noir : Bt.card,
+                  borderRadius: BorderRadius.circular(18),
+                  boxShadow: Bt.shadow,
+                ),
+                child: Icon(icon, size: 24, color: highlight ? bt.accent : Bt.ink),
+              ),
+              const SizedBox(height: 8),
+              Text(label, textAlign: TextAlign.center, style: BtText.caption(context, color: Bt.ink2, weight: FontWeight.w500)),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -2672,54 +2678,42 @@ class _AllProjectEntriesScreen extends StatelessWidget {
     entries.sort((a, b) => b.date.compareTo(a.date));
     final canEdit = RoleManager.canEditProject;
     return Scaffold(
-      backgroundColor: AppColors.gradientStart,
-      body: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            AppTopBar(
-              title: project.name,
-              isSubScreen: true,
-              leftIcon: Icons.arrow_back,
-              onLeftTap: () => Navigator.maybePop(context),
-              rightWidget: canEdit
-                  ? IconButton(
-                      icon: Icon(
-                        Icons.edit_outlined,
-                        color: AppColors.primary,
-                      ),
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => EditProjectScreen(project: project),
-                          ),
-                        ).then((_) => context.read<ProjectProvider>().load());
-                      },
-                    )
-                  : null,
-            ),
-            Expanded(
-              child: entries.isEmpty
-                  ? const AppEmptyState(
-                      icon: Icons.receipt_long_outlined,
-                      message: 'No entries logged yet.',
-                    )
-                  : ListView.builder(
-                      physics: const ClampingScrollPhysics(),
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-                      itemCount: entries.length,
-                      itemBuilder: (context, index) {
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 8.0),
-                          child: _EntryTile(entry: entries[index]),
-                        );
-                      },
+      backgroundColor: Bt.ground,
+      appBar: BtNavBar(
+        title: project.name,
+        subtitle: 'Recent activity',
+        trailing: canEdit
+            ? BtIconButton(
+                icon: Icons.edit_outlined,
+                semantic: 'Edit project',
+                color: Bt.ink2,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => EditProjectScreen(project: project),
                     ),
-            ),
-          ],
-        ),
+                  ).then((_) => context.read<ProjectProvider>().load());
+                },
+              )
+            : null,
       ),
+      body: entries.isEmpty
+          ? const Center(
+              child: BtEmpty(
+                icon: Icons.receipt_long_outlined,
+                title: 'No entries logged yet.',
+              ),
+            )
+          : ListView.builder(
+              physics: const ClampingScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+              itemCount: entries.length,
+              itemBuilder: (context, index) {
+                final tile = _EntryTile(entry: entries[index]);
+                return index < 8 ? BtReveal(index: index, child: tile) : tile;
+              },
+            ),
     );
   }
 }
@@ -2937,21 +2931,11 @@ class _CsvImportExportCardState extends State<_CsvImportExportCard> {
         shareText: 'Exported phase CSV for ${widget.project.name}',
       );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('CSV exported successfully!'),
-            backgroundColor: AppColors.success,
-          ),
-        );
+        btToast(context, 'CSV exported successfully!');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to export CSV: $e'),
-            backgroundColor: const Color(0xFFC01048),
-          ),
-        );
+        btToast(context, 'Failed to export CSV: $e', error: true);
       }
     }
   }
@@ -3142,23 +3126,11 @@ class _CsvImportExportCardState extends State<_CsvImportExportCard> {
       );
       await context.read<ProjectProvider>().updateProject(updatedProject);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Successfully imported budget for $updatedCount activities!',
-            ),
-            backgroundColor: AppColors.success,
-          ),
-        );
+        btToast(context, 'Successfully imported budget for $updatedCount activities!');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Upload failed: $e'),
-            backgroundColor: const Color(0xFFC01048),
-          ),
-        );
+        btToast(context, 'Upload failed: $e', error: true);
       }
     } finally {
       setState(() => _isUploading = false);
@@ -3222,9 +3194,11 @@ class _SitePhotoCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      height: 200,
+      height: 210,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
+        color: Bt.noir3,
+        borderRadius: BorderRadius.circular(Bt.rCard),
+        boxShadow: Bt.shadow,
         image: DecorationImage(
           image: NetworkImage(
             photoUrl.startsWith('http') 
@@ -3233,6 +3207,13 @@ class _SitePhotoCard extends StatelessWidget {
           ),
           fit: BoxFit.cover,
         ),
+      ),
+      alignment: Alignment.bottomLeft,
+      padding: const EdgeInsets.all(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(color: const Color(0x990C0E12), borderRadius: BorderRadius.circular(10)),
+        child: Text('SITE PHOTO', style: BtText.mono(context, color: Bt.bone)),
       ),
     );
   }
@@ -3243,10 +3224,10 @@ class _ProjectScopeCard extends StatelessWidget {
   const _ProjectScopeCard({required this.scope});
   @override
   Widget build(BuildContext context) {
-    return AppCard(
+    return BtCard(
       child: Text(
         scope,
-        style: const TextStyle(fontSize: 14, color: AppColors.textDark),
+        style: BtText.subhead(context, color: Bt.ink).copyWith(height: 1.5),
       ),
     );
   }
@@ -3257,30 +3238,47 @@ class _DocumentsCard extends StatelessWidget {
   const _DocumentsCard({required this.documents});
   @override
   Widget build(BuildContext context) {
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: documents
-            .map((doc) => Padding(
-                  padding: const EdgeInsets.only(bottom: 8.0),
-                  child: Row(
+    return SizedBox(
+      height: 132,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        clipBehavior: Clip.none,
+        itemCount: documents.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 10),
+        itemBuilder: (context, i) {
+          final name = documents[i].split("/").last;
+          final dot = name.lastIndexOf('.');
+          final ext = dot > 0 && dot < name.length - 1 ? name.substring(dot + 1).toUpperCase() : 'FILE';
+          return SizedBox(
+            width: 118,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  height: 88,
+                  decoration: BoxDecoration(color: Bt.noir, borderRadius: BorderRadius.circular(Bt.rTile)),
+                  child: Stack(
                     children: [
-                      Icon(Icons.insert_drive_file, color: AppColors.primary, size: 20),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          doc.split("/").last,
-                          style: TextStyle(fontSize: 14, color: AppColors.primary, decoration: TextDecoration.underline),
-                          overflow: TextOverflow.ellipsis,
+                      const Center(child: Icon(Icons.insert_drive_file_outlined, color: Bt.onNoir3, size: 30)),
+                      Positioned(
+                        left: 8,
+                        bottom: 8,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                          decoration: BoxDecoration(color: Colors.white.withValues(alpha: .1), borderRadius: BorderRadius.circular(6)),
+                          child: Text(ext.length > 4 ? ext.substring(0, 4) : ext, style: BtText.mono(context, color: Bt.bone, size: 9.5)),
                         ),
                       ),
                     ],
                   ),
-                ))
-            .toList(),
+                ),
+                const SizedBox(height: 8),
+                Text(name, maxLines: 2, overflow: TextOverflow.ellipsis, style: BtText.caption(context, color: Bt.ink, weight: FontWeight.w500)),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
 }
-
-
