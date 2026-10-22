@@ -276,8 +276,9 @@ class ChartSection extends StatelessWidget {
           (e['actual'] as double) > (e['target'] as double) &&
           (e['target'] as double) > 0,
     );
-    return AppCard(
-      margin: EdgeInsets.zero,
+    final bt = context.bt;
+    return BtCard(
+      padding: EdgeInsets.zero,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -286,18 +287,14 @@ class ChartSection extends StatelessWidget {
           children: [
             Text(
               'Spend vs Budget by Category',
-              style: AppTheme.heading3.copyWith(fontWeight: FontWeight.w700),
+              style: BtText.body(context, weight: FontWeight.w600),
             ),
             const SizedBox(height: 4),
             Text(
               isExceeded
                   ? '⚠ Budget exceeded in one or more categories'
                   : '✓ All categories within budget',
-              style: TextStyle(
-                fontSize: 13,
-                color: isExceeded ? AppColors.error : AppColors.success,
-                fontWeight: FontWeight.w600,
-              ),
+              style: BtText.caption(context, color: isExceeded ? Bt.red : Bt.green, weight: FontWeight.w600),
             ),
             const SizedBox(height: 14),
             OrientationBuilder(
@@ -312,21 +309,23 @@ class ChartSection extends StatelessWidget {
                       maxY: roundedMaxY,
                       lineTouchData: LineTouchData(
                         touchTooltipData: LineTouchTooltipData(
+                          getTooltipColor: (_) => Bt.noir,
                           getTooltipItems: (touchedSpots) {
                             return touchedSpots.map((spot) {
                               final isTarget = spot.barIndex == 1;
                               final name = isTarget ? 'Budget' : 'Actual';
                               return LineTooltipItem(
                                 '$name\n₹${spot.y.toStringAsFixed(0)}',
-                                const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                const TextStyle(color: Bt.bone, fontWeight: FontWeight.w600, fontFeatures: BtText.tnum),
                               );
                             }).toList();
                           },
                         ),
                       ),
-                      gridData: const FlGridData(
+                      gridData: FlGridData(
                         show: true,
                         drawVerticalLine: false,
+                        getDrawingHorizontalLine: (_) => const FlLine(color: Bt.line, strokeWidth: 1),
                       ),
                       borderData: FlBorderData(show: false),
                       titlesData: FlTitlesData(
@@ -343,7 +342,7 @@ class ChartSection extends StatelessWidget {
                                 padding: const EdgeInsets.only(top: 4),
                                 child: Text(
                                   categories[i]['name'].toString(),
-                                  style: TextStyle(fontSize: isLandscape ? 9 : 10),
+                                  style: BtText.caption(context, color: Bt.ink2).copyWith(fontSize: isLandscape ? 9 : 10.5),
                                 ),
                               );
                             },
@@ -360,10 +359,7 @@ class ChartSection extends StatelessWidget {
                                 space: 4,
                                 child: Text(
                                   formatY(value),
-                                  style: TextStyle(
-                                    fontSize: isLandscape ? 9 : 10,
-                                    color: const Color(0xFF667085),
-                                  ),
+                                  style: BtText.num(BtText.caption(context, color: Bt.ink3).copyWith(fontSize: isLandscape ? 9 : 10)),
                                   maxLines: 1,
                                   overflow: TextOverflow.visible,
                                 ),
@@ -383,18 +379,18 @@ class ChartSection extends StatelessWidget {
                           spots: actualSpots,
                           isCurved: true,
                           barWidth: 3,
-                          color: AppColors.primary,
+                          color: bt.accent,
                           dotData: const FlDotData(show: true),
                           belowBarData: BarAreaData(
                             show: true,
-                            color: AppColors.primary.withValues(alpha: 0.08),
+                            color: bt.accent.withValues(alpha: 0.12),
                           ),
                         ),
                         LineChartBarData(
                           spots: targetSpots,
                           isCurved: false,
                           barWidth: 2,
-                          color: const Color(0xFFC01048),
+                          color: Bt.ink3,
                           dashArray: [6, 4],
                           dotData: const FlDotData(show: false),
                         ),
@@ -407,13 +403,13 @@ class ChartSection extends StatelessWidget {
             const SizedBox(height: 10),
             Row(
               children: [
-                _dot(AppColors.primary),
+                _dot(bt.accent),
                 const SizedBox(width: 6),
-                const Text('Actual Paid', style: TextStyle(fontSize: 13)),
+                Text('Actual Paid', style: BtText.caption(context, color: Bt.ink2)),
                 const SizedBox(width: 16),
-                _dot(const Color(0xFFC01048)),
+                _dot(Bt.ink3),
                 const SizedBox(width: 6),
-                const Text('Target Budget', style: TextStyle(fontSize: 13)),
+                Text('Target Budget', style: BtText.caption(context, color: Bt.ink2)),
               ],
             ),
           ],
@@ -422,9 +418,9 @@ class ChartSection extends StatelessWidget {
     );
   }
   Widget _dot(Color c) => Container(
-    width: 10,
-    height: 10,
-    decoration: BoxDecoration(color: c, shape: BoxShape.circle),
+    width: 8,
+    height: 8,
+    decoration: BoxDecoration(color: c, borderRadius: BorderRadius.circular(2)),
   );
 }
 class ProjectSelector extends StatelessWidget {
@@ -713,6 +709,65 @@ class CategoryBudgetSection extends StatelessWidget {
     );
   }
 }
+/// Quick action tile under the Reports sheet (Reports board "qt" tiles).
+class ReportQuickTile extends StatelessWidget {
+  const ReportQuickTile({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+    this.tileBg,
+    this.tileFg,
+    this.subtitleMaxLines = 1,
+  });
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+  final Color? tileBg;
+  final Color? tileFg;
+  final int subtitleMaxLines;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: '$title. $subtitle',
+      excludeSemantics: true,
+      child: BtPressable(
+        onTap: onTap,
+        scale: .96,
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 108),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Bt.card,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: Bt.shadow,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              BtTile(icon: icon, size: 34, bg: tileBg, fg: tileFg),
+              const SizedBox(height: 16),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.subhead(context, color: Bt.ink, weight: FontWeight.w600)),
+                  Text(subtitle, maxLines: subtitleMaxLines, overflow: TextOverflow.ellipsis, style: BtText.caption(context).copyWith(fontSize: 12)),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class EfficiencyBanner extends StatelessWidget {
   const EfficiencyBanner({
     super.key,
@@ -734,23 +789,15 @@ class EfficiencyBanner extends StatelessWidget {
       );
     }
 
-    return BtGroup(
-      children: [
-        BtRow(
-          leading: BtTile(
-            icon: Icons.bar_chart,
-            bg: isExceeded ? Bt.redSoft : null,
-            fg: isExceeded ? Bt.red : null,
-          ),
-          title: 'Efficiency Report',
-          subtitle: note,
-          subtitleMaxLines: 3,
-          titleWeight: FontWeight.w600,
-          minHeight: 64,
-          onTap: open,
-          showChevron: true,
-        ),
-      ],
+    final bt = context.bt;
+    return ReportQuickTile(
+      icon: Icons.bar_chart,
+      title: 'Efficiency Report',
+      subtitle: note,
+      subtitleMaxLines: 2,
+      tileBg: isExceeded ? Bt.redSoft : bt.accent,
+      tileFg: isExceeded ? Bt.red : bt.onAccent,
+      onTap: open,
     );
   }
 }

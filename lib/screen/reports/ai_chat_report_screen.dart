@@ -1,8 +1,6 @@
 import 'package:buildtrack_mobile/design/design.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../common/themes/app_colors.dart';
-import '../../common/themes/app_theme.dart';
 import '../../controller/ai_chat_report_provider.dart';
 import '../../controller/project_provider.dart';
 import '../../services/auth_service.dart';
@@ -33,36 +31,22 @@ class _AiChatReportScreenState extends State<AiChatReportScreen> {
   @override
   Widget build(BuildContext context) {
     if (loading) {
-      return Scaffold(
-        backgroundColor: AppColors.gradientStart,
-        body: Center(
-          child: CircularProgressIndicator(color: AppColors.primary),
-        ),
+      return const Scaffold(
+        backgroundColor: Bt.noir,
+        body: Center(child: BtBrickLoader(onDark: true)),
       );
     }
     if (token == null || token!.isEmpty) {
       return Scaffold(
-        backgroundColor: AppColors.gradientStart,
-        body: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(
-                Icons.lock_outline,
-                color: AppColors.textLight,
-                size: 48,
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'Session expired. Please log in again.',
-                style: AppTheme.body.copyWith(color: AppColors.textLight),
-              ),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () => Navigator.maybePop(context),
-                child: const Text('Go back'),
-              ),
-            ],
+        backgroundColor: Bt.ground,
+        body: SafeArea(
+          child: Center(
+            child: BtEmpty(
+              icon: Icons.lock_outline,
+              title: 'Session expired. Please log in again.',
+              action: 'Go back',
+              onAction: () => Navigator.maybePop(context),
+            ),
           ),
         ),
       );
@@ -99,10 +83,117 @@ class _AiDashboardViewState extends State<_AiDashboardView> {
     final provider = context.watch<AiChatReportProvider>();
     final bt = context.bt;
     final asked = _searchController.text.trim();
+    final initial = provider.state == AiReportState.initial;
+    final empty = _searchController.text.trim().isEmpty;
+    final topInset = MediaQuery.paddingOf(context).top;
+
+    // Bone pill input (floats on noir on the start screen, on bone elsewhere).
+    final askBar = Padding(
+      padding: EdgeInsets.fromLTRB(16, 8, 16, 12 + MediaQuery.paddingOf(context).bottom),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(4, 4, 6, 4),
+        decoration: BoxDecoration(
+          color: initial ? Bt.bone : Bt.card,
+          borderRadius: BorderRadius.circular(26),
+          border: initial ? null : Border.all(color: Bt.inputBorder),
+          boxShadow: initial
+              ? const [BoxShadow(color: Color(0xCC000000), blurRadius: 40, spreadRadius: -16, offset: Offset(0, 20))]
+              : Bt.shadow,
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _searchController,
+                textInputAction: TextInputAction.search,
+                onSubmitted: (val) => _submitSearch(context, val),
+                onChanged: (_) => setState(() {}),
+                style: BtText.body(context),
+                cursorColor: Bt.ink,
+                decoration: InputDecoration(
+                  hintText: 'Ask about materials, costs, projects…',
+                  hintStyle: BtText.body(context, color: Bt.ink3).copyWith(fontSize: 15),
+                  prefixIcon: Icon(Icons.auto_awesome, color: bt.accentInk, size: 19),
+                  suffixIcon: _searchController.text.isNotEmpty
+                      ? IconButton(
+                          tooltip: 'Clear',
+                          icon: const Icon(Icons.cancel_rounded, color: Bt.placeholder, size: 20),
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() {});
+                          },
+                        )
+                      : null,
+                  filled: false,
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 14),
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                ),
+              ),
+            ),
+            const SizedBox(width: 4),
+            BtPressable(
+              onTap: empty ? () {} : () => _submitSearch(context, _searchController.text),
+              scale: .9,
+              semanticLabel: 'Ask',
+              child: AnimatedContainer(
+                duration: Bt.fast,
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(color: empty ? Bt.ink.withValues(alpha: .12) : Bt.noir, shape: BoxShape.circle),
+                child: Icon(Icons.arrow_upward_rounded, size: 22, color: empty ? Bt.ink3 : bt.accent),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (initial) {
+      return Scaffold(
+        backgroundColor: Bt.noir,
+        resizeToAvoidBottomInset: true,
+        body: BtHero(
+          overlap: 0,
+          padding: EdgeInsets.zero,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: EdgeInsets.fromLTRB(12, topInset + 6, 12, 0),
+                child: Row(children: [
+                  BtIconButton(
+                    icon: Icons.arrow_back_ios_new_rounded,
+                    size: 18,
+                    semantic: 'Back',
+                    color: Bt.bone,
+                    background: Colors.white.withValues(alpha: .09),
+                    onTap: () => Navigator.of(context).maybePop(),
+                  ),
+                ]),
+              ),
+              Expanded(
+                child: _InitialState(
+                  onPromptSelected: (prompt) {
+                    _searchController.text = prompt;
+                    _submitSearch(context, prompt);
+                  },
+                ),
+              ),
+              askBar,
+            ],
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: Bt.ground,
       appBar: BtNavBar(
-        title: 'Ask about your costs',
+        title: 'Ask AI',
+        subtitle: 'Ask about your costs',
         trailing: provider.state == AiReportState.results
             ? BtIconButton(
                 icon: Icons.refresh_rounded,
@@ -118,74 +209,30 @@ class _AiDashboardViewState extends State<_AiDashboardView> {
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (provider.state != AiReportState.initial && asked.isNotEmpty)
+          if (asked.isNotEmpty)
             Padding(
-              padding: const EdgeInsets.fromLTRB(56, 8, 16, 8),
+              padding: const EdgeInsets.fromLTRB(72, 4, 16, 10),
               child: Align(
                 alignment: Alignment.centerRight,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  decoration: const BoxDecoration(
-                    color: Bt.ink,
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(18),
-                      topRight: Radius.circular(18),
-                      bottomLeft: Radius.circular(18),
-                      bottomRight: Radius.circular(4),
+                child: BtReveal(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    decoration: const BoxDecoration(
+                      color: Bt.ink,
+                      borderRadius: BorderRadius.only(
+                        topLeft: Radius.circular(20),
+                        topRight: Radius.circular(20),
+                        bottomLeft: Radius.circular(20),
+                        bottomRight: Radius.circular(6),
+                      ),
                     ),
+                    child: Text(asked, style: BtText.subhead(context, color: Bt.bone)),
                   ),
-                  child: Text(asked, style: BtText.body(context, color: Colors.white)),
                 ),
               ),
             ),
           Expanded(child: _buildContent(provider)),
-          Container(
-            decoration: const BoxDecoration(color: Bt.card, border: Border(top: BorderSide(color: Bt.line))),
-            padding: EdgeInsets.fromLTRB(12, 10, 12, 10 + MediaQuery.of(context).padding.bottom),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _searchController,
-                    textInputAction: TextInputAction.search,
-                    onSubmitted: (val) => _submitSearch(context, val),
-                    onChanged: (_) => setState(() {}),
-                    style: BtText.body(context),
-                    decoration: InputDecoration(
-                      hintText: 'Ask about materials, costs, projects…',
-                      hintStyle: BtText.body(context, color: Bt.placeholder),
-                      prefixIcon: Icon(Icons.auto_awesome, color: bt.brand, size: 20),
-                      suffixIcon: _searchController.text.isNotEmpty
-                          ? IconButton(
-                              tooltip: 'Clear',
-                              icon: const Icon(Icons.cancel_rounded, color: Bt.placeholder, size: 20),
-                              onPressed: () {
-                                _searchController.clear();
-                                setState(() {});
-                              },
-                            )
-                          : null,
-                      filled: true,
-                      fillColor: Bt.ground,
-                      isDense: true,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: const BorderSide(color: Bt.line)),
-                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: const BorderSide(color: Bt.line)),
-                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide(color: bt.brand, width: 1.5)),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                BtIconButton(
-                  icon: Icons.arrow_upward_rounded,
-                  semantic: 'Ask',
-                  color: _searchController.text.trim().isEmpty ? Bt.placeholder : bt.brand,
-                  filled: true,
-                  onTap: _searchController.text.trim().isEmpty ? () {} : () => _submitSearch(context, _searchController.text),
-                ),
-              ],
-            ),
-          ),
+          askBar,
         ],
       ),
     );
@@ -228,51 +275,121 @@ class _InitialState extends StatelessWidget {
     'Equipment usage',
     'Monthly spending',
   ];
+  static const _icons = [
+    Icons.inventory_2_outlined,
+    Icons.compare_arrows_rounded,
+    Icons.warning_amber_rounded,
+    Icons.groups_outlined,
+    Icons.local_shipping_outlined,
+    Icons.calendar_month_outlined,
+  ];
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<AiChatReportProvider>();
+    final bt = context.bt;
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+      padding: const EdgeInsets.fromLTRB(16, 18, 16, 16),
       children: [
-        Row(children: [
-          const BtTile(icon: Icons.auto_awesome),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text('Ask anything about your entries, costs and stock.', style: BtText.body(context, color: Bt.ink2)),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: BtReveal(
+            child: Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(22),
+                gradient: RadialGradient(
+                  center: const Alignment(-.4, -.5),
+                  colors: [Color.lerp(bt.accent, Colors.white, .3)!, bt.accent],
+                ),
+                boxShadow: [BoxShadow(color: bt.accent.withValues(alpha: .35), blurRadius: 60, spreadRadius: 6)],
+              ),
+              child: Icon(Icons.auto_awesome, color: bt.onAccent, size: 28),
+            ),
           ),
-        ]),
-        const SizedBox(height: 24),
-        const BtSectionHeader(title: 'Quick insights', caption: true),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: quickPrompts.map((p) => _PromptCard(prompt: p, onTap: () => onPromptSelected(p))).toList(),
         ),
-        if (provider.recentSearches.isNotEmpty) ...[
-          const SizedBox(height: 28),
-          const BtSectionHeader(title: 'Recent searches', caption: true),
-          BtGroup(
+        const SizedBox(height: 16),
+        BtReveal(index: 1, child: Text('Ask about\nyour costs.', style: BtText.d1(context, color: Bt.bone))),
+        const SizedBox(height: 10),
+        BtReveal(
+          index: 2,
+          child: Text('Ask anything about your entries, costs and stock.', style: BtText.body(context, color: Bt.onNoir2)),
+        ),
+        const SizedBox(height: 28),
+        BtReveal(index: 3, child: Text('QUICK INSIGHTS', style: BtText.mono(context, color: Bt.onNoir3))),
+        const SizedBox(height: 10),
+        LayoutBuilder(builder: (context, c) {
+          final w = (c.maxWidth - 8) / 2;
+          return Wrap(
+            spacing: 8,
+            runSpacing: 8,
             children: [
-              for (final s in provider.recentSearches)
-                BtRow(
-                  leading: const Icon(Icons.history_rounded, color: Bt.ink3),
-                  title: s,
-                  showChevron: true,
-                  onTap: () => onPromptSelected(s),
+              for (var i = 0; i < quickPrompts.length; i++)
+                SizedBox(
+                  width: w,
+                  child: BtReveal(
+                    index: 4 + i,
+                    child: _PromptCard(prompt: quickPrompts[i], icon: _icons[i], onTap: () => onPromptSelected(quickPrompts[i])),
+                  ),
                 ),
             ],
-          ),
+          );
+        }),
+        if (provider.recentSearches.isNotEmpty) ...[
+          const SizedBox(height: 24),
+          Text('RECENT SEARCHES', style: BtText.mono(context, color: Bt.onNoir3)),
+          const SizedBox(height: 4),
+          for (final s in provider.recentSearches)
+            InkWell(
+              onTap: () => onPromptSelected(s),
+              borderRadius: BorderRadius.circular(10),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 44),
+                child: Row(children: [
+                  const Icon(Icons.history_rounded, color: Bt.onNoir3, size: 18),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(s, maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.subhead(context, color: const Color(0xC7F2F0EB))),
+                  ),
+                  const Icon(Icons.north_west_rounded, color: Bt.onNoir3, size: 16),
+                ]),
+              ),
+            ),
         ],
       ],
     );
   }
 }
 class _PromptCard extends StatelessWidget {
-  const _PromptCard({required this.prompt, required this.onTap});
+  const _PromptCard({required this.prompt, required this.icon, required this.onTap});
   final String prompt;
+  final IconData icon;
   final VoidCallback onTap;
   @override
-  Widget build(BuildContext context) => BtChip(label: prompt, icon: Icons.insights_rounded, onTap: onTap);
+  Widget build(BuildContext context) {
+    final bt = context.bt;
+    return BtPressable(
+      onTap: onTap,
+      scale: .96,
+      semanticLabel: prompt,
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 52),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: .06),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white.withValues(alpha: .08)),
+        ),
+        child: Row(children: [
+          Icon(icon, size: 18, color: bt.accent),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(prompt, maxLines: 2, overflow: TextOverflow.ellipsis, style: BtText.subhead(context, color: Bt.bone, weight: FontWeight.w500)),
+          ),
+        ]),
+      ),
+    );
+  }
 }
 class _LoadingState extends StatelessWidget {
   const _LoadingState();
@@ -280,22 +397,12 @@ class _LoadingState extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListView(
       padding: const EdgeInsets.all(16),
-      children: [
-        Row(children: [
-          const BtTile(icon: Icons.auto_awesome, size: 32),
-          const SizedBox(width: 10),
-          Text('Working it out…', style: BtText.subhead(context)),
-        ]),
-        const SizedBox(height: 16),
-        const BtSkeleton(height: 96),
-        const SizedBox(height: 12),
-        const Row(children: [
-          Expanded(child: BtSkeleton(height: 72)),
-          SizedBox(width: 12),
-          Expanded(child: BtSkeleton(height: 72)),
-        ]),
-        const SizedBox(height: 12),
-        const BtSkeleton(height: 180),
+      children: const [
+        Center(child: Padding(padding: EdgeInsets.symmetric(vertical: 12), child: BtBrickLoader(label: 'Working it out…'))),
+        SizedBox(height: 8),
+        BtSkeleton(height: 120, radius: Bt.rCard),
+        SizedBox(height: 12),
+        BtSkeleton(height: 180, radius: Bt.rCard),
       ],
     );
   }
@@ -306,12 +413,20 @@ class _ErrorState extends StatelessWidget {
   final VoidCallback onRetry;
   @override
   Widget build(BuildContext context) {
-    return BtEmpty(
-      icon: Icons.error_outline_rounded,
-      title: 'Failed to generate report',
-      message: error,
-      action: 'Try Again',
-      onAction: onRetry,
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: BtCard(
+          child: BtEmpty(
+            icon: Icons.error_outline_rounded,
+            title: 'Failed to generate report',
+            message: error,
+            action: 'Try Again',
+            onAction: onRetry,
+          ),
+        ),
+      ),
     );
   }
 }
@@ -324,6 +439,8 @@ class _ResultsState extends StatefulWidget {
 }
 class _ResultsStateState extends State<_ResultsState> {
   late List<String> _visibleColumns;
+  /// Details table expanded (was an ExpansionTile, open by default).
+  bool _tableOpen = true;
   @override
   void initState() {
     super.initState();
@@ -339,170 +456,152 @@ class _ResultsStateState extends State<_ResultsState> {
   void _showCustomizeColumnsDialog() {
     List<String> tempActive = List.from(_visibleColumns);
     List<String> tempAll = List.from(widget.result.columns);
-    showDialog(
+    showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Bt.card,
+      barrierColor: Bt.scrim,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(Bt.rSheet))),
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
-            return Dialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              backgroundColor: Colors.white,
-              child: Container(
-                width: 320,
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Customize Columns',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.primary,
-                          ),
+            return SafeArea(
+              top: false,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const BtSheetHeader(
+                    title: 'Customize Columns',
+                    subtitle: 'Drag items to reorder. Toggle checkbox to show/hide columns.',
+                  ),
+                  ConstrainedBox(
+                    constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * .5),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Bt.card,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: Bt.line),
                         ),
-                        IconButton(
-                          icon: const Icon(Icons.close, size: 20),
-                          onPressed: () => Navigator.of(context).pop(),
-                        ),
-                      ],
-                    ),
-                    const Divider(height: 1),
-                    const SizedBox(height: 10),
-                    const Text(
-                      'Drag items to reorder. Toggle checkbox to show/hide columns.',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      height: 300,
-                      child: ReorderableListView.builder(
-                        shrinkWrap: true,
-                        itemCount: tempAll.length,
-                        onReorder: (oldIndex, newIndex) {
-                          setDialogState(() {
-                            if (newIndex > oldIndex) {
-                              newIndex -= 1;
-                            }
-                            final item = tempAll.removeAt(oldIndex);
-                            tempAll.insert(newIndex, item);
-                            final newTempActive = <String>[];
-                            for (final col in tempAll) {
-                              if (tempActive.contains(col)) {
-                                newTempActive.add(col);
-                              }
-                            }
-                            tempActive = newTempActive;
-                          });
-                        },
-                        itemBuilder: (context, index) {
-                          final col = tempAll[index];
-                          final isChecked = tempActive.contains(col);
-                          return ListTile(
-                            key: ValueKey(col),
-                            contentPadding: EdgeInsets.zero,
-                            dense: true,
-                            title: Text(
-                              col,
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            leading: Checkbox(
-                              activeColor: AppColors.primary,
-                              value: isChecked,
-                              onChanged: (val) {
-                                setDialogState(() {
-                                  if (val == true) {
-                                    tempActive.add(col);
-                                    final newTempActive = <String>[];
-                                    for (final c in tempAll) {
-                                      if (tempActive.contains(c)) {
-                                        newTempActive.add(c);
-                                      }
-                                    }
-                                    tempActive = newTempActive;
-                                  } else {
-                                    if (tempActive.length > 1) {
-                                      tempActive.remove(col);
-                                    } else {
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        const SnackBar(
-                                          content: Text(
-                                            'At least one column must be visible.',
-                                          ),
-                                          duration: Duration(seconds: 1),
-                                        ),
-                                      );
-                                    }
-                                  }
-                                });
-                              },
-                            ),
-                            trailing: const Icon(
-                              Icons.drag_handle,
-                              size: 20,
-                              color: Color(0xFF667085),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        TextButton(
-                          onPressed: () {
+                        clipBehavior: Clip.antiAlias,
+                        child: ReorderableListView.builder(
+                          shrinkWrap: true,
+                          buildDefaultDragHandles: false,
+                          itemCount: tempAll.length,
+                          onReorder: (oldIndex, newIndex) {
                             setDialogState(() {
-                              tempActive = List.from(widget.result.columns);
-                              tempAll = List.from(widget.result.columns);
+                              if (newIndex > oldIndex) {
+                                newIndex -= 1;
+                              }
+                              final item = tempAll.removeAt(oldIndex);
+                              tempAll.insert(newIndex, item);
+                              final newTempActive = <String>[];
+                              for (final col in tempAll) {
+                                if (tempActive.contains(col)) {
+                                  newTempActive.add(col);
+                                }
+                              }
+                              tempActive = newTempActive;
                             });
                           },
-                          child: const Text(
-                            'Reset',
-                            style: TextStyle(color: Color(0xFF667085), fontSize: 13),
+                          itemBuilder: (context, index) {
+                            final col = tempAll[index];
+                            final isChecked = tempActive.contains(col);
+                            return Material(
+                              key: ValueKey(col),
+                              color: Bt.card,
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (index > 0) const Divider(height: 1, indent: 52, color: Bt.line),
+                                  SizedBox(
+                                    height: 48,
+                                    child: Row(
+                                      children: [
+                                        const SizedBox(width: 6),
+                                        Checkbox(
+                                          activeColor: Bt.ink,
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                                          value: isChecked,
+                                          onChanged: (val) {
+                                            setDialogState(() {
+                                              if (val == true) {
+                                                tempActive.add(col);
+                                                final newTempActive = <String>[];
+                                                for (final c in tempAll) {
+                                                  if (tempActive.contains(c)) {
+                                                    newTempActive.add(c);
+                                                  }
+                                                }
+                                                tempActive = newTempActive;
+                                              } else {
+                                                if (tempActive.length > 1) {
+                                                  tempActive.remove(col);
+                                                } else {
+                                                  btToast(context, 'At least one column must be visible.', error: true);
+                                                }
+                                              }
+                                            });
+                                          },
+                                        ),
+                                        Expanded(
+                                          child: Text(col, style: BtText.body(context, weight: FontWeight.w500, color: isChecked ? Bt.ink : Bt.ink3)),
+                                        ),
+                                        ReorderableDragStartListener(
+                                          index: index,
+                                          child: const SizedBox(
+                                            width: 48,
+                                            height: 48,
+                                            child: Icon(Icons.drag_handle_rounded, size: 22, color: Bt.ink3),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        SizedBox(
+                          width: 110,
+                          child: BtButton(
+                            label: 'Reset',
+                            variant: BtButtonVariant.secondary,
+                            onPressed: () {
+                              setDialogState(() {
+                                tempActive = List.from(widget.result.columns);
+                                tempAll = List.from(widget.result.columns);
+                              });
+                            },
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          onPressed: () {
-                            setState(() {
-                              _visibleColumns = tempActive;
-                            });
-                            Navigator.of(context).pop();
-                          },
-                          child: const Text(
-                            'Save',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                            ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: BtButton(
+                            label: 'Save',
+                            onPressed: () {
+                              setState(() {
+                                _visibleColumns = tempActive;
+                              });
+                              Navigator.of(context).pop();
+                            },
                           ),
                         ),
                       ],
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             );
           },
@@ -514,300 +613,207 @@ class _ResultsStateState extends State<_ResultsState> {
   Widget build(BuildContext context) {
     final provider = context.watch<AiChatReportProvider>();
     final result = widget.result;
-    return ListView(
-      padding: EdgeInsets.only(bottom: 40),
-      children: [
-        if (result.alerts.isNotEmpty)
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16),
-            child: Column(
-              children: result.alerts.map((alert) {
-                final isCritical = alert['type'] == 'critical';
-                return Container(
-                  margin: EdgeInsets.only(bottom: 12),
-                  padding: EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: isCritical
-                        ? Colors.red.withValues(alpha: 0.1)
-                        : AppColors.primary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: isCritical
-                          ? Colors.red.withValues(alpha: 0.3)
-                          : AppColors.primary.withValues(alpha: 0.3),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        isCritical ? Icons.warning : Icons.info,
-                        color: isCritical ? const Color(0xFFC01048) : AppColors.primary,
-                        size: 24,
-                      ),
-                      SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          alert['message'] ?? '',
-                          style: TextStyle(
-                            color: isCritical
-                                ? Colors.red.withValues(alpha: 0.95)
-                                : AppColors.primary.withValues(alpha: 0.95),
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFFEEF1F5), Color(0xFFC5CAE9)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(Bt.rCard),
-              border: Border.all(color: Colors.white, width: 2),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+    final bt = context.bt;
+    final sections = <Widget>[
+      if (result.alerts.isNotEmpty)
+        Column(
+          children: result.alerts.map((alert) {
+            final isCritical = alert['type'] == 'critical';
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: BtCard(
+                variant: isCritical ? BtCardVariant.danger : BtCardVariant.notice,
+                padding: const EdgeInsets.all(14),
+                child: Row(
                   children: [
-                    Icon(
-                      Icons.auto_awesome,
-                      color: AppColors.primary,
-                      size: 18,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Executive Summary',
-                      style: AppTheme.label.copyWith(
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.bold,
+                    Icon(isCritical ? Icons.warning_amber_rounded : Icons.info_outline_rounded, color: isCritical ? Bt.red : Bt.amber, size: 22),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        alert['message'] ?? '',
+                        style: BtText.subhead(context, color: isCritical ? Bt.red : Bt.amber, weight: FontWeight.w600),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
-                Text(
-                  result.summary,
-                  style: AppTheme.body.copyWith(
-                    color: AppColors.textDark,
-                    height: 1.5,
-                    fontSize: 15,
-                  ),
+              ),
+            );
+          }).toList(),
+        ),
+      BtCard(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 30,
+                  height: 30,
+                  decoration: BoxDecoration(color: bt.accent, shape: BoxShape.circle),
+                  child: Icon(Icons.auto_awesome, color: bt.onAccent, size: 16),
                 ),
+                const SizedBox(width: 10),
+                Text('EXECUTIVE SUMMARY', style: BtText.mono(context, color: bt.accentInk)),
               ],
             ),
-          ),
-        ),
-        const SizedBox(height: 16),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              TextButton.icon(
-                onPressed: () => provider.shareSummary(),
-                icon: const Icon(Icons.share, size: 18),
-                label: const Text('Share'),
-                style: TextButton.styleFrom(foregroundColor: AppColors.primary),
+            const SizedBox(height: 12),
+            Text(result.summary, style: BtText.body(context).copyWith(height: 1.5, fontSize: 15)),
+            if (result.totalAmount != null || result.rowCount != null) ...[
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  if (result.totalAmount != null)
+                    Expanded(
+                      child: _MetricCard(
+                        title: 'Total Amount',
+                        value: _formatCurrency(result.totalAmount!),
+                        icon: Icons.currency_rupee,
+                      ),
+                    ),
+                  if (result.totalAmount != null && result.rowCount != null)
+                    const SizedBox(width: 12),
+                  if (result.rowCount != null)
+                    Expanded(
+                      child: _MetricCard(
+                        title: result.tableType == 'inventory'
+                            ? 'Items Tracked'
+                            : 'Total Entries',
+                        value: result.rowCount.toString(),
+                        icon: Icons.format_list_numbered,
+                      ),
+                    ),
+                ],
               ),
-              if (result.tableRows.isNotEmpty)
-                TextButton.icon(
-                  onPressed: () => provider.exportCsv(),
-                  icon: const Icon(Icons.download, size: 18),
-                  label: const Text('Export CSV'),
-                  style: TextButton.styleFrom(
-                    foregroundColor: AppColors.primary,
-                  ),
-                ),
+            ],
+          ],
+        ),
+      ),
+      Padding(
+        padding: const EdgeInsets.only(top: 10),
+        child: Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            BtChip(label: 'Share', icon: Icons.ios_share_rounded, onTap: () => provider.shareSummary()),
+            if (result.tableRows.isNotEmpty)
+              BtChip(label: 'Export CSV', icon: Icons.file_download_outlined, onTap: () => provider.exportCsv()),
+          ],
+        ),
+      ),
+      if (result.projectBreakdown.length > 1)
+        Padding(
+          padding: const EdgeInsets.only(top: 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const BtSectionHeader(title: 'By Project', caption: true),
+              BtGroup(
+                children: List.generate(result.projectBreakdown.length, (index) {
+                  final item = result.projectBreakdown[index];
+                  final isTop = index == 0;
+                  final val = (item['totalAmount'] as num?)?.toDouble() ?? 0;
+                  final valStr = val > 0
+                      ? _formatCurrency(val)
+                      : '${item['totalQty'] ?? 0} units';
+                  return ConstrainedBox(
+                    constraints: const BoxConstraints(minHeight: 50),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: 24,
+                            child: isTop
+                                ? const Text('🏆', style: TextStyle(fontSize: 14))
+                                : Text('${index + 1}', style: BtText.num(BtText.mono(context))),
+                          ),
+                          Expanded(
+                            child: Text(
+                              item['projectName']?.toString() ?? 'Unknown',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: BtText.body(context, weight: isTop ? FontWeight.w600 : FontWeight.w400),
+                            ),
+                          ),
+                          Text(valStr, style: BtText.num(BtText.body(context, weight: isTop ? FontWeight.w700 : FontWeight.w500))),
+                        ],
+                      ),
+                    ),
+                  );
+                }),
+              ),
             ],
           ),
         ),
-        if (result.totalAmount != null || result.rowCount != null)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              children: [
-                if (result.totalAmount != null)
-                  Expanded(
-                    child: _MetricCard(
-                      title: 'Total Amount',
-                      value: _formatCurrency(result.totalAmount!),
-                      icon: Icons.currency_rupee,
-                    ),
-                  ),
-                if (result.totalAmount != null && result.rowCount != null)
-                  const SizedBox(width: 16),
-                if (result.rowCount != null)
-                  Expanded(
-                    child: _MetricCard(
-                      title: result.tableType == 'inventory'
-                          ? 'Items Tracked'
-                          : 'Total Entries',
-                      value: result.rowCount.toString(),
-                      icon: Icons.format_list_numbered,
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        const SizedBox(height: 24),
-        if (result.projectBreakdown.length > 1)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('By Project', style: AppTheme.heading3),
-                const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Bt.line),
-                  ),
-                  child: Column(
-                    children: List.generate(result.projectBreakdown.length, (
-                      index,
-                    ) {
-                      final item = result.projectBreakdown[index];
-                      final isTop = index == 0;
-                      final val =
-                          (item['totalAmount'] as num?)?.toDouble() ?? 0;
-                      final valStr = val > 0
-                          ? _formatCurrency(val)
-                          : '${item['totalQty'] ?? 0} units';
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Row(
-                              children: [
-                                if (isTop)
-                                  const Text(
-                                    '🏆 ',
-                                    style: TextStyle(fontSize: 13),
-                                  ),
-                                if (!isTop) const SizedBox(width: 16),
-                                Text(
-                                  item['projectName']?.toString() ?? 'Unknown',
-                                  style: AppTheme.body.copyWith(
-                                    color: AppColors.textDark,
-                                    fontWeight: isTop
-                                        ? FontWeight.bold
-                                        : FontWeight.normal,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            Text(
-                              valStr,
-                              style: AppTheme.body.copyWith(
-                                fontWeight: isTop
-                                    ? FontWeight.bold
-                                    : FontWeight.normal,
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }),
-                  ),
-                ),
-                const SizedBox(height: 24),
-              ],
-            ),
-          ),
-        if (result.tableRows.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Bt.line),
-              ),
-              child: ExpansionTile(
-                initiallyExpanded: true,
-                title: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      if (result.tableRows.isNotEmpty)
+        Padding(
+          padding: const EdgeInsets.only(top: 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(2, 0, 0, 8),
+                child: Row(
                   children: [
-                    Text(
-                      result.tableType == 'inventory'
-                          ? 'Inventory Details'
-                          : 'Transaction Details',
-                      style: AppTheme.heading3.copyWith(fontSize: 16),
+                    Expanded(
+                      child: Text(
+                        (result.tableType == 'inventory' ? 'Inventory Details' : 'Transaction Details').toUpperCase(),
+                        style: BtText.mono(context),
+                      ),
                     ),
                     if (result.tableType != 'inventory')
                       TextButton.icon(
                         onPressed: _showCustomizeColumnsDialog,
-                        icon: const Icon(Icons.view_column, size: 16),
+                        icon: const Icon(Icons.view_column_outlined, size: 16),
                         label: const Text('Customize'),
-                        style: TextButton.styleFrom(
-                          foregroundColor: AppColors.primary,
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
-                          visualDensity: VisualDensity.compact,
-                        ),
+                        style: TextButton.styleFrom(foregroundColor: bt.accentInk, minimumSize: const Size(44, 36), padding: const EdgeInsets.symmetric(horizontal: 8)),
                       ),
+                    BtIconButton(
+                      icon: _tableOpen ? Icons.expand_less_rounded : Icons.expand_more_rounded,
+                      semantic: _tableOpen ? 'Collapse table' : 'Expand table',
+                      color: Bt.ink2,
+                      onTap: () => setState(() => _tableOpen = !_tableOpen),
+                    ),
                   ],
                 ),
+              ),
+              if (_tableOpen)
+              Container(
+                decoration: BoxDecoration(color: Bt.card, borderRadius: BorderRadius.circular(16), boxShadow: Bt.shadow),
+                clipBehavior: Clip.antiAlias,
+                child: result.tableType == 'inventory'
+                    ? SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: _buildInventoryTable(),
+                      )
+                    : _buildTransactionTable(),
+              ),
+            ],
+          ),
+        ),
+      if (result.actions.isNotEmpty)
+        Padding(
+          padding: const EdgeInsets.only(top: 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const BtSectionHeader(title: 'Suggested Explorations', caption: true),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
                 children: [
-                  if (result.tableType == 'inventory')
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: _buildInventoryTable(),
-                    )
-                  else
-                    _buildTransactionTable(),
+                  for (final a in result.actions)
+                    BtChip(label: a, icon: Icons.north_east_rounded, onTap: () => widget.onActionTap(a)),
                 ],
               ),
-            ),
+            ],
           ),
-        const SizedBox(height: 32),
-        if (result.actions.isNotEmpty) ...[
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Text(
-              'Suggested Explorations',
-              style: AppTheme.label.copyWith(color: AppColors.textLight),
-            ),
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            height: 40,
-            child: ListView.separated(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              scrollDirection: Axis.horizontal,
-              itemCount: result.actions.length,
-              separatorBuilder: (ctx, i) => const SizedBox(width: 8),
-              itemBuilder: (ctx, i) {
-                return ActionChip(
-                  label: Text(result.actions[i]),
-                  onPressed: () => widget.onActionTap(result.actions[i]),
-                  backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-                  labelStyle: TextStyle(color: AppColors.primary),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(Bt.rCard),
-                    side: const BorderSide(color: Colors.transparent),
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
-      ],
+        ),
+    ];
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+      children: btStagger(sections),
     );
   }
   String _formatCurrency(double v) {
@@ -818,6 +824,7 @@ class _ResultsStateState extends State<_ResultsState> {
   }
   Widget _buildTransactionTable() {
     final result = widget.result;
+    final bt = context.bt;
     double grandTotal = 0;
     for (final r in result.tableRows) {
       final p = r['Amount (INR)'] ?? r['price'];
@@ -825,8 +832,8 @@ class _ResultsStateState extends State<_ResultsState> {
           ? p.toDouble()
           : (double.tryParse(p?.toString() ?? '') ?? 0);
     }
-    const double colHash = 36;
-    const double rowPadH = 16;
+    const double colHash = 30;
+    const double rowPadH = 12;
     double getColWidth(String colName) {
       if (colName == 'Amount (INR)') return 104;
       if (colName == 'Description' ||
@@ -845,20 +852,10 @@ class _ResultsStateState extends State<_ResultsState> {
     for (final col in _visibleColumns) {
       tableWidth += getColWidth(col);
     }
-    const headerBg = Color(0xFFF1F3F8);
-    const headerTextStyle = TextStyle(
-      fontSize: 13,
-      fontWeight: FontWeight.w700,
-      color: Color(0xFF667085),
-      letterSpacing: 0.5,
-    );
-    const cellTextStyle = TextStyle(
-      fontSize: 13,
-      fontWeight: FontWeight.w400,
-      color: Color(0xFF1E293B),
-      height: 1.4,
-    );
-    const dividerColor = Color(0xFFE4E7EC);
+    const headerBg = Color(0xFFF3F3F3);
+    final headerTextStyle = BtText.mono(context, size: 9.5, color: Bt.ink2);
+    final cellTextStyle = BtText.caption(context, color: Bt.ink).copyWith(fontSize: 12.5, height: 1.3);
+    const dividerColor = Color(0x14111317);
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: SizedBox(
@@ -868,24 +865,14 @@ class _ResultsStateState extends State<_ResultsState> {
             Container(
               decoration: const BoxDecoration(
                 color: headerBg,
-                border: Border(
-                  bottom: BorderSide(color: dividerColor, width: 1),
-                ),
+                border: Border(bottom: BorderSide(color: Color(0x24111317), width: 1)),
               ),
-              padding: const EdgeInsets.symmetric(
-                horizontal: rowPadH,
-                vertical: 12,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: rowPadH, vertical: 11),
               child: Row(
                 children: [
                   SizedBox(
                     width: colHash,
-                    child: const Text(
-                      '#',
-                      style: headerTextStyle,
-                      softWrap: false,
-                      maxLines: 1,
-                    ),
+                    child: Text('#', style: headerTextStyle, softWrap: false, maxLines: 1),
                   ),
                   ..._visibleColumns.map((colName) {
                     final isAmount = colName == 'Amount (INR)';
@@ -893,15 +880,8 @@ class _ResultsStateState extends State<_ResultsState> {
                     return SizedBox(
                       width: width,
                       child: Align(
-                        alignment: isAmount
-                            ? Alignment.centerRight
-                            : Alignment.centerLeft,
-                        child: Text(
-                          colName.toUpperCase(),
-                          style: headerTextStyle,
-                          softWrap: false,
-                          maxLines: 1,
-                        ),
+                        alignment: isAmount ? Alignment.centerRight : Alignment.centerLeft,
+                        child: Text(colName.toUpperCase(), style: headerTextStyle, softWrap: false, maxLines: 1),
                       ),
                     );
                   }),
@@ -913,25 +893,17 @@ class _ResultsStateState extends State<_ResultsState> {
               final isEven = index.isEven;
               return Container(
                 decoration: BoxDecoration(
-                  color: isEven ? Colors.white : const Color(0xFFFAFBFD),
-                  border: const Border(
-                    bottom: BorderSide(color: dividerColor, width: 0.5),
-                  ),
+                  color: isEven ? Bt.card : const Color(0xFFFAFAFA),
+                  border: const Border(bottom: BorderSide(color: dividerColor, width: 1)),
                 ),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: rowPadH,
-                  vertical: 11,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: rowPadH, vertical: 11),
                 child: Row(
                   children: [
                     SizedBox(
                       width: colHash,
                       child: Text(
                         (r['number'] ?? (index + 1)).toString(),
-                        style: cellTextStyle.copyWith(
-                          color: const Color(0xFF98A2B3),
-                          fontSize: 13,
-                        ),
+                        style: BtText.num(BtText.mono(context, size: 10)),
                         softWrap: false,
                         maxLines: 1,
                       ),
@@ -947,33 +919,20 @@ class _ResultsStateState extends State<_ResultsState> {
                             ? val.toDouble()
                             : (double.tryParse(val?.toString() ?? '') ?? 0);
                         displayVal = _formatCurrency(parsed);
-                        style = style.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: const Color(0xFF1E293B),
-                        );
+                        style = BtText.num(style.copyWith(fontWeight: FontWeight.w700));
                       } else {
                         displayVal = (val ?? '-').toString();
                         if (colName == 'Description' || colName == 'Project') {
-                          style = style.copyWith(fontWeight: FontWeight.w500);
+                          style = style.copyWith(fontWeight: FontWeight.w600);
                         } else if (colName == 'Brand' || colName == 'Type') {
-                          style = style.copyWith(
-                            color: const Color(0xFF475467),
-                          );
+                          style = style.copyWith(color: Bt.ink2);
                         }
                       }
                       return SizedBox(
                         width: width,
                         child: Align(
-                          alignment: isAmount
-                              ? Alignment.centerRight
-                              : Alignment.centerLeft,
-                          child: Text(
-                            displayVal,
-                            style: style,
-                            softWrap: false,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                          alignment: isAmount ? Alignment.centerRight : Alignment.centerLeft,
+                          child: Text(displayVal, style: style, softWrap: false, maxLines: 1, overflow: TextOverflow.ellipsis),
                         ),
                       );
                     }),
@@ -982,23 +941,11 @@ class _ResultsStateState extends State<_ResultsState> {
               );
             }),
             Container(
-              decoration: const BoxDecoration(
-                color: Color(0xFFF1F3F8),
-                border: Border(
-                  top: BorderSide(color: Color(0xFFD0D5DD), width: 1.5),
-                ),
-                borderRadius: BorderRadius.only(
-                  bottomLeft: Radius.circular(15),
-                  bottomRight: Radius.circular(15),
-                ),
-              ),
-              padding: const EdgeInsets.symmetric(
-                horizontal: rowPadH,
-                vertical: 14,
-              ),
+              color: headerBg,
+              padding: const EdgeInsets.symmetric(horizontal: rowPadH, vertical: 13),
               child: Row(
                 children: [
-                  SizedBox(width: colHash),
+                  const SizedBox(width: colHash),
                   Builder(
                     builder: (context) {
                       double spanWidth = 0;
@@ -1017,13 +964,8 @@ class _ResultsStateState extends State<_ResultsState> {
                           SizedBox(
                             width: spanWidth,
                             child: Text(
-                              'TOTAL (${result.tableRows.length} entries)',
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                                color: Color(0xFF344054),
-                                letterSpacing: 0.3,
-                              ),
+                              'TOTAL (${result.tableRows.length} entries)'.toUpperCase(),
+                              style: BtText.num(BtText.mono(context, color: Bt.ink)),
                               softWrap: false,
                               maxLines: 1,
                             ),
@@ -1035,11 +977,7 @@ class _ResultsStateState extends State<_ResultsState> {
                                 alignment: Alignment.centerRight,
                                 child: Text(
                                   _formatCurrency(grandTotal),
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w700,
-                                    color: Color(0xFF0B63CE),
-                                  ),
+                                  style: BtText.num(BtText.subhead(context, color: bt.accentInk, weight: FontWeight.w700)),
                                   softWrap: false,
                                   maxLines: 1,
                                 ),
@@ -1059,47 +997,32 @@ class _ResultsStateState extends State<_ResultsState> {
   }
   Widget _buildInventoryTable() {
     return DataTable(
-      headingTextStyle: AppTheme.label.copyWith(
-        color: AppColors.textLight,
-        fontWeight: FontWeight.bold,
-      ),
-      dataTextStyle: AppTheme.body.copyWith(
-        color: AppColors.textDark,
-        fontSize: 13,
-      ),
+      headingRowColor: WidgetStateProperty.all(const Color(0xFFF3F3F3)),
+      headingRowHeight: 40,
+      dataRowMinHeight: 44,
+      dataRowMaxHeight: 48,
+      dividerThickness: 1,
+      horizontalMargin: 14,
+      columnSpacing: 20,
+      headingTextStyle: BtText.mono(context, size: 9.5, color: Bt.ink2),
+      dataTextStyle: BtText.caption(context, color: Bt.ink).copyWith(fontSize: 12.5),
       columns: const [
-        DataColumn(label: Text('Material')),
-        DataColumn(label: Text('Type')),
-        DataColumn(label: Text('Quantity')),
-        DataColumn(label: Text('Status')),
+        DataColumn(label: Text('MATERIAL')),
+        DataColumn(label: Text('TYPE')),
+        DataColumn(label: Text('QUANTITY')),
+        DataColumn(label: Text('STATUS')),
       ],
       rows: widget.result.tableRows.map((r) {
         final severity = r['severity']?.toString() ?? 'ok';
-        Color statusColor = AppColors.success;
-        if (severity == 'critical') statusColor = AppColors.error;
-        if (severity == 'low') statusColor = AppColors.primary;
+        BtTone tone = BtTone.green;
+        if (severity == 'critical') tone = BtTone.red;
+        if (severity == 'low') tone = BtTone.amber;
         return DataRow(
           cells: [
             DataCell(Text(r['name']?.toString() ?? '-')),
             DataCell(Text(r['category']?.toString().toUpperCase() ?? '-')),
-            DataCell(Text('${r['quantity'] ?? 0} ${r['unit'] ?? ''}')),
-            DataCell(
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: statusColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  severity.toUpperCase(),
-                  style: TextStyle(
-                    color: statusColor,
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ),
+            DataCell(Text('${r['quantity'] ?? 0} ${r['unit'] ?? ''}', style: const TextStyle(fontFeatures: BtText.tnum))),
+            DataCell(BtBadge(label: severity.toUpperCase(), tone: tone)),
           ],
         );
       }).toList(),
@@ -1118,25 +1041,21 @@ class _MetricCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Bt.line),
-      ),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      decoration: BoxDecoration(color: Bt.ground, borderRadius: BorderRadius.circular(14)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: AppColors.textLight, size: 20),
-          const SizedBox(height: 12),
-          Text(
-            value,
-            style: AppTheme.heading2.copyWith(color: AppColors.primary),
-          ),
+          Row(children: [
+            Icon(icon, color: Bt.ink3, size: 14),
+            const SizedBox(width: 4),
+            Expanded(child: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.caption(context, color: Bt.ink2).copyWith(fontSize: 12))),
+          ]),
           const SizedBox(height: 4),
-          Text(
-            title,
-            style: AppTheme.caption.copyWith(color: AppColors.textLight),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(value, maxLines: 1, style: BtText.num(BtText.title(context, size: 21))),
           ),
         ],
       ),

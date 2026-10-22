@@ -2,11 +2,7 @@ import 'package:buildtrack_mobile/design/design.dart';
 import 'dart:typed_data';
 import 'dart:io' show File;
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:buildtrack_mobile/common/themes/app_colors.dart';
-import 'package:buildtrack_mobile/common/themes/app_theme.dart';
 import 'package:buildtrack_mobile/common/utils/currency_formatter.dart';
-import 'package:buildtrack_mobile/common/widgets/app_widgets.dart';
-import 'package:buildtrack_mobile/common/widgets/common_widgets.dart';
 import 'package:buildtrack_mobile/controller/project_provider.dart';
 import 'package:buildtrack_mobile/controller/report_model.dart';
 import 'package:buildtrack_mobile/screen/reports/report_widgets.dart';
@@ -82,33 +78,18 @@ class _ReportInsightsScreenState extends State<ReportInsightsScreen> {
           : provider.selectedProject;
     }
     if (provider.isLoading) {
-      return Scaffold(
-        backgroundColor: AppColors.gradientStart,
-        body: Center(
-          child: CircularProgressIndicator(color: AppColors.primary),
-        ),
+      return const Scaffold(
+        backgroundColor: Bt.ground,
+        body: BtPageLoader(label: 'Loading insights'),
       );
     }
     if (project == null) {
-      return Scaffold(
-        backgroundColor: AppColors.gradientStart,
-        body: SafeArea(
-          child: Column(
-            children: [
-              AppTopBar(
-                title: 'Report Insights',
-                isSubScreen: true,
-                leftIcon: Icons.arrow_back,
-                onLeftTap: () => Navigator.maybePop(context),
-              ),
-              const Expanded(
-                child: AppEmptyState(
-                  icon: Icons.bar_chart_outlined,
-                  message: 'No project selected.',
-                ),
-              ),
-            ],
-          ),
+      return const Scaffold(
+        backgroundColor: Bt.ground,
+        appBar: BtNavBar(title: 'Report Insights'),
+        body: BtEmpty(
+          icon: Icons.bar_chart_outlined,
+          title: 'No project selected.',
         ),
       );
     }
@@ -137,10 +118,7 @@ class _ReportInsightsScreenState extends State<ReportInsightsScreen> {
       'Labour': report.targetLabour,
       'Equipment': report.targetEquipment,
     };
-    return Scaffold(
-      backgroundColor: AppColors.gradientStart,
-      floatingActionButton: _ExportFab(
-        onTap: () => _showExportSheet(
+    void openExport() => _showExportSheet(
           context,
           project!,
           report,
@@ -149,76 +127,67 @@ class _ReportInsightsScreenState extends State<ReportInsightsScreen> {
           filteredEntries,
           phases,
           _inventoryItems,
-        ),
+        );
+    return Scaffold(
+      backgroundColor: Bt.ground,
+      appBar: BtNavBar(
+        title: 'Report Insights',
+        subtitle: project.name,
       ),
-      body: SafeArea(
-        bottom: false,
+      bottomNavigationBar: BtCtaBar(
+        children: [
+          Expanded(
+            child: BtButton(
+              label: 'Export Report',
+              icon: Icons.share_outlined,
+              onPressed: openExport,
+            ),
+          ),
+        ],
+      ),
+      body: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(Bt.gutter, 4, Bt.gutter, 32),
         child: Column(
-          children: [
-            AppTopBar(
-              title: 'Report Insights',
-              isSubScreen: true,
-              leftIcon: Icons.arrow_back,
-              onLeftTap: () => Navigator.maybePop(context),
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: btStagger([
+            _DateRangeRow(
+              fromDate: _fromDate,
+              toDate: _toDate,
+              onChanged: (from, to) => setState(() {
+                _fromDate = from;
+                _toDate = to;
+              }),
             ),
-            Expanded(
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _DateRangeRow(
-                      fromDate: _fromDate,
-                      toDate: _toDate,
-                      onChanged: (from, to) => setState(() {
-                        _fromDate = from;
-                        _toDate = to;
-                      }),
-                    ),
-                    const SizedBox(height: 10),
-                    _ProjectSummaryCard(project: project, report: report),
-                    const SizedBox(height: 14),
-                    ChartSection(report: report),
-                    const SizedBox(height: 14),
-                    const AppSectionHeader(title: 'Category Breakdown'),
-                    _CategoryBreakdownCard(
-                      project: project,
-                      categoryCosts: categoryCosts,
-                      categoryBudgets: categoryBudgets,
-                    ),
-                    const SizedBox(height: 18),
-                    _ExportDetailsHintCard(
-                      onTap: () => _showExportSheet(
-                        context,
-                        project!,
-                        report,
-                        categoryCosts,
-                        categoryBudgets,
-                        filteredEntries,
-                        phases,
-                        _inventoryItems,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    AppButton(
-                      label: 'Update Progress',
-                      icon: Icons.trending_up,
-                      onPressed: () =>
-                          Navigator.pushNamed(context, '/update-progress'),
-                    ),
-                    const SizedBox(height: 12),
-                    AppButton(
-                      label: 'View Full Logs',
-                      icon: Icons.receipt_long_outlined,
-                      variant: AppButtonVariant.outline,
-                      onPressed: () => Navigator.pushNamed(context, '/logs'),
-                    ),
-                  ],
-                ),
-              ),
+            const SizedBox(height: 12),
+            _ProjectSummaryCard(project: project, report: report),
+            const SizedBox(height: 12),
+            ChartSection(report: report),
+            const SizedBox(height: 24),
+            const BtSectionHeader(title: 'Category Breakdown', caption: true),
+            _CategoryBreakdownCard(
+              project: project,
+              categoryCosts: categoryCosts,
+              categoryBudgets: categoryBudgets,
             ),
-          ],
+            const SizedBox(height: 16),
+            _ExportDetailsHintCard(onTap: openExport),
+            const SizedBox(height: 24),
+            BtButton(
+              label: 'Update Progress',
+              icon: Icons.trending_up,
+              variant: BtButtonVariant.secondary,
+              onPressed: () =>
+                  Navigator.pushNamed(context, '/update-progress'),
+            ),
+            const SizedBox(height: 10),
+            BtButton(
+              label: 'View Full Logs',
+              icon: Icons.receipt_long_outlined,
+              variant: BtButtonVariant.quiet,
+              onPressed: () => Navigator.pushNamed(context, '/logs'),
+            ),
+          ]),
         ),
       ),
     );
@@ -296,9 +265,12 @@ class _ReportInsightsScreenState extends State<ReportInsightsScreen> {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      useSafeArea: true,
+      backgroundColor: Bt.card,
+      barrierColor: Bt.scrim,
+      sheetAnimationStyle: const AnimationStyle(duration: Duration(milliseconds: 520), curve: Bt.ease, reverseDuration: Duration(milliseconds: 260)),
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(Bt.rSheet)),
       ),
       builder: (_) => _ExportSheet(
         project: project,
@@ -327,91 +299,21 @@ class _DateRangeRow extends StatelessWidget {
       '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return BtPickerField(
+      text: '${_fmt(fromDate)}  →  ${_fmt(toDate)}',
+      leading: Icons.calendar_today_outlined,
+      icon: Icons.edit_outlined,
       onTap: () async {
         final picked = await showDateRangePicker(
           context: context,
           firstDate: DateTime(2020),
           lastDate: DateTime.now(),
           initialDateRange: DateTimeRange(start: fromDate, end: toDate),
-          builder: (ctx, child) => Theme(
-            data: Theme.of(ctx).copyWith(
-              colorScheme: ColorScheme.light(primary: AppColors.primary),
-            ),
-            child: child!,
-          ),
         );
         if (picked != null) {
           onChanged(picked.start, picked.end);
         }
       },
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Bt.line),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              Icons.calendar_today_outlined,
-              size: 15,
-              color: AppColors.primary,
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                '${_fmt(fromDate)}  →  ${_fmt(toDate)}',
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textDark,
-                ),
-              ),
-            ),
-            const Icon(
-              Icons.edit_outlined,
-              size: 13,
-              color: AppColors.textLight,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-class _ExportFab extends StatelessWidget {
-  const _ExportFab({required this.onTap});
-  final VoidCallback onTap;
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        height: 52,
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        decoration: BoxDecoration(
-          color: AppColors.primary,
-          borderRadius: BorderRadius.circular(26),
-        ),
-        child: const Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.share_outlined, color: Colors.white, size: 18),
-            SizedBox(width: 8),
-            Text(
-              'Export Report',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
@@ -457,168 +359,64 @@ class _ExportSheetState extends State<_ExportSheet> {
         bottom: MediaQuery.of(context).viewInsets.bottom,
       ),
       child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE4E7EC),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-              Row(
-                children: [
-                  Container(
-                    width: 42,
-                    height: 42,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.10),
-                      borderRadius: BorderRadius.circular(13),
-                    ),
-                    child: Icon(
-                      Icons.picture_as_pdf_outlined,
-                      color: AppColors.primary,
-                      size: 20,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            BtSheetHeader(title: 'Export Report', subtitle: widget.project.name),
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(18, 4, 18, 18),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
                       children: [
-                        const Text(
-                          'Export Report',
-                          style: TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textDark,
+                        const Icon(Icons.date_range, size: 16, color: Bt.ink3),
+                        const SizedBox(width: 8),
+                        Text(_dateRangeLabel.toUpperCase(), style: BtText.num(BtText.mono(context))),
+                      ],
+                    ),
+                    const SizedBox(height: 18),
+                    const BtSectionHeader(title: 'Include in report', caption: true),
+                    BtGroup(
+                      children: [
+                        _toggle('Cost Breakdown', 'Total material, labour & equipment costs', Icons.pie_chart_outline, _includeCostBreakdown, (v) => setState(() => _includeCostBreakdown = v)),
+                        _toggle('Category Chart', 'Visual chart + table of budget vs actual', Icons.bar_chart_outlined, _includeCategoryChart, (v) => setState(() => _includeCategoryChart = v)),
+                        _toggle('Entry Log', 'Line-by-line list of all entries', Icons.receipt_long_outlined, _includeEntryLog, (v) => setState(() => _includeEntryLog = v)),
+                        _toggle('Activity Progress', 'Phase-wise completed activities', Icons.checklist_outlined, _includeActivityProgress, (v) => setState(() => _includeActivityProgress = v)),
+                        _toggle('Inventory Status', 'Stock levels and reorder alerts', Icons.inventory_2_outlined, _includeInventory, (v) => setState(() => _includeInventory = v)),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    Row(
+                      children: [
+                        SizedBox(
+                          width: 120,
+                          child: BtButton(
+                            label: 'Preview',
+                            icon: Icons.visibility_outlined,
+                            variant: BtButtonVariant.secondary,
+                            onPressed: _previewPdf,
                           ),
                         ),
-                        Text(
-                          widget.project.name,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: AppColors.textLight,
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: BtButton(
+                            label: _isGenerating ? 'Generating…' : 'Share PDF',
+                            icon: Icons.share_outlined,
+                            loading: _isGenerating,
+                            onPressed: _isGenerating ? null : _sharePdf,
                           ),
                         ),
                       ],
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 10,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.06),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: AppColors.primary.withValues(alpha: 0.15),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.date_range,
-                      size: 15,
-                      color: AppColors.primary,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      _dateRangeLabel,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.primary,
-                      ),
-                    ),
                   ],
                 ),
               ),
-              const SizedBox(height: 16),
-              const Text(
-                'Include in report',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textLight,
-                  letterSpacing: 0.8,
-                ),
-              ),
-              const SizedBox(height: 10),
-              _toggle(
-                'Cost Breakdown',
-                'Total material, labour & equipment costs',
-                Icons.pie_chart_outline,
-                _includeCostBreakdown,
-                (v) => setState(() => _includeCostBreakdown = v),
-              ),
-              _toggle(
-                'Category Chart',
-                'Visual chart + table of budget vs actual',
-                Icons.bar_chart_outlined,
-                _includeCategoryChart,
-                (v) => setState(() => _includeCategoryChart = v),
-              ),
-              _toggle(
-                'Entry Log',
-                'Line-by-line list of all entries',
-                Icons.receipt_long_outlined,
-                _includeEntryLog,
-                (v) => setState(() => _includeEntryLog = v),
-              ),
-              _toggle(
-                'Activity Progress',
-                'Phase-wise completed activities',
-                Icons.checklist_outlined,
-                _includeActivityProgress,
-                (v) => setState(() => _includeActivityProgress = v),
-              ),
-              _toggle(
-                'Inventory Status',
-                'Stock levels and reorder alerts',
-                Icons.inventory_2_outlined,
-                _includeInventory,
-                (v) => setState(() => _includeInventory = v),
-              ),
-              const SizedBox(height: 20),
-              Row(
-                children: [
-                  Expanded(
-                    child: _actionButton(
-                      icon: Icons.visibility_outlined,
-                      label: 'Preview',
-                      isPrimary: false,
-                      isLoading: false,
-                      onTap: _previewPdf,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _actionButton(
-                      icon: Icons.share_outlined,
-                      label: _isGenerating ? 'Generating…' : 'Share PDF',
-                      isPrimary: true,
-                      isLoading: _isGenerating,
-                      onTap: _isGenerating ? null : _sharePdf,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -630,121 +428,14 @@ class _ExportSheetState extends State<_ExportSheet> {
     bool value,
     ValueChanged<bool> onChanged,
   ) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: InkWell(
-        onTap: () => onChanged(!value),
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-          decoration: BoxDecoration(
-            color: value
-                ? AppColors.primary.withValues(alpha: 0.06)
-                : const Color(0xFFF6F7F9),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: value
-                  ? AppColors.primary.withValues(alpha: 0.25)
-                  : const Color(0xFFE8EAF5),
-            ),
-          ),
-          child: Row(
-            children: [
-              Icon(
-                icon,
-                size: 18,
-                color: value ? AppColors.primary : AppColors.textLight,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: value ? AppColors.textDark : AppColors.textLight,
-                      ),
-                    ),
-                    Text(
-                      subtitle,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: AppColors.textLight,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Switch.adaptive(
-                value: value,
-                onChanged: onChanged,
-                activeThumbColor: AppColors.primary,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-  Widget _actionButton({
-    required IconData icon,
-    required String label,
-    required bool isPrimary,
-    required bool isLoading,
-    required VoidCallback? onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        decoration: BoxDecoration(
-          color: isPrimary ? AppColors.primary : Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: isPrimary ? AppColors.primary : Color(0xFFE4E7EC),
-          ),
-          boxShadow: isPrimary
-              ? [
-                  BoxShadow(
-                    color: AppColors.primary.withValues(alpha: 0.30),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                  ),
-                ]
-              : [],
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            isLoading
-                ? SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: isPrimary ? Colors.white : AppColors.primary,
-                    ),
-                  )
-                : Icon(
-                    icon,
-                    size: 16,
-                    color: isPrimary ? Colors.white : AppColors.primary,
-                  ),
-            const SizedBox(width: 7),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: isPrimary ? Colors.white : AppColors.primary,
-              ),
-            ),
-          ],
-        ),
-      ),
+    return BtRow(
+      leading: BtTile(icon: icon, size: 38, bg: value ? context.bt.accentSoft : Bt.fill, fg: value ? context.bt.accentInk : Bt.ink3),
+      title: title,
+      subtitle: subtitle,
+      titleColor: value ? Bt.ink : Bt.ink2,
+      minHeight: 60,
+      onTap: () => onChanged(!value),
+      trailing: BtSwitch(value: value, onChanged: onChanged),
     );
   }
   Future<Uint8List> _buildPdfBytes() {
@@ -807,17 +498,7 @@ class _ExportSheetState extends State<_ExportSheet> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Export failed: $e'),
-            backgroundColor: const Color(0xFFC01048),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            margin: const EdgeInsets.all(16),
-          ),
-        );
+        btToast(context, 'Export failed: $e', error: true);
       }
     } finally {
       if (mounted) setState(() => _isGenerating = false);
@@ -1461,72 +1142,28 @@ class _ExportDetailsHintCard extends StatelessWidget {
   final VoidCallback onTap;
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final bt = context.bt;
+    return BtCard(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Bt.line),
-      ),
       child: Row(
         children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF0B63CE), Color(0xFF0B63CE)],
-              ),
-              borderRadius: BorderRadius.circular(13),
-            ),
-            child: const Icon(
-              Icons.fact_check_outlined,
-              color: Colors.white,
-              size: 20,
-            ),
-          ),
+          BtTile(icon: Icons.fact_check_outlined, bg: bt.accent, fg: bt.onAccent, size: 44),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Want the full breakdown?',
-                  style: AppTheme.bodyLarge.copyWith(
-                    color: AppColors.textDark,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
+                Text('Want the full breakdown?', style: BtText.body(context, weight: FontWeight.w600)),
                 const SizedBox(height: 2),
                 Text(
                   'Activity log, inventory status & every entry — pick what to include and export as PDF.',
-                  style: AppTheme.caption.copyWith(
-                    color: AppColors.textLight,
-                    height: 1.4,
-                  ),
+                  style: BtText.caption(context),
                 ),
               ],
             ),
           ),
           const SizedBox(width: 8),
-          GestureDetector(
-            onTap: onTap,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: AppColors.primary,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Text(
-                'Export',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-          ),
+          BtButton(label: 'Export', small: true, expand: false, onPressed: onTap),
         ],
       ),
     );
@@ -1547,96 +1184,85 @@ class _ProjectSummaryCard extends StatelessWidget {
         ? (report.totalCost / totalTarget).clamp(0.0, 1.0)
         : project.progress;
     final isOver = totalTarget > 0 && report.totalCost > totalTarget;
-    return AppCard(
+    return BtCard(
+      variant: BtCardVariant.ink,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            project.name,
-            style: AppTheme.heading2.copyWith(
-              fontSize: 18,
-              color: AppColors.textDark,
-            ),
-          ),
-          const SizedBox(height: 4),
           Row(
             children: [
-              const Icon(
-                Icons.location_on_outlined,
-                size: 14,
-                color: AppColors.textLight,
-              ),
-              const SizedBox(width: 4),
-              Text(
-                project.location,
-                style: AppTheme.caption.copyWith(
-                  fontSize: 13,
-                  color: AppColors.textLight,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              if (project.id != 'all')
-                Text(
-                  'Stage: ${project.stage.name[0].toUpperCase()}${project.stage.name.substring(1).toLowerCase()}',
-                  style: AppTheme.label.copyWith(color: AppColors.primary),
-                )
-              else
-                Text(
-                  'Aggregate Portfolio View',
-                  style: AppTheme.label.copyWith(color: AppColors.primary),
-                ),
+              Expanded(child: Text('COST SUMMARY', style: BtText.mono(context, color: Bt.onNoir2))),
               Text(
                 '${(project.progress * 100).toStringAsFixed(1)}% Complete',
-                style: AppTheme.label.copyWith(color: AppColors.textDark),
+                style: BtText.num(BtText.caption(context, color: Bt.onNoir2, weight: FontWeight.w600)),
               ),
             ],
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
+          Text(project.name, maxLines: 2, overflow: TextOverflow.ellipsis, style: BtText.headline(context).copyWith(color: Bt.bone)),
+          const SizedBox(height: 2),
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Spent: ${report.formattedTotal}',
-                style: AppTheme.caption.copyWith(
-                  color: isOver ? AppColors.error : AppColors.primary,
-                  fontWeight: FontWeight.w700,
+              const Icon(Icons.location_on_outlined, size: 14, color: Bt.onNoir2),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  project.id != 'all'
+                      ? '${project.location} · Stage: ${project.stage.name[0].toUpperCase()}${project.stage.name.substring(1).toLowerCase()}'
+                      : '${project.location} · Aggregate Portfolio View',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: BtText.caption(context, color: Bt.onNoir2),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Total spent', style: BtText.caption(context, color: Bt.onNoir2).copyWith(fontSize: 12)),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: BtCountUp(
+                        value: report.totalCost,
+                        format: (v) => formatCurrency(v),
+                        style: BtText.d2(context, color: isOver ? const Color(0xFFFF8A8E) : Bt.bone),
+                      ),
+                    ),
+                  ],
                 ),
               ),
               if (totalTarget > 0)
-                Text(
-                  'Budget: ${formatCurrency(totalTarget)}',
-                  style: AppTheme.caption.copyWith(color: AppColors.textLight),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text('Total budget', style: BtText.caption(context, color: Bt.onNoir2).copyWith(fontSize: 12)),
+                    Text(formatCurrency(totalTarget), style: BtText.num(BtText.headline(context).copyWith(color: Bt.bone))),
+                  ],
                 ),
             ],
           ),
-          const SizedBox(height: 6),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(16),
-            child: LinearProgressIndicator(
-              value: spentPct,
-              minHeight: 8,
-              backgroundColor: const Color(0xFFEEF1F5),
-              valueColor: AlwaysStoppedAnimation<Color>(
-                isOver ? AppColors.error : AppColors.primary,
-              ),
-            ),
-          ),
-          if (isOver)
-            Padding(
-              padding: const EdgeInsets.only(top: 5),
-              child: Text(
-                'Budget exceeded by ${formatCurrency(report.totalCost - totalTarget)}',
-                style: AppTheme.caption.copyWith(
-                  color: AppColors.error,
-                  fontWeight: FontWeight.w600,
+          const SizedBox(height: 14),
+          BtBricks(value: spentPct.toDouble(), onDark: true, color: isOver ? Bt.redBright : null),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Icon(isOver ? Icons.warning_amber_rounded : Icons.check_circle_rounded, size: 16, color: isOver ? const Color(0xFFFF8A8E) : const Color(0xFF4ADBA4)),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  isOver ? 'Budget exceeded by ${formatCurrency(report.totalCost - totalTarget)}' : report.efficiencyNote,
+                  style: BtText.caption(context, color: isOver ? const Color(0xFFFF8A8E) : const Color(0xFF4ADBA4), weight: FontWeight.w600),
                 ),
               ),
-            ),
+            ],
+          ),
         ],
       ),
     );
@@ -1653,114 +1279,74 @@ class _CategoryBreakdownCard extends StatelessWidget {
   });
   @override
   Widget build(BuildContext context) {
-    return AppCard(
-      margin: EdgeInsets.zero,
-      child: Column(
-        children: categoryCosts.entries.map((e) {
-          final cat = e.key;
-          final cost = e.value;
-          final budget = categoryBudgets[cat] ?? 0.0;
-          final hasBudget = budget > 0;
-          final pct = hasBudget ? (cost / budget).clamp(0.0, 1.0) : 0.0;
-          final color = pct >= 0.9
-              ? AppColors.error
-              : pct >= 0.6
-              ? AppColors.warning
-              : AppColors.primary;
-          return InkWell(
-            onTap: () => Navigator.pushNamed(
-              context,
-              '/logs',
-              arguments: {'projectId': project.id, 'category': cat},
-            ),
-            borderRadius: BorderRadius.circular(8),
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: 14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          cat,
-                          style: AppTheme.bodyLarge.copyWith(
-                            color: AppColors.textDark,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                      Text(
-                        formatCurrency(cost),
-                        style: TextStyle(
-                          color: color,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 13,
-                        ),
-                      ),
-                      Text(
-                        hasBudget ? ' / ${formatCurrency(budget)}' : ' / —',
-                        style: AppTheme.caption.copyWith(
-                          color: AppColors.textLight,
-                          fontSize: 13,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      const Icon(
-                        Icons.chevron_right,
-                        size: 14,
-                        color: AppColors.textLight,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(16),
-                          child: LinearProgressIndicator(
-                            value: pct,
-                            backgroundColor: const Color(0xFFEEF1F5),
-                            valueColor: AlwaysStoppedAnimation<Color>(color),
-                            minHeight: 8,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      SizedBox(
-                        width: 38,
-                        child: Text(
-                          hasBudget
-                              ? '${(pct * 100).toStringAsFixed(0)}%'
-                              : '—',
-                          textAlign: TextAlign.right,
-                          style: TextStyle(
-                            color: color,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (hasBudget && cost > budget)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 4),
+    final bt = context.bt;
+    return BtGroup(
+      children: categoryCosts.entries.map((e) {
+        final cat = e.key;
+        final cost = e.value;
+        final budget = categoryBudgets[cat] ?? 0.0;
+        final hasBudget = budget > 0;
+        final pct = hasBudget ? (cost / budget).clamp(0.0, 1.0) : 0.0;
+        final color = pct >= 0.9
+            ? Bt.red
+            : pct >= 0.6
+            ? Bt.amber
+            : bt.accentInk;
+        final barColor = pct >= 0.9
+            ? Bt.redBright
+            : pct >= 0.6
+            ? Bt.amberBright
+            : bt.accent;
+        return InkWell(
+          onTap: () => Navigator.pushNamed(
+            context,
+            '/logs',
+            arguments: {'projectId': project.id, 'category': cat},
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    BtTypeTile(type: cat),
+                    const SizedBox(width: 12),
+                    Expanded(child: Text(cat, style: BtText.body(context, weight: FontWeight.w600))),
+                    Text(formatCurrency(cost), style: BtText.num(BtText.subhead(context, color: color, weight: FontWeight.w700))),
+                    Text(hasBudget ? ' / ${formatCurrency(budget)}' : ' / —', style: BtText.num(BtText.caption(context))),
+                    const SizedBox(width: 4),
+                    const Icon(Icons.chevron_right_rounded, size: 20, color: Bt.placeholder),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(child: BtProgress(value: pct.toDouble(), color: barColor, thin: true)),
+                    const SizedBox(width: 10),
+                    SizedBox(
+                      width: 40,
                       child: Text(
-                        'Exceeded by ${formatCurrency(cost - budget)}',
-                        style: AppTheme.caption.copyWith(
-                          color: AppColors.error,
-                          fontWeight: FontWeight.w600,
-                        ),
+                        hasBudget ? '${(pct * 100).toStringAsFixed(0)}%' : '—',
+                        textAlign: TextAlign.right,
+                        style: BtText.num(BtText.caption(context, color: color, weight: FontWeight.w700)),
                       ),
                     ),
-                ],
-              ),
+                  ],
+                ),
+                if (hasBudget && cost > budget)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Text(
+                      'Exceeded by ${formatCurrency(cost - budget)}',
+                      style: BtText.caption(context, color: Bt.red, weight: FontWeight.w600),
+                    ),
+                  ),
+              ],
             ),
-          );
-        }).toList(),
-      ),
+          ),
+        );
+      }).toList(),
     );
   }
 }

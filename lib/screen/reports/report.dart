@@ -9,7 +9,7 @@ import 'package:buildtrack_mobile/controller/report_provider.dart';
 import 'package:buildtrack_mobile/models/project_model.dart';
 import 'package:buildtrack_mobile/screen/reports/report_export_helper.dart';
 import 'package:buildtrack_mobile/screen/reports/csv_import_helper.dart';
-import 'package:buildtrack_mobile/screen/reports/report_widgets.dart' show EfficiencyBanner;
+import 'package:buildtrack_mobile/screen/reports/report_widgets.dart' show EfficiencyBanner, ReportQuickTile;
 import 'package:buildtrack_mobile/screen/reports/report_sheet.dart';
 import 'package:buildtrack_mobile/services/api_service.dart';
 import 'package:flutter/material.dart';
@@ -130,6 +130,8 @@ class _ReportsViewState extends State<_ReportsView> {
   String? _selectedItemName = ReportFilterState.selectedItemName;
   bool _reportGenerated = ReportFilterState.reportGenerated;
   bool _showSuggestions = false;
+  /// Search field shown under the toolbar (always shown while a search is active).
+  bool _searchOpen = false;
   late final TextEditingController _searchController =
       TextEditingController(text: ReportFilterState.searchQuery);
   Set<EntryType> _selectedTypes = Set.from(ReportFilterState.selectedTypes);
@@ -760,9 +762,7 @@ class _ReportsViewState extends State<_ReportsView> {
     List<String>? activeColumns,
   }) async {
     if (filtered.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No report entries to export.')),
-      );
+      btToast(context, 'No report entries to export.', error: true);
       return;
     }
     try {
@@ -773,9 +773,7 @@ class _ReportsViewState extends State<_ReportsView> {
         activeColumns: activeColumns,
       );
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('CSV Export failed: $e')));
+      btToast(context, 'CSV Export failed: $e', error: true);
     }
   }
 
@@ -786,9 +784,7 @@ class _ReportsViewState extends State<_ReportsView> {
     List<String>? activeColumns,
   }) async {
     if (filtered.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No report entries to export.')),
-      );
+      btToast(context, 'No report entries to export.', error: true);
       return;
     }
     try {
@@ -831,9 +827,7 @@ class _ReportsViewState extends State<_ReportsView> {
         activeColumns: activeColumns,
       );
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('PDF Export failed: $e')));
+      btToast(context, 'PDF Export failed: $e', error: true);
     }
   }
 
@@ -847,40 +841,21 @@ class _ReportsViewState extends State<_ReportsView> {
         activeColumns: activeCols,
       );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Import template downloaded!'),
-            backgroundColor: Color(0xFF067647),
-          ),
-        );
+        btToast(context, 'Import template downloaded!');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Template download failed: $e'),
-            backgroundColor: const Color(0xFFC01048),
-          ),
-        );
+        btToast(context, 'Template download failed: $e', error: true);
       }
     }
   }
 
   Future<void> _handleRevertCsv() async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('Revert Last Upload'),
-        content: Text('Are you sure you want to undo the last CSV import? This will restore the transactions to their previous state.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('Cancel')),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
-            child: Text('Revert', style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
+    final confirm = await btConfirm(
+      context,
+      title: 'Revert Last Upload',
+      message: 'Are you sure you want to undo the last CSV import? This will restore the transactions to their previous state.',
+      confirmLabel: 'Revert',
     );
     if (confirm != true) return;
     
@@ -890,12 +865,12 @@ class _ReportsViewState extends State<_ReportsView> {
     
     if (success) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Successfully reverted last CSV import')));
+        btToast(context, 'Successfully reverted last CSV import');
         context.read<ReportProvider>().refresh();
       }
     } else {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to revert CSV import')));
+        btToast(context, 'Failed to revert CSV import', error: true);
       }
     }
   }
@@ -920,74 +895,58 @@ class _ReportsViewState extends State<_ReportsView> {
       }
       showDialog(
         context: context,
+        barrierColor: Bt.scrim,
         builder: (ctx) => AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: Text(
-            'Import Results',
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ),
+          backgroundColor: Bt.card,
+          surfaceTintColor: Colors.transparent,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
+          title: Text('Import Results', style: BtText.d3(ctx)),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text('Total rows processed: ${result.totalRows}'),
-                SizedBox(height: 8),
-                Text(
-                  'Successfully imported: ${result.successCount}',
-                  style: TextStyle(
-                    color: Color(0xFF067647),
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                Padding(
-                  padding: EdgeInsets.only(left: 16, top: 4),
+                Text('Total rows processed: ${result.totalRows}', style: BtText.subhead(ctx)),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(color: Bt.greenSoft, borderRadius: BorderRadius.circular(14)),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('• Materials: ${result.materialCount}'),
-                      Text('• Labour: ${result.labourCount}'),
-                      Text('• Equipment: ${result.equipmentCount}'),
+                      Text(
+                        'Successfully imported: ${result.successCount}',
+                        style: BtText.num(BtText.body(ctx, color: Bt.green, weight: FontWeight.w600)),
+                      ),
+                      const SizedBox(height: 4),
+                      Text('• Materials: ${result.materialCount}', style: BtText.num(BtText.subhead(ctx, color: Bt.ink))),
+                      Text('• Labour: ${result.labourCount}', style: BtText.num(BtText.subhead(ctx, color: Bt.ink))),
+                      Text('• Equipment: ${result.equipmentCount}', style: BtText.num(BtText.subhead(ctx, color: Bt.ink))),
                     ],
                   ),
                 ),
-                SizedBox(height: 8),
+                const SizedBox(height: 10),
                 Text(
                   'Failed: ${result.failedCount}',
-                  style: TextStyle(
-                    color: result.failedCount > 0 ? const Color(0xFFC01048) : const Color(0xFF667085),
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: BtText.num(BtText.body(ctx, color: result.failedCount > 0 ? Bt.red : Bt.ink3, weight: FontWeight.w600)),
                 ),
                 if (result.errors.isNotEmpty) ...[
-                  SizedBox(height: 12),
-                  Text(
-                    'Details/Errors:',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  SizedBox(height: 6),
+                  const SizedBox(height: 12),
+                  Text('DETAILS/ERRORS', style: BtText.mono(ctx)),
+                  const SizedBox(height: 6),
                   Container(
-                    constraints: BoxConstraints(maxHeight: 150),
-                    padding: EdgeInsets.all(8),
+                    constraints: const BoxConstraints(maxHeight: 150),
+                    padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF6F7F9),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Bt.line),
+                      color: Bt.redSoft,
+                      borderRadius: BorderRadius.circular(12),
                     ),
                     child: SingleChildScrollView(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: result.errors.map((err) => Padding(
-                          padding: EdgeInsets.only(bottom: 4),
-                          child: Text(
-                            err,
-                            style: TextStyle(
-                              color: Colors.red[800],
-                              fontSize: 13,
-                            ),
-                          ),
+                          padding: const EdgeInsets.only(bottom: 4),
+                          child: Text(err, style: BtText.caption(ctx, color: Bt.red)),
                         )).toList(),
                       ),
                     ),
@@ -996,25 +955,15 @@ class _ReportsViewState extends State<_ReportsView> {
               ],
             ),
           ),
+          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: Text(
-                'OK',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-            ),
+            BtButton(label: 'OK', small: true, onPressed: () => Navigator.pop(ctx)),
           ],
         ),
       );
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Import failed: $e'),
-            backgroundColor: const Color(0xFFC01048),
-          ),
-        );
+        btToast(context, 'Import failed: $e', error: true);
       }
     } finally {
       if (mounted) setState(() => _isImportingCsv = false);
@@ -1062,17 +1011,7 @@ class _ReportsViewState extends State<_ReportsView> {
               leading: BtTile(icon: Icons.undo_rounded, bg: Bt.redSoft, fg: Bt.red),
               title: 'Revert last CSV import…',
               titleColor: Bt.red,
-              onTap: _isImportingCsv
-                  ? null
-                  : () async {
-                      final ok = await btConfirm(
-                        context,
-                        title: 'Revert last import?',
-                        message: 'Entries added by your most recent CSV upload will be removed.',
-                        confirmLabel: 'Revert',
-                      );
-                      if (ok) _handleRevertCsv();
-                    },
+              onTap: _isImportingCsv ? null : _handleRevertCsv,
             ),
           ],
         ),
@@ -1348,119 +1287,27 @@ class _ReportsViewState extends State<_ReportsView> {
         ? filtered.sublist(startIndex, endIndex)
         : [];
     final List<String> activeCols = _getActiveColumnsForTab(quickCategoryTab);
-    final List<String> uiActiveCols = [
-      ...activeCols,
-      'Add More',
-      'Record Payment',
-      'Edit Entry',
-    ];
-    final List<DataColumn> columns = uiActiveCols.map((colName) {
-      if (colName == 'Date') {
-        return DataColumn(
-          label: Text(
-            'Date',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-          ),
-          onSort: (colIndex, ascending) {
-            setState(() {
-              _sortColumn = 'date';
-              _sortAscending = ascending;
-              ReportFilterState.sortColumn = 'date';
-              ReportFilterState.sortAscending = ascending;
-            });
-          },
-        );
-      } else if (colName == 'Project') {
-        return DataColumn(
-          label: Text(
-            'Project',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-          ),
-          onSort: (colIndex, ascending) {
-            setState(() {
-              _sortColumn = 'project';
-              _sortAscending = ascending;
-              ReportFilterState.sortColumn = 'project';
-              ReportFilterState.sortAscending = ascending;
-            });
-          },
-        );
-      } else if (colName == 'Amount') {
-        return DataColumn(
-          label: Text(
-            'Amount (INR)',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-          ),
-          numeric: true,
-          onSort: (colIndex, ascending) {
-            setState(() {
-              _sortColumn = 'amount';
-              _sortAscending = ascending;
-              ReportFilterState.sortColumn = 'amount';
-              ReportFilterState.sortAscending = ascending;
-            });
-          },
-        );
-      } else if (colName == 'Rate' ||
-          colName == 'Rate/Day' ||
-          colName == 'Rent Rate' ||
-          colName == 'Qty' ||
-          colName == 'Days' ||
-          colName == 'Duration') {
-        return DataColumn(
-          label: Text(
-            colName,
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-          ),
-          numeric: true,
-        );
-      } else if (colName == 'Paid') {
-        return DataColumn(
-          label: Text(
-            'Paid (INR)',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-          ),
-          numeric: true,
-        );
-      } else if (colName == 'Remaining') {
-        return DataColumn(
-          label: Text(
-            'Remaining (INR)',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-          ),
-          numeric: true,
-        );
-      } else if (colName == 'Add More' ||
-          colName == 'Record Payment' ||
-          colName == 'Edit Entry') {
-        return DataColumn(
-          label: Text(
-            colName,
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-          ),
-        );
-      } else {
-        return DataColumn(
-          label: Text(
-            colName,
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-          ),
-        );
-      }
-    }).toList();
     context.read<NavController>().markCurrent('/reports');
     final bt = context.bt;
     final entriesTitle = quickCategoryTab == 'All' || quickCategoryTab.isEmpty
         ? 'Entries'
         : '$quickCategoryTab entries';
+    String statusOf(EntryModel e) => _getPaymentStatusLabel(e.paymentStatus, amount: e.amount, paidAmount: e.paidAmount);
+    void onSheetSort(String column, bool ascending) => setState(() {
+          _sortColumn = column;
+          _sortAscending = ascending;
+          _currentPage = 1;
+          ReportFilterState.sortColumn = column;
+          ReportFilterState.sortAscending = ascending;
+        });
 
     void openFullScreen() {
       Navigator.of(context).push(
         MaterialPageRoute(
           builder: (context) => _FullScreenLogsViewer(
-            columns: columns,
             filteredEntries: filtered,
             getProjectName: getProjectName,
+            statusOf: statusOf,
             quickCategoryTab: quickCategoryTab,
             title: quickCategoryTab == 'All'
                 ? 'Report Logs'
@@ -1477,38 +1324,73 @@ class _ReportsViewState extends State<_ReportsView> {
               quickCategoryTab,
               activeColumns: activeCols,
             ),
-            activeColumns: uiActiveCols,
+            activeColumns: activeCols,
+            sortColumn: _sortColumn,
+            sortAscending: _sortAscending,
+            onSort: onSheetSort,
+            onRowTap: (e) => _showEntryDetailsDialog(context, e, getProjectName(e.projectId)),
+            onAddMore: (e) => _ReportActions.addMore(context, e),
+            onRecordPayment: (e) => _ReportActions.recordPayment(context, e, getProjectName(e.projectId)),
+            onEdit: (e) => _ReportActions.editEntry(context, e),
           ),
         ),
       );
     }
 
+    void openEditColumns() => _showCustomizeColumnsDialog(context, quickCategoryTab.isEmpty ? 'All' : quickCategoryTab);
+
     void openExport() {
+      final shown = activeCols.length;
+      final all = _getAllColumnsForTab(quickCategoryTab.isEmpty ? 'All' : quickCategoryTab).length;
       showBtSheet(
         context,
         title: 'Export',
         subtitle: '$totalCount entries · current filters',
-        builder: (sheetCtx) => BtGroup(
+        builder: (sheetCtx) => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            BtRow(
-              leading: const BtTile(icon: Icons.description_outlined),
-              title: 'Download CSV',
-              subtitle: 'Opens in Excel or Google Sheets',
-              showChevron: true,
-              onTap: () {
-                Navigator.pop(sheetCtx);
-                _handleCsvExport(filtered, getProjectName, quickCategoryTab, activeColumns: activeCols);
-              },
+            Row(
+              children: [
+                Expanded(
+                  child: _ExportFormatCard(
+                    format: 'PDF',
+                    title: 'Download PDF',
+                    subtitle: 'Ready to print or share',
+                    dark: true,
+                    onTap: () {
+                      Navigator.pop(sheetCtx);
+                      _handlePdfExport(filtered, getProjectName, quickCategoryTab, activeColumns: activeCols);
+                    },
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _ExportFormatCard(
+                    format: 'CSV',
+                    title: 'Download CSV',
+                    subtitle: 'Opens in Excel or Google Sheets',
+                    onTap: () {
+                      Navigator.pop(sheetCtx);
+                      _handleCsvExport(filtered, getProjectName, quickCategoryTab, activeColumns: activeCols);
+                    },
+                  ),
+                ),
+              ],
             ),
-            BtRow(
-              leading: const BtTile(icon: Icons.picture_as_pdf_outlined),
-              title: 'Download PDF',
-              subtitle: 'Ready to print or share',
-              showChevron: true,
-              onTap: () {
-                Navigator.pop(sheetCtx);
-                _handlePdfExport(filtered, getProjectName, quickCategoryTab, activeColumns: activeCols);
-              },
+            const SizedBox(height: 10),
+            BtGroup(
+              children: [
+                BtRow(
+                  leading: const BtTile(icon: Icons.view_column_outlined, size: 38),
+                  title: 'Customize columns',
+                  subtitle: '$shown of $all shown',
+                  showChevron: true,
+                  onTap: () {
+                    Navigator.pop(sheetCtx);
+                    openEditColumns();
+                  },
+                ),
+              ],
             ),
           ],
         ),
@@ -1537,7 +1419,7 @@ class _ReportsViewState extends State<_ReportsView> {
                     title: o[2] as String,
                     minHeight: 48,
                     trailing: (_sortColumn == o[0] && _sortAscending == o[1])
-                        ? Icon(Icons.check_rounded, color: bt.brand, size: 20)
+                        ? Icon(Icons.check_rounded, color: bt.accentInk, size: 20)
                         : null,
                     onTap: () {
                       setState(() {
@@ -1560,7 +1442,7 @@ class _ReportsViewState extends State<_ReportsView> {
                   showChevron: true,
                   onTap: () {
                     Navigator.pop(sheetCtx);
-                    _showCustomizeColumnsDialog(context, quickCategoryTab.isEmpty ? 'All' : quickCategoryTab);
+                    openEditColumns();
                   },
                 ),
                 BtRow(
@@ -1596,264 +1478,357 @@ class _ReportsViewState extends State<_ReportsView> {
     final periodChip = _datePreset == 'Custom' && (_startDate != null || _endDate != null)
         ? '${_startDate == null ? '…' : formatShortDate(_startDate)} – ${_endDate == null ? '…' : formatShortDate(_endDate)}'
         : _sentence(_datePreset);
-    final showSheet = _tableView &&
-        !(quickCategoryTab != 'All' && !_reportGenerated) &&
-        paginatedEntries.isNotEmpty;
+    final notGenerated = quickCategoryTab != 'All' && !_reportGenerated;
+    final showSheet = _tableView && !notGenerated && paginatedEntries.isNotEmpty;
     final extraFilters = [
       _selectedFloor,
       _selectedPhaseId,
       _selectedActivityName,
       _selectedStatus == 'All' ? null : _selectedStatus,
     ].where((v) => v != null).length;
+    final searchVisible = _searchOpen || _searchQuery.isNotEmpty;
+    final sortLabel = switch (_sortColumn) {
+      'amount' => _sortAscending ? 'Amount · low' : 'Amount · high',
+      'project' => _sortAscending ? 'Project · A–Z' : 'Project · Z–A',
+      _ => _sortAscending ? 'Date · oldest' : 'Date · newest',
+    };
+    final topInset = MediaQuery.paddingOf(context).top;
+    final glass = Colors.white.withValues(alpha: .09);
 
-    return Scaffold(
-      backgroundColor: Bt.ground,
-      body: SafeArea(
-        bottom: false,
-        child: RefreshIndicator(
-          color: bt.brand,
-          onRefresh: provider.refresh,
-          child: ListView(
-            controller: _scrollController,
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.only(bottom: 40),
+    // ── noir compact header: title + project / period / filter chips + actions
+    final header = BtHero(
+      overlap: 22,
+      padding: EdgeInsets.fromLTRB(Bt.gutter, topInset + 8, Bt.gutter, 12 + 22),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
             children: [
-              BtLargeHeader(
-                title: 'Reports',
-                trailing: Row(
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Showcase(
-                      key: ShowcaseKeys.helpButton,
-                      description: 'Tap here anytime to replay this tour and get help.',
-                      tooltipBackgroundColor: Bt.ink,
-                      textColor: Colors.white,
-                      tooltipBorderRadius: BorderRadius.circular(16),
-                      tooltipPadding: const EdgeInsets.all(16),
-                      child: BtIconButton(
-                        icon: Icons.help_outline_rounded,
-                        semantic: 'App guidelines',
-                        color: Bt.ink2,
-                        onTap: () {
-                          ShowCaseWidget.of(context).startShowCase([
-                            ShowcaseKeys.reportAskAI,
-                            ShowcaseKeys.reportFilters,
-                            _chartsKey,
-                            ShowcaseKeys.reportCSV,
-                            ShowcaseKeys.helpButton,
-                          ]);
-                        },
-                      ),
+                    Text(
+                      '$totalCount ${totalCount == 1 ? 'ENTRY' : 'ENTRIES'} · ${periodChip.toUpperCase()}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: BtText.num(BtText.mono(context, color: Bt.onNoir2)),
                     ),
-                    BtIconButton(
-                      icon: Icons.ios_share_rounded,
-                      semantic: 'Export report',
-                      color: Bt.ink2,
-                      onTap: openExport,
-                    ),
-                    Semantics(
-                      button: true,
-                      label: 'Account',
-                      child: InkWell(
-                        customBorder: const CircleBorder(),
-                        onTap: () => Navigator.pushNamed(context, '/profile'),
-                        child: const Padding(padding: EdgeInsets.all(4), child: ProfileAvatar(radius: 18)),
-                      ),
-                    ),
+                    const SizedBox(height: 2),
+                    Text('Reports', maxLines: 1, style: BtText.d2(context, color: Bt.bone)),
                   ],
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: Bt.gutter),
-                child: Showcase(
-                  key: ShowcaseKeys.reportAskAI,
-                  description: 'Ask AI about costs, missing entries, or anything related to this report.',
-                  tooltipBackgroundColor: Bt.ink,
-                  textColor: Colors.white,
-                  tooltipBorderRadius: BorderRadius.circular(16),
-                  tooltipPadding: const EdgeInsets.all(16),
-                  child: _AskAiBanner(projectName: provider.selectedProjectName),
-                ),
-              ),
-              const SizedBox(height: 12),
               Showcase(
-                key: ShowcaseKeys.reportFilters,
-                description: 'Filter your reports by project, date, status and more.',
+                key: ShowcaseKeys.helpButton,
+                description: 'Tap here anytime to replay this tour and get help.',
                 tooltipBackgroundColor: Bt.ink,
                 textColor: Colors.white,
                 tooltipBorderRadius: BorderRadius.circular(16),
                 tooltipPadding: const EdgeInsets.all(16),
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: Bt.gutter),
-                  child: Row(
-                    children: [
-                      BtChip(
-                        label: projectChip,
-                        trailingIcon: Icons.expand_more_rounded,
-                        selected: _selectedProjectId != 'all',
-                        onTap: () => _pickProject(context, projectProvider),
-                      ),
-                      const SizedBox(width: 8),
-                      BtChip(
-                        label: periodChip,
-                        trailingIcon: Icons.expand_more_rounded,
-                        selected: _datePreset != 'All Time',
-                        onTap: () => _pickPeriod(context),
-                      ),
-                      const SizedBox(width: 8),
-                      BtChip(
-                        label: extraFilters == 0 ? 'Filter' : 'Filter · $extraFilters',
-                        icon: Icons.tune_rounded,
-                        selected: extraFilters > 0,
-                        onTap: () => _openFilterSheet(context, projectProvider),
-                      ),
-                    ],
-                  ),
+                child: BtIconButton(
+                  icon: Icons.help_outline_rounded,
+                  semantic: 'App guidelines',
+                  color: Bt.bone,
+                  size: 21,
+                  background: glass,
+                  onTap: () {
+                    ShowCaseWidget.of(context).startShowCase([
+                      ShowcaseKeys.reportAskAI,
+                      ShowcaseKeys.reportFilters,
+                      _chartsKey,
+                      ShowcaseKeys.reportCSV,
+                      ShowcaseKeys.helpButton,
+                    ]);
+                  },
                 ),
               ),
-              const SizedBox(height: 16),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: Bt.gutter),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Showcase(
-                      key: _chartsKey,
-                      description: 'View a quick financial summary based on your filters.',
-                      tooltipBackgroundColor: Bt.ink,
-                      textColor: Colors.white,
-                      tooltipBorderRadius: BorderRadius.circular(16),
-                      tooltipPadding: const EdgeInsets.all(16),
-                      child: _buildCostSummary(
-                        context,
-                        total: grandTotal,
-                        paid: grandPaid,
-                        remaining: grandRemaining,
-                        material: materialTotal,
-                        labour: labourTotal,
-                        equipment: equipmentTotal,
-                        onType: _selectCategoryTab,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    EfficiencyBanner(
-                      note: 'Tap to view category breakdowns, monthly spending trends, and budget health charts.',
-                      isExceeded: grandRemaining > 0,
-                    ),
-                    const SizedBox(height: 28),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text('Entries', maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.title(context)),
-                        ),
-                        if (!_tableView) ...[
-                          Text('$totalCount', style: BtText.num(BtText.subhead(context))),
-                          const SizedBox(width: 8),
-                        ],
-                        ReportViewToggle(
-                          table: _tableView,
-                          onChanged: (v) => setState(() {
-                            _tableView = v;
-                            ReportFilterState.tableView = v;
-                          }),
-                        ),
-                        const SizedBox(width: 4),
-                        BtIconButton(
-                          icon: Icons.more_horiz_rounded,
-                          semantic: 'Sort, columns, table and export',
-                          color: Bt.ink2,
-                          filled: true,
-                          onTap: openEntriesMenu,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    _CategoryTabs(
-                      activeTab: quickCategoryTab,
-                      onTabChanged: _selectCategoryTab,
-                    ),
-                    const SizedBox(height: 12),
-                    if (quickCategoryTab != 'All')
-                      _buildCategorySubFilters(context, quickCategoryTab, allEntries)
-                    else
-                      _buildAllTabSearchBar(context),
-                    const SizedBox(height: 16),
-                    if (quickCategoryTab != 'All' && !_reportGenerated)
-                      BtCard(
-                        child: BtEmpty(
-                          icon: Icons.analytics_outlined,
-                          title: 'Set your filters',
-                          message: 'Configure filters above and tap "Generate report" to view logs.',
-                        ),
-                      )
-                    else if (paginatedEntries.isEmpty)
-                      const BtCard(
-                        child: BtEmpty(
-                          icon: Icons.search_off_outlined,
-                          title: 'No transaction logs match filters.',
-                        ),
-                      )
-                    else if (!_tableView) ...[
-                      ..._buildEntryGroups(context, paginatedEntries, getProjectName),
-                      if (totalCount > _rowsPerPage || _rowsPerPage != 10)
-                        _buildPager(context, safeCurrentPage, totalPages)
-                      else
-                        const SizedBox(height: 4),
-                    ],
-                  ],
-                ),
+              const SizedBox(width: 6),
+              BtIconButton(
+                icon: Icons.ios_share_rounded,
+                semantic: 'Export report',
+                color: Bt.bone,
+                size: 20,
+                background: glass,
+                onTap: openExport,
               ),
-              // The spreadsheet runs edge to edge, so it sits outside the padded column.
-              if (showSheet) ...[
-                ReportSheet(
-                  entries: paginatedEntries,
-                  columns: activeCols,
-                  totalCount: totalCount,
-                  projectNameOf: (e) => getProjectName(e.projectId),
-                  statusOf: (e) => _getPaymentStatusLabel(e.paymentStatus, amount: e.amount, paidAmount: e.paidAmount),
-                  sortColumn: _sortColumn,
-                  sortAscending: _sortAscending,
-                  onSort: (column, ascending) => setState(() {
-                    _sortColumn = column;
-                    _sortAscending = ascending;
-                    _currentPage = 1;
-                    ReportFilterState.sortColumn = column;
-                    ReportFilterState.sortAscending = ascending;
-                  }),
-                  onRowTap: (e) => _showEntryDetailsDialog(context, e, getProjectName(e.projectId)),
-                  onAddMore: (e) => _ReportActions.addMore(context, e),
-                  onRecordPayment: (e) => _ReportActions.recordPayment(context, e, getProjectName(e.projectId)),
-                  onEdit: (e) => _ReportActions.editEntry(context, e),
-                  onEditColumns: () => _showCustomizeColumnsDialog(context, quickCategoryTab.isEmpty ? 'All' : quickCategoryTab),
-                  onFullScreen: openFullScreen,
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(Bt.gutter, 4, Bt.gutter, 0),
-                  child: _buildPager(context, safeCurrentPage, totalPages),
-                ),
-              ],
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: Bt.gutter),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const SizedBox(height: 28),
-                    Showcase(
-                      key: ShowcaseKeys.reportCSV,
-                      description: 'Use this to export data to CSV or import bulk entries from a CSV file.',
-                      tooltipBackgroundColor: Bt.ink,
-                      textColor: Colors.white,
-                      tooltipBorderRadius: BorderRadius.circular(16),
-                      tooltipPadding: const EdgeInsets.all(16),
-                      child: _buildCsvImportCard(quickCategoryTab, activeCols),
-                    ),
-                  ],
+              const SizedBox(width: 4),
+              Semantics(
+                button: true,
+                label: 'Account',
+                child: InkWell(
+                  customBorder: const CircleBorder(),
+                  onTap: () => Navigator.pushNamed(context, '/profile'),
+                  child: const Padding(padding: EdgeInsets.all(4), child: ProfileAvatar(radius: 18)),
                 ),
               ),
             ],
           ),
+          const SizedBox(height: 12),
+          Showcase(
+            key: ShowcaseKeys.reportFilters,
+            description: 'Filter your reports by project, date, status and more.',
+            tooltipBackgroundColor: Bt.ink,
+            textColor: Colors.white,
+            tooltipBorderRadius: BorderRadius.circular(16),
+            tooltipPadding: const EdgeInsets.all(16),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              clipBehavior: Clip.none,
+              child: Row(
+                children: [
+                  BtChip(
+                    label: projectChip,
+                    onDark: true,
+                    trailingIcon: Icons.expand_more_rounded,
+                    selected: _selectedProjectId != 'all',
+                    onTap: () => _pickProject(context, projectProvider),
+                  ),
+                  const SizedBox(width: 8),
+                  BtChip(
+                    label: periodChip,
+                    onDark: true,
+                    trailingIcon: Icons.expand_more_rounded,
+                    selected: _datePreset != 'All Time',
+                    onTap: () => _pickPeriod(context),
+                  ),
+                  const SizedBox(width: 8),
+                  BtChip(
+                    label: extraFilters == 0 ? 'Filter' : 'Filter · $extraFilters',
+                    onDark: true,
+                    icon: Icons.tune_rounded,
+                    selected: extraFilters > 0,
+                    onTap: () => _openFilterSheet(context, projectProvider),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    // ── toolbar: search · item · Edit columns · sort · Export · full screen | table/list
+    final toolbar = Row(
+      children: [
+        Expanded(
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            clipBehavior: Clip.none,
+            child: Row(
+              children: [
+                _ToolChip(
+                  icon: Icons.search_rounded,
+                  semantic: searchVisible ? 'Hide search' : 'Search entries',
+                  selected: _searchQuery.isNotEmpty,
+                  onTap: () => setState(() {
+                    if (_searchQuery.isNotEmpty) {
+                      _searchOpen = true;
+                    } else {
+                      _searchOpen = !_searchOpen;
+                    }
+                  }),
+                ),
+                if (quickCategoryTab != 'All') ...[
+                  const SizedBox(width: 8),
+                  ..._categoryToolbarChips(context, quickCategoryTab, allEntries),
+                ],
+                const SizedBox(width: 8),
+                _ToolChip(icon: Icons.view_column_outlined, label: 'Edit columns', onTap: openEditColumns),
+                const SizedBox(width: 8),
+                _ToolChip(
+                  icon: _sortAscending ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
+                  label: sortLabel,
+                  semantic: 'Sort, columns, table and export',
+                  onTap: openEntriesMenu,
+                ),
+                const SizedBox(width: 8),
+                _ToolChip(icon: Icons.file_download_outlined, label: 'Export', onTap: openExport),
+                const SizedBox(width: 8),
+                _ToolChip(icon: Icons.open_in_full_rounded, semantic: 'Full screen, can rotate', onTap: openFullScreen),
+              ],
+            ),
+          ),
         ),
+        const SizedBox(width: 8),
+        ReportViewToggle(
+          table: _tableView,
+          onChanged: (v) => setState(() {
+            _tableView = v;
+            ReportFilterState.tableView = v;
+          }),
+        ),
+      ],
+    );
+
+    // ── summary strip: Total billed · Paid · Remaining
+    final summary = Showcase(
+      key: _chartsKey,
+      description: 'View a quick financial summary based on your filters.',
+      tooltipBackgroundColor: Bt.ink,
+      textColor: Colors.white,
+      tooltipBorderRadius: BorderRadius.circular(16),
+      tooltipPadding: const EdgeInsets.all(16),
+      child: _SummaryStrip(total: grandTotal, paid: grandPaid, remaining: grandRemaining),
+    );
+
+    return Scaffold(
+      backgroundColor: Bt.ground,
+      body: LayoutBuilder(
+        builder: (context, viewport) {
+          // The sheet takes whatever height is left under the header,
+          // toolbar and summary so it is fully visible without scrolling.
+          final chromeAbove = topInset + 297 + (searchVisible ? 54 : 0);
+          const chromeBelow = ReportSheet.footerHeight + 60;
+          final sheetMax = (viewport.maxHeight - chromeAbove - chromeBelow).clamp(260.0, 900.0);
+          return RefreshIndicator(
+            color: Bt.noir,
+            backgroundColor: bt.accent,
+            edgeOffset: topInset,
+            onRefresh: provider.refresh,
+            child: ListView(
+              controller: _scrollController,
+              physics: const AlwaysScrollableScrollPhysics(parent: ClampingScrollPhysics()),
+              padding: EdgeInsets.zero,
+              children: [
+                header,
+                BtSheet(
+                  overlap: 22,
+                  padding: const EdgeInsets.fromLTRB(Bt.gutter, 16, Bt.gutter, 32),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _CategoryTabs(
+                        activeTab: quickCategoryTab,
+                        onTabChanged: _selectCategoryTab,
+                      ),
+                      const SizedBox(height: 12),
+                      toolbar,
+                      AnimatedSize(
+                        duration: Bt.fast,
+                        curve: Bt.ease,
+                        alignment: Alignment.topCenter,
+                        child: searchVisible
+                            ? Padding(
+                                padding: const EdgeInsets.only(top: 10),
+                                child: quickCategoryTab != 'All'
+                                    ? _buildCategorySubFilters(context, quickCategoryTab, allEntries)
+                                    : _buildAllTabSearchBar(context),
+                              )
+                            : const SizedBox(width: double.infinity),
+                      ),
+                      const SizedBox(height: 12),
+                      summary,
+                      const SizedBox(height: 12),
+                      if (notGenerated)
+                        BtCard(
+                          child: BtEmpty(
+                            icon: Icons.analytics_outlined,
+                            title: 'Set your filters',
+                            message: 'Configure filters above and tap "Generate report" to view logs.',
+                          ),
+                        )
+                      else if (paginatedEntries.isEmpty)
+                        const BtCard(
+                          child: BtEmpty(
+                            icon: Icons.search_off_outlined,
+                            title: 'No transaction logs match filters.',
+                          ),
+                        )
+                      else if (showSheet)
+                        ReportSheet(
+                          entries: paginatedEntries,
+                          columns: activeCols,
+                          maxHeight: sheetMax,
+                          firstRowNumber: startIndex + 1,
+                          projectNameOf: (e) => getProjectName(e.projectId),
+                          statusOf: statusOf,
+                          sortColumn: _sortColumn,
+                          sortAscending: _sortAscending,
+                          onSort: onSheetSort,
+                          onRowTap: (e) => _showEntryDetailsDialog(context, e, getProjectName(e.projectId), rowNumber: startIndex + paginatedEntries.indexOf(e) + 1),
+                          onAddMore: (e) => _ReportActions.addMore(context, e),
+                          onRecordPayment: (e) => _ReportActions.recordPayment(context, e, getProjectName(e.projectId)),
+                          onEdit: (e) => _ReportActions.editEntry(context, e),
+                        )
+                      else
+                        ..._buildEntryGroups(context, paginatedEntries, getProjectName),
+                      if (!notGenerated && paginatedEntries.isNotEmpty && (showSheet || totalCount > _rowsPerPage || _rowsPerPage != 10))
+                        _buildPager(context, safeCurrentPage, totalPages),
+                      const SizedBox(height: 24),
+                      Showcase(
+                        key: ShowcaseKeys.reportAskAI,
+                        description: 'Ask AI about costs, missing entries, or anything related to this report.',
+                        tooltipBackgroundColor: Bt.ink,
+                        textColor: Colors.white,
+                        tooltipBorderRadius: BorderRadius.circular(16),
+                        tooltipPadding: const EdgeInsets.all(16),
+                        child: _AskAiBanner(projectName: provider.selectedProjectName),
+                      ),
+                      const SizedBox(height: 10),
+                      IntrinsicHeight(
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Expanded(
+                              child: EfficiencyBanner(
+                                note: 'Budget vs spend',
+                                isExceeded: grandRemaining > 0,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: ReportQuickTile(
+                                icon: Icons.screen_rotation_rounded,
+                                title: 'Table view',
+                                subtitle: 'Full screen',
+                                onTap: openFullScreen,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: ReportQuickTile(
+                                icon: Icons.ios_share_rounded,
+                                title: 'Export',
+                                subtitle: 'CSV or PDF',
+                                onTap: openExport,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 28),
+                      _buildByType(
+                        context,
+                        total: grandTotal,
+                        material: materialTotal,
+                        labour: labourTotal,
+                        equipment: equipmentTotal,
+                        onType: (tab) {
+                          _selectCategoryTab(tab);
+                          if (_scrollController.hasClients) {
+                            _scrollController.animateTo(0, duration: Bt.medium, curve: Bt.ease);
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 28),
+                      Showcase(
+                        key: ShowcaseKeys.reportCSV,
+                        description: 'Use this to export data to CSV or import bulk entries from a CSV file.',
+                        tooltipBackgroundColor: Bt.ink,
+                        textColor: Colors.white,
+                        tooltipBorderRadius: BorderRadius.circular(16),
+                        tooltipPadding: const EdgeInsets.all(16),
+                        child: _buildCsvImportCard(quickCategoryTab, activeCols),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
       ),
       bottomNavigationBar: AppBottomNav(),
     );
@@ -2176,73 +2151,59 @@ class _ReportsViewState extends State<_ReportsView> {
   }
 
   Widget _buildPager(BuildContext context, int page, int totalPages) {
+    Widget nav(IconData icon, String semantic, bool enabled, VoidCallback onTap) => Opacity(
+          opacity: enabled ? 1 : .4,
+          child: BtPressable(
+            onTap: enabled ? onTap : () {},
+            scale: .92,
+            semanticLabel: semantic,
+            child: Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(color: Bt.ink.withValues(alpha: .06), shape: BoxShape.circle),
+              child: Icon(icon, size: 22, color: Bt.ink),
+            ),
+          ),
+        );
     return Padding(
       padding: const EdgeInsets.only(top: 4),
       child: Row(
         children: [
-          InkWell(
-            borderRadius: BorderRadius.circular(Bt.rChip),
+          BtChip(
+            label: 'Show $_rowsPerPage',
+            trailingIcon: Icons.expand_more_rounded,
             onTap: () async {
               final v = await _pickOption(context, 'Rows per page', const [MapEntry('10', '10'), MapEntry('20', '20'), MapEntry('50', '50')], '$_rowsPerPage');
               if (v != null) setState(() { _rowsPerPage = int.parse(v); _currentPage = 1; });
             },
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                Text('Show $_rowsPerPage', style: BtText.subhead(context)),
-                const Icon(Icons.expand_more_rounded, size: 18, color: Bt.ink3),
-              ]),
-            ),
           ),
           const Spacer(),
-          BtIconButton(
-            icon: Icons.chevron_left_rounded,
-            semantic: 'Previous page',
-            color: page > 1 ? Bt.ink : Bt.placeholder,
-            onTap: page > 1 ? () => setState(() => _currentPage = page - 1) : () {},
-          ),
-          Text('$page of $totalPages', style: BtText.num(BtText.subhead(context, color: Bt.ink))),
-          BtIconButton(
-            icon: Icons.chevron_right_rounded,
-            semantic: 'Next page',
-            color: page < totalPages ? Bt.ink : Bt.placeholder,
-            onTap: page < totalPages ? () => setState(() => _currentPage = page + 1) : () {},
-          ),
+          nav(Icons.chevron_left_rounded, 'Previous page', page > 1, () => setState(() => _currentPage = page - 1)),
+          const SizedBox(width: 10),
+          Text('Page $page of $totalPages', style: BtText.num(BtText.subhead(context, color: Bt.ink, weight: FontWeight.w500))),
+          const SizedBox(width: 10),
+          nav(Icons.chevron_right_rounded, 'Next page', page < totalPages, () => setState(() => _currentPage = page + 1)),
         ],
       ),
     );
   }
 
-  Widget _buildCostSummary(
+  /// Totals per entry type (tap a row to open that tab).
+  Widget _buildByType(
     BuildContext context, {
     required double total,
-    required double paid,
-    required double remaining,
     required double material,
     required double labour,
     required double equipment,
     required ValueChanged<String> onType,
   }) {
     final bt = context.bt;
-    Widget split(String label, double v, Color c) => Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label, style: BtText.caption(context)),
-              const SizedBox(height: 2),
-              FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerLeft,
-                child: Text(formatInr(v), maxLines: 1, style: BtText.num(BtText.headline(context).copyWith(color: c))),
-              ),
-            ],
-          ),
-        );
     Widget type(String label, String tab, String typeName, double v, Color c) {
       final share = total > 0 ? (v / total).clamp(0.0, 1.0) : 0.0;
       return BtRow(
         leading: BtTypeTile(type: typeName),
         title: label,
+        subtitle: '${(share * 100).round()}% of billed',
         minHeight: 64,
         onTap: () => onType(tab),
         trailing: Row(mainAxisSize: MainAxisSize.min, children: [
@@ -2267,30 +2228,7 @@ class _ReportsViewState extends State<_ReportsView> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        BtCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Total billed', style: BtText.subhead(context)),
-              const SizedBox(height: 2),
-              FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerLeft,
-                child: Text(formatInr(total), maxLines: 1, style: BtText.amount(context)),
-              ),
-              const SizedBox(height: 14),
-              IntrinsicHeight(
-                child: Row(children: [
-                  split('Paid', paid, Bt.green),
-                  const VerticalDivider(width: 24, thickness: 1, color: Bt.line),
-                  split('Still owed', remaining, remaining > 0 ? Bt.amber : Bt.green),
-                ]),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 24),
-        const BtSectionHeader(title: 'By type'),
+        const BtSectionHeader(title: 'By type', caption: true),
         BtGroup(children: [
           type('Material', 'Materials', 'material', material, bt.series[0]),
           type('Labour', 'Labour', 'labour', labour, bt.series[1]),
@@ -2304,32 +2242,32 @@ class _ReportsViewState extends State<_ReportsView> {
     return TextField(
       controller: _searchController,
       onChanged: onChanged,
+      autofocus: _searchOpen && _searchQuery.isEmpty,
       style: BtText.body(context),
       textInputAction: TextInputAction.search,
       decoration: InputDecoration(
         hintText: hint,
         hintStyle: BtText.body(context, color: Bt.placeholder),
         prefixIcon: const Icon(Icons.search_rounded, color: Bt.ink3, size: 22),
-        suffixIcon: _searchQuery.isNotEmpty
-            ? IconButton(
-                tooltip: 'Clear search',
-                icon: const Icon(Icons.cancel_rounded, color: Bt.placeholder, size: 20),
-                onPressed: () {
-                  setState(() {
-                    _searchController.clear();
-                    _searchQuery = '';
-                    _selectedItemName = null;
-                    _showSuggestions = false;
-                  });
-                },
-              )
-            : null,
+        suffixIcon: IconButton(
+          tooltip: _searchQuery.isNotEmpty ? 'Clear search' : 'Hide search',
+          icon: Icon(_searchQuery.isNotEmpty ? Icons.cancel_rounded : Icons.close_rounded, color: Bt.placeholder, size: 20),
+          onPressed: () {
+            setState(() {
+              if (_searchQuery.isEmpty) _searchOpen = false;
+              _searchController.clear();
+              _searchQuery = '';
+              _selectedItemName = null;
+              _showSuggestions = false;
+            });
+          },
+        ),
         filled: true,
-        fillColor: Bt.fill,
+        fillColor: Bt.card,
         isDense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(Bt.rInput), borderSide: BorderSide.none),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(Bt.rInput), borderSide: BorderSide.none),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(Bt.rInput), borderSide: const BorderSide(color: Bt.inputBorder)),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(Bt.rInput), borderSide: const BorderSide(color: Bt.inputBorder)),
         focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(Bt.rInput), borderSide: BorderSide(color: context.bt.brand, width: 1.5)),
       ),
     );
@@ -2346,28 +2284,17 @@ class _ReportsViewState extends State<_ReportsView> {
     );
   }
 
-  Widget _buildCategorySubFilters(
-    BuildContext context,
-    String tabName,
-    List<EntryModel> allEntries,
-  ) {
-    final String searchPlaceholder;
-    final String dropdownLabel;
-    final EntryType targetType;
+  ({String placeholder, String label, EntryType type}) _categoryMeta(String tabName) {
     if (tabName == 'Materials') {
-      searchPlaceholder = 'Search materials';
-      dropdownLabel = 'Material';
-      targetType = EntryType.material;
+      return (placeholder: 'Search materials', label: 'Material', type: EntryType.material);
     } else if (tabName == 'Labour') {
-      searchPlaceholder = 'Search labour';
-      dropdownLabel = 'Worker Type';
-      targetType = EntryType.labour;
-    } else {
-      searchPlaceholder = 'Search equipment';
-      dropdownLabel = 'Equipment';
-      targetType = EntryType.equipment;
+      return (placeholder: 'Search labour', label: 'Worker Type', type: EntryType.labour);
     }
-    final uniqueNames = allEntries
+    return (placeholder: 'Search equipment', label: 'Equipment', type: EntryType.equipment);
+  }
+
+  List<String> _uniqueItemNames(EntryType targetType, List<EntryModel> allEntries) {
+    return allEntries
         .where(
           (e) =>
               e.type == targetType &&
@@ -2378,6 +2305,69 @@ class _ReportsViewState extends State<_ReportsView> {
         .where((name) => name.isNotEmpty)
         .toSet()
         .toList();
+  }
+
+  /// Item picker ("Material: All") and, when needed, "Generate report" — they
+  /// live in the toolbar so they stay reachable with the search field closed.
+  List<Widget> _categoryToolbarChips(
+    BuildContext context,
+    String tabName,
+    List<EntryModel> allEntries,
+  ) {
+    final meta = _categoryMeta(tabName);
+    final dropdownLabel = meta.label;
+    final uniqueNames = _uniqueItemNames(meta.type, allEntries);
+    final itemLabel = _selectedItemName ?? 'All';
+    return [
+      BtChip(
+        label: '$dropdownLabel: ${itemLabel.length > 16 ? '${itemLabel.substring(0, 15).trimRight()}…' : itemLabel}',
+        trailingIcon: Icons.expand_more_rounded,
+        selected: _selectedItemName != null,
+        onTap: () async {
+          final val = await _pickOption(
+            context,
+            dropdownLabel,
+            [const MapEntry('All', 'All'), ...uniqueNames.map((n) => MapEntry(n, n))],
+            _selectedItemName ?? 'All',
+          );
+          if (val == null) return;
+          setState(() {
+            _selectedItemName = val == 'All' ? null : val;
+            final selectedVal = val == 'All' ? '' : val;
+            _searchController.text = selectedVal;
+            _searchQuery = selectedVal;
+            _showSuggestions = false;
+            _currentPage = 1;
+          });
+        },
+      ),
+      if (!_reportGenerated) ...[
+        const SizedBox(width: 8),
+        BtButton(
+          label: 'Generate report',
+          small: true,
+          expand: false,
+          icon: Icons.analytics_outlined,
+          onPressed: () {
+            setState(() {
+              _reportGenerated = true;
+              _currentPage = 1;
+              _showSuggestions = false;
+            });
+          },
+        ),
+      ],
+    ];
+  }
+
+  Widget _buildCategorySubFilters(
+    BuildContext context,
+    String tabName,
+    List<EntryModel> allEntries,
+  ) {
+    final meta = _categoryMeta(tabName);
+    final searchPlaceholder = meta.placeholder;
+    final uniqueNames = _uniqueItemNames(meta.type, allEntries);
     final suggestions = uniqueNames
         .where(
           (name) => name.toLowerCase().contains(_searchQuery.toLowerCase()),
@@ -2413,9 +2403,9 @@ class _ReportsViewState extends State<_ReportsView> {
               decoration: BoxDecoration(
                 color: Bt.card,
                 borderRadius: BorderRadius.circular(Bt.rInput),
-                border: Border.all(color: Bt.line),
-                boxShadow: const [BoxShadow(color: Color(0x14101828), blurRadius: 16, offset: Offset(0, 6))],
+                boxShadow: Bt.shadowLg,
               ),
+              clipBehavior: Clip.antiAlias,
               child: ListView.separated(
                 shrinkWrap: true,
                 padding: const EdgeInsets.symmetric(vertical: 4),
@@ -2450,51 +2440,6 @@ class _ReportsViewState extends State<_ReportsView> {
               ),
             ),
           ],
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Flexible(
-                child: BtChip(
-                  label: '$dropdownLabel: ${_selectedItemName ?? 'All'}',
-                  trailingIcon: Icons.expand_more_rounded,
-                  selected: _selectedItemName != null,
-                  onTap: () async {
-                    final val = await _pickOption(
-                      context,
-                      dropdownLabel,
-                      [const MapEntry('All', 'All'), ...uniqueNames.map((n) => MapEntry(n, n))],
-                      _selectedItemName ?? 'All',
-                    );
-                    if (val == null) return;
-                    setState(() {
-                      _selectedItemName = val == 'All' ? null : val;
-                      final selectedVal = val == 'All' ? '' : val;
-                      _searchController.text = selectedVal;
-                      _searchQuery = selectedVal;
-                      _showSuggestions = false;
-                      _currentPage = 1;
-                    });
-                  },
-                ),
-              ),
-              if (!_reportGenerated) ...[
-                const SizedBox(width: 8),
-                BtButton(
-                  label: 'Generate report',
-                  small: true,
-                  expand: false,
-                  icon: Icons.analytics_outlined,
-                  onPressed: () {
-                    setState(() {
-                      _reportGenerated = true;
-                      _currentPage = 1;
-                      _showSuggestions = false;
-                    });
-                  },
-                ),
-              ],
-            ],
-          ),
         ],
       ),
     );
@@ -2503,120 +2448,154 @@ class _ReportsViewState extends State<_ReportsView> {
   void _showEntryDetailsDialog(
     BuildContext context,
     EntryModel entry,
-    String projectName,
-  ) {
+    String projectName, {
+    int? rowNumber,
+  }) {
     final status = _getPaymentStatusLabel(
       entry.paymentStatus,
       amount: entry.amount,
       paidAmount: entry.paidAmount,
     );
     final canDelete = EntryPermissions.canDelete(status: entry.approvalStatus.toLowerCase(), createdBy: entry.createdBy ?? '', projectId: entry.projectId);
+    final typeLabel = _sentence(entry.type.name);
+    final paidShare = entry.amount > 0
+        ? (entry.paidAmount / entry.amount).clamp(0.0, 1.0).toDouble()
+        : (status == 'Fully Paid' ? 1.0 : 0.0);
     showBtSheet(
       context,
-      title: entry.description.isEmpty ? 'Entry details' : entry.description,
-      subtitle: '$projectName · ${_sentence(entry.type.name)}',
+      title: 'Entry details',
+      subtitle: rowNumber == null ? '$typeLabel · $projectName' : 'Row $rowNumber · $typeLabel · $projectName',
       builder: (sheetCtx) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          BtCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(child: Text(_formatIndianCurrency(entry.amount), style: BtText.amount(sheetCtx, size: 28))),
-                    BtBadge(label: status, tone: status == 'Fully Paid' ? BtTone.green : (status == 'Partial' ? BtTone.amber : BtTone.red)),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                IntrinsicHeight(
-                  child: Row(
+          BtReveal(
+            child: BtCard(
+              variant: BtCardVariant.ink,
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
                     children: [
-                      Expanded(child: _miniStat(sheetCtx, 'Paid', _formatIndianCurrency(entry.paidAmount), Bt.green)),
-                      const VerticalDivider(width: 24, thickness: 1, color: Bt.line),
-                      Expanded(child: _miniStat(sheetCtx, 'Remaining', _formatIndianCurrency(entry.remainingAmount), entry.remainingAmount > 0 ? Bt.amber : Bt.green)),
+                      Expanded(
+                        child: Text(
+                          entry.description.isEmpty ? typeLabel : entry.description,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: BtText.headline(sheetCtx).copyWith(color: Bt.bone),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      BtBadge(label: status, tone: status == 'Fully Paid' ? BtTone.green : (status == 'Partial' ? BtTone.amber : BtTone.red)),
                     ],
                   ),
-                ),
-              ],
+                  const SizedBox(height: 14),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(child: _miniStat(sheetCtx, 'Amount', _formatIndianCurrency(entry.amount), Bt.bone)),
+                      const SizedBox(width: 8),
+                      Expanded(child: _miniStat(sheetCtx, 'Paid', _formatIndianCurrency(entry.paidAmount), const Color(0xFF4ADBA4))),
+                      const SizedBox(width: 8),
+                      Expanded(child: _miniStat(sheetCtx, 'Remaining', _formatIndianCurrency(entry.remainingAmount), entry.remainingAmount > 0 ? const Color(0xFFFF8A8E) : const Color(0xFF4ADBA4))),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  BtProgress(value: paidShare, onDark: true, color: Bt.greenBright),
+                ],
+              ),
             ),
           ),
           if (entry.rejectionReason != null && entry.rejectionReason!.isNotEmpty) ...[
             const SizedBox(height: 12),
             BtCard(
               variant: BtCardVariant.danger,
+              padding: const EdgeInsets.all(14),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Rejection reason', style: BtText.caption(sheetCtx, color: Bt.red, weight: FontWeight.w600)),
-                  const SizedBox(height: 2),
+                  Text('REJECTION REASON', style: BtText.mono(sheetCtx, color: Bt.red)),
+                  const SizedBox(height: 4),
                   Text(entry.rejectionReason!, style: BtText.body(sheetCtx)),
                 ],
               ),
             ),
           ],
+          const SizedBox(height: 12),
+          BtReveal(
+            index: 1,
+            child: _DetailGrid(items: [
+              ('Project', projectName),
+              ('Type', typeLabel),
+              ('Date', _formatDateLong(entry.date)),
+              if (entry.description.isNotEmpty) ('Description', entry.description),
+              if (entry.brand != null && entry.brand!.isNotEmpty) ('Brand', entry.brand!),
+              if (entry.floor != null && entry.floor!.isNotEmpty) ('Floor', entry.floor!),
+              if (entry.phase != null && entry.phase!.isNotEmpty) ('Phase', entry.phase!),
+              if (entry.unit != null && entry.unit!.isNotEmpty) ('Unit', entry.unit!),
+            ]),
+          ),
+          BtReveal(
+            index: 2,
+            child: _PaymentHistorySection(
+              entry: entry,
+              formatCurrency: _formatIndianCurrency,
+              formatDate: _formatDateLong,
+            ),
+          ),
           const SizedBox(height: 16),
-          BtGroup(
-            children: [
-              _buildDetailRow('Project', projectName),
-              _buildDetailRow('Type', _sentence(entry.type.name)),
-              _buildDetailRow('Date', _formatDateLong(entry.date)),
-              if (entry.description.isNotEmpty) _buildDetailRow('Description', entry.description),
-              if (entry.brand != null && entry.brand!.isNotEmpty) _buildDetailRow('Brand', entry.brand!),
-              if (entry.floor != null && entry.floor!.isNotEmpty) _buildDetailRow('Floor', entry.floor!),
-              if (entry.phase != null && entry.phase!.isNotEmpty) _buildDetailRow('Phase', entry.phase!),
-              if (entry.unit != null && entry.unit!.isNotEmpty) _buildDetailRow('Unit', entry.unit!),
-            ],
-          ),
-          const SizedBox(height: 8),
-          _PaymentHistorySection(
-            entry: entry,
-            formatCurrency: _formatIndianCurrency,
-            formatDate: _formatDateLong,
-          ),
-          const SizedBox(height: 16),
-          BtButton(
-            label: 'Record Payment',
-            icon: Icons.credit_card_outlined,
-            onPressed: () {
-              Navigator.of(sheetCtx).pop();
-              _ReportActions.recordPayment(context, entry, projectName);
-            },
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: BtButton(
-                  label: 'Add More',
-                  icon: Icons.add_rounded,
-                  variant: BtButtonVariant.secondary,
-                  onPressed: () {
-                    Navigator.of(sheetCtx).pop();
-                    _ReportActions.addMore(context, entry);
-                  },
+          BtReveal(
+            index: 3,
+            child: Row(
+              children: [
+                Expanded(
+                  child: _DetailAction(
+                    label: 'Add More',
+                    semantic: 'Add more of this entry',
+                    icon: Icons.add_circle_outline_rounded,
+                    variant: BtButtonVariant.primary,
+                    onTap: () {
+                      Navigator.of(sheetCtx).pop();
+                      _ReportActions.addMore(context, entry);
+                    },
+                  ),
                 ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: BtButton(
-                  label: 'Edit Entry',
-                  icon: Icons.edit_outlined,
-                  variant: BtButtonVariant.secondary,
-                  onPressed: () {
-                    Navigator.of(sheetCtx).pop();
-                    _ReportActions.editEntry(context, entry);
-                  },
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _DetailAction(
+                    label: 'Payment',
+                    semantic: 'Record Payment',
+                    icon: Icons.credit_card_outlined,
+                    variant: BtButtonVariant.accent,
+                    onTap: () {
+                      Navigator.of(sheetCtx).pop();
+                      _ReportActions.recordPayment(context, entry, projectName);
+                    },
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _DetailAction(
+                    label: 'Edit',
+                    semantic: 'Edit Entry',
+                    icon: Icons.edit_outlined,
+                    variant: BtButtonVariant.secondary,
+                    onTap: () {
+                      Navigator.of(sheetCtx).pop();
+                      _ReportActions.editEntry(context, entry);
+                    },
+                  ),
+                ),
+              ],
+            ),
           ),
           if (canDelete) ...[
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
             BtButton(
               label: 'Delete entry…',
-              variant: BtButtonVariant.destructive,
+              variant: BtButtonVariant.quiet,
               icon: Icons.delete_outline,
+              small: true,
               onPressed: () {
                 Navigator.of(sheetCtx).pop();
                 _ReportActions.deleteEntry(context, entry);
@@ -2631,25 +2610,20 @@ class _ReportsViewState extends State<_ReportsView> {
   Widget _miniStat(BuildContext context, String label, String value, Color color) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: BtText.caption(context)),
+          Text(label, style: BtText.caption(context, color: Bt.onNoir2).copyWith(fontSize: 12)),
           const SizedBox(height: 2),
           FittedBox(
             fit: BoxFit.scaleDown,
             alignment: Alignment.centerLeft,
-            child: Text(value, maxLines: 1, style: BtText.num(BtText.body(context, weight: FontWeight.w600, color: color))),
+            child: Text(value, maxLines: 1, style: BtText.num(BtText.body(context, weight: FontWeight.w700, color: color))),
           ),
         ],
       );
-
-  Widget _buildDetailRow(String label, String value, {bool isWarning = false}) {
-    return BtValueRow(label: label, value: value, valueColor: isWarning ? Bt.red : null);
-  }
-
-
 }
 
+/// Noir "Ask AI about your costs" card (Reports board).
 class _AskAiBanner extends StatelessWidget {
-  _AskAiBanner({required this.projectName});
+  const _AskAiBanner({required this.projectName});
   final String projectName;
   @override
   Widget build(BuildContext context) {
@@ -2658,38 +2632,41 @@ class _AskAiBanner extends StatelessWidget {
       button: true,
       label: 'Ask AI about costs, entries and inventory',
       excludeSemantics: true,
-      child: Material(
-        color: Bt.card,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(Bt.rInput),
-          side: const BorderSide(color: Bt.inputBorder),
+      child: BtCard(
+        variant: BtCardVariant.ink,
+        padding: const EdgeInsets.fromLTRB(14, 14, 16, 14),
+        onTap: () => Navigator.pushNamed(
+          context,
+          '/ai-chat',
+          arguments: {'projectName': projectName},
         ),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(Bt.rInput),
-          onTap: () => Navigator.pushNamed(
-            context,
-            '/ai-chat',
-            arguments: {'projectName': projectName},
-          ),
-          child: SizedBox(
-            height: Bt.fieldH,
-            child: Row(
-              children: [
-                const SizedBox(width: 14),
-                Icon(Icons.auto_awesome, color: bt.brand, size: 20),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'Ask AI about your costs',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: BtText.body(context, color: Bt.placeholder),
-                  ),
-                ),
-                const SizedBox(width: 14),
-              ],
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: bt.accent,
+                shape: BoxShape.circle,
+                boxShadow: [BoxShadow(color: bt.accent.withValues(alpha: .35), blurRadius: 18)],
+              ),
+              child: Icon(Icons.auto_awesome, color: bt.onAccent, size: 21),
             ),
-          ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('Ask AI about your costs', maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.headline(context).copyWith(color: Bt.bone)),
+                  const SizedBox(height: 2),
+                  Text('Costs, entries and inventory', maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.subhead(context, color: Bt.onNoir2)),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Icon(Icons.arrow_forward_rounded, color: Bt.onNoir2, size: 20),
+          ],
         ),
       ),
     );
@@ -2697,7 +2674,7 @@ class _AskAiBanner extends StatelessWidget {
 }
 
 class _CategoryTabs extends StatelessWidget {
-  _CategoryTabs({required this.activeTab, required this.onTabChanged});
+  const _CategoryTabs({required this.activeTab, required this.onTabChanged});
   final String activeTab;
   final ValueChanged<String> onTabChanged;
   static const _tabs = ['All', 'Materials', 'Labour', 'Equipment'];
@@ -2711,360 +2688,445 @@ class _CategoryTabs extends StatelessWidget {
   }
 }
 
+/// Toolbar chip (icon only, or icon + label) — Report-Table board.
+class _ToolChip extends StatelessWidget {
+  const _ToolChip({required this.icon, required this.onTap, this.label, this.semantic, this.selected = false});
+  final IconData icon;
+  final String? label;
+  final String? semantic;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = selected ? Bt.bone : Bt.ink;
+    return BtPressable(
+      onTap: onTap,
+      scale: .95,
+      semanticLabel: semantic ?? label,
+      child: AnimatedContainer(
+        duration: Bt.fast,
+        curve: Bt.ease,
+        height: 36,
+        constraints: const BoxConstraints(minWidth: 36),
+        padding: EdgeInsets.symmetric(horizontal: label == null ? 0 : 12),
+        decoration: BoxDecoration(
+          color: selected ? Bt.ink : Bt.card,
+          borderRadius: BorderRadius.circular(Bt.rChip),
+          border: selected ? null : Border.all(color: Bt.inputBorder),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 16, color: fg),
+            if (label != null) ...[
+              const SizedBox(width: 6),
+              Text(label!, maxLines: 1, style: BtText.subhead(context, weight: FontWeight.w500, color: fg).copyWith(fontSize: 13)),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Slim 3-cell strip: Total billed · Paid · Remaining.
+class _SummaryStrip extends StatelessWidget {
+  const _SummaryStrip({required this.total, required this.paid, required this.remaining});
+  final double total;
+  final double paid;
+  final double remaining;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget cell(String label, double v, Color color) => Expanded(
+          child: Container(
+            color: Bt.card,
+            padding: const EdgeInsets.fromLTRB(11, 9, 11, 9),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.caption(context, color: Bt.ink2).copyWith(fontSize: 12)),
+                const SizedBox(height: 1),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: BtCountUp(
+                    value: v,
+                    format: (x) => formatInr(x),
+                    style: BtText.body(context, weight: FontWeight.w700, color: color).copyWith(fontSize: 15),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+    return DecoratedBox(
+      decoration: BoxDecoration(borderRadius: BorderRadius.circular(14), boxShadow: Bt.shadow),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: ColoredBox(
+          color: Bt.line,
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                cell('Total billed', total, Bt.ink),
+                const SizedBox(width: 1),
+                cell('Paid', paid, Bt.green),
+                const SizedBox(width: 1),
+                cell('Remaining', remaining, remaining > 0 ? Bt.red : Bt.green),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// PDF / CSV format card in the Export sheet (Export-Sheet board).
+class _ExportFormatCard extends StatelessWidget {
+  const _ExportFormatCard({required this.format, required this.title, required this.subtitle, required this.onTap, this.dark = false});
+  final String format;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+  final bool dark;
+
+  @override
+  Widget build(BuildContext context) {
+    final bt = context.bt;
+    final docBg = format == 'PDF' ? bt.accent : const Color(0xFF16B981);
+    final docFg = format == 'PDF' ? bt.onAccent : Colors.white;
+    return BtPressable(
+      onTap: onTap,
+      semanticLabel: title,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: dark ? Bt.ink : Bt.ground,
+          borderRadius: BorderRadius.circular(Bt.rCard),
+          border: dark ? null : Border.all(color: Bt.inputBorder),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 44,
+              height: 54,
+              alignment: Alignment.bottomCenter,
+              padding: const EdgeInsets.only(bottom: 7),
+              decoration: BoxDecoration(
+                color: docBg,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(8),
+                  topRight: Radius.circular(16),
+                  bottomLeft: Radius.circular(8),
+                  bottomRight: Radius.circular(8),
+                ),
+              ),
+              child: Text(format, style: BtText.mono(context, color: docFg, size: 10)),
+            ),
+            const SizedBox(height: 14),
+            Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.body(context, weight: FontWeight.w600, color: dark ? Bt.bone : Bt.ink)),
+            const SizedBox(height: 2),
+            Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis, style: BtText.caption(context, color: dark ? Bt.onNoir2 : Bt.ink3).copyWith(fontSize: 12)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Two-column label/value grid with hairline gaps (Report-Row-Detail board).
+class _DetailGrid extends StatelessWidget {
+  const _DetailGrid({required this.items});
+  final List<(String, String)> items;
+
+  @override
+  Widget build(BuildContext context) {
+    final rows = <Widget>[];
+    for (var i = 0; i < items.length; i += 2) {
+      final left = items[i];
+      final right = i + 1 < items.length ? items[i + 1] : null;
+      if (i > 0) rows.add(const SizedBox(height: 1));
+      rows.add(IntrinsicHeight(
+        child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Expanded(child: _cell(context, left)),
+          const SizedBox(width: 1),
+          Expanded(child: right == null ? const ColoredBox(color: Bt.card) : _cell(context, right)),
+        ]),
+      ));
+    }
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: ColoredBox(
+        color: Bt.line,
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: rows),
+      ),
+    );
+  }
+
+  Widget _cell(BuildContext context, (String, String) item) => Container(
+        color: Bt.card,
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(item.$1, style: BtText.caption(context, color: Bt.ink2).copyWith(fontSize: 12)),
+            const SizedBox(height: 2),
+            Text(item.$2, maxLines: 3, overflow: TextOverflow.ellipsis, style: BtText.subhead(context, color: Bt.ink, weight: FontWeight.w600)),
+          ],
+        ),
+      );
+}
+
+/// Compact 3-up action button in the entry details sheet.
+class _DetailAction extends StatelessWidget {
+  const _DetailAction({required this.label, required this.semantic, required this.icon, required this.variant, required this.onTap});
+  final String label;
+  final String semantic;
+  final IconData icon;
+  final BtButtonVariant variant;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final bt = context.bt;
+    late Color bg, fg;
+    Border? border;
+    switch (variant) {
+      case BtButtonVariant.primary:
+        bg = Bt.ink;
+        fg = Bt.bone;
+        break;
+      case BtButtonVariant.accent:
+        bg = bt.accent;
+        fg = bt.onAccent;
+        break;
+      default:
+        bg = Bt.card;
+        fg = Bt.ink;
+        border = Border.all(color: Bt.inputBorder);
+    }
+    return BtPressable(
+      onTap: onTap,
+      semanticLabel: semantic,
+      child: Container(
+        height: 48,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(14), border: border),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 17, color: fg),
+            const SizedBox(width: 6),
+            Flexible(child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.button(context, size: 14, color: fg))),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Full-screen sheet with a rotate (landscape) / straight view switch.
 class _FullScreenLogsViewer extends StatefulWidget {
-  _FullScreenLogsViewer({
-    required this.columns,
+  const _FullScreenLogsViewer({
     required this.filteredEntries,
     required this.getProjectName,
+    required this.statusOf,
     required this.quickCategoryTab,
     required this.title,
     required this.onExportCsv,
     required this.onExportPdf,
     required this.activeColumns,
+    required this.sortColumn,
+    required this.sortAscending,
+    required this.onSort,
+    required this.onRowTap,
+    required this.onAddMore,
+    required this.onRecordPayment,
+    required this.onEdit,
   });
-  final List<DataColumn> columns;
   final List<EntryModel> filteredEntries;
   final String Function(String) getProjectName;
+  final String Function(EntryModel) statusOf;
   final String quickCategoryTab;
   final String title;
   final VoidCallback onExportCsv;
   final VoidCallback onExportPdf;
   final List<String> activeColumns;
+  final String sortColumn;
+  final bool sortAscending;
+  final void Function(String column, bool ascending) onSort;
+  final void Function(EntryModel) onRowTap;
+  final void Function(EntryModel) onAddMore;
+  final void Function(EntryModel) onRecordPayment;
+  final void Function(EntryModel) onEdit;
   @override
   State<_FullScreenLogsViewer> createState() => _FullScreenLogsViewerState();
 }
 
 class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
   int _quarterTurns = 0;
+  late String _sortColumn = widget.sortColumn;
+  late bool _sortAscending = widget.sortAscending;
+  late List<EntryModel> _rows = _sorted();
+
   void _toggleRotation() {
     setState(() {
       _quarterTurns = (_quarterTurns == 0) ? 1 : 0;
     });
   }
 
-  String _formatDateShort(DateTime dt) {
-    final months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
-    final day = dt.day.toString().padLeft(2, '0');
-    final month = months[dt.month - 1];
-    final year = dt.year.toString().substring(dt.year.toString().length - 2);
-    return '$day $month $year';
-  }
-
-  String _formatIndianCurrency(double amount) {
-    final parts = amount.toStringAsFixed(2).split('.');
-    final whole = parts[0];
-    final decimal = parts[1];
-    if (whole.length <= 3) {
-      return '₹$whole.$decimal';
-    }
-    final lastThree = whole.substring(whole.length - 3);
-    final remaining = whole.substring(0, whole.length - 3);
-    final buffer = StringBuffer();
-    int count = 0;
-    for (int i = remaining.length - 1; i >= 0; i--) {
-      if (count > 0 && count % 2 == 0) {
-        buffer.write(',');
+  List<EntryModel> _sorted() {
+    final list = List<EntryModel>.from(widget.filteredEntries);
+    list.sort((a, b) {
+      int cmp = 0;
+      if (_sortColumn == 'date') {
+        cmp = a.date.compareTo(b.date);
+      } else if (_sortColumn == 'amount') {
+        cmp = a.amount.compareTo(b.amount);
+      } else if (_sortColumn == 'project') {
+        cmp = widget.getProjectName(a.projectId).compareTo(widget.getProjectName(b.projectId));
       }
-      buffer.write(remaining[i]);
-      count++;
-    }
-    final formattedRemaining = buffer.toString().split('').reversed.join('');
-    return '₹$formattedRemaining,$lastThree.$decimal';
+      return _sortAscending ? cmp : -cmp;
+    });
+    return list;
   }
 
-  Widget _buildTypeChip(EntryType type) {
-    Color color;
-    IconData icon;
-    switch (type) {
-      case EntryType.material:
-        color = AppColors.primary;
-        icon = Icons.construction;
-        break;
-      case EntryType.labour:
-        color = Color(0xFF067647);
-        icon = Icons.people_outline;
-        break;
-      case EntryType.equipment:
-        color = Color(0xFFF59E0B);
-        icon = Icons.precision_manufacturing_outlined;
-        break;
-    }
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
+  void _openExport() {
+    showBtSheet(
+      context,
+      title: 'Export',
+      subtitle: '${_rows.length} entries',
+      builder: (sheetCtx) => BtGroup(
         children: [
-          Icon(icon, size: 10, color: color),
-          SizedBox(width: 4),
-          Text(
-            type.name.toUpperCase(),
-            style: TextStyle(
-              color: color,
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-            ),
+          BtRow(
+            leading: const BtTile(icon: Icons.description_outlined),
+            title: 'Download CSV',
+            subtitle: 'Opens in Excel or Google Sheets',
+            showChevron: true,
+            onTap: () {
+              Navigator.pop(sheetCtx);
+              widget.onExportCsv();
+            },
+          ),
+          BtRow(
+            leading: const BtTile(icon: Icons.picture_as_pdf_outlined),
+            title: 'Download PDF',
+            subtitle: 'Ready to print or share',
+            showChevron: true,
+            onTap: () {
+              Navigator.pop(sheetCtx);
+              widget.onExportPdf();
+            },
           ),
         ],
       ),
     );
   }
 
-  Widget _buildStatusBadge(String status) {
-    Color bg;
-    Color text;
-    final label = _getPaymentStatusLabel(status);
-    switch (label) {
-      case 'Fully Paid':
-        bg = Color(0xFFE7F6EE);
-        text = Color(0xFF067647);
-        break;
-      case 'Partial':
-        bg = Color(0xFFFEF3E7);
-        text = Color(0xFFB54708);
-        break;
-      case 'Not Paid':
-      default:
-        bg = Color(0xFFFDECEF);
-        text = Color(0xFFC01048);
-        break;
-    }
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(color: text, fontSize: 12, fontWeight: FontWeight.bold),
-      ),
-    );
-  }
-
-  void _showEntryDetailsDialog(
-    BuildContext context,
-    EntryModel entry,
-    String projectName,
-  ) {
-    String formatDateLong(DateTime dt) {
-      final isMidnightLocal = dt.hour == 0 && dt.minute == 0 && dt.second == 0;
-
-      final months = [
-        'Jan',
-        'Feb',
-        'Mar',
-        'Apr',
-        'May',
-        'Jun',
-        'Jul',
-        'Aug',
-        'Sep',
-        'Oct',
-        'Nov',
-        'Dec',
-      ];
-
-      final day = dt.day.toString().padLeft(2, '0');
-      final month = months[dt.month - 1];
-      final year = dt.year;
-
-      if (isMidnightLocal) {
-        return '$day $month $year';
-      }
-
-      final hour24 = dt.hour;
-      final ampm = hour24 >= 12 ? 'PM' : 'AM';
-      var hour12 = hour24 % 12;
-      if (hour12 == 0) hour12 = 12;
-      final hour = hour12.toString().padLeft(2, '0');
-      final minute = dt.minute.toString().padLeft(2, '0');
-      return '$day $month $year, $hour:$minute $ampm';
-    }
-
-    Widget detailRow(String label, String value, {bool isWarning = false}) {
-      return Padding(
-        padding: EdgeInsets.symmetric(vertical: 5),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(
-              width: 100,
-              child: Text(
-                label,
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textSecondary,
-                  fontSize: 13,
-                ),
-              ),
-            ),
-            Expanded(
-              child: Text(
-                value,
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: isWarning ? AppColors.error : AppColors.textPrimary,
-                  fontSize: 13,
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    showDialog(
-      context: context,
-      builder: (BuildContext dialogContext) {
-        return Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          backgroundColor: Colors.white,
+  Widget _content(double width) {
+    final rotated = _quarterTurns != 0;
+    final wide = width > 600;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SizedBox(
+          height: 60,
           child: Padding(
-            padding: EdgeInsets.all(20),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Row(
+              children: [
+                BtIconButton(
+                  icon: Icons.close_rounded,
+                  semantic: 'Close',
+                  background: Bt.ink.withValues(alpha: .06),
+                  onTap: () => Navigator.of(context).pop(),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(
-                        'Entry Details',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.primary,
-                        ),
+                      Text.rich(
+                        TextSpan(children: [
+                          TextSpan(text: widget.title),
+                          TextSpan(text: '  (${_rows.length} entries)', style: BtText.caption(context, color: Bt.ink2, weight: FontWeight.w500)),
+                        ]),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: BtText.navTitle(context).copyWith(fontSize: 16),
                       ),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (EntryPermissions.canDelete(status: entry.approvalStatus.toLowerCase(), createdBy: entry.createdBy ?? '', projectId: entry.projectId))
-                            IconButton(
-                              icon: Icon(Icons.delete_outline, size: 20, color: const Color(0xFFC01048)),
-                              onPressed: () {
-                                Navigator.of(dialogContext).pop();
-                                _ReportActions.deleteEntry(context, entry);
-                              },
-                            ),
-                          IconButton(
-                            icon: Icon(Icons.close, size: 20),
-                            onPressed: () => Navigator.of(dialogContext).pop(),
-                          ),
-                        ],
-                      ),
+                      Text('Tap a row for details', maxLines: 1, style: BtText.caption(context).copyWith(fontSize: 12)),
                     ],
                   ),
-                  Divider(height: 1),
-                  SizedBox(height: 12),
-                  detailRow('Project', projectName),
-                  detailRow('Type', entry.type.name.toUpperCase()),
-                  detailRow('Date', formatDateLong(entry.date)),
-                  detailRow('Amount', _formatIndianCurrency(entry.amount)),
-                  detailRow('Paid', _formatIndianCurrency(entry.paidAmount)),
-                  detailRow(
-                    'Remaining',
-                    _formatIndianCurrency(entry.remainingAmount),
+                ),
+                const SizedBox(width: 8),
+                Tooltip(
+                  message: rotated ? 'Straight View' : 'Rotate View (Landscape)',
+                  child: _ToolChip(
+                    icon: rotated ? Icons.screen_lock_portrait : Icons.screen_rotation,
+                    label: wide ? (rotated ? 'Straight view' : 'Rotate view') : null,
+                    semantic: rotated ? 'Straight View' : 'Rotate View (Landscape)',
+                    onTap: _toggleRotation,
                   ),
-                  detailRow(
-                    'Status',
-                    _getPaymentStatusLabel(entry.paymentStatus),
+                ),
+                const SizedBox(width: 8),
+                Tooltip(
+                  message: 'Export Options',
+                  child: _ToolChip(
+                    icon: Icons.ios_share_rounded,
+                    label: wide ? 'CSV · PDF' : null,
+                    semantic: 'Export Options',
+                    onTap: _openExport,
                   ),
-                  _PaymentHistorySection(
-                    entry: entry,
-                    formatCurrency: _formatIndianCurrency,
-                    formatDate: formatDateLong,
-                  ),
-                  if (entry.description.isNotEmpty)
-                    detailRow('Description', entry.description),
-                  if (entry.brand != null && entry.brand!.isNotEmpty)
-                    detailRow('Brand', entry.brand!),
-                  if (entry.floor != null && entry.floor!.isNotEmpty)
-                    detailRow('Floor', entry.floor!),
-                  if (entry.phase != null && entry.phase!.isNotEmpty)
-                    detailRow('Phase', entry.phase!),
-                  if (entry.unit != null && entry.unit!.isNotEmpty)
-                    detailRow('Unit', entry.unit!),
-                  if (entry.rejectionReason != null &&
-                      entry.rejectionReason!.isNotEmpty)
-                    detailRow(
-                      'Rejection Reason',
-                      entry.rejectionReason!,
-                      isWarning: true,
-                    ),
-                  SizedBox(height: 12),
-                  Divider(height: 1),
-                  SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      Expanded(
-                        child: _ReportActionBtn(
-                          label: 'Add More',
-                          icon: Icons.add_circle_outline,
-                          style: _ReportActionStyle.primary,
-                          onTap: () {
-                            Navigator.of(dialogContext).pop();
-                            _ReportActions.addMore(context, entry);
-                          },
-                        ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(Bt.gutter, 4, Bt.gutter, 8),
+            child: LayoutBuilder(
+              builder: (context, c) => Align(
+                alignment: Alignment.topCenter,
+                child: _rows.isEmpty
+                    ? const BtCard(child: BtEmpty(icon: Icons.search_off_outlined, title: 'No transaction logs match filters.'))
+                    : ReportSheet(
+                        entries: _rows,
+                        columns: widget.activeColumns,
+                        maxHeight: c.maxHeight - ReportSheet.footerHeight,
+                        pinnedWidth: wide ? 158 : 132,
+                        projectNameOf: (e) => widget.getProjectName(e.projectId),
+                        statusOf: widget.statusOf,
+                        sortColumn: _sortColumn,
+                        sortAscending: _sortAscending,
+                        onSort: (column, ascending) {
+                          setState(() {
+                            _sortColumn = column;
+                            _sortAscending = ascending;
+                            _rows = _sorted();
+                          });
+                          widget.onSort(column, ascending);
+                        },
+                        onRowTap: widget.onRowTap,
+                        onAddMore: widget.onAddMore,
+                        onRecordPayment: widget.onRecordPayment,
+                        onEdit: widget.onEdit,
                       ),
-                      SizedBox(width: 8),
-                      Expanded(
-                        child: _ReportActionBtn(
-                          label: 'Record Payment',
-                          icon: Icons.credit_card_outlined,
-                          style: _ReportActionStyle.secondary,
-                          onTap: () {
-                            Navigator.of(dialogContext).pop();
-                            _ReportActions.recordPayment(
-                              context,
-                              entry,
-                              projectName,
-                            );
-                          },
-                        ),
-                      ),
-                      SizedBox(width: 8),
-                      Expanded(
-                        child: _ReportActionBtn(
-                          label: 'Edit Entry',
-                          icon: Icons.edit_outlined,
-                          style: _ReportActionStyle.tertiary,
-                          onTap: () {
-                            Navigator.of(dialogContext).pop();
-                            _ReportActions.editEntry(context, entry);
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
               ),
             ),
           ),
-        );
-      },
+        ),
+      ],
     );
   }
 
@@ -3072,313 +3134,19 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
   Widget build(BuildContext context) {
     final rotated = _quarterTurns != 0;
     return Scaffold(
-      backgroundColor: Bt.card,
-      appBar: AppBar(
-        centerTitle: true,
-        title: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(widget.title, style: BtText.navTitle(context)),
-            Text('${widget.filteredEntries.length} entries', style: BtText.caption(context)),
-          ],
-        ),
-        backgroundColor: Bt.card,
-        surfaceTintColor: Bt.card,
-        elevation: 0,
-        shape: const Border(bottom: BorderSide(color: Bt.line)),
-        leading: IconButton(
-          tooltip: 'Close',
-          icon: const Icon(Icons.close_rounded, color: Bt.ink),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        actions: [
-          IconButton(
-            tooltip: rotated ? 'Straight View' : 'Rotate View (Landscape)',
-            icon: Icon(
-              rotated ? Icons.screen_lock_portrait : Icons.screen_rotation,
-              color: Bt.ink2,
-            ),
-            onPressed: _toggleRotation,
-          ),
-          Theme(
-            data: Theme.of(context).copyWith(cardColor: Colors.white),
-            child: PopupMenuButton<String>(
-              tooltip: 'Export Options',
-              icon: const Icon(Icons.ios_share_rounded, color: Bt.ink2),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              onSelected: (val) {
-                if (val == 'csv') {
-                  widget.onExportCsv();
-                } else if (val == 'pdf') {
-                  widget.onExportPdf();
-                }
-              },
-              itemBuilder: (context) => [
-                PopupMenuItem(
-                  value: 'csv',
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.description_outlined,
-                        color: AppColors.primary,
-                        size: 18,
-                      ),
-                      SizedBox(width: 8),
-                      Text('Download CSV'),
-                    ],
-                  ),
-                ),
-                PopupMenuItem(
-                  value: 'pdf',
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.picture_as_pdf_outlined,
-                        color: AppColors.primary,
-                        size: 18,
-                      ),
-                      SizedBox(width: 8),
-                      Text('Download PDF'),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+      backgroundColor: Bt.ground,
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final rows = widget.filteredEntries.map((entry) {
-              final projectName = widget.getProjectName(entry.projectId);
-              final List<DataCell> cells = widget.activeColumns.map((colName) {
-                if (colName == 'Purchased Date') {
-                  return DataCell(
-                    Text(
-                      _formatDateShort(entry.date),
-                      style: TextStyle(fontSize: 13),
-                    ),
-                  );
-                } else if (colName == 'Payment Date') {
-                  final payDateStr = entry.paymentDate != null
-                      ? _formatDateShort(entry.paymentDate!)
-                      : '—';
-                  return DataCell(
-                    Text(payDateStr, style: TextStyle(fontSize: 13)),
-                  );
-                } else if (colName == 'Project') {
-                  return DataCell(
-                    Text(projectName, style: TextStyle(fontSize: 13)),
-                  );
-                } else if (colName == 'Type') {
-                  return DataCell(_buildTypeChip(entry.type));
-                } else if (colName == 'Description') {
-                  return DataCell(
-                    Text(
-                      entry.description.isEmpty ? '—' : entry.description,
-                      style: TextStyle(fontSize: 13),
-                    ),
-                  );
-                } else if (colName == 'Material' ||
-                    colName == 'Worker Type' ||
-                    colName == 'Equipment') {
-                  return DataCell(
-                    Text(
-                      entry.description,
-                      style: TextStyle(fontSize: 13),
-                    ),
-                  );
-                } else if (colName == 'Brand') {
-                  return DataCell(
-                    Text(
-                      entry.brand ?? '—',
-                      style: TextStyle(fontSize: 13),
-                    ),
-                  );
-                } else if (colName == 'Floor') {
-                  return DataCell(
-                    Text(
-                      entry.floor ?? '—',
-                      style: TextStyle(fontSize: 13),
-                    ),
-                  );
-                } else if (colName == 'Phase') {
-                  return DataCell(
-                    Text(
-                      entry.phase ?? '—',
-                      style: TextStyle(fontSize: 13),
-                    ),
-                  );
-                } else if (colName == 'Activity') {
-                  return DataCell(
-                    Text(
-                      entry.activity ?? '—',
-                      style: TextStyle(fontSize: 13),
-                    ),
-                  );
-                } else if (colName == 'Unit') {
-                  return DataCell(
-                    Text(
-                      entry.unit ?? '—',
-                      style: TextStyle(fontSize: 13),
-                    ),
-                  );
-                } else if (colName == 'Status') {
-                  return DataCell(_buildStatusBadge(entry.paymentStatus));
-                } else if (colName == 'Amount') {
-                  return DataCell(
-                    Text(
-                      _formatIndianCurrency(entry.amount),
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
-                      ),
-                    ),
-                  );
-                } else if (colName == 'Paid') {
-                  return DataCell(
-                    Text(
-                      _formatIndianCurrency(entry.paidAmount),
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: entry.paidAmount > 0
-                            ? Color(0xFF067647)
-                            : AppColors.textSecondary,
-                      ),
-                    ),
-                  );
-                } else if (colName == 'Remaining') {
-                  final rem = entry.remainingAmount;
-                  return DataCell(
-                    Text(
-                      _formatIndianCurrency(rem),
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: rem > 0
-                            ? Color(0xFFC01048)
-                            : Color(0xFF067647),
-                      ),
-                    ),
-                  );
-                } else if (colName == 'Rate' ||
-                    colName == 'Rate/Day' ||
-                    colName == 'Rent Rate') {
-                  final rate = entry.ratePerUnit ?? 0.0;
-                  return DataCell(
-                    Text(
-                      _formatIndianCurrency(rate),
-                      style: TextStyle(fontSize: 13),
-                    ),
-                  );
-                } else if (colName == 'Qty' ||
-                    colName == 'Days' ||
-                    colName == 'Duration') {
-                  final rate = entry.ratePerUnit ?? 0.0;
-                  final val = (rate == 0) ? 0.0 : entry.amount / rate;
-                  return DataCell(
-                    Text(
-                      val.toStringAsFixed(1),
-                      style: TextStyle(fontSize: 13),
-                    ),
-                  );
-                } else if (colName == 'Add More') {
-                  return DataCell(
-                    _ReportActionBtn(
-                      label: 'Add More',
-                      icon: Icons.add_circle_outline,
-                      style: _ReportActionStyle.primary,
-                      onTap: () => _ReportActions.addMore(context, entry),
-                    ),
-                  );
-                } else if (colName == 'Record Payment') {
-                  return DataCell(
-                    _ReportActionBtn(
-                      label: 'Record Payment',
-                      icon: Icons.credit_card_outlined,
-                      style: _ReportActionStyle.secondary,
-                      onTap: () => _ReportActions.recordPayment(
-                        context,
-                        entry,
-                        projectName,
-                      ),
-                    ),
-                  );
-                } else if (colName == 'Edit Entry') {
-                  return DataCell(
-                    _ReportActionBtn(
-                      label: 'Edit Entry',
-                      icon: Icons.edit_outlined,
-                      style: _ReportActionStyle.tertiary,
-                      onTap: () => _ReportActions.editEntry(context, entry),
-                    ),
-                  );
-                } else {
-                  return DataCell(SizedBox.shrink());
-                }
-              }).toList();
-              return DataRow(
-                onSelectChanged: (selected) {
-                  if (selected ?? false) {
-                    _showEntryDetailsDialog(context, entry, projectName);
-                  }
-                },
-                cells: cells,
-              );
-            }).toList();
-            Widget tableWidget = SingleChildScrollView(
-              scrollDirection: Axis.vertical,
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Theme(
-                  data: Theme.of(context).copyWith(cardColor: Colors.white),
-                  child: DataTable(
-                    showCheckboxColumn: false,
-                    headingRowColor: WidgetStateProperty.all(
-                      AppColors.primary.withValues(alpha: 0.04),
-                    ),
-                    horizontalMargin: 16,
-                    columnSpacing: 24,
-                    columns: widget.columns,
-                    rows: rows,
-                  ),
-                ),
+            if (!rotated) return _content(constraints.maxWidth);
+            return RotatedBox(
+              quarterTurns: _quarterTurns,
+              child: SizedBox(
+                width: constraints.maxHeight,
+                height: constraints.maxWidth,
+                child: _content(constraints.maxHeight),
               ),
             );
-            if (rotated) {
-              tableWidget = RotatedBox(
-                quarterTurns: _quarterTurns,
-                child: SizedBox(
-                  width: constraints.maxHeight,
-                  height: constraints.maxWidth,
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.vertical,
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Theme(
-                        data: Theme.of(
-                          context,
-                        ).copyWith(cardColor: Colors.white),
-                        child: DataTable(
-                          showCheckboxColumn: false,
-                          headingRowColor: WidgetStateProperty.all(
-                            AppColors.primary.withValues(alpha: 0.04),
-                          ),
-                          horizontalMargin: 16,
-                          columnSpacing: 24,
-                          columns: widget.columns,
-                          rows: rows,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            }
-            return Center(child: tableWidget);
           },
         ),
       ),
@@ -3438,83 +3206,6 @@ String _getPaymentStatusLabel(
     case 'unpaid':
     default:
       return 'Not Paid';
-  }
-}
-
-enum _ReportActionStyle { primary, secondary, tertiary }
-
-class _ReportActionBtn extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final _ReportActionStyle style;
-  final VoidCallback onTap;
-  _ReportActionBtn({
-    required this.label,
-    required this.icon,
-    required this.style,
-    required this.onTap,
-  });
-  @override
-  Widget build(BuildContext context) {
-    BoxDecoration deco;
-    Color color;
-    switch (style) {
-      case _ReportActionStyle.primary:
-        deco = BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFF0B63CE), Color(0xFF1D4ED8)],
-          ),
-          borderRadius: BorderRadius.circular(6),
-        );
-        color = Colors.white;
-        break;
-      case _ReportActionStyle.secondary:
-        deco = BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: Color(0xFF0B63CE), width: 1.0),
-        );
-        color = Color(0xFF0B63CE);
-        break;
-      case _ReportActionStyle.tertiary:
-        deco = BoxDecoration(
-          color: Color(0xFFEEF1F5),
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: Color(0xFFE4E7EC), width: 1.0),
-        );
-        color = Color(0xFF475467);
-        break;
-    }
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: EdgeInsets.symmetric(vertical: 6, horizontal: 8),
-          decoration: deco,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 12, color: color),
-              SizedBox(width: 4),
-              Flexible(
-                child: Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: color,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 }
 
@@ -3578,24 +3269,11 @@ class _ReportActions {
   }
 
   static Future<void> deleteEntry(BuildContext context, EntryModel entry) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('Delete Entry?', style: TextStyle(fontWeight: FontWeight.w700)),
-        content: Text('Are you sure you want to permanently delete this entry?'),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text('Cancel', style: TextStyle(color: const Color(0xFF667085))),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFC01048)),
-            child: Text('Delete', style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
+    final confirm = await btConfirm(
+      context,
+      title: 'Delete Entry?',
+      message: 'Are you sure you want to permanently delete this entry?',
+      confirmLabel: 'Delete',
     );
 
     if (confirm == true) {
@@ -3603,7 +3281,8 @@ class _ReportActions {
       showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (ctx) => Center(child: CircularProgressIndicator()),
+        barrierColor: Bt.scrim,
+        builder: (ctx) => const Center(child: BtBrickLoader(onDark: true)),
       );
       
       final success = await ApiService.deleteTransaction(entry.id);
@@ -3611,14 +3290,10 @@ class _ReportActions {
       if (context.mounted) {
         Navigator.of(context).pop(); // pop progress
         if (success) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Entry deleted successfully'), backgroundColor: const Color(0xFFC01048)),
-          );
+          btToast(context, 'Entry deleted successfully');
           context.read<ProjectProvider>().load();
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to delete entry'), backgroundColor: const Color(0xFFC01048)),
-          );
+          btToast(context, 'Failed to delete entry', error: true);
         }
       }
     }
@@ -3632,7 +3307,8 @@ class _ReportActions {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => Center(child: CircularProgressIndicator()),
+      barrierColor: Bt.scrim,
+      builder: (context) => const Center(child: BtBrickLoader(onDark: true)),
     );
     final tx = await ApiService.fetchTransactionById(entry.id);
     if (context.mounted) {
@@ -3640,9 +3316,7 @@ class _ReportActions {
     }
     if (tx == null) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to load transaction details.')),
-        );
+        btToast(context, 'Failed to load transaction details.', error: true);
       }
       return;
     }
@@ -3759,74 +3433,48 @@ class _PaymentHistorySectionState extends State<_PaymentHistorySection> {
   @override
   Widget build(BuildContext context) {
     final history = _fetchedHistory ?? widget.entry.paymentHistory;
+    final bt = context.bt;
     Widget header = BtSectionHeader(
       title: 'Payment history',
+      caption: true,
       action: history.length > 1 ? (_viewAll ? 'View less' : 'View all (${history.length})') : null,
       onAction: () => setState(() => _viewAll = !_viewAll),
     );
+    Widget note(String text) => Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          child: Text(text, style: BtText.caption(context, color: Bt.ink3)),
+        );
     Widget content;
     if (_isLoading) {
       content = Padding(
-        padding: EdgeInsets.symmetric(vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         child: Row(
           children: [
             SizedBox(
               height: 12,
               width: 12,
-              child: CircularProgressIndicator(
-                strokeWidth: 1.5,
-                valueColor: AlwaysStoppedAnimation<Color>(
-                  AppColors.primary,
-                ),
-              ),
+              child: CircularProgressIndicator(strokeWidth: 1.5, valueColor: AlwaysStoppedAnimation<Color>(bt.accentInk)),
             ),
-            SizedBox(width: 8),
-            Text(
-              'Loading payment history...',
-              style: TextStyle(
-                fontSize: 13,
-                fontStyle: FontStyle.italic,
-                color: AppColors.textSecondary,
-              ),
-            ),
+            const SizedBox(width: 8),
+            Text('Loading payment history...', style: BtText.caption(context, color: Bt.ink3)),
           ],
         ),
       );
     } else if (history.isEmpty) {
       if (widget.entry.paidAmount > 0) {
-        content = Padding(
-          padding: EdgeInsets.symmetric(vertical: 8),
-          child: Text(
-            'Detailed payment history is unavailable for payments recorded before transaction tracking was introduced.',
-            style: TextStyle(
-              fontSize: 13,
-              fontStyle: FontStyle.italic,
-              color: AppColors.textSecondary,
-            ),
-          ),
-        );
+        content = note('Detailed payment history is unavailable for payments recorded before transaction tracking was introduced.');
       } else {
-        content = Padding(
-          padding: EdgeInsets.symmetric(vertical: 8),
-          child: Text(
-            'No payments recorded yet.',
-            style: TextStyle(
-              fontSize: 13,
-              fontStyle: FontStyle.italic,
-              color: AppColors.textSecondary,
-            ),
-          ),
-        );
+        content = note('No payments recorded yet.');
       }
     } else {
       final displayedList = List.from(history.reversed);
       final itemsToShow = _viewAll ? displayedList : [displayedList.first];
       Widget list = ListView.separated(
         shrinkWrap: true,
-        physics: NeverScrollableScrollPhysics(),
+        physics: const NeverScrollableScrollPhysics(),
+        padding: EdgeInsets.zero,
         itemCount: itemsToShow.length,
-        separatorBuilder: (_, _) =>
-            const Divider(height: 16, color: Bt.line),
+        separatorBuilder: (_, _) => const Divider(height: 1, indent: 58, color: Bt.line),
         itemBuilder: (context, idx) {
           final item = itemsToShow[idx];
           final amt = (item['amount'] as num?)?.toDouble() ?? 0.0;
@@ -3841,101 +3489,62 @@ class _PaymentHistorySectionState extends State<_PaymentHistorySection> {
           final method = item['method'] as String? ?? 'Cash';
           final note = item['note'] as String? ?? '';
           final receipt = item['receipt'] as String?;
-          return Padding(
-            padding: EdgeInsets.symmetric(vertical: 4),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            dateStr,
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
-                          SizedBox(height: 4),
-                          Row(
-                            children: [
-                              Container(
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: 6,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: AppColors.badgeInfoBg,
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Text(
-                                  method.isEmpty ? method : method[0].toUpperCase() + method.substring(1),
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.badgeInfoText,
-                                  ),
-                                ),
-                              ),
-                              if (receipt != null && receipt.isNotEmpty) ...[
-                                SizedBox(width: 8),
-                                GestureDetector(
-                                  onTap: () async {
-                                    final uri = Uri.parse(receipt);
-                                    if (await canLaunchUrl(uri)) {
-                                      await launchUrl(uri);
-                                    }
-                                  },
-                                  child: Text(
-                                    'Receipt ↗',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                      color: AppColors.primary,
-                                      decoration: TextDecoration.underline,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
+          final methodLabel = method.isEmpty ? method : method[0].toUpperCase() + method.substring(1);
+          return ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 56),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 10, 14, 10),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const BtTile(icon: Icons.payments_outlined, bg: Bt.greenSoft, fg: Bt.green, size: 34),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${widget.formatCurrency(amt)} · $methodLabel',
+                          style: BtText.num(BtText.subhead(context, color: Bt.ink, weight: FontWeight.w600)),
+                        ),
+                        const SizedBox(height: 1),
+                        Text(dateStr, style: BtText.caption(context).copyWith(fontSize: 12)),
+                        if (note.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text('Note: $note', style: BtText.caption(context, color: Bt.ink2)),
                         ],
-                      ),
+                      ],
                     ),
-                    Text(
-                      widget.formatCurrency(amt),
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.badgeSuccessText,
+                  ),
+                  if (receipt != null && receipt.isNotEmpty) ...[
+                    const SizedBox(width: 8),
+                    Semantics(
+                      button: true,
+                      label: 'Open receipt',
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () async {
+                          final uri = Uri.parse(receipt);
+                          if (await canLaunchUrl(uri)) {
+                            await launchUrl(uri);
+                          }
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Text('Receipt ↗', style: BtText.subhead(context, color: bt.accentInk, weight: FontWeight.w600)),
+                        ),
                       ),
                     ),
                   ],
-                ),
-                if (note.isNotEmpty) ...[
-                  SizedBox(height: 4),
-                  Text(
-                    'Note: $note',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontStyle: FontStyle.italic,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
                 ],
-              ],
+              ),
             ),
           );
         },
       );
       if (_viewAll && displayedList.length > 3) {
         content = Container(
-          constraints: BoxConstraints(maxHeight: 180),
+          constraints: const BoxConstraints(maxHeight: 200),
           child: Scrollbar(
             thumbVisibility: true,
             child: SingleChildScrollView(child: list),
@@ -3946,12 +3555,20 @@ class _PaymentHistorySectionState extends State<_PaymentHistorySection> {
       }
     }
     return Padding(
-      padding: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.only(top: 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           header,
-          BtCard(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10), child: content),
+          Container(
+            decoration: BoxDecoration(
+              color: Bt.card,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Bt.line),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: content,
+          ),
         ],
       ),
     );

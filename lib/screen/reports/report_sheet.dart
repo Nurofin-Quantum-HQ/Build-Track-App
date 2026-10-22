@@ -3,16 +3,21 @@ import 'package:buildtrack_mobile/models/project_model.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
-/// Spreadsheet view of report entries, shown right on the Reports page.
-/// The item column stays pinned on the left and the header row stays on top;
-/// everything else scrolls sideways, and up/down once there are more than
-/// [maxVisibleRows] rows.
+// Grid colours from the V2 "Report table" board (ink at 8 % / 14 % / 5 % / 2.2 %).
+const _line = Color(0x14111317);
+const _line2 = Color(0x24111317);
+const _headBg = Color(0xFFF3F3F3);
+const _zebra = Color(0xFFFAFAFA);
+
+/// Excel-style sheet of report entries, shown at the top of the Reports tab
+/// (and full screen). The item column (with row numbers) stays pinned on the
+/// left and the header row stays on top; everything else scrolls sideways,
+/// and up/down inside the sheet once the rows outgrow [maxHeight].
 class ReportSheet extends StatefulWidget {
   const ReportSheet({
     super.key,
     required this.entries,
     required this.columns,
-    required this.totalCount,
     required this.projectNameOf,
     required this.statusOf,
     required this.sortColumn,
@@ -22,15 +27,15 @@ class ReportSheet extends StatefulWidget {
     required this.onAddMore,
     required this.onRecordPayment,
     required this.onEdit,
-    required this.onEditColumns,
-    required this.onFullScreen,
+    this.maxHeight = 420,
+    this.firstRowNumber = 1,
+    this.pinnedWidth = 132,
   });
 
   final List<EntryModel> entries;
 
   /// The tab's active columns, in the user's order (see "Edit columns").
   final List<String> columns;
-  final int totalCount;
   final String Function(EntryModel) projectNameOf;
 
   /// 'Fully Paid', 'Partial' or 'Not Paid'.
@@ -44,16 +49,22 @@ class ReportSheet extends StatefulWidget {
   final void Function(EntryModel) onAddMore;
   final void Function(EntryModel) onRecordPayment;
   final void Function(EntryModel) onEdit;
-  final VoidCallback onEditColumns;
-  final VoidCallback onFullScreen;
 
-  static const rowHeight = 48.0;
-  static const headerHeight = 40.0;
-  static const maxVisibleRows = 10;
-  static const pinnedWidth = 136.0;
+  /// Height of the whole sheet (header + rows); fewer rows shrink it.
+  final double maxHeight;
+
+  /// Number shown in the # column for the first row (continues across pages).
+  final int firstRowNumber;
+  final double pinnedWidth;
+
+  static const rowHeight = 40.0;
+  static const headerHeight = 36.0;
+
+  /// Height of the hint + scroll track under the sheet.
+  static const footerHeight = 28.0;
 
   static const _itemColumns = {'Description', 'Material', 'Worker Type', 'Equipment'};
-  static const _actionsColumn = 'Actions';
+  static const _actionColumns = ['Add More', 'Record Payment', 'Edit Entry'];
   static const _sortKeys = {'Purchased Date': 'date', 'Project': 'project', 'Amount': 'amount'};
   static const _numeric = {
     'Amount', 'Paid', 'Remaining', 'Rate', 'Rate/Day', 'Rent Rate', 'Qty', 'Days', 'Duration',
@@ -62,54 +73,92 @@ class ReportSheet extends StatefulWidget {
   static double widthOf(String column) {
     switch (column) {
       case 'Purchased Date':
-        return 100;
+        return 92;
       case 'Payment Date':
-        return 112;
+        return 104;
       case 'Project':
-        return 148;
+        return 132;
       case 'Type':
-        return 116;
+        return 108;
       case 'Description':
       case 'Material':
       case 'Worker Type':
       case 'Equipment':
-        return 168;
+        return 156;
       case 'Brand':
-        return 120;
+        return 108;
       case 'Floor':
-        return 96;
+        return 92;
       case 'Phase':
       case 'Activity':
-        return 140;
+        return 128;
       case 'Unit':
-        return 76;
+        return 68;
       case 'Status':
-        return 108;
+        return 100;
       case 'Amount':
-        return 112;
+        return 124;
       case 'Paid':
-        return 104;
+        return 108;
       case 'Remaining':
-        return 116;
+        return 132;
       case 'Rate':
       case 'Rate/Day':
       case 'Rent Rate':
-        return 100;
+        return 96;
       case 'Qty':
       case 'Days':
       case 'Duration':
-        return 84;
-      case _actionsColumn:
-        return 340;
+        return 76;
+      case 'Add More':
+        return 112;
+      case 'Record Payment':
+        return 150;
+      case 'Edit Entry':
+        return 112;
       default:
-        return 120;
+        return 112;
     }
   }
 
-  static String labelOf(String column) => column == 'Purchased Date' ? 'Date' : column;
+  static String labelOf(String column) {
+    switch (column) {
+      case 'Purchased Date':
+        return 'DATE';
+      case 'Amount':
+        return 'AMOUNT (INR)';
+      case 'Paid':
+        return 'PAID (INR)';
+      case 'Remaining':
+        return 'REMAINING (INR)';
+      default:
+        return column.toUpperCase();
+    }
+  }
 
   @override
   State<ReportSheet> createState() => _ReportSheetState();
+}
+
+/// Text styles resolved once per build (not per cell).
+class _Styles {
+  _Styles(BuildContext context, BtTheme bt)
+      : cell = BtText.caption(context, color: Bt.ink).copyWith(fontSize: 12.5, height: 1.2),
+        head = BtText.mono(context, size: 9.5, color: Bt.ink2),
+        rowNo = BtText.mono(context, size: 10, color: Bt.ink3).copyWith(letterSpacing: 0, fontFeatures: BtText.tnum),
+        pill = BtText.caption(context, weight: FontWeight.w600).copyWith(fontSize: 11, height: 1.1),
+        action = BtText.caption(context, weight: FontWeight.w600).copyWith(fontSize: 11.5, height: 1.1),
+        accentInk = bt.accentInk,
+        selected = Color.alphaBlend(bt.accent.withValues(alpha: .14), Bt.card),
+        accent = bt.accent;
+  final TextStyle cell;
+  final TextStyle head;
+  final TextStyle rowNo;
+  final TextStyle pill;
+  final TextStyle action;
+  final Color accentInk;
+  final Color selected;
+  final Color accent;
 }
 
 class _ReportSheetState extends State<ReportSheet> {
@@ -118,6 +167,9 @@ class _ReportSheetState extends State<ReportSheet> {
   final _vPin = ScrollController();
   final _vBody = ScrollController();
   bool _syncing = false;
+
+  /// Last row the user opened — highlighted like a selected spreadsheet row.
+  String? _selectedId;
 
   @override
   void initState() {
@@ -137,6 +189,7 @@ class _ReportSheetState extends State<ReportSheet> {
     final rowsChanged = old.entries.length != widget.entries.length ||
         Iterable.generate(widget.entries.length).any((i) => old.entries[i].id != widget.entries[i].id);
     final colsChanged = old.columns.join('|') != widget.columns.join('|');
+    if (!rowsChanged && !colsChanged) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       for (final c in [if (rowsChanged) ...[_vPin, _vBody], if (colsChanged) ...[_hHead, _hBody]]) {
@@ -172,30 +225,26 @@ class _ReportSheetState extends State<ReportSheet> {
 
   List<String> get _scrollColumns {
     final pinned = _pinned;
-    return [...widget.columns.where((c) => c != pinned), ReportSheet._actionsColumn];
+    return [...widget.columns.where((c) => c != pinned), ...ReportSheet._actionColumns];
   }
 
-  String get _sortCaption {
-    switch (widget.sortColumn) {
-      case 'amount':
-        return widget.sortAscending ? 'Amount: low to high' : 'Amount: high to low';
-      case 'project':
-        return widget.sortAscending ? 'Project A–Z' : 'Project Z–A';
-      default:
-        return widget.sortAscending ? 'Oldest first' : 'Newest first';
-    }
+  void _tapRow(EntryModel e) {
+    if (_selectedId != e.id) setState(() => _selectedId = e.id);
+    widget.onRowTap(e);
   }
 
   @override
   Widget build(BuildContext context) {
     final bt = context.bt;
+    final s = _Styles(context, bt);
     final rows = widget.entries;
     final pinned = _pinned;
+    final pinW = widget.pinnedWidth;
     final scrollCols = _scrollColumns;
     final scrollWidth = scrollCols.fold<double>(0, (w, c) => w + ReportSheet.widthOf(c));
-    final visibleRows = rows.length.clamp(1, ReportSheet.maxVisibleRows);
-    final bodyHeight = visibleRows * ReportSheet.rowHeight;
-    final innerScroll = rows.length > ReportSheet.maxVisibleRows;
+    final maxBody = (widget.maxHeight - ReportSheet.headerHeight).clamp(ReportSheet.rowHeight, double.infinity);
+    final bodyHeight = (rows.length * ReportSheet.rowHeight).clamp(ReportSheet.rowHeight, maxBody).toDouble();
+    final innerScroll = rows.length * ReportSheet.rowHeight > bodyHeight + .5;
     final vPhysics = innerScroll ? const ClampingScrollPhysics() : const NeverScrollableScrollPhysics();
 
     return ScrollConfiguration(
@@ -204,101 +253,33 @@ class _ReportSheetState extends State<ReportSheet> {
         dragDevices: {PointerDeviceKind.touch, PointerDeviceKind.mouse, PointerDeviceKind.trackpad, PointerDeviceKind.stylus},
         scrollbars: false,
       ),
-      child: DecoratedBox(
-        decoration: const BoxDecoration(
-          color: Bt.card,
-          border: Border.symmetric(horizontal: BorderSide(color: Bt.line)),
-        ),
-        child: LayoutBuilder(builder: (context, constraints) {
-          final overflows = scrollWidth > constraints.maxWidth - ReportSheet.pinnedWidth;
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(Bt.gutter, 6, 4, 6),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            '${widget.totalCount} ${widget.totalCount == 1 ? 'entry' : 'entries'}',
-                            style: BtText.num(BtText.body(context, weight: FontWeight.w600)),
-                          ),
-                          Text(
-                            overflows ? 'Swipe sideways for more columns' : _sortCaption,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: BtText.caption(context),
-                          ),
-                        ],
-                      ),
-                    ),
-                    BtIconButton(
-                      icon: Icons.view_column_outlined,
-                      semantic: 'Edit columns',
-                      color: Bt.ink2,
-                      onTap: widget.onEditColumns,
-                    ),
-                    BtIconButton(
-                      icon: Icons.open_in_full_rounded,
-                      semantic: 'Full screen, can rotate',
-                      color: Bt.ink2,
-                      onTap: widget.onFullScreen,
-                    ),
-                  ],
-                ),
-              ),
-              const Divider(height: 1, thickness: 1, color: Bt.line),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (pinned != null)
-                    AnimatedBuilder(
-                      animation: _hBody,
-                      builder: (context, child) {
-                        final lifted = _hBody.hasClients && _hBody.offset > 1;
-                        return Container(
-                          width: ReportSheet.pinnedWidth,
-                          decoration: BoxDecoration(
-                            color: Bt.card,
-                            boxShadow: lifted
-                                ? const [BoxShadow(color: Color(0x2E101828), blurRadius: 12, offset: Offset(4, 0), spreadRadius: -6)]
-                                : null,
-                          ),
-                          child: child,
-                        );
-                      },
-                      child: Column(
-                        children: [
-                          _headerCell(context, pinned, ReportSheet.pinnedWidth),
-                          SizedBox(
-                            height: bodyHeight,
-                            child: ListView.builder(
-                              controller: _vPin,
-                              physics: vPhysics,
-                              padding: EdgeInsets.zero,
-                              itemExtent: ReportSheet.rowHeight,
-                              itemCount: rows.length,
-                              itemBuilder: (context, i) => _pinnedCell(context, rows[i], pinned, i, bt),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  Expanded(
-                    child: Column(
-                      children: [
+      child: LayoutBuilder(builder: (context, constraints) {
+        final overflows = scrollWidth > constraints.maxWidth - (pinned == null ? 0 : pinW);
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            DecoratedBox(
+              decoration: BoxDecoration(color: Bt.card, borderRadius: BorderRadius.circular(16), boxShadow: Bt.shadow),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: SizedBox(
+                  height: ReportSheet.headerHeight + bodyHeight,
+                  child: Stack(children: [
+                    Positioned.fill(
+                      left: pinned == null ? 0 : pinW,
+                      child: Column(children: [
                         SingleChildScrollView(
                           controller: _hHead,
                           scrollDirection: Axis.horizontal,
                           physics: const ClampingScrollPhysics(),
-                          child: Row(children: [for (final c in scrollCols) _headerCell(context, c, ReportSheet.widthOf(c))]),
+                          child: Container(
+                            height: ReportSheet.headerHeight,
+                            decoration: const BoxDecoration(color: _headBg, border: Border(bottom: BorderSide(color: _line2))),
+                            child: Row(children: [for (final c in scrollCols) _headerCell(c, ReportSheet.widthOf(c), s)]),
+                          ),
                         ),
-                        SizedBox(
-                          height: bodyHeight,
+                        Expanded(
                           child: SingleChildScrollView(
                             controller: _hBody,
                             scrollDirection: Axis.horizontal,
@@ -311,129 +292,196 @@ class _ReportSheetState extends State<ReportSheet> {
                                 padding: EdgeInsets.zero,
                                 itemExtent: ReportSheet.rowHeight,
                                 itemCount: rows.length,
-                                itemBuilder: (context, i) => _bodyRow(context, rows[i], scrollCols, i, bt),
+                                itemBuilder: (context, i) => _bodyRow(rows[i], scrollCols, i, s),
                               ),
                             ),
                           ),
                         ),
-                      ],
+                      ]),
                     ),
-                  ),
-                ],
+                    if (overflows)
+                      Positioned(
+                        right: 0,
+                        top: 0,
+                        bottom: 0,
+                        width: 26,
+                        child: IgnorePointer(
+                          child: AnimatedBuilder(
+                            animation: _hBody,
+                            builder: (context, child) {
+                              final atEnd = _hBody.hasClients &&
+                                  _hBody.position.hasContentDimensions &&
+                                  _hBody.offset >= _hBody.position.maxScrollExtent - 1;
+                              return AnimatedOpacity(opacity: atEnd ? 0 : 1, duration: Bt.fast, child: child);
+                            },
+                            child: const DecoratedBox(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(colors: [Color(0x00FFFFFF), Bt.card]),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    if (pinned != null)
+                      Positioned(
+                        left: 0,
+                        top: 0,
+                        bottom: 0,
+                        width: pinW,
+                        child: AnimatedBuilder(
+                          animation: _hBody,
+                          builder: (context, child) {
+                            final lifted = _hBody.hasClients && _hBody.offset > 1;
+                            return DecoratedBox(
+                              decoration: BoxDecoration(
+                                color: Bt.card,
+                                border: const Border(right: BorderSide(color: _line2)),
+                                boxShadow: lifted
+                                    ? const [BoxShadow(color: Color(0x590C0E12), blurRadius: 14, offset: Offset(8, 0), spreadRadius: -10)]
+                                    : null,
+                              ),
+                              child: child,
+                            );
+                          },
+                          child: Column(children: [
+                            Container(
+                              height: ReportSheet.headerHeight,
+                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                              decoration: const BoxDecoration(color: _headBg, border: Border(bottom: BorderSide(color: _line2))),
+                              child: Row(children: [
+                                SizedBox(width: 20, child: Text('#', textAlign: TextAlign.right, style: s.rowNo)),
+                                const SizedBox(width: 6),
+                                Expanded(child: _headerLabel(pinned, s)),
+                              ]),
+                            ),
+                            Expanded(
+                              child: ListView.builder(
+                                controller: _vPin,
+                                physics: vPhysics,
+                                padding: EdgeInsets.zero,
+                                itemExtent: ReportSheet.rowHeight,
+                                itemCount: rows.length,
+                                itemBuilder: (context, i) => _pinnedCell(rows[i], pinned, i, s, bt),
+                              ),
+                            ),
+                          ]),
+                        ),
+                      ),
+                  ]),
+                ),
               ),
-              _ScrollTrack(controller: _hBody),
-            ],
-          );
-        }),
-      ),
+            ),
+            SizedBox(
+              height: ReportSheet.footerHeight,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(2, 10, 2, 0),
+                child: Row(children: [
+                  Text('Tap a row for details', style: BtText.caption(context).copyWith(fontSize: 12)),
+                  const SizedBox(width: 12),
+                  Expanded(child: _ScrollTrack(controller: _hBody)),
+                ]),
+              ),
+            ),
+          ],
+        );
+      }),
     );
   }
 
-  Widget _headerCell(BuildContext context, String column, double width) {
-    final bt = context.bt;
+  Widget _headerLabel(String column, _Styles s) {
     final sortKey = ReportSheet._sortKeys[column];
     final active = sortKey != null && sortKey == widget.sortColumn;
     final numeric = ReportSheet._numeric.contains(column);
-    final color = active ? bt.brand : Bt.ink2;
-    final label = Text(
-      ReportSheet.labelOf(column),
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-      style: BtText.caption(context, color: color, weight: FontWeight.w600),
-    );
-    Widget content = Row(
+    final label = Text(ReportSheet.labelOf(column), maxLines: 1, overflow: TextOverflow.ellipsis, style: active ? s.head.copyWith(color: Bt.ink) : s.head);
+    final content = Row(
       mainAxisAlignment: numeric ? MainAxisAlignment.end : MainAxisAlignment.start,
       children: [
         Flexible(child: label),
         if (sortKey != null) ...[
-          const SizedBox(width: 4),
-          Icon(
-            active ? (widget.sortAscending ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded) : Icons.unfold_more_rounded,
-            size: 14,
-            color: active ? bt.brand : Bt.placeholder,
-          ),
+          const SizedBox(width: 3),
+          active
+              ? Icon(widget.sortAscending ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded, size: 13, color: s.accentInk)
+              : const Icon(Icons.unfold_more_rounded, size: 13, color: Color(0x59111317)),
         ],
       ],
     );
-    final cell = Container(
-      width: width,
-      height: ReportSheet.headerHeight,
-      padding: const EdgeInsets.symmetric(horizontal: 10),
-      alignment: numeric ? Alignment.centerRight : Alignment.centerLeft,
-      decoration: const BoxDecoration(
-        color: Bt.fill,
-        border: Border(right: BorderSide(color: Bt.line), bottom: BorderSide(color: Bt.line)),
-      ),
-      child: content,
-    );
-    if (sortKey == null) return cell;
+    if (sortKey == null) return content;
     return Semantics(
       button: true,
-      label: 'Sort by ${ReportSheet.labelOf(column)}',
-      child: InkWell(
+      label: 'Sort by ${ReportSheet.labelOf(column).toLowerCase()}',
+      excludeSemantics: true,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
         // Tapping the active column flips the direction; a new column starts newest/highest first.
         onTap: () => widget.onSort(sortKey, active ? !widget.sortAscending : sortKey == 'project'),
-        child: cell,
+        child: SizedBox(height: ReportSheet.headerHeight, child: content),
       ),
     );
   }
 
-  Color _rowColor(int i) => i.isOdd ? const Color(0xFFFAFBFC) : Bt.card;
+  Widget _headerCell(String column, double width, _Styles s) {
+    return Container(
+      width: width,
+      height: ReportSheet.headerHeight,
+      padding: const EdgeInsets.symmetric(horizontal: 9),
+      alignment: ReportSheet._numeric.contains(column) ? Alignment.centerRight : Alignment.centerLeft,
+      decoration: const BoxDecoration(border: Border(right: BorderSide(color: _line))),
+      child: _headerLabel(column, s),
+    );
+  }
 
-  Widget _pinnedCell(BuildContext context, EntryModel e, String column, int i, BtTheme bt) {
+  Widget _pinnedCell(EntryModel e, String column, int i, _Styles s, BtTheme bt) {
+    final selected = e.id == _selectedId;
     final isItem = ReportSheet._itemColumns.contains(column);
-    return InkWell(
-      onTap: () => widget.onRowTap(e),
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => _tapRow(e),
       child: Container(
-        padding: const EdgeInsets.only(left: 8, right: 10),
+        padding: const EdgeInsets.only(left: 8, right: 8),
         decoration: BoxDecoration(
-          color: _rowColor(i),
-          border: const Border(right: BorderSide(color: Bt.line), bottom: BorderSide(color: Bt.line)),
+          color: selected ? s.selected : (i.isOdd ? _zebra : Bt.card),
+          border: Border(
+            bottom: const BorderSide(color: _line),
+            left: selected ? BorderSide(color: s.accent, width: 3) : BorderSide.none,
+          ),
         ),
-        child: Row(
-          children: [
-            Container(
-              width: 3,
-              height: 24,
-              decoration: BoxDecoration(color: _typeColor(e.type, bt), borderRadius: BorderRadius.circular(2)),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: isItem
-                  ? Text(
-                      _text(e.description),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: BtText.caption(context, color: Bt.ink, weight: FontWeight.w600).copyWith(height: 1.25),
-                    )
-                  : _cell(context, column, e, bt),
-            ),
-          ],
-        ),
+        child: Row(children: [
+          SizedBox(
+            width: selected ? 17 : 20,
+            child: Text('${widget.firstRowNumber + i}', textAlign: TextAlign.right, maxLines: 1, style: s.rowNo),
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: isItem
+                ? Text(_text(e.description), maxLines: 1, overflow: TextOverflow.ellipsis, style: s.cell.copyWith(fontWeight: FontWeight.w600))
+                : _cell(column, e, s, bt),
+          ),
+        ]),
       ),
     );
   }
 
-  Widget _bodyRow(BuildContext context, EntryModel e, List<String> cols, int i, BtTheme bt) {
-    return InkWell(
-      onTap: () => widget.onRowTap(e),
+  Widget _bodyRow(EntryModel e, List<String> cols, int i, _Styles s) {
+    final selected = e.id == _selectedId;
+    final bt = context.bt;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => _tapRow(e),
       child: Container(
-        color: _rowColor(i),
-        child: Row(
-          children: [
-            for (final c in cols)
-              Container(
-                width: ReportSheet.widthOf(c),
-                height: ReportSheet.rowHeight,
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                alignment: ReportSheet._numeric.contains(c) ? Alignment.centerRight : Alignment.centerLeft,
-                decoration: const BoxDecoration(
-                  border: Border(right: BorderSide(color: Bt.line), bottom: BorderSide(color: Bt.line)),
-                ),
-                child: _cell(context, c, e, bt),
-              ),
-          ],
+        decoration: BoxDecoration(
+          color: selected ? s.selected : (i.isOdd ? _zebra : Bt.card),
+          border: const Border(bottom: BorderSide(color: _line)),
         ),
+        child: Row(children: [
+          for (final c in cols)
+            Container(
+              width: ReportSheet.widthOf(c),
+              padding: const EdgeInsets.symmetric(horizontal: 9),
+              alignment: ReportSheet._numeric.contains(c) ? Alignment.centerRight : Alignment.centerLeft,
+              decoration: const BoxDecoration(border: Border(right: BorderSide(color: _line))),
+              child: _cell(c, e, s, bt),
+            ),
+        ]),
       ),
     );
   }
@@ -462,75 +510,80 @@ class _ReportSheetState extends State<ReportSheet> {
     return q == q.roundToDouble() ? q.toStringAsFixed(0) : q.toStringAsFixed(2).replaceFirst(RegExp(r'0+$'), '');
   }
 
-  Widget _plain(BuildContext context, String v, {Color? color, FontWeight? weight, bool numeric = false}) {
-    final style = BtText.caption(context, color: v == '—' ? Bt.placeholder : (color ?? Bt.ink), weight: weight ?? FontWeight.w400);
-    return Text(v, maxLines: 1, overflow: TextOverflow.ellipsis, style: numeric ? BtText.num(style) : style);
+  Widget _plain(String v, _Styles s, {Color? color, FontWeight? weight, bool numeric = false}) {
+    var style = s.cell;
+    if (v == '—') {
+      style = style.copyWith(color: Bt.placeholder);
+    } else if (color != null || weight != null) {
+      style = style.copyWith(color: color, fontWeight: weight);
+    }
+    if (numeric) style = style.copyWith(fontFeatures: BtText.tnum);
+    return Text(v, maxLines: 1, overflow: TextOverflow.ellipsis, softWrap: false, style: style);
   }
 
-  Widget _cell(BuildContext context, String column, EntryModel e, BtTheme bt) {
+  Widget _cell(String column, EntryModel e, _Styles s, BtTheme bt) {
     switch (column) {
       case 'Purchased Date':
-        return _plain(context, formatShortDate(e.date), numeric: true);
+        return _plain(formatShortDate(e.date), s, numeric: true);
       case 'Payment Date':
-        return _plain(context, e.paymentDate == null ? '—' : formatShortDate(e.paymentDate), numeric: true);
+        return _plain(e.paymentDate == null ? '—' : formatShortDate(e.paymentDate), s, numeric: true);
       case 'Project':
-        return _plain(context, _text(widget.projectNameOf(e)));
+        return _plain(_text(widget.projectNameOf(e)), s);
       case 'Type':
         final label = e.type == EntryType.material ? 'Material' : (e.type == EntryType.labour ? 'Labour' : 'Equipment');
         return Row(children: [
-          Container(width: 7, height: 7, decoration: BoxDecoration(color: _typeColor(e.type, bt), shape: BoxShape.circle)),
+          Container(width: 7, height: 7, decoration: BoxDecoration(color: _typeColor(e.type, bt), borderRadius: BorderRadius.circular(2))),
           const SizedBox(width: 6),
-          Flexible(child: _plain(context, label, color: Bt.ink2)),
+          Flexible(child: _plain(label, s, color: Bt.ink2)),
         ]);
       case 'Description':
       case 'Material':
       case 'Worker Type':
       case 'Equipment':
-        return _plain(context, _text(e.description));
+        return _plain(_text(e.description), s);
       case 'Brand':
-        return _plain(context, _text(e.brand));
+        return _plain(_text(e.brand), s);
       case 'Floor':
-        return _plain(context, _text(e.floor));
+        return _plain(_text(e.floor), s);
       case 'Phase':
-        return _plain(context, _text(e.phase));
+        return _plain(_text(e.phase), s);
       case 'Activity':
-        return _plain(context, _text(e.activity));
+        return _plain(_text(e.activity), s);
       case 'Unit':
-        return _plain(context, _text(e.unit));
+        return _plain(_text(e.unit), s);
       case 'Status':
-        return _StatusPill(status: widget.statusOf(e));
+        return _StatusPill(status: widget.statusOf(e), style: s.pill);
       case 'Amount':
-        return _plain(context, formatInr(e.amount), weight: FontWeight.w600, numeric: true);
+        return _plain(formatInr(e.amount), s, weight: FontWeight.w700, numeric: true);
       case 'Paid':
-        return _plain(context, formatInr(e.paidAmount), color: e.paidAmount > 0 ? Bt.green : Bt.ink3, numeric: true);
+        return _plain(formatInr(e.paidAmount), s, color: e.paidAmount > 0 ? Bt.green : Bt.ink3, numeric: true);
       case 'Remaining':
         final rem = e.remainingAmount;
-        return _plain(context, formatInr(rem), color: rem > 0 ? Bt.red : Bt.green, weight: FontWeight.w600, numeric: true);
+        return _plain(formatInr(rem), s, color: rem > 0 ? Bt.red : Bt.green, weight: FontWeight.w600, numeric: true);
       case 'Rate':
       case 'Rate/Day':
       case 'Rent Rate':
-        return _plain(context, e.ratePerUnit == null ? '—' : formatInr(e.ratePerUnit), numeric: true);
+        return _plain(e.ratePerUnit == null ? '—' : formatInr(e.ratePerUnit), s, numeric: true);
       case 'Qty':
       case 'Days':
       case 'Duration':
-        return _plain(context, _qty(e), numeric: true);
-      case ReportSheet._actionsColumn:
-        return Row(children: [
-          _SheetAction(label: 'Add more', icon: Icons.add_rounded, primary: true, onTap: () => widget.onAddMore(e)),
-          const SizedBox(width: 6),
-          _SheetAction(label: 'Record payment', icon: Icons.credit_card_outlined, onTap: () => widget.onRecordPayment(e)),
-          const SizedBox(width: 6),
-          _SheetAction(label: 'Edit', icon: Icons.edit_outlined, onTap: () => widget.onEdit(e)),
-        ]);
+        return _plain(_qty(e), s, numeric: true);
+      case 'Add More':
+        return _SheetAction(label: 'Add More', icon: Icons.add_circle_outline_rounded, primary: true, style: s.action, onTap: () => widget.onAddMore(e));
+      case 'Record Payment':
+        return _SheetAction(label: 'Record Payment', icon: Icons.credit_card_outlined, style: s.action, onTap: () => widget.onRecordPayment(e));
+      case 'Edit Entry':
+        return _SheetAction(label: 'Edit Entry', icon: Icons.edit_outlined, style: s.action, onTap: () => widget.onEdit(e));
       default:
-        return _plain(context, '—');
+        return _plain('—', s);
     }
   }
 }
 
 class _StatusPill extends StatelessWidget {
-  const _StatusPill({required this.status});
+  const _StatusPill({required this.status, required this.style});
   final String status;
+  final TextStyle style;
 
   @override
   Widget build(BuildContext context) {
@@ -540,39 +593,50 @@ class _StatusPill extends StatelessWidget {
       _ => ('Not paid', Bt.red, Bt.redSoft),
     };
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(11)),
-      child: Text(label, style: BtText.caption(context, color: fg, weight: FontWeight.w500)),
+      height: 20,
+      padding: const EdgeInsets.symmetric(horizontal: 7),
+      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(10)),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Container(width: 5, height: 5, decoration: BoxDecoration(color: fg, shape: BoxShape.circle)),
+        const SizedBox(width: 5),
+        Text(label, maxLines: 1, style: style.copyWith(color: fg)),
+      ]),
     );
   }
 }
 
+/// Small in-cell button (Add More / Record Payment / Edit Entry). Plain
+/// decorated box + gesture detector so 50 rows stay cheap.
 class _SheetAction extends StatelessWidget {
-  const _SheetAction({required this.label, required this.icon, required this.onTap, this.primary = false});
+  const _SheetAction({required this.label, required this.icon, required this.onTap, required this.style, this.primary = false});
   final String label;
   final IconData icon;
   final VoidCallback onTap;
+  final TextStyle style;
   final bool primary;
 
   @override
   Widget build(BuildContext context) {
-    final bt = context.bt;
-    final fg = primary ? bt.brand : Bt.ink;
-    return Material(
-      color: primary ? bt.brandSoft : Bt.card,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
-        side: primary ? BorderSide.none : const BorderSide(color: Bt.line),
-      ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(8),
+    final fg = primary ? Bt.bone : Bt.ink;
+    return Semantics(
+      button: true,
+      label: label,
+      excludeSemantics: true,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
         onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        child: Container(
+          height: 26,
+          padding: const EdgeInsets.symmetric(horizontal: 9),
+          decoration: BoxDecoration(
+            color: primary ? Bt.ink : Bt.card,
+            borderRadius: BorderRadius.circular(8),
+            border: primary ? null : Border.all(color: _line2),
+          ),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
-            Icon(icon, size: 14, color: fg),
-            const SizedBox(width: 4),
-            Text(label, style: BtText.caption(context, color: fg, weight: FontWeight.w600)),
+            Icon(icon, size: 13, color: fg),
+            const SizedBox(width: 5),
+            Text(label, maxLines: 1, style: style.copyWith(color: fg)),
           ]),
         ),
       ),
@@ -580,46 +644,45 @@ class _SheetAction extends StatelessWidget {
   }
 }
 
-/// Thin sideways-position bar under the sheet; hidden when nothing is off-screen.
+/// Thin sideways-position bar under the sheet; empty when nothing is off-screen.
 class _ScrollTrack extends StatelessWidget {
   const _ScrollTrack({required this.controller});
   final ScrollController controller;
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: controller,
-      builder: (context, _) {
-        if (!controller.hasClients || !controller.position.hasContentDimensions) {
-          return const SizedBox(height: 11);
-        }
-        final pos = controller.position;
-        final max = pos.maxScrollExtent;
-        if (max <= 0) return const SizedBox(height: 11);
-        final view = pos.viewportDimension;
-        final frac = (view / (view + max)).clamp(.08, 1.0);
-        final at = (pos.pixels / max).clamp(0.0, 1.0);
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(Bt.gutter, 8, Bt.gutter, 0),
-          child: LayoutBuilder(builder: (context, c) {
+    return RepaintBoundary(
+      child: AnimatedBuilder(
+        animation: controller,
+        builder: (context, _) {
+          if (!controller.hasClients || !controller.position.hasContentDimensions) {
+            return const SizedBox(height: 4);
+          }
+          final pos = controller.position;
+          final max = pos.maxScrollExtent;
+          if (max <= 0) return const SizedBox(height: 4);
+          final view = pos.viewportDimension;
+          final frac = (view / (view + max)).clamp(.08, 1.0);
+          final at = (pos.pixels / max).clamp(0.0, 1.0);
+          return LayoutBuilder(builder: (context, c) {
             final w = c.maxWidth * frac;
             return Container(
-              height: 3,
-              decoration: BoxDecoration(color: Bt.fill, borderRadius: BorderRadius.circular(2)),
+              height: 4,
+              decoration: BoxDecoration(color: const Color(0x14111317), borderRadius: BorderRadius.circular(4)),
               alignment: Alignment.centerLeft,
               child: Padding(
                 padding: EdgeInsets.only(left: (c.maxWidth - w) * at),
-                child: Container(width: w, decoration: BoxDecoration(color: Bt.ink3, borderRadius: BorderRadius.circular(2))),
+                child: Container(width: w, decoration: BoxDecoration(color: Bt.ink2, borderRadius: BorderRadius.circular(4))),
               ),
             );
-          }),
-        );
-      },
+          });
+        },
+      ),
     );
   }
 }
 
-/// Table / List switch next to the Entries title.
+/// Table / List switch in the Reports toolbar.
 class ReportViewToggle extends StatelessWidget {
   const ReportViewToggle({super.key, required this.table, required this.onChanged});
   final bool table;
@@ -633,35 +696,33 @@ class ReportViewToggle extends StatelessWidget {
         button: true,
         selected: on,
         label: '$label view',
+        excludeSemantics: true,
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: () => onChanged(value),
           child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
-            height: 32,
-            padding: const EdgeInsets.symmetric(horizontal: 10),
+            duration: Bt.fast,
+            curve: Bt.ease,
+            height: 30,
+            width: 34,
             decoration: BoxDecoration(
               color: on ? Bt.card : Colors.transparent,
-              borderRadius: BorderRadius.circular(8),
-              boxShadow: on ? const [BoxShadow(color: Color(0x1F11121C), blurRadius: 2, offset: Offset(0, 1))] : null,
+              borderRadius: BorderRadius.circular(9),
+              boxShadow: on ? const [BoxShadow(color: Color(0x240C0E12), blurRadius: 3, offset: Offset(0, 1))] : null,
             ),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              Icon(icon, size: 16, color: on ? Bt.ink : Bt.ink2),
-              const SizedBox(width: 5),
-              Text(label, style: BtText.caption(context, color: on ? Bt.ink : Bt.ink2, weight: on ? FontWeight.w600 : FontWeight.w500)),
-            ]),
+            child: Icon(icon, size: 17, color: on ? Bt.ink : Bt.ink3),
           ),
         ),
       );
     }
 
     return Container(
-      padding: const EdgeInsets.all(2),
-      decoration: BoxDecoration(color: Bt.fill, borderRadius: BorderRadius.circular(10)),
+      height: 36,
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(color: Bt.ink.withValues(alpha: .06), borderRadius: BorderRadius.circular(Bt.rChip)),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
         option(true, Icons.table_chart_outlined, 'Table'),
-        const SizedBox(width: 2),
-        option(false, Icons.view_list_rounded, 'List'),
+        option(false, Icons.view_agenda_outlined, 'List'),
       ]),
     );
   }
