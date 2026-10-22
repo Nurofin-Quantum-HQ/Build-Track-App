@@ -490,9 +490,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _heroPill(String label) => Container(
-        height: 24,
-        padding: const EdgeInsets.symmetric(horizontal: 9),
-        alignment: Alignment.center,
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
         decoration: BoxDecoration(color: Colors.white.withValues(alpha: .10), borderRadius: BorderRadius.circular(12)),
         child: Text(label, maxLines: 1, style: BtText.caption(context, color: Bt.bone.withValues(alpha: .8), weight: FontWeight.w600).copyWith(fontSize: 12)),
       );
@@ -571,9 +569,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
   Widget _buildRoleBadge(String role) => Container(
-        height: 24,
-        padding: const EdgeInsets.symmetric(horizontal: 9),
-        alignment: Alignment.center,
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
         decoration: BoxDecoration(color: context.bt.accent, borderRadius: BorderRadius.circular(12)),
         child: Text(role, maxLines: 1, style: BtText.caption(context, color: context.bt.onAccent, weight: FontWeight.w700).copyWith(fontSize: 12)),
       );

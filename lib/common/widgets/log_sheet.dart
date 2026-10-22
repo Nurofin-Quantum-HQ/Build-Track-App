@@ -201,7 +201,7 @@ class LogKindTile extends StatelessWidget {
               ),
             ),
             Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-              Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.headline(context).copyWith(color: selected ? Bt.bone : Bt.ink)),
+              FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Text(title, maxLines: 1, style: BtText.headline(context).copyWith(color: selected ? Bt.bone : Bt.ink))),
               const SizedBox(height: 2),
               Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis, style: BtText.caption(context, color: selected ? Bt.onNoir2 : Bt.ink2).copyWith(fontSize: 12)),
             ]),

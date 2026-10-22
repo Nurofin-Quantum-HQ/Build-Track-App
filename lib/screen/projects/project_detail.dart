@@ -1614,7 +1614,7 @@ class _RingStat extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.subhead(context, weight: FontWeight.w600, color: Bt.ink)),
+                Text(title, maxLines: 2, overflow: TextOverflow.ellipsis, style: BtText.subhead(context, weight: FontWeight.w600, color: Bt.ink)),
                 Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.num(BtText.caption(context))),
               ],
             ),
