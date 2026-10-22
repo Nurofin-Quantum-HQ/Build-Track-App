@@ -1,4 +1,5 @@
 import 'package:buildtrack_mobile/common/widgets/common_widgets.dart';
+import 'package:buildtrack_mobile/common/widgets/entry_widgets.dart' show PaymentStatus;
 import 'package:buildtrack_mobile/controller/nav_controller.dart';
 import 'package:buildtrack_mobile/controller/role_manager.dart';
 import 'package:buildtrack_mobile/controller/user_session.dart';
@@ -9,11 +10,18 @@ import 'package:provider/provider.dart';
 
 enum InboxTab { approvals, activity }
 
+/// What the screen shows: both tabs (`/inbox`), only the notification list
+/// (`/notifications`, opened from the Home bell) or only pending approvals
+/// (`/approvals`, Home's "See all").
+enum InboxMode { both, notifications, approvals }
+
 /// Inbox = Pending approvals (was /approvals) + Notifications (was /notifications).
-/// Same data, same actions, one place (SCREEN-PLAN B32/B35).
+/// Same data, same actions, one place (SCREEN-PLAN B32/B35). With [mode] it
+/// shows a single list instead (no tabs).
 class InboxScreen extends StatefulWidget {
-  const InboxScreen({super.key, this.initialTab});
+  const InboxScreen({super.key, this.initialTab, this.mode = InboxMode.both});
   final InboxTab? initialTab;
+  final InboxMode mode;
 
   /// Who sees the "To approve" segment (same people who saw pending approvals before).
   static bool get canSeeApprovals => UserSession.isAdmin || UserSession.isSupervisor || RoleManager.canApproveUpdates;
@@ -32,13 +40,51 @@ class _InboxScreenState extends State<InboxScreen> {
   @override
   void initState() {
     super.initState();
-    _tab = widget.initialTab ?? (InboxScreen.canSeeApprovals ? InboxTab.approvals : InboxTab.activity);
-    if (!InboxScreen.canSeeApprovals) _tab = InboxTab.activity;
+    switch (widget.mode) {
+      case InboxMode.notifications:
+        _tab = InboxTab.activity;
+        break;
+      case InboxMode.approvals:
+        _tab = InboxTab.approvals;
+        break;
+      case InboxMode.both:
+        _tab = widget.initialTab ?? (InboxScreen.canSeeApprovals ? InboxTab.approvals : InboxTab.activity);
+        if (!InboxScreen.canSeeApprovals) _tab = InboxTab.activity;
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final nav = context.read<NavController>();
+      // Same marker for every mode: none of them is a bottom-bar tab.
       if (!Navigator.of(context).canPop()) nav.markCurrent('/inbox');
     });
+  }
+
+  String get _title => switch (widget.mode) {
+        InboxMode.notifications => 'Notifications',
+        InboxMode.approvals => 'Approvals',
+        InboxMode.both => 'Inbox',
+      };
+
+  /// Tabs only in the combined Inbox (and only for people who can approve).
+  bool get _showTabs => widget.mode == InboxMode.both && InboxScreen.canSeeApprovals;
+
+  Widget _body() {
+    final approvals = ApprovalsPane(
+      onCount: (n) => setState(() => _pendingCount = n),
+      onTotal: (t) => setState(() => _pendingTotal = t),
+    );
+    final activity = ActivityPane(key: _activityKey, onUnread: (n) => setState(() => _unread = n));
+    switch (widget.mode) {
+      case InboxMode.notifications:
+        return activity;
+      case InboxMode.approvals:
+        return approvals;
+      case InboxMode.both:
+        return IndexedStack(index: _tab == InboxTab.approvals ? 0 : 1, children: [
+          InboxScreen.canSeeApprovals ? approvals : const SizedBox.shrink(),
+          activity,
+        ]);
+    }
   }
 
   @override
@@ -62,11 +108,11 @@ class _InboxScreenState extends State<InboxScreen> {
               ]),
             BtReveal(
               child: Row(children: [
-                Expanded(child: Text('Inbox', style: BtText.d1(context, color: Bt.bone))),
+                Expanded(child: Text(_title, style: BtText.d1(context, color: Bt.bone))),
                 if (!canPop) AnimatedSwitcher(duration: Bt.fast, child: _tab == InboxTab.activity ? _activityMenu() : const SizedBox(width: Bt.touch, height: Bt.touch)),
               ]),
             ),
-            if (InboxScreen.canSeeApprovals) ...[
+            if (_showTabs) ...[
               const SizedBox(height: 18),
               BtReveal(
                 index: 1,
@@ -100,15 +146,7 @@ class _InboxScreenState extends State<InboxScreen> {
             child: Container(
               clipBehavior: Clip.antiAlias,
               decoration: const BoxDecoration(color: Bt.ground, borderRadius: BorderRadius.vertical(top: Radius.circular(Bt.rSheet))),
-              child: IndexedStack(index: _tab == InboxTab.approvals ? 0 : 1, children: [
-                InboxScreen.canSeeApprovals
-                    ? ApprovalsPane(
-                        onCount: (n) => setState(() => _pendingCount = n),
-                        onTotal: (t) => setState(() => _pendingTotal = t),
-                      )
-                    : const SizedBox.shrink(),
-                ActivityPane(key: _activityKey, onUnread: (n) => setState(() => _unread = n)),
-              ]),
+              child: _body(),
             ),
           ),
         ),
@@ -593,6 +631,9 @@ class _ActivityPaneState extends State<ActivityPane> {
     }
   }
 
+  /// Notification currently being opened (its entry is being fetched).
+  String? _opening;
+
   void _openNotification(dynamic n) {
     final id = n['_id'] as String?;
     if (id != null && n['read'] != true) {
@@ -600,10 +641,105 @@ class _ActivityPaneState extends State<ActivityPane> {
         if (mounted) _fetchNotifications();
       });
     }
+    final relatedId = n['relatedId']?.toString() ?? '';
+    if (n['relatedModel'] == 'Transaction' && relatedId.isNotEmpty) {
+      _openTransaction(id, relatedId);
+      return;
+    }
     final route = _targetRoute(n);
     if (route != null && mounted) {
       Navigator.pushNamed(context, route);
     }
+  }
+
+  /// "Entry Approved / Rejected / Payment Received" → that entry's detail
+  /// (`/entry-detail`), not the project log. The notification only carries the
+  /// id, so the entry is fetched and mapped to the arguments the detail screen
+  /// reads (same mapping as the project screen's entry tiles).
+  Future<void> _openTransaction(String? notificationId, String txId) async {
+    if (_opening != null) return;
+    setState(() => _opening = notificationId ?? txId);
+    final tx = await ApiService.fetchTransactionById(txId);
+    if (!mounted) return;
+    setState(() => _opening = null);
+    if (tx == null) {
+      btToast(context, "This entry can't be opened — it may have been deleted.", error: true);
+      return;
+    }
+    final type = (tx['type'] ?? '').toString().toLowerCase().trim();
+    if (type == 'income' || type == 'revenue') {
+      // Client money lives on Home (Client money → history), not in entry detail.
+      context.read<NavController>().setRoute('/home', context);
+      return;
+    }
+    Navigator.pushNamed(context, '/entry-detail', arguments: entryDetailArgs(tx));
+  }
+
+  /// Raw transaction (GET /transactions/:id) → `/entry-detail` arguments.
+  static Map<String, dynamic> entryDetailArgs(Map<String, dynamic> tx) {
+    final rawCat = (tx['category'] ?? '').toString().trim().toLowerCase();
+    final rawType = (tx['type'] ?? '').toString().trim().toLowerCase();
+    var category = 'material';
+    if (rawCat.contains('labour') || rawCat == 'wages' || rawCat == 'labor' || rawType == 'wages' || rawType == 'labour') {
+      category = 'labour';
+    } else if (rawCat == 'equipment' || rawCat == 'machinery' || rawCat == 'expense' || rawType == 'expense' || rawType == 'equipment') {
+      category = 'equipment';
+    }
+    final isPositive = tx['subType']?.toString().toLowerCase() != 'consumption';
+    final id = (tx['_id'] ?? tx['id'] ?? '').toString();
+    final project = tx['project'];
+    final projectId = project is Map ? (project['_id'] ?? '').toString() : (project ?? '').toString();
+    final projectName = project is Map ? project['projectName']?.toString() : null;
+    final createdBy = tx['createdBy'];
+    final pay = (tx['paymentStatus'] ?? '').toString().toLowerCase();
+    final payStatus = pay == 'paid'
+        ? PaymentStatus.paid
+        : pay == 'partial'
+            ? PaymentStatus.partial
+            : pay == 'overdue'
+                ? PaymentStatus.overdue
+                : PaymentStatus.pending;
+    final approval = (tx['approvalStatus'] ?? '').toString().toLowerCase();
+    double d(dynamic v) => v is num ? v.toDouble() : double.tryParse('$v') ?? 0.0;
+    final attachments = tx['attachments'];
+    return {
+      ...tx,
+      'id': id,
+      'title': tx['title'] ?? tx['materialName'] ?? 'Entry',
+      'ref': id.length > 4 ? '#${id.substring(id.length - 4)}' : '#$id',
+      'amount': '${isPositive ? '+' : '-'}${tx['quantity'] ?? 0}',
+      'date': tx['date']?.toString() ?? '',
+      'isPositive': isPositive,
+      'type': category,
+      'name': tx['title'] ?? tx['materialName'] ?? 'Entry',
+      'receipt': (attachments is List && attachments.isNotEmpty) ? attachments.first?.toString() : null,
+      'attachment': null,
+      'createdBy': createdBy is Map ? (createdBy['_id'] ?? '').toString() : (createdBy ?? '').toString(),
+      'project': projectId,
+      'projectId': projectId,
+      'projectName': ?projectName,
+      'status': approval == 'approved' ? 'approved' : (approval == 'rejected' ? 'rejected' : 'pending'),
+      'paymentStatus': payStatus,
+      'billAmount': d(tx['amount']),
+      'paidAmount': d(tx['paidAmount']),
+      'supplier': tx['supplier'] ?? '',
+      'paymentMethod': tx['paymentMode'] ?? '',
+      'lastUpdated': tx['updatedAt'] ?? tx['date'] ?? '',
+      'paymentHistory': tx['paymentHistory'],
+      'rate': d(tx['rate']),
+      'brand': tx['brand'] ?? '',
+      'notes': tx['notes'] ?? '',
+      'remarks': tx['remarks'] ?? '',
+      'categoryName': tx['category'] ?? '',
+      'quantity': d(tx['quantity']),
+      'overtime': d(tx['overtime']),
+      'subType': tx['subType'] ?? '',
+      'materialType': tx['materialType'] ?? '',
+      'floor': tx['floor']?.toString(),
+      'phase': tx['phase']?.toString(),
+      'activity': tx['activity']?.toString(),
+      'paymentReceipt': tx['paymentReceipt']?.toString(),
+    };
   }
 
   IconData _icon(String type) {
@@ -724,14 +860,17 @@ class _ActivityPaneState extends State<ActivityPane> {
             ]),
           ),
           const SizedBox(width: 10),
-          AnimatedOpacity(
-            opacity: read ? 0 : 1,
-            duration: Bt.fast,
-            child: Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: Container(width: 8, height: 8, decoration: BoxDecoration(color: context.bt.accent, shape: BoxShape.circle)),
+          if (_opening != null && _opening == (n['_id'] ?? n['relatedId'])?.toString())
+            const Padding(padding: EdgeInsets.only(top: 4), child: SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)))
+          else
+            AnimatedOpacity(
+              opacity: read ? 0 : 1,
+              duration: Bt.fast,
+              child: Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Container(width: 8, height: 8, decoration: BoxDecoration(color: context.bt.accent, shape: BoxShape.circle)),
+              ),
             ),
-          ),
         ]),
       ),
     );

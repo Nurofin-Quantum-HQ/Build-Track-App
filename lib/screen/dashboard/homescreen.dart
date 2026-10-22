@@ -19,6 +19,7 @@ import 'package:showcaseview/showcaseview.dart';
 import 'package:buildtrack_mobile/controller/showcase_keys.dart';
 import 'package:buildtrack_mobile/controller/nav_controller.dart';
 import 'package:buildtrack_mobile/screen/dashboard/notifications_bell.dart';
+import 'package:buildtrack_mobile/config/api_config.dart';
 
 String relativeTimeLabel(DateTime date) {
   final now = DateTime.now();
@@ -85,8 +86,8 @@ class HomeScreen extends StatelessWidget {
         if (UserSession.globalTourActive) {
           Future.delayed(const Duration(milliseconds: 300), () {
             if (context.mounted) {
-              final nav = Provider.of<NavController>(context, listen: false);
-              nav.setRoute('/projects', context);
+              // Next tab this user can open (skips disabled ones), or ends the tour.
+              context.read<NavController>().continueTour(context, from: '/home');
             }
           });
         }
@@ -102,28 +103,31 @@ class _HomeScreenContent extends StatefulWidget {
   State<_HomeScreenContent> createState() => _HomeScreenContentState();
 }
 class _HomeScreenContentState extends State<_HomeScreenContent> {
+  /// Home tour steps in the order they appear on screen (top → bottom, then
+  /// the bottom dock left → right). Only keys whose widgets are mounted right
+  /// now are used — the admin cards don't exist on the supervisor / mason
+  /// homes, and the dock hides tabs the user can't open; passing an unmounted
+  /// key makes the tour jump or stall. (Before: a fixed list in arbitrary
+  /// order incl. `inventoryTab`, which is no longer on screen anywhere.)
   List<GlobalKey> _getShowcaseKeys({bool isReplay = false}) {
-    final keys = <GlobalKey>[];
-    if (isReplay || !UserSession.hasCreatedProject) {
-      keys.add(ShowcaseKeys.projects);
-    }
-    keys.add(ShowcaseKeys.inventoryTab);
-    keys.add(ShowcaseKeys.profileIcon);
-    keys.add(ShowcaseKeys.progress);
-    keys.add(ShowcaseKeys.dashboardTotalCost);
-    keys.add(ShowcaseKeys.dashboardTotalBudget);
-    keys.add(ShowcaseKeys.dashboardTotalRevenue);
-    keys.add(ShowcaseKeys.dashboardNetCashFlow);
-    if (isReplay || !UserSession.hasAddedEntry) {
-      keys.add(ShowcaseKeys.addEntry);
-    }
-    keys.add(ShowcaseKeys.recentEntries);
-    if (isReplay || !UserSession.hasViewedReports) {
-      keys.add(ShowcaseKeys.reports);
-    }
-    keys.add(ShowcaseKeys.quickAddEntry);
-    keys.add(ShowcaseKeys.helpButton);
-    return keys;
+    final ordered = <GlobalKey>[
+      _notificationsTourKey,
+      ShowcaseKeys.helpButton,
+      ShowcaseKeys.profileIcon,
+      // Admin hero + cards
+      ShowcaseKeys.dashboardTotalCost,
+      ShowcaseKeys.dashboardTotalBudget,
+      ShowcaseKeys.quickAddEntry,
+      ShowcaseKeys.progress,
+      ShowcaseKeys.dashboardTotalRevenue,
+      ShowcaseKeys.dashboardNetCashFlow,
+      ShowcaseKeys.recentEntries,
+      // Bottom dock
+      if (isReplay || !UserSession.hasCreatedProject) ShowcaseKeys.projects,
+      if (isReplay || !UserSession.hasAddedEntry) ShowcaseKeys.addEntry,
+      if (isReplay || !UserSession.hasViewedReports) ShowcaseKeys.reports,
+    ];
+    return ordered.where((k) => k.currentContext != null).toList();
   }
 
   bool _tourChecked = false;
@@ -188,38 +192,23 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
   /// Inbox bell · help/tour · account (same targets as before).
   Widget _buildHeroTop(BuildContext context) {
     final company = UserSession.companyName.isNotEmpty ? UserSession.companyName : 'BuildTrack';
-    final hasLogo = UserSession.companyLogo != null && UserSession.companyLogo!.isNotEmpty;
     return BtReveal(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
+          _CompanyLogoTile(company: company),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(children: [
-                  if (hasLogo) ...[
-                    Container(
-                      width: 18,
-                      height: 18,
-                      margin: const EdgeInsets.only(right: 7),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(5),
-                        image: DecorationImage(image: getProfileImageProvider(UserSession.companyLogo)!, fit: BoxFit.contain),
-                      ),
-                    ),
-                  ],
-                  Flexible(
-                    child: Text(
-                      company,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      // The company's chosen name style (Create workspace / Edit profile).
-                      style: UserSession.getCompanyTextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Bt.onNoir2),
-                    ),
-                  ),
-                ]),
+                Text(
+                  company,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  // The company's chosen name style (Create workspace / Edit profile).
+                  style: UserSession.getCompanyTextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Bt.onNoir2),
+                ),
                 const SizedBox(height: 3),
                 Text(
                   _homeGreeting(),
@@ -231,11 +220,19 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
             ),
           ),
           const SizedBox(width: 6),
-          const NotificationsBell(),
+          Showcase(
+            key: _notificationsTourKey,
+            description: 'Notifications — approvals, rejections and updates about your entries. The dot shows how many are unread.',
+            tooltipBackgroundColor: Bt.ink,
+            textColor: Colors.white,
+            tooltipBorderRadius: BorderRadius.circular(16),
+            tooltipPadding: const EdgeInsets.all(16),
+            child: const NotificationsBell(),
+          ),
           const SizedBox(width: 6),
           Showcase(
             key: ShowcaseKeys.helpButton,
-            description: 'Tap here anytime to replay this tour and get help.',
+            description: 'App guidelines — tap here anytime to replay this tour.',
             tooltipBackgroundColor: Bt.ink,
             textColor: Colors.white,
             tooltipBorderRadius: BorderRadius.circular(16),
@@ -257,7 +254,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
           const SizedBox(width: 6),
           Showcase(
             key: ShowcaseKeys.profileIcon,
-            description: 'Tap your profile for your account, team, plan, logs and settings.',
+            description: 'Your account — profile, team, plan, logs and settings.',
             tooltipBackgroundColor: Bt.ink,
             textColor: Colors.white,
             tooltipBorderRadius: BorderRadius.circular(16),
@@ -301,6 +298,108 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
 }
 
 // ───────────────────────────────────────────────────────── shared home pieces
+
+/// Tour step for the Home bell (the bell has no key in [ShowcaseKeys]).
+final GlobalKey _notificationsTourKey = GlobalKey();
+
+/// Company logo in the Home hero: a 40 px rounded white tile next to the
+/// company name. No logo (or one that fails to load) → the company's initial
+/// on a glass tile, so the header never shows an empty box.
+class _CompanyLogoTile extends StatelessWidget {
+  const _CompanyLogoTile({required this.company});
+  final String company;
+  static const double size = 40;
+
+  @override
+  Widget build(BuildContext context) {
+    final provider = getProfileImageProvider(UserSession.companyLogo);
+    final initial = company.trim().isNotEmpty ? company.trim()[0].toUpperCase() : 'B';
+    final fallback = Container(
+      width: size,
+      height: size,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: .09),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withValues(alpha: .14)),
+      ),
+      child: Text(initial, style: BtText.headline(context).copyWith(color: Bt.bone)),
+    );
+    if (provider == null) return ExcludeSemantics(child: fallback);
+    return Semantics(
+      image: true,
+      label: '$company logo',
+      child: Container(
+        width: size,
+        height: size,
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: Image(
+            image: provider,
+            fit: BoxFit.contain,
+            errorBuilder: (_, _, _) => Center(child: Text(initial, style: BtText.headline(context).copyWith(color: Bt.ink))),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Quiet "Powered by Nurofin" line at the bottom of every role's Home
+/// (same asset and treatment as the login screen footer).
+class _PoweredByFooter extends StatelessWidget {
+  const _PoweredByFooter();
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 32, bottom: 4),
+      child: Semantics(
+        label: 'Powered by Nurofin',
+        child: ExcludeSemantics(
+          child: Opacity(
+            opacity: .75,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text('POWERED BY', style: BtText.mono(context)),
+                const SizedBox(width: 6),
+                Image.asset(
+                  'assets/images/nurofin-logo.png',
+                  height: 16,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, _, _) => Text('Nurofin', style: BtText.caption(context, weight: FontWeight.w600)),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Where a revenue entry's proof image lives: the uploaded photo
+/// (`attachments`) or, for a cash e-signature, `paymentReceipt`.
+String? _revenueProofUrl(Map<String, dynamic> tx) {
+  final att = tx['attachments'];
+  if (att is List) {
+    for (final a in att) {
+      final s = a?.toString() ?? '';
+      if (s.isNotEmpty) return s;
+    }
+  }
+  final r = tx['paymentReceipt']?.toString() ?? '';
+  return r.isNotEmpty ? r : null;
+}
+
+/// Image provider for a stored proof (https URL, server-relative path or data URI).
+ImageProvider? _proofImageProvider(String? src) {
+  if (src == null || src.isEmpty) return null;
+  if (src.startsWith('/')) return NetworkImage('${ApiConfig.baseUrl.replaceAll('/api', '')}$src');
+  return getProfileImageProvider(src);
+}
 
 String _homeGreeting() {
   final h = DateTime.now().hour;
@@ -353,7 +452,7 @@ double _sumAmounts(Iterable<dynamic> txs) => txs.fold<double>(0.0, (s, t) {
       return s + ((a is num) ? a.toDouble() : (double.tryParse(a?.toString() ?? '') ?? 0.0));
     });
 
-/// "4 entries need your approval · ₹99,963 waiting" — opens the Inbox.
+/// "4 entries need your approval · ₹99,963 waiting" — opens Approvals.
 class _ApprovalsSummaryCard extends StatelessWidget {
   const _ApprovalsSummaryCard({required this.count, required this.amount, required this.onTap, this.updates = 0});
   final int count;
@@ -390,7 +489,7 @@ class _ApprovalsSummaryCard extends StatelessWidget {
 }
 
 /// Pending approvals on Home for anyone who can approve: count + amount,
-/// the top two entries with Approve / Reject…, and "See all" → Inbox.
+/// the top two entries with Approve / Reject…, and "See all" → Approvals.
 class _HomeApprovals extends StatefulWidget {
   const _HomeApprovals();
   @override
@@ -419,7 +518,7 @@ class _HomeApprovalsState extends State<_HomeApprovals> {
   }
 
   void _seeAll() {
-    Navigator.pushNamed(context, '/inbox').then((_) {
+    Navigator.pushNamed(context, '/approvals').then((_) {
       if (mounted) _load();
     });
   }
@@ -464,7 +563,7 @@ class _HomeApprovalsState extends State<_HomeApprovals> {
         if (_txs.length > top.length)
           Padding(
             padding: const EdgeInsets.only(top: 4),
-            child: BtButton(label: 'See all ${_txs.length} in Inbox', variant: BtButtonVariant.quiet, icon: Icons.arrow_forward_rounded, onPressed: _seeAll),
+            child: BtButton(label: 'See all ${_txs.length} approvals', variant: BtButtonVariant.quiet, icon: Icons.arrow_forward_rounded, onPressed: _seeAll),
           ),
       ]),
     );
@@ -701,6 +800,42 @@ class _AdminDashboardState extends State<_AdminDashboard> {
   bool _isGlobalView = true;
   bool _loadingRevenue = false;
   String? _lastProjectId;
+
+  /// Bumped when proof images arrive, so an open Revenue History sheet redraws.
+  final ValueNotifier<int> _revenueProofs = ValueNotifier<int>(0);
+
+  @override
+  void dispose() {
+    _revenueProofs.dispose();
+    super.dispose();
+  }
+
+  /// The revenue list (`GET /transactions?type=Income`) is served WITHOUT
+  /// `attachments` (the backend list query does `.select("-attachments")`),
+  /// so rows, the detail sheet and the edit sheet never had the uploaded
+  /// image. `GET /transactions/:id` returns it; copy `attachments` (and the
+  /// e-sign `paymentReceipt`) onto the row. Rows that already carry the
+  /// field are left alone.
+  Future<void> _withProof(Map<String, dynamic> tx) async {
+    if (tx['attachments'] is List) return;
+    final id = (tx['_id'] ?? tx['id'] ?? '').toString();
+    if (id.isEmpty) return;
+    final full = await ApiService.fetchTransactionById(id);
+    if (full == null) return;
+    tx['attachments'] = full['attachments'] is List ? full['attachments'] : <dynamic>[];
+    tx['paymentReceipt'] ??= full['paymentReceipt'];
+  }
+
+  Future<void> _hydrateRevenueProofs(List<dynamic> entries, String projectId) async {
+    final rows = entries.whereType<Map<String, dynamic>>().toList();
+    for (var i = 0; i < rows.length; i += 6) {
+      await Future.wait(rows.skip(i).take(6).map(_withProof));
+      if (!mounted || projectId != _lastProjectId) return;
+      setState(() {});
+      _revenueProofs.value++;
+    }
+  }
+
   double get _totalRevenueSum {
     return _revenueEntries.fold<double>(0.0, (sum, tx) {
       final amount = double.tryParse(tx['amount']?.toString() ?? '0') ?? 0.0;
@@ -737,6 +872,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
             _revenueEntries = entries;
             _loadingRevenue = false;
           });
+          _hydrateRevenueProofs(entries, projectId);
         }
       } else {
         if (mounted) {
@@ -779,13 +915,27 @@ class _AdminDashboardState extends State<_AdminDashboard> {
       } catch (_) {}
     }
     PickedImage? pickedImage;
-    List<dynamic> attachments = editingTx?['attachments'] is List
-        ? editingTx!['attachments'] as List
-        : [];
-    String? existingImageUrl = attachments.isNotEmpty
-        ? attachments.first.toString()
-        : (editingTx?['paymentReceipt']?.toString());
+    // The entry's uploaded image (kept unless replaced / removed). Only known
+    // when the row carries `attachments` (see _withProof).
+    final bool knowsAttachments = editingTx?['attachments'] is List;
+    final List<dynamic> attachments = knowsAttachments ? editingTx!['attachments'] as List : const [];
+    String? existingImageUrl = attachments.map((a) => a?.toString() ?? '').firstWhere((a) => a.isNotEmpty, orElse: () => '');
+    if (existingImageUrl.isEmpty) existingImageUrl = null;
+    // Cash e-signature already on the entry (shown, not editable here).
+    final String? existingSignatureUrl = (editingTx?['paymentReceipt']?.toString().isNotEmpty ?? false) ? editingTx!['paymentReceipt'].toString() : null;
     bool isInflow = editingTx != null ? initialAmt >= 0 : true;
+    // Sheet state lives OUT here, not inside the sheet builder: the modal
+    // route re-runs its builder whenever MediaQuery changes (e.g. the keyboard
+    // opening), which used to reset `requestEsign` to false and recreate the
+    // email controller — so tapping the client email box made it vanish.
+    bool isSaving = false;
+    bool isEsignPolling = false;
+    bool isEsignCompleted = false;
+    String esignStatusText = '';
+    bool requestEsign = false;
+    final clientEmailCtrl = TextEditingController();
+    String? newReceiptDataUri;
+    bool sheetOpen = true;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -797,14 +947,9 @@ class _AdminDashboardState extends State<_AdminDashboard> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(Bt.rSheet)),
       ),
       builder: (ctx) {
-        bool isSaving = false;
-        bool isEsignPolling = false;
-        bool isEsignCompleted = false;
-        String esignStatusText = '';
-        bool requestEsign = false;
-        final clientEmailCtrl = TextEditingController();
-        String? newReceiptDataUri;
-        Future<void> startEsignFlow(StateSetter ss) async {
+        Future<void> startEsignFlow(StateSetter setSheet) async {
+          // No setState on a closed sheet (polling can outlive it).
+          void ss(VoidCallback f) => sheetOpen ? setSheet(f) : f();
           final amt = double.tryParse(amountCtrl.text.trim()) ?? 0.0;
           if (amt <= 0) {
             btToast(context, 'Please enter a valid amount before requesting an E-Signature', error: true);
@@ -838,9 +983,9 @@ class _AdminDashboardState extends State<_AdminDashboard> {
             esignStatusText = 'Waiting for client to sign...';
           });
           final reqId = res['requestId'];
-          while (isEsignPolling) {
+          while (isEsignPolling && sheetOpen) {
             await Future.delayed(const Duration(seconds: 3));
-            if (!isEsignPolling) break;
+            if (!isEsignPolling || !sheetOpen) break;
             final statusRes = await ApiService.checkEsignatureStatus(reqId);
             if (statusRes != null && statusRes['status'] == 'signed') {
               ss(() {
@@ -949,6 +1094,9 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                                 child: TextField(
                                   controller: clientEmailCtrl,
                                   keyboardType: TextInputType.emailAddress,
+                                  autocorrect: false,
+                                  textInputAction: TextInputAction.done,
+                                  scrollPadding: const EdgeInsets.only(bottom: 120),
                                   style: BtText.body(context),
                                   decoration: btInput(context, hint: 'client@email.com', prefix: const Icon(Icons.email_outlined, color: Bt.ink3)),
                                 ),
@@ -1083,10 +1231,15 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                                           newReceiptDataUri = null;
                                         })),
                                   ] else if (existingImageUrl != null) ...[
-                                    Text('Has Image', style: BtText.subhead(context, weight: FontWeight.w600, color: context.bt.accentInk)),
+                                    Text('Current image', style: BtText.subhead(context, weight: FontWeight.w600, color: context.bt.accentInk)),
                                     _ClearButton(onTap: () => setModalState(() {
                                           existingImageUrl = null;
                                         })),
+                                  ] else if (existingSignatureUrl != null) ...[
+                                    Padding(
+                                      padding: const EdgeInsets.only(right: 8),
+                                      child: Text('E-Signature', style: BtText.subhead(context, weight: FontWeight.w600, color: context.bt.accentInk)),
+                                    ),
                                   ] else
                                     const Padding(padding: EdgeInsets.only(right: 8), child: Icon(Icons.chevron_right_rounded, color: Bt.placeholder)),
                                 ]),
@@ -1113,10 +1266,10 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                                 errorBuilder: (context, error, stackTrace) => brokenImage,
                               ),
                             )
-                          else if (existingImageUrl != null)
+                          else if ((existingImageUrl ?? existingSignatureUrl) != null && _proofImageProvider(existingImageUrl ?? existingSignatureUrl) != null)
                             preview(
-                              Image.network(
-                                existingImageUrl!,
+                              Image(
+                                image: _proofImageProvider(existingImageUrl ?? existingSignatureUrl)!,
                                 fit: BoxFit.cover,
                                 loadingBuilder: (context, child, loadingProgress) {
                                   if (loadingProgress == null) return child;
@@ -1172,7 +1325,9 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                                         if (newReceiptDataUri != null) 'paymentReceipt': newReceiptDataUri,
                                         if (newReceiptDataUri != null) 'receiptImage': newReceiptDataUri,
                                         if (base64Image != null) 'receiptImage': base64Image,
-                                        if (base64Image == null && newReceiptDataUri == null && editingTx != null)
+                                        // Only send `attachments` when we know the real list —
+                                        // otherwise the server keeps what it has (never wipe it).
+                                        if (base64Image == null && newReceiptDataUri == null && editingTx != null && knowsAttachments)
                                           'attachments': existingImageUrl != null
                                               ? [existingImageUrl]
                                               : [],
@@ -1247,7 +1402,10 @@ class _AdminDashboardState extends State<_AdminDashboard> {
           },
         );
       },
-    );
+    ).whenComplete(() {
+      sheetOpen = false;
+      isEsignPolling = false;
+    });
   }
 
   /// Footer line of the Client money card → opens the revenue timeline.
@@ -1284,8 +1442,10 @@ class _AdminDashboardState extends State<_AdminDashboard> {
       ),
       builder: (ctx) {
         return StatefulBuilder(
-          builder: (ctx, setSheetState) {
-            return DraggableScrollableSheet(
+          builder: (ctx, setSheetState) => ValueListenableBuilder<int>(
+            // Redraw when proof images (thumbnails) arrive.
+            valueListenable: _revenueProofs,
+            builder: (_, _, _) => DraggableScrollableSheet(
               initialChildSize: 0.7,
               minChildSize: 0.4,
               maxChildSize: 0.9,
@@ -1412,12 +1572,24 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                   ),
                 );
               },
-            );
-          },
+            ),
+          ),
         );
       },
     );
   }
+  /// Detail sheet needs the entry's image (missing from the list rows until
+  /// hydrated) — fetch it first if needed, then open.
+  Future<void> _openRevenueDetail(
+    BuildContext context,
+    Map<String, dynamic> tx, {
+    VoidCallback? onRefresh,
+  }) async {
+    await _withProof(tx);
+    if (!context.mounted) return;
+    _showRevenueDetailDialog(context, tx, onRefresh: onRefresh);
+  }
+
   void _showRevenueDetailDialog(
     BuildContext context,
     Map<String, dynamic> tx, {
@@ -1433,9 +1605,9 @@ class _AdminDashboardState extends State<_AdminDashboard> {
     final paymentStatus = tx['paymentStatus']?.toString() ?? 'Paid';
     final rawId = tx['_id']?.toString() ?? tx['id']?.toString() ?? '';
     final refId = rawId.isNotEmpty ? rawId.toUpperCase() : 'N/A';
-    final List<dynamic> attachments = tx['attachments'] is List
-        ? tx['attachments'] as List
-        : [];
+    final proofUrl = _revenueProofUrl(tx);
+    final proofImage = _proofImageProvider(proofUrl);
+    final List<dynamic> attachments = proofUrl != null ? [proofUrl] : [];
 
     DateTime date = DateTime.now();
     if (tx['date'] != null) {
@@ -1554,7 +1726,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                     ),
                   ),
                 ],
-                if (attachments.isNotEmpty) ...[
+                if (proofUrl != null && proofImage != null) ...[
                   const SizedBox(height: 12),
                   Container(
                     padding: const EdgeInsets.all(14),
@@ -1562,7 +1734,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('PROOF OF PAYMENT', style: BtText.mono(context)),
+                        Text(proofUrl == tx['paymentReceipt']?.toString() ? 'CLIENT E-SIGNATURE' : 'PROOF OF PAYMENT', style: BtText.mono(context)),
                         const SizedBox(height: 8),
                         BtPressable(
                           onTap: () {
@@ -1570,7 +1742,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                               context,
                               '/receipt-viewer',
                               arguments: {
-                                'receipt': attachments.first.toString(),
+                                'receipt': proofUrl,
                               },
                             );
                           },
@@ -1579,8 +1751,8 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                             children: [
                               ClipRRect(
                                 borderRadius: BorderRadius.circular(12),
-                                child: Image.network(
-                                  attachments.first.toString(),
+                                child: Image(
+                                  image: proofImage,
                                   height: 150,
                                   width: double.infinity,
                                   fit: BoxFit.cover,
@@ -1806,72 +1978,6 @@ class _AdminDashboardState extends State<_AdminDashboard> {
       ),
     );
   }
-  void _showFullScreenImageDialog(BuildContext context, String imageUrl) {
-    showDialog(
-      context: context,
-      barrierColor: Colors.black.withValues(alpha: .88),
-      builder: (BuildContext ctx) {
-        return Dialog(
-          backgroundColor: Colors.transparent,
-          insetPadding: const EdgeInsets.all(10),
-          child: GestureDetector(
-            onTap: () => Navigator.of(ctx).pop(),
-            child: Stack(
-              alignment: Alignment.topRight,
-              children: [
-                InteractiveViewer(
-                  panEnabled: true,
-                  boundaryMargin: const EdgeInsets.all(20),
-                  minScale: 0.5,
-                  maxScale: 4.0,
-                  child: Center(
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(14),
-                      child: Image.network(
-                        imageUrl,
-                        fit: BoxFit.contain,
-                        loadingBuilder: (context, child, loadingProgress) {
-                          if (loadingProgress == null) return child;
-                          return const Center(
-                            child: CircularProgressIndicator(color: Colors.white),
-                          );
-                        },
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
-                            padding: const EdgeInsets.all(20),
-                            color: Bt.card,
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.broken_image_outlined, color: Bt.red, size: 40),
-                                const SizedBox(height: 8),
-                                Text('Failed to load image', style: BtText.subhead(context, color: Bt.ink)),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ),
-                ),
-                Positioned(
-                  top: 10,
-                  right: 10,
-                  child: BtIconButton(
-                    icon: Icons.close_rounded,
-                    semantic: 'Close',
-                    color: Bt.bone,
-                    background: Colors.white.withValues(alpha: .12),
-                    onTap: () => Navigator.of(ctx).pop(),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
   Widget _revenueTile(
     BuildContext context,
     Map<String, dynamic> tx, {
@@ -1884,11 +1990,8 @@ class _AdminDashboardState extends State<_AdminDashboard> {
     final formattedAmt = formatCurrency(absAmount);
     final textColor = isOutflow ? Bt.ink : Bt.green;
     final paymentMode = tx['paymentMode']?.toString() ?? 'Cash';
-    final List<dynamic> attachments = tx['attachments'] is List
-        ? tx['attachments'] as List
-        : [];
-    final hasImage =
-        attachments.isNotEmpty && attachments.first.toString().isNotEmpty;
+    final proofUrl = _revenueProofUrl(tx);
+    final proofImage = _proofImageProvider(proofUrl);
 
     DateTime date = DateTime.now();
     if (tx['date'] != null) {
@@ -1900,20 +2003,20 @@ class _AdminDashboardState extends State<_AdminDashboard> {
         '${date.day.toString().padLeft(2, '0')} ${_getMonthName(date.month)}';
     final timeStr = _formatTime12Hour(date);
     Widget? thumbnail;
-    if (hasImage) {
-      final imageUrl = attachments.first.toString();
-      thumbnail = GestureDetector(
-        onTap: () {
-          _showFullScreenImageDialog(context, imageUrl);
-        },
+    if (proofUrl != null && proofImage != null) {
+      thumbnail = Semantics(
+        button: true,
+        label: 'View proof image',
+        child: GestureDetector(
+        onTap: () => Navigator.pushNamed(context, '/receipt-viewer', arguments: {'receipt': proofUrl}),
         child: Container(
           width: 40,
           height: 40,
           decoration: BoxDecoration(color: Bt.fill, borderRadius: BorderRadius.circular(10)),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(10),
-            child: Image.network(
-              imageUrl,
+            child: Image(
+              image: proofImage,
               fit: BoxFit.cover,
               loadingBuilder: (context, child, loadingProgress) {
                 if (loadingProgress == null) return child;
@@ -1933,11 +2036,12 @@ class _AdminDashboardState extends State<_AdminDashboard> {
             ),
           ),
         ),
+        ),
       );
     }
     return InkWell(
       onTap: () {
-        _showRevenueDetailDialog(context, tx, onRefresh: onRefresh);
+        _openRevenueDetail(context, tx, onRefresh: onRefresh);
       },
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -2046,7 +2150,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
         const SizedBox(height: 20),
         Showcase(
           key: ShowcaseKeys.dashboardTotalCost,
-          description: 'Track your total funds spent across all categories for this project.',
+          description: 'Total cost so far — everything spent on materials, labour and equipment. Tap the project chip above to switch project or see all projects.',
           tooltipBackgroundColor: Bt.ink,
           textColor: Colors.white,
           tooltipBorderRadius: BorderRadius.circular(16),
@@ -2092,7 +2196,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
             Expanded(
               child: Showcase(
                 key: ShowcaseKeys.dashboardTotalBudget,
-                description: 'Track the total allocated budget and remaining balance for this project.',
+                description: 'Budget left — how much of the planned budget is still available.',
                 tooltipBackgroundColor: Bt.ink,
                 textColor: Colors.white,
                 tooltipBorderRadius: BorderRadius.circular(16),
@@ -2118,7 +2222,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
 
     final workDone = Showcase(
       key: ShowcaseKeys.progress,
-      description: 'Track your overall project completion here',
+      description: 'Work done — overall completion of the project.',
       tooltipBackgroundColor: Bt.ink,
       textColor: Colors.white,
       tooltipBorderRadius: BorderRadius.circular(16),
@@ -2157,7 +2261,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
         const SizedBox(height: 10),
         Showcase(
           key: ShowcaseKeys.dashboardTotalRevenue,
-          description: 'View the total revenue inflow recorded for this project.',
+          description: 'Total revenue — money received from the client. Tap this card to see every payment and record a new one.',
           tooltipBackgroundColor: Bt.ink,
           textColor: Colors.white,
           tooltipBorderRadius: BorderRadius.circular(16),
@@ -2170,7 +2274,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
         const SizedBox(height: 8),
         Showcase(
           key: ShowcaseKeys.dashboardNetCashFlow,
-          description: 'See your net profit or loss calculated instantly.',
+          description: 'Net cash flow — revenue minus cost, so you see profit or loss at a glance.',
           tooltipBackgroundColor: Bt.ink,
           textColor: Colors.white,
           tooltipBorderRadius: BorderRadius.circular(16),
@@ -2208,7 +2312,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
           index: 3,
           child: Showcase(
             key: ShowcaseKeys.recentEntries,
-            description: 'Quickly view or edit your most recently added entries',
+            description: 'Recent activity — your team\'s approved / rejected entries and the latest entries. "View all" opens the full log.',
             tooltipBackgroundColor: Bt.ink,
             textColor: Colors.white,
             tooltipBorderRadius: BorderRadius.circular(16),
@@ -2216,6 +2320,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
             child: _buildRecentActivity(context),
           ),
         ),
+        const _PoweredByFooter(),
       ],
     );
   }
@@ -2303,7 +2408,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
     final bt = context.bt;
     return Showcase(
       key: ShowcaseKeys.quickAddEntry,
-      description: 'Quickly add a new entry from here.',
+      description: 'Speak Update — say what happened and we fill in the entry form for you.',
       tooltipBackgroundColor: Bt.ink,
       textColor: Colors.white,
       tooltipBorderRadius: BorderRadius.circular(16),
@@ -2463,7 +2568,7 @@ class _SupervisorDashboardState extends State<_SupervisorDashboard> {
     if (ok) _handleReject(id);
   }
   void _openInbox() {
-    Navigator.pushNamed(context, '/inbox').then((_) {
+    Navigator.pushNamed(context, '/approvals').then((_) {
       if (mounted) _loadAll();
     });
   }
@@ -2595,6 +2700,7 @@ class _SupervisorDashboardState extends State<_SupervisorDashboard> {
           const SizedBox(height: 28),
           _buildRecentHistorySection(),
         ],
+        const _PoweredByFooter(),
       ],
     );
   }
@@ -2831,10 +2937,39 @@ class _MasonDashboardState extends State<_MasonDashboard> {
   void initState() {
     super.initState();
     final projectId = context.read<ProjectProvider>().selectedProject?.id;
-    _recentEntriesFuture = ApiService.fetchMyRecentEntries(
-      projectId: projectId,
-    );
+    _recentEntriesFuture = _fetchOwnRecentEntries(projectId);
     _loadTasks();
+  }
+
+  /// The mason's OWN recent entries. `fetchMyRecentEntries` reads
+  /// `/transactions?filterByViewAccess=true`, which returns every entry on the
+  /// mason's projects — incl. admin / supervisor entries. `/transactions/my`
+  /// is scoped to `createdBy = me` server-side; the creator check below is a
+  /// second guard. Same filters as before otherwise (no revenue, approved
+  /// only, current project when one is selected, newest first).
+  static Future<List<dynamic>> _fetchOwnRecentEntries(String? projectId) async {
+    final me = UserSession.userId;
+    String idOf(dynamic v) => v is Map ? (v['_id'] ?? v['id'] ?? '').toString() : (v ?? '').toString();
+    try {
+      final response = await ApiService.get('/transactions/my?limit=50');
+      if (response.statusCode != 200) return [];
+      final decoded = json.decode(response.body);
+      final List<dynamic> raw = decoded is List ? decoded : ((decoded['transactions'] ?? decoded['data'] ?? []) as List<dynamic>);
+      final own = raw.where((e) {
+        if (e is! Map<String, dynamic>) return false;
+        if (me.isNotEmpty && idOf(e['createdBy']) != me) return false;
+        final type = (e['type'] ?? '').toString().toLowerCase().trim();
+        if (type == 'income' || type == 'revenue') return false;
+        if ((e['approvalStatus'] ?? '').toString().toLowerCase().trim() != 'approved') return false;
+        if (projectId != null && projectId.isNotEmpty && e['project'] != null && idOf(e['project']) != projectId) return false;
+        return true;
+      }).toList()
+        ..sort((a, b) => (b['date'] ?? b['createdAt'] ?? '').toString().compareTo((a['date'] ?? a['createdAt'] ?? '').toString()));
+      return own;
+    } catch (e) {
+      debugPrint('Mason recent entries error: $e');
+      return [];
+    }
   }
   Future<void> _loadTasks() async {
     try {
@@ -2955,6 +3090,7 @@ class _MasonDashboardState extends State<_MasonDashboard> {
             );
           },
         ),
+        const _PoweredByFooter(),
       ],
     );
   }
