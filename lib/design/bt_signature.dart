@@ -240,9 +240,10 @@ class _BtRevealState extends State<BtReveal> with SingleTickerProviderStateMixin
       animation: _t,
       child: widget.child,
       builder: (_, child) {
-        final v = _t.value;
-        if (v >= 1) return child!;
-        return Opacity(opacity: v.clamp(0.0, 1.0), child: Transform.translate(offset: Offset(0, widget.distance * (1 - v)), child: child));
+        // Keep the same widget structure for the whole animation (and after),
+        // so stateful children (text fields, controllers) are never remounted.
+        final v = _t.value.clamp(0.0, 1.0);
+        return Opacity(opacity: v, child: Transform.translate(offset: Offset(0, widget.distance * (1 - v)), child: child));
       },
     );
   }

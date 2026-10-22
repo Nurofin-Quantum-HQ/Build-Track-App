@@ -1,73 +1,64 @@
+import 'package:buildtrack_mobile/common/widgets/log_sheet.dart';
 import 'package:buildtrack_mobile/design/design.dart';
-import 'package:buildtrack_mobile/common/themes/app_colors.dart';
 import 'package:flutter/material.dart';
+
 class _EntryType {
   final String id;
   final String title;
   final String subtitle;
-  final IconData icon;
-  final Color iconColor;
-  final Color iconBg;
   final String route;
   const _EntryType({
     required this.id,
     required this.title,
     required this.subtitle,
-    required this.icon,
-    required this.iconColor,
-    required this.iconBg,
     required this.route,
   });
 }
+
 const _entryTypes = [
   _EntryType(
     id: 'material',
     title: 'Material',
-    subtitle: 'Log concrete, steel, timber or any raw material used on site.',
-    icon: Icons.inventory_2_outlined,
-    iconColor: AppColors.primaryBlue,
-    iconBg: Color(0xFFE8F1FC),
+    subtitle: 'Concrete, steel, timber & raw materials',
     route: '/add-material',
   ),
   _EntryType(
     id: 'labour',
     title: 'Labour',
-    subtitle: 'Record worker hours, headcount and wages for the shift.',
-    icon: Icons.people_outline,
-    iconColor: Color(0xFF067647),
-    iconBg: Color(0xFFE7F6EE),
+    subtitle: 'Worker hours, headcount, wages',
     route: '/add-labour',
   ),
   _EntryType(
     id: 'equipment',
     title: 'Equipment',
-    subtitle: 'Track machinery usage, fuel consumption and operating costs.',
-    icon: Icons.construction_outlined,
-    iconColor: Color(0xFFB54708),
-    iconBg: Color(0xFFFEF3E7),
+    subtitle: 'Machinery usage, fuel, running costs',
     route: '/add-equipment',
   ),
 ];
+
 void showAddEntryPopup(BuildContext context) {
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
-    backgroundColor: Colors.white,
+    useSafeArea: true,
+    backgroundColor: Bt.card,
+    barrierColor: Bt.scrim,
+    sheetAnimationStyle: const AnimationStyle(duration: Duration(milliseconds: 520), curve: Bt.ease, reverseDuration: Duration(milliseconds: 260)),
     shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      borderRadius: BorderRadius.vertical(top: Radius.circular(Bt.rSheet)),
     ),
     builder: (_) => _AddEntrySheet(parentContext: context),
   );
 }
+
 class _AddEntrySheet extends StatefulWidget {
   final BuildContext parentContext;
   const _AddEntrySheet({required this.parentContext});
   @override
   State<_AddEntrySheet> createState() => _AddEntrySheetState();
 }
+
 class _AddEntrySheetState extends State<_AddEntrySheet> {
-  static const textDark = AppColors.textDark;
-  static const textGray = AppColors.textLight;
   String? _selectedId;
   @override
   Widget build(BuildContext context) {
@@ -76,173 +67,52 @@ class _AddEntrySheetState extends State<_AddEntrySheet> {
       top: false,
       child: ConstrainedBox(
         constraints: BoxConstraints(maxHeight: maxH),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(18, 10, 18, 24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Center(
                 child: Container(
                   width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE4E7EC),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
+                  height: 5,
+                  decoration: BoxDecoration(color: Bt.inputBorder, borderRadius: BorderRadius.circular(3)),
                 ),
               ),
-              const SizedBox(height: 20),
-              Text(
-                'What are you adding?',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                  color: textDark,
-                  letterSpacing: -0.3,
-                ),
-              ),
+              const SizedBox(height: 16),
+              Text('NEW ENTRY', style: BtText.mono(context, color: context.bt.accentInk)),
               const SizedBox(height: 4),
-              Text(
-                'Select the entry type to log for the current shift.',
-                style: TextStyle(
-                  fontSize: 13.5,
-                  color: textGray,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const SizedBox(height: 24),
-              ..._entryTypes.map(
-                (type) => Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: _EntryCard(
-                    type: type,
-                    isSelected: _selectedId == type.id,
-                    onTap: () {
-                      setState(() => _selectedId = type.id);
-                      Future.delayed(const Duration(milliseconds: 150), () {
-                        if (!mounted) return;
-                        Navigator.pop(context);
-                        Navigator.pushNamed(widget.parentContext, type.route);
-                      });
-                    },
+              Text('What are you adding?', style: BtText.d2(context)),
+              const SizedBox(height: 4),
+              Text('Select the entry type to log for the current shift.', style: BtText.subhead(context)),
+              const SizedBox(height: 20),
+              Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                for (var i = 0; i < _entryTypes.length; i++) ...[
+                  if (i > 0) const SizedBox(width: 8),
+                  Expanded(
+                    child: BtReveal(
+                      index: i,
+                      child: LogKindTile(
+                        type: _entryTypes[i].id,
+                        title: _entryTypes[i].title,
+                        subtitle: _entryTypes[i].subtitle,
+                        selected: _selectedId == _entryTypes[i].id,
+                        onTap: () {
+                          final type = _entryTypes[i];
+                          setState(() => _selectedId = type.id);
+                          Future.delayed(const Duration(milliseconds: 150), () {
+                            if (!mounted) return;
+                            Navigator.pop(context);
+                            Navigator.pushNamed(widget.parentContext, type.route);
+                          });
+                        },
+                      ),
+                    ),
                   ),
-                ),
-              ),
+                ],
+              ]),
             ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-class _EntryCard extends StatelessWidget {
-  final _EntryType type;
-  final bool isSelected;
-  final VoidCallback onTap;
-  const _EntryCard({
-    required this.type,
-    required this.isSelected,
-    required this.onTap,
-  });
-  static var primaryBlue = AppColors.primary;
-  static const textDark = AppColors.textDark;
-  static const textGray = AppColors.textLight;
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      decoration: BoxDecoration(
-        color: isSelected ? const Color(0xFFE8F1FC) : const Color(0xFFF6F7F9),
-        borderRadius: BorderRadius.circular(Bt.rCard),
-        border: Border.all(
-          color: isSelected ? primaryBlue : const Color(0xFFE8F1FC),
-          width: isSelected ? 2 : 1.5,
-        ),
-        boxShadow: isSelected
-            ? [
-                BoxShadow(
-                  color: primaryBlue.withValues(alpha: 0.12),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ]
-            : [],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(Bt.rCard),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(Bt.rCard),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  width: 52,
-                  height: 52,
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? type.iconColor.withValues(alpha: 0.18)
-                        : type.iconBg,
-                    borderRadius: BorderRadius.circular(15),
-                  ),
-                  child: Icon(type.icon, color: type.iconColor, size: 26),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        type.title,
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          color: textDark,
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        type.subtitle,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: textGray,
-                          height: 1.45,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 12),
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 200),
-                  child: isSelected
-                      ? Container(
-                          key: const ValueKey('check'),
-                          width: 28,
-                          height: 28,
-                          decoration: BoxDecoration(
-                            color: primaryBlue,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.check,
-                            color: Colors.white,
-                            size: 16,
-                          ),
-                        )
-                      : const Icon(
-                          key: ValueKey('chevron'),
-                          Icons.chevron_right,
-                          color: textGray,
-                          size: 22,
-                        ),
-                ),
-              ],
-            ),
           ),
         ),
       ),

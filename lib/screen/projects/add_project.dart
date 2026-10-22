@@ -1,6 +1,4 @@
-import 'package:buildtrack_mobile/common/widgets/entry_widgets.dart';
 import 'package:buildtrack_mobile/design/design.dart';
-import 'package:buildtrack_mobile/common/themes/app_colors.dart';
 import 'package:buildtrack_mobile/controller/project_provider.dart';
 import 'package:buildtrack_mobile/models/construction_models.dart';
 import 'package:buildtrack_mobile/models/project_model.dart';
@@ -20,9 +18,9 @@ class AddProjectScreen extends StatefulWidget {
   State<AddProjectScreen> createState() => _AddProjectScreenState();
 }
 class _AddProjectScreenState extends State<AddProjectScreen> {
-  static var primaryBlue = AppColors.primary;
-  static const textDark = AppColors.textDark;
-  static const textGray = AppColors.textLight;
+  static const primaryBlue = Bt.ink;
+  static const textDark = Bt.ink;
+  static const textGray = Bt.ink2;
   final _scrollController = ScrollController();
   final _formKey = GlobalKey<FormState>();
   int _step = 0;
@@ -78,16 +76,7 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
     'Completed',
     'Cancelled',
   ];
-  bool _cfgBasicInfoExpanded = true;
-  bool _cfgBuildingTypeExpanded = true;
-  bool _cfgLandExpanded = true;
-  bool _cfgRoomsExpanded = false;
   bool _cfgAddlExpanded = false;
-  bool _cfgUtilityExpanded = false;
-  bool _cfgGasExpanded = false;
-  bool _cfgKitchenExpanded = false;
-  bool _cfgElectricalExpanded = false;
-  bool _cfgTerraceExpanded = false;
   final _landAreaCtrl = TextEditingController();
   String _landUnit = 'Sq ft';
   final List<String> _selectedFloorChips = [];
@@ -232,9 +221,7 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
   }
   Future<void> _submit() async {
     if (_nameCtrl.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a project name')),
-      );
+      btToast(context, 'Please enter a project name', error: true);
       return;
     }
     final subProvider = Provider.of<SubscriptionProvider>(
@@ -251,6 +238,7 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
       showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
+          backgroundColor: Bt.card,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(Bt.rCard),
           ),
@@ -258,77 +246,38 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                width: 60,
-                height: 60,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF0B63CE), Color(0xFF0B63CE)],
-                  ),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: const Icon(
-                  Icons.auto_awesome_rounded,
-                  color: Colors.white,
-                  size: 28,
-                ),
+              BtTile(
+                icon: Icons.auto_awesome_rounded,
+                bg: ctx.bt.accentSoft,
+                fg: ctx.bt.accentInk,
+                size: 56,
               ),
               const SizedBox(height: 16),
               Text(
                 'Project Limit Reached',
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.primary,
-                ),
+                style: BtText.title(ctx, size: 20),
               ),
               const SizedBox(height: 8),
               Text(
                 'Your ${subProvider.currentPlan.label} plan allows up to $maxProjects projects. '
                 'Upgrade to create more.',
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 13.5,
-                  color: AppColors.textLight,
-                  height: 1.5,
-                ),
+                style: BtText.subhead(ctx),
               ),
               const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(ctx);
-                    Navigator.pushNamed(context, '/subscription');
-                  },
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    backgroundColor: AppColors.primary,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Text(
-                    'View Plans',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 15,
-                    ),
-                  ),
-                ),
+              BtButton(
+                label: 'View Plans',
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  Navigator.pushNamed(context, '/subscription');
+                },
               ),
-              const SizedBox(height: 10),
-              TextButton(
+              const SizedBox(height: 6),
+              BtButton(
+                label: 'Maybe Later',
+                variant: BtButtonVariant.quiet,
                 onPressed: () => Navigator.pop(ctx),
-                child: const Text(
-                  'Maybe Later',
-                  style: TextStyle(
-                    color: AppColors.textLight,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
               ),
             ],
           ),
@@ -337,12 +286,7 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
       return;
     }
     if (_startDate == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Please select a start date'),
-          backgroundColor: AppColors.primary,
-        ),
-      );
+      btToast(context, 'Please select a start date', error: true);
       return;
     }
     if (_mainBuildingType == null) {
@@ -460,19 +404,19 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
       );
       await projectProvider.addProject(newProject);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Project created!'),
-            backgroundColor: Color(0xFF067647),
-          ),
+        await showBtSuccess(
+          context,
+          kind: BtSuccessKind.check,
+          title: 'Project created',
+          message: newProject.name,
+          label: _projectCode,
         );
+        if (!mounted) return;
         Navigator.pop(context);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: const Color(0xFFC01048)),
-        );
+        btToast(context, 'Error: $e', error: true);
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -506,897 +450,415 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
     }
     _submit();
   }
+  static const _kStepLabels = ['BASICS', 'BUILDING', 'BUDGET', 'PHASES'];
 
   @override
   Widget build(BuildContext context) {
+    final int totalActs = _phases.fold(0, (s, p) => s + p.allActivities.length);
+    final int doneActs = _phases.fold(0, (s, p) => s + p.selectedCount);
     return Scaffold(
       backgroundColor: Bt.ground,
-      appBar: BtNavBar(title: 'New project', subtitle: 'Step ${_step + 1} of 4 · ${_kSteps[_step]}'),
+      appBar: BtNavBar(title: 'New project', subtitle: 'Step ${_step + 1} of 4', close: true),
       body: SafeArea(
         bottom: false,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-              child: Row(
-                children: [
-                  for (var i = 0; i < 4; i++) ...[
-                    if (i > 0) const SizedBox(width: 6),
-                    Expanded(
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: i <= _step ? context.bt.brand : Bt.line,
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+              child: _StepBar(step: _step, labels: _kStepLabels, onTap: null),
             ),
             Expanded(
               child: SingleChildScrollView(
                 key: const PageStorageKey<String>('add_project_scroll_key'),
                 controller: _scrollController,
                 physics: const ClampingScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
+                padding: const EdgeInsets.fromLTRB(16, 18, 16, 40),
                 child: Form(
                   key: _formKey,
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      _buildSubscriptionWarning(context),
-                      Offstage(
-                        offstage: _step != 0,
-                        child: Column(
+                      // ── Step 1 · Basics
+                      _stepBlock(0, [
+                        Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                      _buildSectionCard(
-                        title: 'Project Setup',
-                        icon: Icons.business_center_rounded,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _label('Project Name'),
-                            const SizedBox(height: 8),
-                            _field(
-                              controller: _nameCtrl,
-                              hint: 'e.g. Skyline Towers',
-                              icon: Icons.apartment_rounded,
-                              validator: (v) => v == null || v.trim().isEmpty
-                                  ? 'Required'
-                                  : null,
-                            ),
-                            const SizedBox(height: 16),
-                            _label('City'),
-                            const SizedBox(height: 8),
-                            _field(
-                              controller: _cityCtrl,
-                              hint: 'e.g. Bengaluru',
-                              icon: Icons.location_city_rounded,
-                              validator: (v) => v == null || v.trim().isEmpty
-                                  ? 'Required'
-                                  : null,
-                            ),
+                            _buildSubscriptionWarning(context),
+                            Text('Name the site.', style: BtText.d2(context)),
                           ],
                         ),
-                      ),
-                      const SizedBox(height: 16),
-                      _buildAccordionCard(
-                        title: 'Basic Information',
-                        isExpanded: _cfgBasicInfoExpanded,
-                        onToggle: () => setState(
-                          () => _cfgBasicInfoExpanded = !_cfgBasicInfoExpanded,
+                        _section(
+                          'PROJECT SETUP',
+                          _InGroup(children: [
+                            _inRow(
+                              'Name',
+                              required: true,
+                              child: _bareField(
+                                controller: _nameCtrl,
+                                hint: 'e.g. Skyline Towers',
+                                validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+                              ),
+                            ),
+                            _inRow(
+                              'Code',
+                              child: Text(
+                                '$_projectCode · auto',
+                                textAlign: TextAlign.right,
+                                style: BtText.monoFont(TextStyle(fontSize: 13, color: Bt.ink2, fontFeatures: BtText.tnum)),
+                              ),
+                            ),
+                            _inRow(
+                              'City',
+                              required: true,
+                              child: _bareField(
+                                controller: _cityCtrl,
+                                hint: 'e.g. Bengaluru',
+                                validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+                              ),
+                            ),
+                            _inRow(
+                              'Address',
+                              trailing: Icon(Icons.place_outlined, size: 20, color: context.bt.accentInk),
+                              child: _bareField(
+                                controller: _mapAddressCtrl,
+                                hint: 'Map location or address',
+                              ),
+                            ),
+                          ]),
                         ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 14,
-                                vertical: 12,
+                        _section(
+                          'CLIENT',
+                          _InGroup(children: [
+                            _inRow(
+                              'Name',
+                              child: _bareField(controller: _clientCtrl, hint: 'Client / Owner'),
+                            ),
+                            _inRow(
+                              'Contact',
+                              child: _bareField(
+                                controller: _contactCtrl,
+                                hint: '+91 XXXXX XXXXX',
+                                maxLength: 10,
+                                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                                keyboardType: TextInputType.phone,
                               ),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF3F4FF),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: primaryBlue.withValues(alpha: 0.18),
-                                  width: 1.5,
-                                ),
+                            ),
+                          ]),
+                        ),
+                        _section(
+                          'SITE TEAM',
+                          _InGroup(children: [
+                            _inRow(
+                              'Contractor',
+                              child: _bareField(controller: _contractorCtrl, hint: 'Main contractor'),
+                            ),
+                            _inRow(
+                              'Engineer',
+                              child: _bareField(controller: _engineerCtrl, hint: 'Engineer in charge'),
+                            ),
+                          ]),
+                        ),
+                      ]),
+
+                      // ── Step 2 · Building
+                      _stepBlock(1, [
+                        Text('What are we building?', style: BtText.d2(context)),
+                        _buildingTypePicker(),
+                        BtCard(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Text('LAND & FLOORS', style: BtText.mono(context)),
+                              const SizedBox(height: 10),
+                              TextFormField(
+                                controller: _landAreaCtrl,
+                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                inputFormatters: [
+                                  LengthLimitingTextInputFormatter(10),
+                                  FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d*')),
+                                ],
+                                style: BtText.num(BtText.body(context)),
+                                decoration: btInput(context, hint: 'Total land area, e.g. 2400'),
                               ),
-                              child: Row(
+                              const SizedBox(height: 10),
+                              BtSegmented<String>(
+                                segments: const {'Sq ft': 'Sq ft', 'Sq m': 'Sq m', 'Acres': 'Acres', 'Hectares': 'Hectares'},
+                                value: _landUnit,
+                                onChanged: (val) => setState(() => _landUnit = val),
+                              ),
+                              const SizedBox(height: 16),
+                              Text('Floors included', style: BtText.subhead(context, weight: FontWeight.w500)),
+                              const SizedBox(height: 8),
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 6,
+                                children: _floorChipOptions
+                                    .map(
+                                      (f) => BtChip(
+                                        label: f,
+                                        selected: _selectedFloorChips.contains(f),
+                                        onTap: () => setState(
+                                          () => _selectedFloorChips.contains(f)
+                                              ? _selectedFloorChips.remove(f)
+                                              : _selectedFloorChips.add(f),
+                                        ),
+                                      ),
+                                    )
+                                    .toList(),
+                              ),
+                            ],
+                          ),
+                        ),
+                        BtCard(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Text('ROOMS & BATHROOMS', style: BtText.mono(context)),
+                              const SizedBox(height: 10),
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Expanded(
                                     child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
+                                      crossAxisAlignment: CrossAxisAlignment.stretch,
                                       children: [
-                                        Text(
-                                          'Project Code',
-                                          style: TextStyle(
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w700,
-                                            color: textGray.withValues(
-                                              alpha: 0.7,
-                                            ),
-                                            letterSpacing: 0.3,
+                                        Text('Room types', style: BtText.caption(context)),
+                                        _Counter(
+                                          label: '1 BHK',
+                                          value: _room1BHKCount,
+                                          onInc: () => setState(() => _room1BHKCount++),
+                                          onDec: () => setState(
+                                            () => _room1BHKCount > 0 ? _room1BHKCount-- : 0,
                                           ),
                                         ),
-                                        Text(
-                                          'Auto-generated',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: textGray.withValues(
-                                              alpha: 0.5,
-                                            ),
+                                        _Counter(
+                                          label: '2 BHK',
+                                          value: _room2BHKCount,
+                                          onInc: () => setState(() => _room2BHKCount++),
+                                          onDec: () => setState(
+                                            () => _room2BHKCount > 0 ? _room2BHKCount-- : 0,
+                                          ),
+                                        ),
+                                        _Counter(
+                                          label: '3 BHK',
+                                          value: _room3BHKCount,
+                                          onInc: () => setState(() => _room3BHKCount++),
+                                          onDec: () => setState(
+                                            () => _room3BHKCount > 0 ? _room3BHKCount-- : 0,
+                                          ),
+                                        ),
+                                        _Counter(
+                                          label: 'Custom',
+                                          value: _roomCustomCount,
+                                          onInc: () => setState(() => _roomCustomCount++),
+                                          onDec: () => setState(
+                                            () => _roomCustomCount > 0
+                                                ? _roomCustomCount--
+                                                : 0,
                                           ),
                                         ),
                                       ],
                                     ),
                                   ),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 14,
-                                      vertical: 7,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: primaryBlue,
-                                      borderRadius: BorderRadius.circular(Bt.rCard),
-                                    ),
-                                    child: Text(
-                                      _projectCode,
-                                      style: const TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w700,
-                                        color: Colors.white,
-                                        letterSpacing: 0.5,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            _label(
-                              'Map Location / Address',
-                              icon: Icons.location_on_rounded,
-                            ),
-                            const SizedBox(height: 8),
-                            _field(
-                              controller: _mapAddressCtrl,
-                              hint: 'e.g. 12 Main St, Bengaluru',
-                              icon: Icons.place_rounded,
-                            ),
-                            const SizedBox(height: 16),
-                            _groupContainer(
-                              icon: Icons.person_rounded,
-                              title: 'Client Details',
-                              child: Column(
- crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  Padding(padding: EdgeInsets.zero, child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
+                                  const SizedBox(width: 14),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.stretch,
                                       children: [
-                                        _label('Client Name'),
-                                        const SizedBox(height: 8),
-                                        _field(
-                                          controller: _clientCtrl,
-                                          hint: 'Client / Owner',
-                                          icon: Icons.person_outline_rounded,
+                                        Text('Bathroom types', style: BtText.caption(context)),
+                                        _Counter(
+                                          label: 'Western',
+                                          value: _bathWesternCount,
+                                          onInc: () => setState(() => _bathWesternCount++),
+                                          onDec: () => setState(
+                                            () => _bathWesternCount > 0
+                                                ? _bathWesternCount--
+                                                : 0,
+                                          ),
                                         ),
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(height: 16),
-                                  Padding(padding: EdgeInsets.zero, child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        _label('Contact Number'),
-                                        const SizedBox(height: 8),
-                                        _field(
-                                          controller: _contactCtrl,
-                                          hint: '+91 XXXXX XXXXX',
-                                          icon: Icons.phone_outlined,
-                                          maxLength: 10,
-                                          inputFormatters: [
-                                            FilteringTextInputFormatter
-                                                .digitsOnly,
-                                          ],
-                                          keyboardType: TextInputType.phone,
+                                        _Counter(
+                                          label: 'Indian',
+                                          value: _bathIndianCount,
+                                          onInc: () => setState(() => _bathIndianCount++),
+                                          onDec: () => setState(
+                                            () => _bathIndianCount > 0
+                                                ? _bathIndianCount--
+                                                : 0,
+                                          ),
+                                        ),
+                                        _Counter(
+                                          label: 'Common',
+                                          value: _bathCommonCount,
+                                          onInc: () => setState(() => _bathCommonCount++),
+                                          onDec: () => setState(
+                                            () => _bathCommonCount > 0
+                                                ? _bathCommonCount--
+                                                : 0,
+                                          ),
+                                        ),
+                                        _Counter(
+                                          label: 'Attached',
+                                          value: _bathAttachedCount,
+                                          onInc: () => setState(() => _bathAttachedCount++),
+                                          onDec: () => setState(
+                                            () => _bathAttachedCount > 0
+                                                ? _bathAttachedCount--
+                                                : 0,
+                                          ),
                                         ),
                                       ],
                                     ),
                                   ),
                                 ],
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            _groupContainer(
-                              icon: Icons.engineering_rounded,
-                              title: 'Site Team',
-                              child: Column(
- crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  Padding(padding: EdgeInsets.zero, child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        _label('Site Engineer'),
-                                        const SizedBox(height: 8),
-                                        _field(
-                                          controller: _engineerCtrl,
-                                          hint: 'Engineer in charge',
-                                          icon: Icons.construction_outlined,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(height: 16),
-                                  Padding(padding: EdgeInsets.zero, child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        _label('Contractor Name'),
-                                        const SizedBox(height: 8),
-                                        _field(
-                                          controller: _contractorCtrl,
-                                          hint: 'Main contractor',
-                                          icon: Icons.engineering_outlined,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                          ],
-                        ),
-                      ),
-                      Offstage(
-                        offstage: _step != 1,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                      _buildAccordionCard(
-                        title: 'Building Type',
-                        isExpanded: _cfgBuildingTypeExpanded,
-                        onToggle: () => setState(
-                          () => _cfgBuildingTypeExpanded =
-                              !_cfgBuildingTypeExpanded,
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Column(
- crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                Padding(padding: EdgeInsets.zero, child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      _label('Main Type'),
-                                      const SizedBox(height: 8),
-                                      _buildDropdown(
-                                        value: _mainBuildingType,
-                                        hint: 'Select building type',
-                                        items: _buildingSubTypes.keys.toList(),
-                                        onChanged: (val) => setState(() {
-                                          _mainBuildingType = val;
-                                          _buildingSubType = null;
-                                          _isCustomSubType = false;
-                                          _customSubTypeCtrl.clear();
-                                          _buildingTypeError = null;
-                                        }),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                                Padding(padding: EdgeInsets.zero, child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      _label('Sub Type'),
-                                      const SizedBox(height: 8),
-                                      _buildDropdown(
-                                        value: _isCustomSubType
-                                            ? 'Other (Custom)'
-                                            : _buildingSubType,
-                                        hint: _mainBuildingType == null
-                                            ? 'Select main type first'
-                                            : 'Select sub type',
-                                        items: _mainBuildingType != null
-                                            ? (_buildingSubTypes[_mainBuildingType!] ??
-                                                  [])
-                                            : [],
-                                        onChanged: _mainBuildingType == null
-                                            ? null
-                                            : (val) => setState(() {
-                                                if (val == 'Other (Custom)') {
-                                                  _isCustomSubType = true;
-                                                  _buildingSubType = null;
-                                                } else {
-                                                  _isCustomSubType = false;
-                                                  _buildingSubType = val;
-                                                  _customSubTypeCtrl.clear();
-                                                }
-                                              }),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                            if (_isCustomSubType) ...[
-                              const SizedBox(height: 12),
-                              _label(
-                                'Enter Custom Sub Type',
-                                icon: Icons.edit_rounded,
-                              ),
-                              const SizedBox(height: 8),
-                              _field(
-                                controller: _customSubTypeCtrl,
-                                hint: 'e.g. Duplex, Penthouse...',
-                                icon: Icons.category_outlined,
                               ),
                             ],
-                            if (_buildingTypeError != null)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 8),
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      Icons.error_outline,
-                                      size: 14,
-                                      color: Colors.red.shade400,
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      _buildingTypeError!,
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.red.shade400,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                          ],
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 16),
-                      _buildAccordionCard(
-                        title: 'Land & Floors',
-                        isExpanded: _cfgLandExpanded,
-                        onToggle: () => setState(
-                          () => _cfgLandExpanded = !_cfgLandExpanded,
+                        _configSection(
+                          'ADDITIONAL CONFIGURATION',
+                          _addlConfigOptions,
+                          expanded: _cfgAddlExpanded,
+                          onToggle: () => setState(() => _cfgAddlExpanded = !_cfgAddlExpanded),
                         ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  flex: 2,
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      _label('Total Land Area'),
-                                      const SizedBox(height: 8),
-                                      _field(
-                                        controller: _landAreaCtrl,
-                                        hint: 'e.g. 2400',
-                                        keyboardType:
-                                            const TextInputType.numberWithOptions(
-                                              decimal: true,
-                                            ),
-                                        inputFormatters: [
-                                          LengthLimitingTextInputFormatter(10),
-                                          FilteringTextInputFormatter.allow(
-                                            RegExp(r'^\d+\.?\d*'),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  flex: 1,
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      _label('Unit'),
-                                      const SizedBox(height: 8),
-                                      _buildDropdown(
-                                        value: _landUnit,
-                                        hint: 'Unit',
-                                        items: const [
-                                          'Sq ft',
-                                          'Sq m',
-                                          'Acres',
-                                          'Hectares',
-                                        ],
-                                        onChanged: (val) => setState(
-                                          () => _landUnit = val ?? 'Sq ft',
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 20),
-                            _label('Floors Included'),
-                            const SizedBox(height: 12),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: _floorChipOptions
-                                  .map(
-                                    (f) => _buildSelectableChip(
-                                      label: f,
-                                      isSelected: _selectedFloorChips.contains(
-                                        f,
-                                      ),
-                                      onTap: () => setState(
-                                        () => _selectedFloorChips.contains(f)
-                                            ? _selectedFloorChips.remove(f)
-                                            : _selectedFloorChips.add(f),
-                                      ),
-                                    ),
-                                  )
-                                  .toList(),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      _buildAccordionCard(
-                        title: 'Rooms & Bathrooms',
-                        isExpanded: _cfgRoomsExpanded,
-                        onToggle: () => setState(
-                          () => _cfgRoomsExpanded = !_cfgRoomsExpanded,
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _label('Room types', uppercase: true),
-                            const SizedBox(height: 16),
-                            _buildCounterRow(
-                              '1 BHK',
-                              _room1BHKCount,
-                              onInc: () => setState(() => _room1BHKCount++),
-                              onDec: () => setState(
-                                () => _room1BHKCount > 0 ? _room1BHKCount-- : 0,
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            _buildCounterRow(
-                              '2 BHK',
-                              _room2BHKCount,
-                              onInc: () => setState(() => _room2BHKCount++),
-                              onDec: () => setState(
-                                () => _room2BHKCount > 0 ? _room2BHKCount-- : 0,
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            _buildCounterRow(
-                              '3 BHK',
-                              _room3BHKCount,
-                              onInc: () => setState(() => _room3BHKCount++),
-                              onDec: () => setState(
-                                () => _room3BHKCount > 0 ? _room3BHKCount-- : 0,
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            _buildCounterRow(
-                              'Custom Room',
-                              _roomCustomCount,
-                              onInc: () => setState(() => _roomCustomCount++),
-                              onDec: () => setState(
-                                () => _roomCustomCount > 0
-                                    ? _roomCustomCount--
-                                    : 0,
-                              ),
-                            ),
-                            const Padding(
-                              padding: EdgeInsets.symmetric(vertical: 24),
-                              child: Divider(
-                                color: Color(0xFFEEF1F5),
-                                height: 1,
-                              ),
-                            ),
-                            _label('Bathroom types', uppercase: true),
-                            const SizedBox(height: 16),
-                            _buildCounterRow(
-                              'Western Toilet',
-                              _bathWesternCount,
-                              onInc: () => setState(() => _bathWesternCount++),
-                              onDec: () => setState(
-                                () => _bathWesternCount > 0
-                                    ? _bathWesternCount--
-                                    : 0,
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            _buildCounterRow(
-                              'Indian Toilet',
-                              _bathIndianCount,
-                              onInc: () => setState(() => _bathIndianCount++),
-                              onDec: () => setState(
-                                () => _bathIndianCount > 0
-                                    ? _bathIndianCount--
-                                    : 0,
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            _buildCounterRow(
-                              'Common Bath',
-                              _bathCommonCount,
-                              onInc: () => setState(() => _bathCommonCount++),
-                              onDec: () => setState(
-                                () => _bathCommonCount > 0
-                                    ? _bathCommonCount--
-                                    : 0,
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            _buildCounterRow(
-                              'Attached Bath',
-                              _bathAttachedCount,
-                              onInc: () => setState(() => _bathAttachedCount++),
-                              onDec: () => setState(
-                                () => _bathAttachedCount > 0
-                                    ? _bathAttachedCount--
-                                    : 0,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      _buildAccordionCard(
-                        title: 'Additional Configuration',
-                        isExpanded: _cfgAddlExpanded,
-                        onToggle: () => setState(
-                          () => _cfgAddlExpanded = !_cfgAddlExpanded,
-                        ),
-                        child: LayoutBuilder(
-                          builder: (context, constraints) {
-                            final halfWidth = (constraints.maxWidth - 16) / 2;
-                            return Wrap(
-                              spacing: 16,
-                              runSpacing: 16,
-                              children: _addlConfigOptions
-                                  .map(
-                                    (opt) => SizedBox(
-                                      width: halfWidth,
-                                      child: _buildCheckboxRow(
-                                        opt,
-                                        _additionalConfigs.contains(opt),
-                                        (v) => setState(
-                                          () => v == true
-                                              ? _additionalConfigs.add(opt)
-                                              : _additionalConfigs.remove(opt),
-                                        ),
-                                      ),
-                                    ),
-                                  )
-                                  .toList(),
-                            );
-                          },
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      _buildAccordionCard(
-                        title: 'Utility & Services',
-                        isExpanded: _cfgUtilityExpanded,
-                        onToggle: () => setState(
-                          () => _cfgUtilityExpanded = !_cfgUtilityExpanded,
-                        ),
-                        child: _buildConfigList(_utilityOptions),
-                      ),
-                      const SizedBox(height: 16),
-                      _buildAccordionCard(
-                        title: 'Gas Connection',
-                        isExpanded: _cfgGasExpanded,
-                        onToggle: () =>
-                            setState(() => _cfgGasExpanded = !_cfgGasExpanded),
-                        child: _buildConfigList(_gasOptions),
-                      ),
-                      const SizedBox(height: 16),
-                      _buildAccordionCard(
-                        title: 'Kitchen Requirements',
-                        isExpanded: _cfgKitchenExpanded,
-                        onToggle: () => setState(
-                          () => _cfgKitchenExpanded = !_cfgKitchenExpanded,
-                        ),
-                        child: _buildConfigList(_kitchenOptions),
-                      ),
-                      const SizedBox(height: 16),
-                      _buildAccordionCard(
-                        title: 'Electrical & Plumbing',
-                        isExpanded: _cfgElectricalExpanded,
-                        onToggle: () => setState(
-                          () =>
-                              _cfgElectricalExpanded = !_cfgElectricalExpanded,
-                        ),
-                        child: _buildConfigList(_electricalOptions),
-                      ),
-                      const SizedBox(height: 16),
-                      _buildAccordionCard(
-                        title: 'Terrace & Interior',
-                        isExpanded: _cfgTerraceExpanded,
-                        onToggle: () => setState(
-                          () => _cfgTerraceExpanded = !_cfgTerraceExpanded,
-                        ),
-                        child: _buildConfigList(_terraceOptions),
-                      ),
-                          ],
-                        ),
-                      ),
-                      Offstage(
-                        offstage: _step != 2,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                      _buildSectionCard(
-                        title: 'Dates, Budget & Status',
-                        icon: Icons.calendar_today_rounded,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _label('Project timeline', uppercase: true),
-                            const SizedBox(height: 16),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      _label('Start Date'),
-                                      const SizedBox(height: 8),
-                                      _datePicker(
-                                        date: _startDate,
-                                        hint: 'Select start date',
-                                        onSelect: () => _pickDate(
-                                          initial: _startDate ?? DateTime.now(),
-                                          onPicked: (d) => _startDate = d,
-                                        ),
-                                        required: true,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      _label('Expected End'),
-                                      const SizedBox(height: 8),
-                                      _datePicker(
-                                        date: _expectedEndDate,
-                                        hint: 'dd/mm/yyyy',
-                                        onSelect: () => _pickDate(
-                                          initial:
-                                              _expectedEndDate ??
-                                              DateTime.now(),
-                                          onPicked: (d) => _expectedEndDate = d,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const Padding(
-                              padding: EdgeInsets.symmetric(vertical: 24),
-                              child: Divider(
-                                color: Color(0xFFEEF1F5),
-                                height: 1,
-                              ),
-                            ),
-                            _label('Budget breakdown', uppercase: true),
-                            const SizedBox(height: 16),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      _label('Material (₹)'),
-                                      const SizedBox(height: 8),
-                                      _field(
-                                        controller: _budgetMaterialCtrl,
-                                        hint: '₹ 0',
-                                        keyboardType:
-                                            const TextInputType.numberWithOptions(
-                                              decimal: true,
-                                            ),
-                                        maxLength: 10,
-                                        inputFormatters: [
-                                          FilteringTextInputFormatter.allow(
-                                            RegExp(r'^\d+\.?\d*'),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      _label('Labour (₹)'),
-                                      const SizedBox(height: 8),
-                                      _field(
-                                        controller: _budgetLabourCtrl,
-                                        hint: '₹ 0',
-                                        keyboardType:
-                                            const TextInputType.numberWithOptions(
-                                              decimal: true,
-                                            ),
-                                        maxLength: 10,
-                                        inputFormatters: [
-                                          FilteringTextInputFormatter.allow(
-                                            RegExp(r'^\d+\.?\d*'),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      _label('Equipment (₹)'),
-                                      const SizedBox(height: 8),
-                                      _field(
-                                        controller: _budgetEquipmentCtrl,
-                                        hint: '₹ 0',
-                                        keyboardType:
-                                            const TextInputType.numberWithOptions(
-                                              decimal: true,
-                                            ),
-                                        maxLength: 10,
-                                        inputFormatters: [
-                                          FilteringTextInputFormatter.allow(
-                                            RegExp(r'^\d+\.?\d*'),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      _label('Misc (₹)'),
-                                      const SizedBox(height: 8),
-                                      _field(
-                                        controller: _budgetMiscCtrl,
-                                        hint: '₹ 0',
-                                        keyboardType:
-                                            const TextInputType.numberWithOptions(
-                                              decimal: true,
-                                            ),
-                                        maxLength: 10,
-                                        inputFormatters: [
-                                          FilteringTextInputFormatter.allow(
-                                            RegExp(r'^\d+\.?\d*'),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const Padding(
-                              padding: EdgeInsets.symmetric(vertical: 24),
-                              child: Divider(
-                                color: Color(0xFFEEF1F5),
-                                height: 1,
-                              ),
-                            ),
-                            _label('Project status', uppercase: true),
-                            const SizedBox(height: 16),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: _statusOptions.map((opt) {
-                                final isSelected = _projectStatus == opt;
-                                final isCancelled = opt == 'Cancelled';
-                                return GestureDetector(
-                                  onTap: () =>
-                                      setState(() => _projectStatus = opt),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 16,
-                                      vertical: 10,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: isSelected
-                                          ? (isCancelled
-                                                ? const Color(0xFFFDECEF)
-                                                : primaryBlue.withValues(
-                                                    alpha: 0.1,
-                                                  ))
-                                          : Colors.white,
-                                      borderRadius: BorderRadius.circular(Bt.rCard),
-                                      border: Border.all(
-                                        color: isSelected
-                                            ? (isCancelled
-                                                  ? Colors.red.withValues(
-                                                      alpha: 0.5,
-                                                    )
-                                                  : primaryBlue)
-                                            : const Color(0xFFEEF1F5),
-                                        width: 1.5,
-                                      ),
-                                    ),
-                                    child: Text(
-                                      opt,
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w700,
-                                        color: isSelected
-                                            ? (isCancelled
-                                                  ? const Color(0xFFC01048)
-                                                  : primaryBlue)
-                                            : textGray,
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              }).toList(),
-                            ),
-                          ],
-                        ),
-                      ),
-                          ],
-                        ),
-                      ),
-                      Offstage(
-                        offstage: _step != 3,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                      _buildCsvImportExportCard(),
-                      const SizedBox(height: 16),
-                      _buildConstructionPhasesCard(),
-                          ],
-                        ),
-                      ),
+                        _configSection('UTILITY & SERVICES', _utilityOptions),
+                        _configSection('GAS CONNECTION', _gasOptions),
+                        _configSection('KITCHEN REQUIREMENTS', _kitchenOptions),
+                        _configSection('ELECTRICAL & PLUMBING', _electricalOptions),
+                        _configSection('TERRACE & INTERIOR', _terraceOptions),
+                      ]),
 
+                      // ── Step 3 · Dates & budget
+                      _stepBlock(2, [
+                        Text('When, and how much?', style: BtText.d2(context)),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _DateTile(
+                                label: 'Start date',
+                                required: true,
+                                date: _startDate,
+                                onTap: () => _pickDate(
+                                  initial: _startDate ?? DateTime.now(),
+                                  onPicked: (d) => _startDate = d,
+                                ),
+                              ),
+                            ),
+                            const Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 8),
+                              child: Icon(Icons.arrow_forward_rounded, size: 18, color: Bt.ink3),
+                            ),
+                            Expanded(
+                              child: _DateTile(
+                                label: 'Expected end',
+                                required: false,
+                                date: _expectedEndDate,
+                                onTap: () => _pickDate(
+                                  initial: _expectedEndDate ?? DateTime.now(),
+                                  onPicked: (d) => _expectedEndDate = d,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        _statusPicker(),
+                        ListenableBuilder(
+                          listenable: Listenable.merge([
+                            _budgetMaterialCtrl,
+                            _budgetLabourCtrl,
+                            _budgetEquipmentCtrl,
+                            _budgetMiscCtrl,
+                          ]),
+                          builder: (context, _) => _BudgetSummary(values: [
+                            double.tryParse(_budgetMaterialCtrl.text) ?? 0,
+                            double.tryParse(_budgetLabourCtrl.text) ?? 0,
+                            double.tryParse(_budgetEquipmentCtrl.text) ?? 0,
+                            double.tryParse(_budgetMiscCtrl.text) ?? 0,
+                          ]),
+                        ),
+                        _section(
+                          'BUDGET BREAKDOWN',
+                          _InGroup(children: [
+                            _budgetRow('Material', context.bt.accent, _budgetMaterialCtrl),
+                            _budgetRow('Labour', Bt.steel, _budgetLabourCtrl),
+                            _budgetRow('Equipment', Bt.slate, _budgetEquipmentCtrl),
+                            _budgetRow('Misc', Bt.ink, _budgetMiscCtrl),
+                          ]),
+                        ),
+                      ]),
+
+                      // ── Step 4 · Phases
+                      _stepBlock(3, [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Phases & work', style: BtText.d2(context)),
+                            const SizedBox(height: 4),
+                            Text('Select phases and activities required.', style: BtText.subhead(context)),
+                          ],
+                        ),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                '${_phases.length} phases · $doneActs of $totalActs activities selected',
+                                maxLines: 2,
+                                style: BtText.num(BtText.subhead(context, color: Bt.ink, weight: FontWeight.w600)),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            _link(
+                              'Select all',
+                              color: context.bt.accentInk,
+                              onTap: () => setState(() {
+                                for (var p in _phases) {
+                                  p.isSelected = true;
+                                  for (var a in p.allActivities) {
+                                    a.isSelected = true;
+                                  }
+                                }
+                              }),
+                            ),
+                            const SizedBox(width: 4),
+                            _link(
+                              'Clear',
+                              color: Bt.ink2,
+                              onTap: () => setState(() {
+                                for (var p in _phases) {
+                                  p.isSelected = false;
+                                  for (var a in p.allActivities) {
+                                    a.isSelected = false;
+                                  }
+                                }
+                              }),
+                            ),
+                          ],
+                        ),
+                        _buildCsvImportExportCard(),
+                        Container(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(Bt.rCard),
+                            boxShadow: Bt.shadow,
+                          ),
+                          child: Material(
+                            color: Bt.card,
+                            borderRadius: BorderRadius.circular(Bt.rCard),
+                            clipBehavior: Clip.antiAlias,
+                            child: Column(
+                              children: List.generate(
+                                _phases.length,
+                                (i) => _buildPhaseAccordion(i, _phases[i]),
+                              ),
+                            ),
+                          ),
+                        ),
+                        BtButton(
+                          label: 'Add custom phase',
+                          icon: Icons.add_rounded,
+                          variant: BtButtonVariant.secondary,
+                          onPressed: _showAddCustomStageDialog,
+                        ),
+                      ]),
                     ],
                   ),
                 ),
@@ -1405,704 +867,431 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
           ],
         ),
       ),
-      bottomNavigationBar: EntryBottomBar(
+      bottomNavigationBar: BtCtaBar(
+        children: [
+          SizedBox(
+            width: 104,
+            child: BtButton(
+              label: _step == 0 ? 'Cancel' : 'Back',
+              variant: BtButtonVariant.secondary,
+              onPressed: _saving
+                  ? null
+                  : () => _step == 0 ? Navigator.maybePop(context) : _goStep(_step - 1),
+            ),
+          ),
+          Expanded(
+            child: _step < 3
+                ? BtButton(label: 'Next: ${_kSteps[_step + 1]}', onPressed: _next)
+                : BtButton(
+                    label: 'Add Project',
+                    icon: Icons.check_rounded,
+                    variant: BtButtonVariant.accent,
+                    loading: _saving,
+                    onPressed: (_saving || _mainBuildingType == null) ? null : _finish,
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// One wizard step. All steps stay mounted (Offstage) so the form can
+  /// validate fields on earlier steps; the active one re-runs its entrance.
+  Widget _stepBlock(int n, List<Widget> children) {
+    final active = _step == n;
+    return Offstage(
+      offstage: !active,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (var i = 0; i < children.length; i++)
+            Padding(
+              padding: EdgeInsets.only(top: i == 0 ? 0 : (i == 1 ? 18 : 16)),
+              child: BtReveal(
+                key: ValueKey('np-$n-$i-$active'),
+                index: i > 7 ? 7 : i,
+                child: children[i],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _section(String mono, Widget child, {Widget? trailing}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Expanded(child: Text(mono, style: BtText.mono(context))),
+            ?trailing,
+          ],
+        ),
+        const SizedBox(height: 8),
+        child,
+      ],
+    );
+  }
+
+  Widget _inRow(String label, {required Widget child, bool required = false, Widget? leading, Widget? trailing}) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 54),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Row(
           children: [
-            if (_step > 0) ...[
-              Expanded(
-                child: BtButton(
-                  label: 'Back',
-                  variant: BtButtonVariant.secondary,
-                  onPressed: _saving ? null : () => _goStep(_step - 1),
-                ),
+            if (leading != null) ...[leading, const SizedBox(width: 10)],
+            SizedBox(
+              width: leading != null ? 82 : 96,
+              child: Text.rich(
+                TextSpan(children: [
+                  TextSpan(text: label),
+                  if (required) const TextSpan(text: ' *', style: TextStyle(color: Bt.red)),
+                ]),
+                style: BtText.subhead(context),
               ),
-              const SizedBox(width: 12),
-            ],
-            Expanded(
-              flex: 2,
-              child: _step < 3
-                  ? BtButton(label: 'Next: ${_kSteps[_step + 1]}', onPressed: _next)
-                  : BtButton(
-                      label: 'Add Project',
-                      loading: _saving,
-                      onPressed: (_saving || _mainBuildingType == null) ? null : _finish,
-                    ),
             ),
+            const SizedBox(width: 8),
+            Expanded(child: child),
+            if (trailing != null) ...[const SizedBox(width: 8), trailing],
           ],
         ),
       ),
     );
   }
-  Widget _groupContainer({
-    required IconData icon,
-    required String title,
-    required Widget child,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF6F7F9),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Bt.line),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, size: 14, color: primaryBlue),
-              const SizedBox(width: 6),
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: textDark,
-                  letterSpacing: 0.3,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          child,
-        ],
-      ),
-    );
-  }
-  Widget _buildConfigList(List<String> options) {
-    return Column(
-      children: options
-          .map(
-            (opt) => Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: _buildCheckboxRow(
-                opt,
-                _additionalConfigs.contains(opt),
-                (v) => setState(
-                  () => v == true
-                      ? _additionalConfigs.add(opt)
-                      : _additionalConfigs.remove(opt),
-                ),
-              ),
-            ),
-          )
-          .toList(),
-    );
-  }
-  Widget _buildAccordionCard({
-    required String title,
-    required bool isExpanded,
-    required VoidCallback onToggle,
-    required Widget child,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Bt.line),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          InkWell(
-            onTap: onToggle,
-            borderRadius: BorderRadius.circular(12),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: textDark,
-                    ),
-                  ),
-                  AnimatedRotation(
-                    turns: isExpanded ? 0.5 : 0,
-                    duration: const Duration(milliseconds: 200),
-                    child: const Icon(
-                      Icons.keyboard_arrow_down_rounded,
-                      color: textGray,
-                      size: 24,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          AnimatedCrossFade(
-            firstChild: const SizedBox(width: double.infinity, height: 0),
-            secondChild: Column(
-              children: [
-                const Divider(height: 1, color: Color(0xFFEEF1F5)),
-                Padding(padding: const EdgeInsets.all(16), child: child),
-              ],
-            ),
-            crossFadeState: isExpanded
-                ? CrossFadeState.showSecond
-                : CrossFadeState.showFirst,
-            duration: const Duration(milliseconds: 200),
-          ),
-        ],
-      ),
-    );
-  }
-  Widget _buildSectionCard({
-    required String title,
-    required IconData icon,
-    required Widget child,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Bt.line),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: primaryBlue.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(icon, color: primaryBlue, size: 20),
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: textDark,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const Divider(height: 1, color: Color(0xFFEEF1F5)),
-          Padding(padding: const EdgeInsets.all(16), child: child),
-        ],
-      ),
-    );
-  }
-  Widget _label(String text, {IconData? icon, bool uppercase = false}) {
-    final tw = Text(
-      text,
-      style: TextStyle(
-        fontSize: uppercase ? 15 : 14,
-        fontWeight: uppercase ? FontWeight.w600 : FontWeight.w500,
-        color: uppercase ? Bt.ink : Bt.ink2,
-      ),
-    );
-    if (icon == null) return tw;
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 14, color: primaryBlue),
-        const SizedBox(width: 6),
-        tw,
-      ],
-    );
-  }
-  Widget _field({
+
+  /// Borderless input for grouped rows.
+  Widget _bareField({
     required TextEditingController controller,
     required String hint,
-    IconData? icon,
     TextInputType? keyboardType,
     List<TextInputFormatter>? inputFormatters,
     int? maxLength,
+    String? prefixText,
     String? Function(String?)? validator,
   }) {
+    const none = InputBorder.none;
     return TextFormField(
       controller: controller,
       keyboardType: keyboardType,
       inputFormatters: inputFormatters,
       maxLength: maxLength,
       validator: validator,
-      style: const TextStyle(
-        fontWeight: FontWeight.w600,
-        fontSize: 14,
-        color: textDark,
-      ),
+      style: BtText.num(BtText.body(context)),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: TextStyle(
-          color: textGray.withValues(alpha: 0.5),
-          fontSize: 14,
-        ),
-        filled: true,
-        fillColor: Colors.white,
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 14,
-        ),
+        hintStyle: BtText.body(context, color: Bt.placeholder),
+        prefixText: prefixText,
+        prefixStyle: BtText.body(context, color: Bt.ink2),
         counterText: '',
-        prefixIcon: icon != null ? Icon(icon, size: 18, color: textGray) : null,
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFFEEF1F5), width: 1.5),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: primaryBlue, width: 2),
-        ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.red.shade300, width: 1.5),
-        ),
-        focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.red.shade400, width: 2),
-        ),
+        isDense: true,
+        filled: false,
+        contentPadding: const EdgeInsets.symmetric(vertical: 17),
+        border: none,
+        enabledBorder: none,
+        focusedBorder: none,
+        errorBorder: none,
+        focusedErrorBorder: none,
+        disabledBorder: none,
+        errorStyle: BtText.caption(context, color: Bt.red),
       ),
     );
   }
-  Widget _buildDropdown({
-    required String? value,
-    required String hint,
-    required List<String> items,
-    ValueChanged<String?>? onChanged,
-  }) {
-    final bool disabled = onChanged == null;
-    return Container(
-      height: 48,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: BoxDecoration(
-        color: disabled ? const Color(0xFFF5F5F8) : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Bt.line),
+
+  Widget _budgetRow(String label, Color dot, TextEditingController ctrl) {
+    return _inRow(
+      label,
+      leading: Container(
+        width: 8,
+        height: 8,
+        decoration: BoxDecoration(color: dot, borderRadius: BorderRadius.circular(2)),
       ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: value,
-          isExpanded: true,
-          hint: Text(
-            hint,
-            style: TextStyle(
-              color: disabled
-                  ? textGray.withValues(alpha: 0.3)
-                  : textGray.withValues(alpha: 0.5),
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          icon: Icon(
-            Icons.keyboard_arrow_down_rounded,
-            color: disabled ? textGray.withValues(alpha: 0.3) : textGray,
-          ),
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: textDark,
-          ),
-          items: items
-              .map((e) => DropdownMenuItem<String>(value: e, child: Text(e)))
-              .toList(),
-          onChanged: onChanged,
-        ),
+      child: _bareField(
+        controller: ctrl,
+        hint: '₹ 0',
+        prefixText: '₹ ',
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        maxLength: 10,
+        inputFormatters: [
+          FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d*')),
+        ],
       ),
     );
   }
-  Widget _buildSelectableChip({
-    required String label,
-    required bool isSelected,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
+
+  Widget _link(String text, {required Color color, required VoidCallback onTap}) {
+    return BtPressable(
       onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        decoration: BoxDecoration(
-          color: isSelected ? primaryBlue : Colors.white,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(
-            color: isSelected ? primaryBlue : const Color(0xFFEEF1F5),
-            width: 1.5,
-          ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-            color: isSelected ? Colors.white : textGray,
+      semanticLabel: text,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 44),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6),
+          child: Center(
+            widthFactor: 1,
+            child: Text(text, style: BtText.subhead(context, color: color, weight: FontWeight.w600)),
           ),
         ),
       ),
     );
   }
-  Widget _buildCounterRow(
-    String title,
-    int value, {
-    required VoidCallback onInc,
-    required VoidCallback onDec,
-  }) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+
+  static IconData _typeIcon(String type) {
+    final t = type.toLowerCase();
+    if (t.contains('resid')) return Icons.home_outlined;
+    if (t.contains('educ')) return Icons.school_outlined;
+    if (t.contains('instit')) return Icons.account_balance_outlined;
+    if (t.contains('commer')) return Icons.storefront_outlined;
+    if (t.contains('indus')) return Icons.factory_outlined;
+    return Icons.apartment_outlined;
+  }
+
+  static String _typeLabel(String type) =>
+      type == 'Business / Commercial' ? 'Commercial' : type;
+
+  Widget _buildingTypePicker() {
+    final subs = _mainBuildingType != null
+        ? (_buildingSubTypes[_mainBuildingType!] ?? const <String>[])
+        : const <String>[];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          title,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: textDark,
-          ),
-        ),
-        Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Bt.line),
-          ),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          clipBehavior: Clip.none,
           child: Row(
             children: [
-              GestureDetector(
-                onTap: onDec,
-                child: Container(
-                  width: 36,
-                  height: 36,
-                  color: Colors.transparent,
-                  child: const Icon(Icons.remove, size: 16, color: textGray),
+              for (final type in _buildingSubTypes.keys) ...[
+                if (type != _buildingSubTypes.keys.first) const SizedBox(width: 8),
+                _TypeTile(
+                  icon: _typeIcon(type),
+                  label: _typeLabel(type),
+                  selected: _mainBuildingType == type,
+                  onTap: () => setState(() {
+                    _mainBuildingType = type;
+                    _buildingSubType = null;
+                    _isCustomSubType = false;
+                    _customSubTypeCtrl.clear();
+                    _buildingTypeError = null;
+                  }),
                 ),
+              ],
+            ],
+          ),
+        ),
+        if (_buildingTypeError != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Row(
+              children: [
+                const Icon(Icons.error_outline_rounded, size: 16, color: Bt.red),
+                const SizedBox(width: 6),
+                Text(_buildingTypeError!, style: BtText.caption(context, color: Bt.red, weight: FontWeight.w500)),
+              ],
+            ),
+          ),
+        const SizedBox(height: 14),
+        Text('Sub type', style: BtText.subhead(context, weight: FontWeight.w500)),
+        const SizedBox(height: 8),
+        if (_mainBuildingType == null)
+          Text('Select main type first', style: BtText.caption(context))
+        else
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: subs.map((val) {
+              final sel = val == 'Other (Custom)' ? _isCustomSubType : (!_isCustomSubType && _buildingSubType == val);
+              return BtChip(
+                label: val,
+                selected: sel,
+                onTap: () => setState(() {
+                  if (val == 'Other (Custom)') {
+                    _isCustomSubType = true;
+                    _buildingSubType = null;
+                  } else {
+                    _isCustomSubType = false;
+                    _buildingSubType = val;
+                    _customSubTypeCtrl.clear();
+                  }
+                }),
+              );
+            }).toList(),
+          ),
+        if (_isCustomSubType) ...[
+          const SizedBox(height: 10),
+          _InGroup(children: [
+            _inRow(
+              'Custom',
+              child: _bareField(
+                controller: _customSubTypeCtrl,
+                hint: 'e.g. Duplex, Penthouse...',
               ),
-              Container(
-                width: 36,
-                alignment: Alignment.center,
-                decoration: const BoxDecoration(
-                  border: Border.symmetric(
-                    vertical: BorderSide(color: Color(0xFFEEF1F5), width: 1.5),
-                  ),
+            ),
+          ]),
+        ],
+      ],
+    );
+  }
+
+  Widget _statusPicker() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text('Project status', style: BtText.subhead(context, weight: FontWeight.w500)),
+        const SizedBox(height: 8),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          clipBehavior: Clip.none,
+          child: Row(
+            children: [
+              for (final opt in _statusOptions) ...[
+                if (opt != _statusOptions.first) const SizedBox(width: 6),
+                BtChip(
+                  label: opt,
+                  selected: _projectStatus == opt,
+                  onTap: () => setState(() => _projectStatus = opt),
                 ),
-                child: Text(
-                  value.toString(),
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: textDark,
-                  ),
-                ),
-              ),
-              GestureDetector(
-                onTap: onInc,
-                child: Container(
-                  width: 36,
-                  height: 36,
-                  color: Colors.transparent,
-                  child: Icon(Icons.add, size: 16, color: primaryBlue),
-                ),
-              ),
+              ],
             ],
           ),
         ),
       ],
     );
   }
-  Widget _buildCheckboxRow(
-    String title,
-    bool value,
-    ValueChanged<bool?> onChanged,
-  ) {
-    return Row(
+
+  /// A configuration group as chips. Long groups show the first 8 (plus any
+  /// selected) until expanded.
+  Widget _configSection(String title, List<String> options, {bool expanded = true, VoidCallback? onToggle}) {
+    final selCount = options.where(_additionalConfigs.contains).length;
+    final collapsible = onToggle != null && options.length > 8;
+    final showAll = !collapsible || expanded;
+    final visible = showAll
+        ? options
+        : [
+            for (var i = 0; i < options.length; i++)
+              if (i < 8 || _additionalConfigs.contains(options[i])) options[i],
+          ];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SizedBox(
-          width: 24,
-          height: 24,
-          child: Checkbox(
-            value: value,
-            onChanged: onChanged,
-            activeColor: primaryBlue,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(4),
-            ),
-            side: const BorderSide(color: Color(0xFFE4E7EC), width: 1.5),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            title,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: textDark,
-            ),
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-      ],
-    );
-  }
-  Widget _datePicker({
-    DateTime? date,
-    String? hint,
-    required VoidCallback onSelect,
-    bool required = false,
-  }) {
-    final bool isEmpty = date == null;
-    return GestureDetector(
-      onTap: onSelect,
-      child: Container(
-        height: 48,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: (isEmpty && required)
-                ? Colors.red.shade300
-                : const Color(0xFFEEF1F5),
-            width: 1.5,
-          ),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        Row(
           children: [
-            Flexible(
-              child: Text(
-                date != null
-                    ? '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}'
-                    : (hint ?? 'Select'),
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: date != null
-                      ? textDark
-                      : (isEmpty && required
-                            ? Colors.red.shade400
-                            : textGray.withValues(alpha: 0.5)),
-                ),
-                overflow: TextOverflow.ellipsis,
-                maxLines: 1,
-              ),
-            ),
-            Icon(
-              Icons.calendar_month_rounded,
-              size: 14,
-              color: (isEmpty && required)
-                  ? Colors.red.shade300
-                  : textGray.withValues(alpha: 0.5),
+            Expanded(child: Text(title, style: BtText.mono(context))),
+            Text(
+              selCount > 0 ? '$selCount selected' : 'None selected',
+              style: BtText.caption(context),
             ),
           ],
         ),
-      ),
-    );
-  }
-  Widget _buildConstructionPhasesCard() {
-    final int total = _phases.fold(0, (s, p) => s + p.allActivities.length);
-    final int done = _phases.fold(0, (s, p) => s + p.selectedCount);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Bt.line),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  const Flexible(
-                    child: Text(
-                      'Construction phases',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: textDark,
-                        letterSpacing: 0.5,
-                      ),
+        const SizedBox(height: 8),
+        AnimatedSize(
+          duration: Bt.medium,
+          curve: Bt.ease,
+          alignment: Alignment.topCenter,
+          child: Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: visible
+                .map(
+                  (opt) => BtChip(
+                    label: opt,
+                    selected: _additionalConfigs.contains(opt),
+                    onTap: () => setState(
+                      () => _additionalConfigs.contains(opt)
+                          ? _additionalConfigs.remove(opt)
+                          : _additionalConfigs.add(opt),
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  GestureDetector(
-                    onTap: () => setState(() {
-                      for (var p in _phases) {
-                        p.isSelected = true;
-                        for (var a in p.allActivities) {
-                          a.isSelected = true;
-                        }
-                      }
-                    }),
-                    child: Text(
-                      'Select All',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: primaryBlue,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    '|',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: textGray.withValues(alpha: 0.4),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  GestureDetector(
-                    onTap: () => setState(() {
-                      for (var p in _phases) {
-                        p.isSelected = false;
-                        for (var a in p.allActivities) {
-                          a.isSelected = false;
-                        }
-                      }
-                    }),
-                    child: Text(
-                      'Clear',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: textGray.withValues(alpha: 0.7),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Select phases and activities required.',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: textGray.withValues(alpha: 0.8),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '$done of $total activities selected',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: primaryBlue,
-                ),
-              ),
-            ],
+                )
+                .toList(),
           ),
         ),
-        const SizedBox(height: 14),
-        Column(
-          children: List.generate(
-            _phases.length,
-            (i) => _buildPhaseAccordion(i, _phases[i]),
-          ),
-        ),
-        const SizedBox(height: 12),
-        GestureDetector(
-          onTap: _showAddCustomStageDialog,
-          child: Padding(
-            padding: EdgeInsets.symmetric(vertical: 4),
-            child: Text(
-              '+ Add Custom Phase',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                color: primaryBlue,
-              ),
+        if (collapsible)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: _link(
+              showAll ? 'Show less' : '+${options.length - visible.length} more',
+              color: context.bt.accentInk,
+              onTap: onToggle,
             ),
           ),
-        ),
       ],
     );
   }
+
   Widget _buildPhaseAccordion(int index, ConstructionPhase phase) {
-    return Container(
+    final sel = phase.selectedCount;
+    final tot = phase.totalCount;
+    final state = !phase.isSelected ? 0 : ((tot == 0 || sel == tot) ? 2 : 1);
+    return Column(
       key: ValueKey('phase_${phase.name}_$index'),
-      margin: EdgeInsets.only(bottom: index < _phases.length - 1 ? 8 : 0),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Bt.line),
-      ),
-      child: Column(
-        children: [
-          InkWell(
-            onTap: () => setState(() => phase.isExpanded = !phase.isExpanded),
-            borderRadius: phase.isExpanded
-                ? const BorderRadius.vertical(top: Radius.circular(12))
-                : BorderRadius.circular(12),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              child: Row(
-                children: [
-                  GestureDetector(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (index > 0)
+          const Padding(
+            padding: EdgeInsets.only(left: 58),
+            child: Divider(height: 1, thickness: 1, color: Bt.line),
+          ),
+        InkWell(
+          onTap: () => setState(() => phase.isExpanded = !phase.isExpanded),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(6, 8, 12, 8),
+            child: Row(
+              children: [
+                Semantics(
+                  button: true,
+                  checked: state == 2,
+                  mixed: state == 1,
+                  label: 'Select ${phase.name}',
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
                     onTap: () => setState(() {
                       phase.isSelected = !phase.isSelected;
                       for (var a in phase.allActivities) {
                         a.isSelected = phase.isSelected;
                       }
                     }),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 150),
-                      width: 22,
-                      height: 22,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(6),
-                        color: phase.isSelected
-                            ? primaryBlue
-                            : Colors.transparent,
-                        border: Border.all(
-                          color: phase.isSelected
-                              ? primaryBlue
-                              : const Color(0xFFD0D5DD),
-                          width: 1.5,
-                        ),
+                    child: SizedBox(
+                      width: 46,
+                      height: 44,
+                      child: Center(child: _TriCheck(state: state)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        phase.name,
+                        style: BtText.body(context, weight: FontWeight.w600, color: state == 0 ? Bt.ink2 : Bt.ink),
                       ),
-                      child: phase.isSelected
-                          ? const Icon(
-                              Icons.check,
-                              size: 14,
-                              color: Colors.white,
-                            )
-                          : null,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      phase.name,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: textDark,
+                      Text(
+                        state == 0 && sel == 0 ? 'None selected' : '$sel of $tot activities',
+                        style: BtText.num(BtText.caption(context, color: state == 0 ? Bt.ink3 : Bt.ink2)),
                       ),
-                    ),
+                    ],
                   ),
-                  AnimatedRotation(
-                    turns: phase.isExpanded ? 0.5 : 0,
-                    duration: const Duration(milliseconds: 180),
-                    child: const Icon(
-                      Icons.keyboard_arrow_down_rounded,
-                      color: textGray,
-                      size: 22,
-                    ),
-                  ),
-                ],
-              ),
+                ),
+                AnimatedRotation(
+                  turns: phase.isExpanded ? 0.5 : 0,
+                  duration: Bt.fast,
+                  curve: Bt.ease,
+                  child: const Icon(Icons.keyboard_arrow_down_rounded, color: Bt.ink3, size: 22),
+                ),
+              ],
             ),
           ),
-          AnimatedCrossFade(
-            firstChild: const SizedBox(width: double.infinity, height: 0),
-            secondChild: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+        ),
+        AnimatedCrossFade(
+          firstChild: const SizedBox(width: double.infinity, height: 0),
+          secondChild: Padding(
+            padding: const EdgeInsets.fromLTRB(58, 0, 14, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Divider(height: 1, color: Color(0xFFEEF1F5)),
                 ReorderableListView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
@@ -2112,12 +1301,7 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
                     builder: (_, _) => Material(
                       color: Colors.transparent,
                       shadowColor: Colors.transparent,
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: child,
-                      ),
+                      child: child,
                     ),
                   ),
                   onReorder: (oldIndex, newIndex) => setState(() {
@@ -2127,113 +1311,50 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
                   itemCount: phase.allActivities.length,
                   itemBuilder: (_, idx) {
                     final act = phase.allActivities[idx];
-                    return InkWell(
+                    return Padding(
                       key: ValueKey(act.key),
-                      onTap: () => setState(() {
-                        act.isSelected = !act.isSelected;
-                        if (act.isSelected) {
-                          phase.isSelected = true;
-                        } else {
-                          if (!phase.allActivities.any((a) => a.isSelected)) {
-                            phase.isSelected = false;
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: _ActivityPill(
+                        name: act.name,
+                        selected: act.isSelected,
+                        onTap: () => setState(() {
+                          act.isSelected = !act.isSelected;
+                          if (act.isSelected) {
+                            phase.isSelected = true;
+                          } else {
+                            if (!phase.allActivities.any((a) => a.isSelected)) {
+                              phase.isSelected = false;
+                            }
                           }
-                        }
-                      }),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
-                        ),
-                        child: Row(
-                          children: [
-                            AnimatedContainer(
-                              duration: const Duration(milliseconds: 150),
-                              width: 20,
-                              height: 20,
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(4),
-                                color: act.isSelected
-                                    ? primaryBlue
-                                    : Colors.transparent,
-                                border: Border.all(
-                                  color: act.isSelected
-                                      ? primaryBlue
-                                      : const Color(0xFFD0D5DD),
-                                  width: 1.5,
-                                ),
-                              ),
-                              child: act.isSelected
-                                  ? const Icon(
-                                      Icons.check_rounded,
-                                      size: 14,
-                                      color: Colors.white,
-                                    )
-                                  : null,
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                act.name,
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: act.isSelected
-                                      ? FontWeight.w500
-                                      : FontWeight.w400,
-                                  color: act.isSelected
-                                      ? textDark
-                                      : const Color(0xFF667085),
-                                ),
-                              ),
-                            ),
-                            ReorderableDragStartListener(
-                              index: idx,
-                              child: const Icon(
-                                Icons.drag_indicator_rounded,
-                                size: 20,
-                                color: Color(0xFFE4E7EC),
-                              ),
-                            ),
-                          ],
+                        }),
+                        handle: ReorderableDragStartListener(
+                          index: idx,
+                          child: const SizedBox(
+                            width: 36,
+                            height: 42,
+                            child: Icon(Icons.drag_indicator_rounded, size: 18, color: Bt.ink3),
+                          ),
                         ),
                       ),
                     );
                   },
                 ),
-                GestureDetector(
-                  onTap: () => _showAddCustomActivityDialog(phase),
-                  child: Container(
-                    margin: const EdgeInsets.fromLTRB(16, 4, 16, 14),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: primaryBlue.withValues(alpha: 0.06),
-                      borderRadius: BorderRadius.circular(Bt.rCard),
-                      border: Border.all(
-                        color: primaryBlue.withValues(alpha: 0.2),
-                        width: 1,
-                      ),
-                    ),
-                    child: Text(
-                      '+ Add Custom Activity',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: primaryBlue,
-                      ),
-                    ),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: _link(
+                    '+ Add custom activity',
+                    color: context.bt.accentInk,
+                    onTap: () => _showAddCustomActivityDialog(phase),
                   ),
                 ),
               ],
             ),
-            crossFadeState: phase.isExpanded
-                ? CrossFadeState.showSecond
-                : CrossFadeState.showFirst,
-            duration: const Duration(milliseconds: 180),
           ),
-        ],
-      ),
+          crossFadeState: phase.isExpanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+          duration: Bt.fast,
+          sizeCurve: Bt.ease,
+        ),
+      ],
     );
   }
   void _showAddCustomStageDialog() {
@@ -2241,8 +1362,8 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        backgroundColor: Bt.card,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Bt.rCard)),
         title: const Text(
           'Add Custom Phase',
           style: TextStyle(
@@ -2297,7 +1418,7 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
               backgroundColor: primaryBlue,
               elevation: 0,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(12),
               ),
             ),
             child: const Text(
@@ -2318,8 +1439,8 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        backgroundColor: Bt.card,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Bt.rCard)),
         title: const Text(
           'Add Custom Activity',
           style: TextStyle(
@@ -2376,7 +1497,7 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
               backgroundColor: primaryBlue,
               elevation: 0,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(12),
               ),
             ),
             child: const Text(
@@ -2475,21 +1596,11 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
         shareText: 'Exported phase template',
       );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Template downloaded successfully!'),
-            backgroundColor: Color(0xFF067647),
-          ),
-        );
+        btToast(context, 'Template downloaded successfully!');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to download template: $e'),
-            backgroundColor: const Color(0xFFC01048),
-          ),
-        );
+        btToast(context, 'Failed to download template: $e', error: true);
       }
     }
   }
@@ -2652,132 +1763,58 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
           : '';
       setState(() {});
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Successfully imported budget for $updatedCount activities!',
-            ),
-            backgroundColor: const Color(0xFF067647),
-          ),
-        );
+        btToast(context, 'Successfully imported budget for $updatedCount activities!');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Upload failed: $e'),
-            backgroundColor: const Color(0xFFC01048),
-          ),
-        );
+        btToast(context, 'Upload failed: $e', error: true);
       }
     } finally {
       setState(() => _isUploadingCsv = false);
     }
   }
   Widget _buildCsvImportExportCard() {
-    return Container(
+    return BtCard(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-      ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF067647).withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(
-                  Icons.table_chart_rounded,
-                  color: Color(0xFF067647),
-                  size: 18,
-                ),
-              ),
+              const BtTile(icon: Icons.table_chart_outlined, bg: Bt.greenSoft, fg: Bt.green, size: 40),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Phases & budget configuration',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: textGray,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                    Text(
-                      'Import/Export CSV budgets for all phases.',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: textDark,
-                      ),
-                    ),
+                    Text('Phases & budget configuration', style: BtText.subhead(context, color: Bt.ink, weight: FontWeight.w600)),
+                    Text('Import/Export CSV budgets for all phases.', style: BtText.caption(context)),
                   ],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
           Row(
             children: [
               Expanded(
-                child: OutlinedButton.icon(
+                child: BtButton(
+                  label: 'Template',
+                  icon: Icons.download_rounded,
+                  variant: BtButtonVariant.secondary,
+                  small: true,
                   onPressed: _downloadTemplate,
-                  icon: const Icon(Icons.download_rounded, size: 16),
-                  label: const Text('Template'),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    side: const BorderSide(
-                      color: Color(0xFFEEF1F5),
-                      width: 1.5,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    foregroundColor: primaryBlue,
-                    textStyle: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               Expanded(
-                child: _isUploadingCsv
-                    ? const Center(
-                        child: Padding(
-                          padding: EdgeInsets.symmetric(vertical: 8),
-                          child: CircularProgressIndicator(strokeWidth: 3),
-                        ),
-                      )
-                    : ElevatedButton.icon(
-                        onPressed: _uploadCsv,
-                        icon: const Icon(Icons.upload_file_rounded, size: 16),
-                        label: const Text('Upload CSV'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: primaryBlue,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          textStyle: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
+                child: BtButton(
+                  label: 'Upload CSV',
+                  icon: Icons.upload_file_rounded,
+                  small: true,
+                  loading: _isUploadingCsv,
+                  onPressed: _isUploadingCsv ? null : _uploadCsv,
+                ),
               ),
             ],
           ),
@@ -2787,4 +1824,410 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
   }
 }
 
+// ─────────────────────────────────────────────────────────────── V2 private widgets
+// (Project form only — kept private to this file so the shared design system
+// stays untouched.)
 
+/// Segmented 4-step progress bar with mono labels under each segment.
+class _StepBar extends StatelessWidget {
+  const _StepBar({required this.step, required this.labels, required this.onTap});
+  final int step;
+  final List<String> labels;
+  final ValueChanged<int>? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = context.bt.accent;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (var i = 0; i < labels.length; i++) ...[
+          if (i > 0) const SizedBox(width: 6),
+          Expanded(
+            child: Semantics(
+              button: onTap != null,
+              selected: i == step,
+              label: '${labels[i]}, step ${i + 1} of ${labels.length}',
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: onTap == null ? null : () => onTap!(i),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(6),
+                        child: Container(
+                          height: 6,
+                          color: Bt.ink.withValues(alpha: .08),
+                          alignment: Alignment.centerLeft,
+                          child: TweenAnimationBuilder<double>(
+                            tween: Tween(end: i < step ? 1.0 : (i == step ? .55 : 0.0)),
+                            duration: Bt.reduceMotion(context) ? Duration.zero : Bt.slow,
+                            curve: Bt.ease,
+                            builder: (_, v, _) => FractionallySizedBox(
+                              widthFactor: v,
+                              heightFactor: 1,
+                              child: AnimatedContainer(
+                                duration: Bt.fast,
+                                decoration: BoxDecoration(
+                                  color: i < step ? Bt.green : accent,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        labels[i],
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: BtText.mono(context, color: i == step ? Bt.ink : Bt.ink3),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+/// White grouped-input card: rows of label-left / input-right with inset hairlines.
+class _InGroup extends StatelessWidget {
+  const _InGroup({required this.children});
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Bt.card,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: Bt.shadow,
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (var i = 0; i < children.length; i++) ...[
+            if (i > 0)
+              const Padding(
+                padding: EdgeInsets.only(left: 16),
+                child: Divider(height: 1, thickness: 1, color: Bt.line),
+              ),
+            children[i],
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Building-type tile (icon + label). Selected = ink with accent icon.
+class _TypeTile extends StatelessWidget {
+  const _TypeTile({required this.icon, required this.label, required this.selected, required this.onTap});
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      selected: selected,
+      child: BtPressable(
+        onTap: onTap,
+        scale: .95,
+        semanticLabel: label,
+        child: AnimatedContainer(
+          duration: Bt.fast,
+          curve: Bt.ease,
+          width: 106,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: selected ? Bt.ink : Bt.card,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: selected ? Bt.ink : Bt.inputBorder),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, size: 22, color: selected ? context.bt.accent : Bt.ink),
+              const SizedBox(height: 10),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: BtText.caption(context, color: selected ? Bt.bone : Bt.ink, weight: FontWeight.w600),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Compact − n + counter used for rooms / bathrooms.
+class _Counter extends StatelessWidget {
+  const _Counter({required this.label, required this.value, required this.onInc, required this.onDec});
+  final String label;
+  final int value;
+  final VoidCallback onInc;
+  final VoidCallback onDec;
+
+  Widget _btn(BuildContext context, IconData icon, VoidCallback onTap, String semantic, {bool dim = false}) {
+    return BtPressable(
+      onTap: onTap,
+      scale: .9,
+      semanticLabel: semantic,
+      child: SizedBox(
+        width: 36,
+        height: 44,
+        child: Center(
+          child: Container(
+            width: 30,
+            height: 30,
+            decoration: BoxDecoration(
+              color: Bt.ink.withValues(alpha: .06),
+              borderRadius: BorderRadius.circular(9),
+            ),
+            child: Icon(icon, size: 16, color: dim ? Bt.ink3 : Bt.ink),
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: BtText.subhead(context, color: Bt.ink),
+          ),
+        ),
+        _btn(context, Icons.remove_rounded, onDec, 'Decrease $label', dim: value == 0),
+        SizedBox(
+          width: 22,
+          child: AnimatedSwitcher(
+            duration: Bt.fast,
+            transitionBuilder: (c, a) => FadeTransition(opacity: a, child: ScaleTransition(scale: a, child: c)),
+            child: Text(
+              '$value',
+              key: ValueKey(value),
+              textAlign: TextAlign.center,
+              style: BtText.num(BtText.subhead(context, color: Bt.ink, weight: FontWeight.w700)),
+            ),
+          ),
+        ),
+        _btn(context, Icons.add_rounded, onInc, 'Increase $label'),
+      ],
+    );
+  }
+}
+
+/// White date tile (caption + value). Shows a red edge when a required date is missing.
+class _DateTile extends StatelessWidget {
+  const _DateTile({required this.label, required this.date, required this.onTap, required this.required});
+  final String label;
+  final DateTime? date;
+  final VoidCallback onTap;
+  final bool required;
+
+  @override
+  Widget build(BuildContext context) {
+    final missing = required && date == null;
+    return BtPressable(
+      onTap: onTap,
+      semanticLabel: label,
+      child: AnimatedContainer(
+        duration: Bt.fast,
+        padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
+        decoration: BoxDecoration(
+          color: Bt.card,
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: Bt.shadow,
+          border: Border.all(color: missing ? Bt.red.withValues(alpha: .55) : Bt.card),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text.rich(
+                    TextSpan(children: [
+                      TextSpan(text: label),
+                      if (required) const TextSpan(text: ' *', style: TextStyle(color: Bt.red)),
+                    ]),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: BtText.caption(context, color: Bt.ink2),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    date != null ? formatDate(date) : 'Select',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: BtText.num(BtText.body(
+                      context,
+                      weight: FontWeight.w600,
+                      color: date != null ? Bt.ink : (missing ? Bt.red : Bt.placeholder),
+                    )),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.calendar_today_outlined, size: 16, color: missing ? Bt.red : Bt.ink3),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Ink card: live total budget (rolls up) + stacked bar of the four categories.
+class _BudgetSummary extends StatelessWidget {
+  const _BudgetSummary({required this.values});
+
+  /// material, labour, equipment, misc
+  final List<double> values;
+
+  @override
+  Widget build(BuildContext context) {
+    final total = values.fold<double>(0, (a, b) => a + b);
+    final colors = [context.bt.accent, Bt.steel, Bt.slate, Bt.bone];
+    return BtCard(
+      variant: BtCardVariant.ink,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('TOTAL BUDGET', style: BtText.mono(context, color: Bt.onNoir2)),
+          const SizedBox(height: 6),
+          BtCountUp(
+            value: total,
+            format: (v) => formatInr(v, compact: true),
+            style: BtText.d1(context, color: Bt.bone),
+          ),
+          const SizedBox(height: 14),
+          LayoutBuilder(
+            builder: (context, c) {
+              final nonZero = values.where((v) => v > 0).length;
+              final avail = c.maxWidth - (nonZero > 1 ? 2.0 * (nonZero - 1) : 0);
+              final segs = <Widget>[];
+              for (var i = 0; i < values.length; i++) {
+                if (values[i] <= 0 || total <= 0) continue;
+                if (segs.isNotEmpty) segs.add(const SizedBox(width: 2));
+                segs.add(AnimatedContainer(
+                  duration: Bt.medium,
+                  curve: Bt.ease,
+                  width: (values[i] / total * avail).clamp(0.0, avail),
+                  height: 10,
+                  color: colors[i],
+                ));
+              }
+              return ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  height: 10,
+                  color: Colors.white.withValues(alpha: .10),
+                  child: Row(children: segs),
+                ),
+              );
+            },
+          ),
+          if (total <= 0) ...[
+            const SizedBox(height: 10),
+            Text('Enter the split below — the total updates as you type.', style: BtText.caption(context, color: Bt.onNoir2)),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Tri-state check: 0 none, 1 some, 2 all.
+class _TriCheck extends StatelessWidget {
+  const _TriCheck({required this.state});
+  final int state;
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = state == 2 ? Bt.green : (state == 1 ? Bt.ink : Colors.transparent);
+    return AnimatedContainer(
+      duration: Bt.fast,
+      curve: Bt.ease,
+      width: 24,
+      height: 24,
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: state == 0 ? Bt.inputBorder : bg, width: 1.6),
+      ),
+      child: state == 0
+          ? null
+          : Icon(state == 2 ? Icons.check_rounded : Icons.remove_rounded, size: 15, color: Colors.white),
+    );
+  }
+}
+
+/// Activity as a selectable chip-row (keeps the drag handle for reordering).
+class _ActivityPill extends StatelessWidget {
+  const _ActivityPill({required this.name, required this.selected, required this.onTap, required this.handle});
+  final String name;
+  final bool selected;
+  final VoidCallback onTap;
+  final Widget handle;
+
+  @override
+  Widget build(BuildContext context) {
+    final bt = context.bt;
+    return Semantics(
+      selected: selected,
+      child: BtPressable(
+        onTap: onTap,
+        scale: .98,
+        semanticLabel: name,
+        child: AnimatedContainer(
+          duration: Bt.fast,
+          curve: Bt.ease,
+          constraints: const BoxConstraints(minHeight: 42),
+          padding: const EdgeInsets.only(left: 12),
+          decoration: BoxDecoration(
+            color: selected ? bt.accentSoft : Bt.card,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: selected ? bt.accent.withValues(alpha: .45) : Bt.inputBorder),
+          ),
+          child: Row(
+            children: [
+              Icon(selected ? Icons.check_rounded : Icons.add_rounded, size: 16, color: selected ? bt.accentInk : Bt.ink3),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  child: Text(
+                    name,
+                    style: BtText.subhead(context, weight: FontWeight.w500, color: selected ? bt.accentInk : Bt.ink2),
+                  ),
+                ),
+              ),
+              handle,
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

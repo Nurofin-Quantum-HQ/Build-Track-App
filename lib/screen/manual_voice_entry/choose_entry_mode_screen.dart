@@ -11,27 +11,10 @@ class ChooseEntryModeScreen extends StatefulWidget {
   @override
   State<ChooseEntryModeScreen> createState() => _ChooseEntryModeScreenState();
 }
-class _ChooseEntryModeScreenState extends State<ChooseEntryModeScreen>
-    with SingleTickerProviderStateMixin {
+class _ChooseEntryModeScreenState extends State<ChooseEntryModeScreen> {
   String _entryType = 'material';
   Map<String, dynamic> _contextArgs = {};
   bool _argsLoaded = false;
-  late AnimationController _animCtrl;
-  late Animation<double> _fadeAnim;
-  late Animation<Offset> _slideAnim;
-  @override
-  void initState() {
-    super.initState();
-    _animCtrl = AnimationController(
-      duration: const Duration(milliseconds: 350),
-      vsync: this,
-    );
-    _fadeAnim = CurvedAnimation(parent: _animCtrl, curve: Curves.easeOut);
-    _slideAnim = Tween<Offset>(
-      begin: const Offset(0, 0.08),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _animCtrl, curve: Curves.easeOut));
-  }
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -54,12 +37,6 @@ class _ChooseEntryModeScreenState extends State<ChooseEntryModeScreen>
     _contextArgs['phaseId'] = projectProvider.selectedPhaseId;
     _contextArgs['activity'] = projectProvider.selectedActivity;
     _contextArgs['activityId'] = projectProvider.selectedActivityId;
-    WidgetsBinding.instance.addPostFrameCallback((_) => _animCtrl.forward());
-  }
-  @override
-  void dispose() {
-    _animCtrl.dispose();
-    super.dispose();
   }
   static const Map<String, String> _voiceRoutes = {
     'material': '/review-material',
@@ -130,338 +107,198 @@ class _ChooseEntryModeScreenState extends State<ChooseEntryModeScreen>
         });
         return Scaffold(
           backgroundColor: Bt.ground,
-          appBar: BtNavBar(title: '$_entryTypeLabel entry'),
+          appBar: BtNavBar(title: '$_entryTypeLabel entry', subtitle: 'Step 3 of 3'),
           body: SingleChildScrollView(
             physics: const ClampingScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
-            child: FadeTransition(
-              opacity: _fadeAnim,
-              child: SlideTransition(
-                position: _slideAnim,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _buildStepIndicator(),
-                    const SizedBox(height: 24),
-                    Text('How do you want to add?', style: BtText.title(context, size: 24)),
-                    const SizedBox(height: 4),
-                    Text('Adding $_entryTypeLabel entry', style: BtText.subhead(context)),
-                    const SizedBox(height: 20),
-                    Showcase(
-                      key: ShowcaseKeys.addEntryVoiceTab,
-                      description: 'Use voice to automatically log entries.',
-                      tooltipBackgroundColor: Bt.ink,
-                      textColor: Colors.white,
-                      tooltipBorderRadius: BorderRadius.circular(16),
-                      tooltipPadding: const EdgeInsets.all(16),
-                      child: _VoiceChoice(onTap: _goVoice),
-                    ),
-                    const SizedBox(height: 12),
-                    Showcase(
-                      key: ShowcaseKeys.addEntryManualTab,
-                      description: 'Manually input entry details.',
-                      tooltipBackgroundColor: Bt.ink,
-                      textColor: Colors.white,
-                      tooltipBorderRadius: BorderRadius.circular(16),
-                      tooltipPadding: const EdgeInsets.all(16),
-                      child: BtGroup(children: [
-                        BtRow(
-                          leading: const BtTile(icon: Icons.edit_outlined),
-                          title: 'Enter Manually',
-                          subtitle: 'Fill the form manually.',
-                          showChevron: true,
-                          minHeight: 64,
-                          onTap: _goManual,
+            padding: const EdgeInsets.fromLTRB(Bt.gutter, 6, Bt.gutter, 40),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const _StepBar(step: 3),
+                const SizedBox(height: 20),
+                BtReveal(child: Text('How do you want\nto add it?', style: BtText.d2(context))),
+                const SizedBox(height: 6),
+                BtReveal(index: 1, child: Text('Adding $_entryTypeLabel entry', style: BtText.subhead(context))),
+                const SizedBox(height: 20),
+                // Not wrapped in BtReveal: the tour measures these tiles on the first frame.
+                Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Expanded(
+                        child: Showcase(
+                          key: ShowcaseKeys.addEntryVoiceTab,
+                          description: 'Use voice to automatically log entries.',
+                          tooltipBackgroundColor: Bt.ink,
+                          textColor: Colors.white,
+                          tooltipBorderRadius: BorderRadius.circular(16),
+                          tooltipPadding: const EdgeInsets.all(16),
+                          child: _HowTile(
+                            ink: true,
+                            semantic: 'Use Voice',
+                            title: 'Speak it',
+                            subtitle: 'Speak naturally — AI fills the form',
+                            onTap: _goVoice,
+                          ),
                         ),
-                      ]),
-                    ),
-                    const SizedBox(height: 28),
-                    _buildContextBanner(),
-                  ],
-                ),
-              ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Showcase(
+                          key: ShowcaseKeys.addEntryManualTab,
+                          description: 'Manually input entry details.',
+                          tooltipBackgroundColor: Bt.ink,
+                          textColor: Colors.white,
+                          tooltipBorderRadius: BorderRadius.circular(16),
+                          tooltipPadding: const EdgeInsets.all(16),
+                          child: _HowTile(
+                            ink: false,
+                            semantic: 'Enter Manually',
+                            title: 'Type it',
+                            subtitle: 'Fill the form manually',
+                            onTap: _goManual,
+                          ),
+                        ),
+                      ),
+                ]),
+                const SizedBox(height: 28),
+                BtReveal(index: 3, child: _buildContextBanner()),
+              ],
             ),
           ),
         );
       },
     );
   }
-  Widget _buildStepIndicator() {
-    return Row(
-      children: [
-        _stepDot(1, 'Entry Type', done: true),
-        _stepLine(done: true),
-        _stepDot(2, 'Context', done: true),
-        _stepLine(done: true),
-        _stepDot(3, 'How to Add', active: true),
-        _stepLine(),
-        _stepDot(4, 'Entry'),
-      ],
-    );
-  }
-  Widget _stepDot(
-    int step,
-    String label, {
-    bool done = false,
-    bool active = false,
-  }) {
-    final Color bg = done
-        ? const Color(0xFF067647)
-        : active
-        ? AppColors.primary
-        : const Color(0xFFE4E7EC);
-    final Color textColor = (done || active)
-        ? Colors.white
-        : AppColors.textLight;
-    return Column(
-      children: [
-        AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          width: 26,
-          height: 26,
-          decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
-          child: Center(
-            child: done
-                ? const Icon(Icons.check, size: 13, color: Colors.white)
-                : Text(
-                    '$step',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: textColor,
-                    ),
-                  ),
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: active
-                ? AppColors.primary
-                : done
-                ? const Color(0xFF067647)
-                : AppColors.textLight,
-          ),
-        ),
-      ],
-    );
-  }
-  Widget _stepLine({bool done = false}) {
-    return Expanded(
-      child: Container(
-        height: 2,
-        margin: const EdgeInsets.only(bottom: 14),
-        decoration: BoxDecoration(
-          color: done ? const Color(0xFF067647) : const Color(0xFFE4E7EC),
-          borderRadius: BorderRadius.circular(2),
-        ),
-      ),
-    );
-  }
   Widget _buildContextBanner() {
+    final rows = [
+      ('Project', _projectName),
+      ('Floor', _floor),
+      ('Phase', _phase),
+      ('Activity', _activity),
+    ];
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Padding(
-        padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+        padding: const EdgeInsets.fromLTRB(4, 0, 4, 10),
         child: Row(children: [
-          const Icon(Icons.check_circle_outline, color: Bt.green, size: 16),
+          const Icon(Icons.check_circle_rounded, color: Bt.green, size: 15),
           const SizedBox(width: 6),
-          Text('Execution Context Selected', style: BtText.caption(context, color: Bt.green, weight: FontWeight.w600)),
+          Text('EXECUTION CONTEXT SELECTED', style: BtText.mono(context, color: Bt.green)),
         ]),
       ),
-      BtGroup(insetDividers: false, children: [
-        BtValueRow(label: 'Project', value: _projectName),
-        BtValueRow(label: 'Floor', value: _floor),
-        BtValueRow(label: 'Phase', value: _phase),
-        BtValueRow(label: 'Activity', value: _activity),
-      ]),
+      BtCard(
+        padding: EdgeInsets.zero,
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          for (var i = 0; i < rows.length; i++) ...[
+            if (i > 0) const Padding(padding: EdgeInsets.only(left: 16), child: Divider(height: 1, thickness: 1, color: Bt.line)),
+            Semantics(
+              label: '${rows[i].$1}: ${rows[i].$2}',
+              excludeSemantics: true,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                child: Row(children: [
+                  SizedBox(width: 26, child: Text('0${i + 1}', style: BtText.mono(context, color: Bt.green, size: 11))),
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(rows[i].$1.toUpperCase(), style: BtText.mono(context)),
+                      const SizedBox(height: 3),
+                      Text(rows[i].$2, maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.body(context, weight: FontWeight.w600)),
+                    ]),
+                  ),
+                  const SizedBox(width: 8),
+                  const Icon(Icons.check_rounded, size: 20, color: Bt.green),
+                ]),
+              ),
+            ),
+          ],
+        ]),
+      ),
     ]);
   }
 }
 
-class _VoiceChoice extends StatelessWidget {
-  const _VoiceChoice({required this.onTap});
+/// Big "how" choice tile (Where-Picker board): ink "Speak it" with a pulsing
+/// accent mic, white "Type it" card.
+class _HowTile extends StatelessWidget {
+  const _HowTile({required this.ink, required this.semantic, required this.title, required this.subtitle, required this.onTap});
+  final bool ink;
+  final String semantic;
+  final String title;
+  final String subtitle;
   final VoidCallback onTap;
   @override
   Widget build(BuildContext context) {
     final bt = context.bt;
-    return Semantics(
-      button: true,
-      label: 'Use Voice',
-      child: Container(
-        decoration: BoxDecoration(gradient: bt.signature, borderRadius: BorderRadius.circular(Bt.rCard)),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(Bt.rCard),
-            onTap: onTap,
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(color: Colors.white.withValues(alpha: .18), shape: BoxShape.circle),
-                  child: Icon(Icons.mic_rounded, color: bt.onAccent, size: 26),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text('Use Voice', style: BtText.headline(context).copyWith(color: bt.onAccent)),
-                    Text('Speak naturally and let AI capture the details.', style: BtText.subhead(context, color: bt.onAccent.withValues(alpha: .85))),
-                  ]),
-                ),
-                Icon(Icons.arrow_forward_rounded, color: bt.onAccent),
-              ]),
+    final icon = ink
+        ? BtPulse(
+            size: 46,
+            child: Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(color: bt.accent, shape: BoxShape.circle),
+              child: Icon(Icons.mic_rounded, color: bt.onAccent, size: 24),
             ),
-          ),
+          )
+        : const BtTile(icon: Icons.keyboard_alt_outlined, size: 46);
+    return BtPressable(
+      onTap: onTap,
+      scale: .96,
+      semanticLabel: semantic,
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 164),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: ink ? Bt.ink : Bt.card,
+          borderRadius: BorderRadius.circular(Bt.rCard),
+          boxShadow: ink ? Bt.shadowLg : Bt.shadow,
         ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            icon,
+            const Spacer(),
+            Icon(Icons.arrow_forward_rounded, size: 20, color: ink ? Bt.onNoir2 : Bt.ink3),
+          ]),
+          const SizedBox(height: 18),
+          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(title, style: BtText.d3(context, color: ink ? Bt.bone : Bt.ink)),
+            const SizedBox(height: 2),
+            Text(subtitle, style: BtText.caption(context, color: ink ? Bt.onNoir2 : Bt.ink2)),
+          ]),
+        ]),
       ),
     );
   }
 }
 
-class _InteractiveModeCard extends StatefulWidget {
-  const _InteractiveModeCard({
-    required this.icon,
-    required this.iconColor,
-    required this.iconBg,
-    required this.title,
-    required this.subtitle,
-    required this.onTap,
-  });
-  final IconData icon;
-  final Color iconColor;
-  final Color iconBg;
-  final String title;
-  final String subtitle;
-  final VoidCallback onTap;
-  @override
-  State<_InteractiveModeCard> createState() => _InteractiveModeCardState();
-}
-class _InteractiveModeCardState extends State<_InteractiveModeCard>
-    with SingleTickerProviderStateMixin {
-  bool _isHovered = false;
-  late AnimationController _animationController;
-  late Animation<double> _scaleAnimation;
-  @override
-  void initState() {
-    super.initState();
-    _animationController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 100),
-    );
-    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.97).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
-    );
-  }
-  @override
-  void dispose() {
-    _animationController.dispose();
-    super.dispose();
-  }
+/// Three-segment progress: Type ✓ · Where ✓ · How (shared look with the
+/// execution-context screen).
+class _StepBar extends StatelessWidget {
+  const _StepBar({required this.step});
+  final int step; // 1..3
   @override
   Widget build(BuildContext context) {
-    final borderColor = _isHovered
-        ? AppColors.primary
-        : const Color(0xFFE8EBF5);
-    final borderWidth = _isHovered ? 2.0 : 1.0;
-    return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
-      child: ScaleTransition(
-        scale: _scaleAnimation,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          height: 96,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(Bt.rCard),
-            border: Border.all(color: borderColor, width: borderWidth),
-          ),
-          child: Material(
-            color: Colors.transparent,
-            borderRadius: BorderRadius.circular(Bt.rCard),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(Bt.rCard),
-              onTapDown: (_) => _animationController.forward(),
-              onTapUp: (_) => _animationController.reverse(),
-              onTapCancel: () => _animationController.reverse(),
-              onTap: widget.onTap,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 18),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: widget.iconBg,
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Center(
-                        child: Icon(
-                          widget.icon,
-                          color: widget.iconColor,
-                          size: 24,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            widget.title,
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF101828),
-                              letterSpacing: -0.3,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            widget.subtitle,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                              color: Color(0xFF666666),
-                              height: 1.3,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Center(
-                        child: Icon(
-                          Icons.arrow_forward_rounded,
-                          color: AppColors.primary,
-                          size: 18,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+    const labels = ['Type', 'Where', 'How'];
+    return Row(children: [
+      for (var i = 0; i < 3; i++) ...[
+        if (i > 0) const SizedBox(width: 6),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            BtProgress(
+              thin: true,
+              value: i + 1 < step ? 1 : (i + 1 == step ? .6 : 0),
+              color: i + 1 < step ? Bt.greenBright : null,
             ),
-          ),
+            const SizedBox(height: 6),
+            Row(children: [
+              if (i + 1 < step) ...[
+                const Icon(Icons.check_rounded, size: 12, color: Bt.green),
+                const SizedBox(width: 3),
+              ],
+              Text(
+                labels[i].toUpperCase(),
+                style: BtText.mono(context, color: i + 1 < step ? Bt.green : (i + 1 == step ? context.bt.accentInk : Bt.ink3)),
+              ),
+            ]),
+          ]),
         ),
-      ),
-    );
+      ],
+    ]);
   }
 }

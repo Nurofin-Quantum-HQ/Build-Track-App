@@ -1,6 +1,7 @@
 import 'package:buildtrack_mobile/common/themes/app_colors.dart';
 import 'package:buildtrack_mobile/common/themes/app_theme.dart';
 import 'package:flutter/material.dart';
+import 'package:buildtrack_mobile/design/design.dart';
 class AppCard extends StatelessWidget {
   const AppCard({
     super.key,
@@ -22,18 +23,14 @@ class AppCard extends StatelessWidget {
     final card = Container(
       margin: margin,
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(borderRadius),
-        border: Border.all(color: AppColors.cardBorder),
+        color: color ?? Colors.white,
+        borderRadius: BorderRadius.circular(borderRadius < 22 ? 22 : borderRadius),
+        boxShadow: Bt.shadow,
       ),
       child: Padding(padding: padding, child: child),
     );
     if (onTap == null) return card;
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: card,
-    );
+    return BtPressable(onTap: onTap, scale: .98, child: card);
   }
 }
 enum AppButtonVariant { primary, secondary, outline, danger }
@@ -65,20 +62,20 @@ class AppButton extends StatelessWidget {
         child: DecoratedBox(
           decoration: BoxDecoration(
             color: isPrimary
-                ? AppColors.primary
+                ? Bt.ink
                 : (variant == AppButtonVariant.outline
                       ? Colors.white
                       : bg),
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(Bt.rButton),
             border: variant == AppButtonVariant.outline
                 ? Border.all(color: AppColors.cardBorder, width: 1)
                 : null,
           ),
           child: Material(
             color: Colors.transparent,
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(Bt.rButton),
             child: InkWell(
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(Bt.rButton),
               onTap: (enabled && !isLoading) ? onPressed : null,
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 15),
@@ -101,11 +98,7 @@ class AppButton extends StatelessWidget {
                             ],
                             Text(
                               label,
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: fg,
-                              ),
+                              style: BtText.button(context, color: fg),
                             ),
                           ],
                         ),
@@ -120,9 +113,9 @@ class AppButton extends StatelessWidget {
   (Color bg, Color fg, Color border) _resolveColors() {
     switch (variant) {
       case AppButtonVariant.primary:
-        return (AppTheme.primary, Colors.white, AppTheme.primary);
+        return (Bt.ink, Bt.bone, Bt.ink);
       case AppButtonVariant.secondary:
-        return (AppColors.primary, Colors.white, AppColors.primary);
+        return (Bt.ink, Bt.bone, Bt.ink);
       case AppButtonVariant.outline:
         return (Colors.white, AppTheme.textDark, AppColors.cardBorder);
       case AppButtonVariant.danger:
@@ -316,7 +309,7 @@ class AppSectionHeader extends StatelessWidget {
               child: Text(
                 actionLabel!,
                 style: AppTheme.body.copyWith(
-                  color: AppTheme.secondary,
+                  color: Bt.ink2,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -372,7 +365,7 @@ class AppProgressBar extends StatelessWidget {
             children: [
               Container(
                 decoration: BoxDecoration(
-                  color: const Color(0xFFEEF1F5),
+                  color: Bt.fill,
                   borderRadius: BorderRadius.circular(3),
                 ),
               ),
@@ -380,7 +373,7 @@ class AppProgressBar extends StatelessWidget {
                 widthFactor: percent.clamp(0.0, 1.0),
                 child: Container(
                   decoration: BoxDecoration(
-                    color: color ?? AppColors.primary,
+                    color: color ?? context.bt.accent,
                     borderRadius: BorderRadius.circular(3),
                   ),
                 ),
@@ -415,8 +408,8 @@ class AppEmptyState extends StatelessWidget {
             Container(
               width: 56,
               height: 56,
-              decoration: BoxDecoration(color: const Color(0xFFEEF1F5), borderRadius: BorderRadius.circular(14)),
-              child: Icon(icon, size: 28, color: AppTheme.textMedium),
+              decoration: BoxDecoration(color: context.bt.accentSoft, borderRadius: BorderRadius.circular(20)),
+              child: Icon(icon, size: 28, color: context.bt.accentInk),
             ),
             const SizedBox(height: 14),
             Text(message, style: AppTheme.heading3.copyWith(fontWeight: FontWeight.w500), textAlign: TextAlign.center),

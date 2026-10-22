@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:buildtrack_mobile/common/themes/app_colors.dart';
 import 'package:buildtrack_mobile/controller/nav_controller.dart';
 import 'package:buildtrack_mobile/common/widgets/common_widgets.dart';
+import 'package:buildtrack_mobile/common/widgets/log_sheet.dart';
 import 'package:buildtrack_mobile/controller/project_provider.dart';
 import 'package:buildtrack_mobile/controller/inventory_provider.dart';
 import 'package:buildtrack_mobile/controller/role_manager.dart';
@@ -125,6 +126,7 @@ class _AddEntryScreenContentState extends State<_AddEntryScreenContent> {
         'subtitle':
             'Log concrete, steel, lumber, or site-specific procurement items.',
         'type': 'material',
+        'short': 'Concrete, steel, lumber & site items',
       });
     }
     if (RoleManager.canAddEntries) {
@@ -134,6 +136,7 @@ class _AddEntryScreenContentState extends State<_AddEntryScreenContent> {
         'subtitle':
             'Track crew hours, specialized trade performance, and site presence.',
         'type': 'labour',
+        'short': 'Crew hours, trades, site presence',
       });
     }
     if (RoleManager.canManageEquipmentMaster) {
@@ -143,6 +146,7 @@ class _AddEntryScreenContentState extends State<_AddEntryScreenContent> {
         'subtitle':
             'Record heavy machinery runtime, fuel logs, and maintenance events.',
         'type': 'equipment',
+        'short': 'Machine runtime, fuel, maintenance',
       });
     }
     return items;
@@ -231,23 +235,14 @@ class _AddEntryScreenContentState extends State<_AddEntryScreenContent> {
         shareText: shareText,
       );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              '${type == "all" ? "All" : type[0].toUpperCase() + type.substring(1)} template downloaded successfully!',
-            ),
-            backgroundColor: const Color(0xFF067647),
-          ),
+        btToast(
+          context,
+          '${type == "all" ? "All" : type[0].toUpperCase() + type.substring(1)} template downloaded successfully!',
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Download failed: $e'),
-            backgroundColor: const Color(0xFFC01048),
-          ),
-        );
+        btToast(context, 'Download failed: $e', error: true);
       }
     }
   }
@@ -413,38 +408,9 @@ class _AddEntryScreenContentState extends State<_AddEntryScreenContent> {
           return StatefulBuilder(
             builder: (context, setDlgState) {
               dialogSetState = setDlgState;
-              return AlertDialog(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                title: const Row(
-                  children: [
-                    CircularProgressIndicator(strokeWidth: 3),
-                    SizedBox(width: 16),
-                    Text(
-                      'Importing Entries',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-                content: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(progressText, style: const TextStyle(fontSize: 14)),
-                    const SizedBox(height: 16),
-                    LinearProgressIndicator(
-                      value: progressValue,
-                      backgroundColor: const Color(0xFFEEF1F5),
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        AppColors.primary,
-                      ),
-                    ),
-                  ],
-                ),
+              return _ImportProgressDialog(
+                text: progressText,
+                value: progressValue,
               );
             },
           );
@@ -1071,115 +1037,42 @@ class _AddEntryScreenContentState extends State<_AddEntryScreenContent> {
         }
         context.read<ProjectProvider>().load();
       }
+      if (mounted && successCount > 0) {
+        await showBtSuccess(
+          context,
+          kind: BtSuccessKind.bags,
+          title: 'Entries imported',
+          message: '$successCount ${successCount == 1 ? 'entry' : 'entries'} added from your spreadsheet',
+        );
+        if (!mounted) return;
+      }
       if (mounted) {
         showDialog(
           context: context,
+          barrierColor: Bt.scrim,
           builder: (ctx) {
-            return AlertDialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              title: const Text(
-                'Import Results',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Total rows processed: ${successCount + failedCount}'),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Successfully imported: $successCount',
-                      style: const TextStyle(
-                        color: Color(0xFF067647),
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.only(left: 16, top: 4),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('• Materials: $materialCount'),
-                          Text('• Labour: $labourCount'),
-                          Text('• Equipment: $equipmentCount'),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Failed: $failedCount',
-                      style: TextStyle(
-                        color: failedCount > 0 ? const Color(0xFFC01048) : const Color(0xFF667085),
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    if (errorMessages.isNotEmpty) ...[
-                      const SizedBox(height: 12),
-                      const Text(
-                        'Details/Errors:',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 6),
-                      Container(
-                        width: double.maxFinite,
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF6F7F9),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Bt.line),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: errorMessages
-                              .map(
-                                (msg) => Padding(
-                                  padding: const EdgeInsets.only(bottom: 4),
-                                  child: Text(
-                                    msg,
-                                    style: TextStyle(
-                                      color: Colors.red[800],
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                ),
-                              )
-                              .toList(),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: const Text(
-                    'OK',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ],
+            return _ImportResultsDialog(
+              successCount: successCount,
+              failedCount: failedCount,
+              materialCount: materialCount,
+              labourCount: labourCount,
+              equipmentCount: equipmentCount,
+              errorMessages: errorMessages,
             );
           },
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Upload failed: $e'),
-            backgroundColor: const Color(0xFFC01048),
-          ),
-        );
+        btToast(context, 'Upload failed: $e', error: true);
       }
     } finally {
       setState(() => _isUploadingCsv = false);
     }
   }
   Widget _buildCsvImportCard(BuildContext context) {
+    final bt = context.bt;
+    final visibleCols = _customColumns.where((c) => _columnVisibility[c] ?? true).toList();
     return Showcase(
       key: ShowcaseKeys.addEntryCSV,
       description: 'Upload bulk entries via CSV. Download templates and upload completed files here.',
@@ -1190,63 +1083,76 @@ class _AddEntryScreenContentState extends State<_AddEntryScreenContent> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const BtSectionHeader(title: 'Import many from a spreadsheet'),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(4, 0, 4, 12),
-            child: Text(
-              'Import Materials, Labour, or Equipment entries. Download the template, fill it, and upload the file.',
-              style: BtText.subhead(context),
-            ),
+          Text('IMPORT MANY', style: BtText.mono(context, color: bt.accentInk)),
+          const SizedBox(height: 4),
+          Text('From a\nspreadsheet.', style: BtText.d2(context)),
+          const SizedBox(height: 8),
+          Text(
+            'Import Materials, Labour, or Equipment entries. Download the template, fill it, and upload the file — each row becomes an entry.',
+            style: BtText.subhead(context),
           ),
-          BtGroup(
-            children: [
-              BtRow(
-                leading: const BtTile(icon: Icons.download_rounded),
-                title: 'Download Template',
-                subtitle: 'CSV with the columns you chose',
-                showChevron: true,
-                onTap: _isUploadingCsv ? null : () => _downloadCsvTemplate('all'),
-              ),
-              Showcase(
-                key: _csvKey,
-                title: 'Customize Template',
-                description: 'You can adjust which columns appear in the CSV.',
-                child: BtRow(
-                  leading: const BtTile(icon: Icons.view_column_outlined),
-                  title: 'Customize Template Columns',
-                  subtitle: 'Choose, hide and reorder columns',
-                  showChevron: true,
-                  onTap: _isUploadingCsv ? null : _openCustomizeColumnsSheet,
-                ),
-              ),
-              BtRow(
-                leading: _isUploadingCsv
-                    ? const SizedBox(width: 40, height: 40, child: Padding(padding: EdgeInsets.all(10), child: CircularProgressIndicator(strokeWidth: 2)))
-                    : const BtTile(icon: Icons.upload_file_rounded),
-                title: _isUploadingCsv ? 'Uploading…' : 'Upload CSV File',
-                titleColor: context.bt.brand,
-                titleWeight: FontWeight.w600,
-                subtitle: 'Each row becomes an entry',
-                onTap: _isUploadingCsv ? null : _uploadCsv,
-              ),
-            ],
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(4, 10, 4, 0),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Icon(Icons.info_outline_rounded, size: 16, color: Bt.ink3),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    'If you skip an optional column in a row, type "###" instead of leaving it blank so the file parses correctly.',
-                    style: BtText.caption(context),
+          const SizedBox(height: 22),
+          _Timeline(steps: [
+            // 01 · Get the template
+            _TimelineStep(
+              number: 1,
+              active: true,
+              title: 'Get the template',
+              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                Text('${visibleCols.length} of ${_customColumns.length} columns · consolidated (all entry types)', style: BtText.caption(context)),
+                const SizedBox(height: 10),
+                Row(children: [
+                  Expanded(
+                    child: BtButton(
+                      label: 'Download template',
+                      icon: Icons.download_rounded,
+                      small: true,
+                      onPressed: _isUploadingCsv ? null : () => _downloadCsvTemplate('all'),
+                    ),
                   ),
-                ),
-              ],
+                  const SizedBox(width: 8),
+                  Showcase(
+                    key: _csvKey,
+                    title: 'Customize Template',
+                    description: 'You can adjust which columns appear in the CSV.',
+                    child: BtButton(
+                      label: 'Columns',
+                      icon: Icons.tune_rounded,
+                      small: true,
+                      expand: false,
+                      variant: BtButtonVariant.secondary,
+                      onPressed: _isUploadingCsv ? null : _openCustomizeColumnsSheet,
+                    ),
+                  ),
+                ]),
+              ]),
             ),
-          ),
+            // 02 · Fill one row per entry
+            _TimelineStep(
+              number: 2,
+              title: 'Fill one row per entry',
+              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                _MiniSheet(columns: visibleCols),
+                const SizedBox(height: 10),
+                Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  const Padding(padding: EdgeInsets.only(top: 1), child: Icon(Icons.info_outline_rounded, size: 15, color: Bt.ink3)),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'If you skip an optional column in a row, type "###" instead of leaving it blank so the file parses correctly.',
+                      style: BtText.caption(context),
+                    ),
+                  ),
+                ]),
+              ]),
+            ),
+            // 03 · Upload it
+            _TimelineStep(
+              number: 3,
+              title: 'Upload it',
+              child: _UploadDrop(uploading: _isUploadingCsv, onTap: _isUploadingCsv ? null : _uploadCsv),
+            ),
+          ]),
         ],
       ),
     );
@@ -1254,6 +1160,7 @@ class _AddEntryScreenContentState extends State<_AddEntryScreenContent> {
   @override
   Widget build(BuildContext context) {
     final canPop = Navigator.canPop(context);
+    final types = _entries;
     return Scaffold(
       backgroundColor: Bt.ground,
       body: SafeArea(
@@ -1261,55 +1168,58 @@ class _AddEntryScreenContentState extends State<_AddEntryScreenContent> {
         child: ListView(
           controller: _scrollController,
           physics: const ClampingScrollPhysics(),
-          padding: const EdgeInsets.only(bottom: 32),
+          padding: const EdgeInsets.only(bottom: 40),
           children: [
-            if (canPop)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(4, 4, 4, 0),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: BtIconButton(
+            SizedBox(
+              height: 56,
+              child: Row(children: [
+                const SizedBox(width: 4),
+                if (canPop)
+                  BtIconButton(
                     icon: Icons.arrow_back_ios_new_rounded,
-                    size: 20,
+                    size: 19,
                     semantic: 'Back',
                     onTap: () => Navigator.pop(context),
                   ),
+                const Spacer(),
+                BtIconButton(
+                  icon: Icons.help_outline_rounded,
+                  semantic: 'Help',
+                  color: Bt.ink2,
+                  onTap: () => ShowCaseWidget.of(context).startShowCase([_csvKey]),
                 ),
-              ),
-            BtLargeHeader(
-              title: 'Add entry',
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  BtIconButton(
-                    icon: Icons.help_outline_rounded,
-                    semantic: 'Help',
-                    color: Bt.ink2,
-                    onTap: () => ShowCaseWidget.of(context).startShowCase([_csvKey]),
+                Semantics(
+                  button: true,
+                  label: 'Account',
+                  child: InkWell(
+                    customBorder: const CircleBorder(),
+                    onTap: () => Navigator.pushNamed(context, '/profile'),
+                    child: const Padding(padding: EdgeInsets.all(4), child: ProfileAvatar(radius: 18)),
                   ),
-                  Semantics(
-                    button: true,
-                    label: 'Account',
-                    child: InkWell(
-                      customBorder: const CircleBorder(),
-                      onTap: () => Navigator.pushNamed(context, '/profile'),
-                      child: const Padding(padding: EdgeInsets.all(4), child: ProfileAvatar(radius: 18)),
-                    ),
-                  ),
-                ],
-              ),
+                ),
+                const SizedBox(width: 12),
+              ]),
             ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: Bt.gutter),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text('Select the entry type to log for the current shift.', style: BtText.body(context, color: Bt.ink2)),
-                  const SizedBox(height: 16),
-                  BtGroup(
-                    children: List.generate(_entries.length, (i) => _entryCard(context, i)),
-                  ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 8),
+                  BtReveal(child: Text('ADD ENTRY', style: BtText.mono(context, color: context.bt.accentInk))),
+                  const SizedBox(height: 4),
+                  BtReveal(index: 1, child: Text('What are you\nadding?', style: BtText.d1(context))),
+                  const SizedBox(height: 8),
+                  BtReveal(index: 2, child: Text('Select the entry type to log for the current shift.', style: BtText.body(context, color: Bt.ink2))),
+                  const SizedBox(height: 20),
+                  if (types.isNotEmpty)
+                    Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      for (var i = 0; i < types.length; i++) ...[
+                        if (i > 0) const SizedBox(width: 8),
+                        Expanded(child: _entryCard(context, i)),
+                      ],
+                    ]),
+                  const SizedBox(height: 36),
                   _buildCsvImportCard(context),
                 ],
               ),
@@ -1336,14 +1246,10 @@ class _AddEntryScreenContentState extends State<_AddEntryScreenContent> {
       description = 'Record heavy machinery runtime, fuel logs, and maintenance events.';
     }
 
-    Widget cardContent = BtRow(
-      leading: BtTypeTile(type: type),
+    Widget cardContent = LogKindTile(
+      type: type,
       title: entry['title'] as String,
-      subtitle: entry['subtitle'] as String,
-      subtitleMaxLines: 2,
-      titleWeight: FontWeight.w600,
-      minHeight: 72,
-      showChevron: true,
+      subtitle: entry['short'] as String,
       onTap: () => _navigateToContext(context, type),
     );
 
@@ -1351,7 +1257,7 @@ class _AddEntryScreenContentState extends State<_AddEntryScreenContent> {
       return Showcase(
         key: showcaseKey,
         description: description,
-        tooltipBackgroundColor: const Color(0xFF1E1E2C),
+        tooltipBackgroundColor: Bt.ink,
         textColor: Colors.white,
         tooltipBorderRadius: BorderRadius.circular(16),
         tooltipPadding: const EdgeInsets.all(16),
@@ -1378,12 +1284,7 @@ class _AddEntryScreenContentState extends State<_AddEntryScreenContent> {
         _columnVisibility = Map<String, bool>.from(result['visibility'] as Map);
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Template customization applied! Ready to download.'),
-            backgroundColor: AppColors.primary,
-          ),
-        );
+        btToast(context, 'Template customization applied! Ready to download.');
       }
     }
   }
@@ -1488,7 +1389,7 @@ class _CustomizeTemplateSheetState extends State<CustomizeTemplateSheet> {
                 children: [
                   Expanded(
                     child: BtButton(
-                      label: 'Reset',
+                      label: 'Reset to default',
                       variant: BtButtonVariant.secondary,
                       onPressed: () {
                         setState(() {
@@ -1541,3 +1442,323 @@ class _CustomizeTemplateSheetState extends State<CustomizeTemplateSheet> {
   }
 }
 
+// ─────────────────────────────────────────────── CSV import (Design V2 · CSV-Import board)
+
+/// Vertical dashed timeline holding the three import steps.
+class _Timeline extends StatelessWidget {
+  const _Timeline({required this.steps});
+  final List<Widget> steps;
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      painter: const _DashedRail(),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        for (var i = 0; i < steps.length; i++) ...[
+          if (i > 0) const SizedBox(height: 26),
+          steps[i],
+        ],
+      ]),
+    );
+  }
+}
+
+class _DashedRail extends CustomPainter {
+  const _DashedRail();
+  @override
+  void paint(Canvas canvas, Size size) {
+    final p = Paint()
+      ..color = Bt.inputBorder
+      ..strokeWidth = 1.5;
+    const x = 14.0;
+    for (double y = 32; y < size.height - 24; y += 8) {
+      canvas.drawLine(Offset(x, y), Offset(x, y + 4), p);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DashedRail oldDelegate) => false;
+}
+
+class _TimelineStep extends StatelessWidget {
+  const _TimelineStep({required this.number, required this.title, required this.child, this.active = false});
+  final int number;
+  final String title;
+  final Widget child;
+  final bool active;
+  @override
+  Widget build(BuildContext context) {
+    return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Container(
+        width: 28,
+        height: 28,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: active ? Bt.ink : Bt.card,
+          borderRadius: BorderRadius.circular(9),
+          border: active ? null : Border.all(color: Bt.inputBorder, width: 1.5),
+        ),
+        child: Text(number.toString().padLeft(2, '0'), style: BtText.mono(context, color: active ? Bt.bone : Bt.ink2, size: 11)),
+      ),
+      const SizedBox(width: 12),
+      Expanded(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(title, style: BtText.body(context, weight: FontWeight.w600)),
+          ),
+          const SizedBox(height: 10),
+          child,
+        ]),
+      ),
+    ]);
+  }
+}
+
+/// Mini spreadsheet illustration: the first visible template columns as the
+/// header, with empty rows sliding in (no fake data).
+class _MiniSheet extends StatelessWidget {
+  const _MiniSheet({required this.columns});
+  final List<String> columns;
+  @override
+  Widget build(BuildContext context) {
+    final cols = columns.take(4).toList();
+    if (cols.isEmpty) return const SizedBox.shrink();
+    final mono = BtText.mono(context, size: 9.5);
+    Widget row(List<Widget> cells, {bool header = false}) => DecoratedBox(
+          decoration: BoxDecoration(
+            color: header ? Bt.ink.withValues(alpha: .05) : Bt.card,
+            border: header ? null : const Border(top: BorderSide(color: Bt.line)),
+          ),
+          child: IntrinsicHeight(
+            child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              for (var i = 0; i < cells.length; i++)
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                    decoration: BoxDecoration(border: i < cells.length - 1 ? const Border(right: BorderSide(color: Bt.line)) : null),
+                    child: cells[i],
+                  ),
+                ),
+            ]),
+          ),
+        );
+    return ExcludeSemantics(
+      child: Container(
+        decoration: BoxDecoration(borderRadius: BorderRadius.circular(14), border: Border.all(color: Bt.inputBorder)),
+        clipBehavior: Clip.antiAlias,
+        child: Column(children: [
+          row([for (final c in cols) Text(c.toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis, style: mono.copyWith(color: Bt.ink))], header: true),
+          for (var r = 0; r < 3; r++)
+            BtReveal(
+              index: r + 1,
+              distance: 0,
+              child: _SlideIn(
+                delay: r,
+                child: row([
+                  for (var c = 0; c < cols.length; c++)
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: FractionallySizedBox(
+                        widthFactor: const [.8, .55, .7, .45, .65][(r + c) % 5],
+                        child: Container(height: 6, decoration: BoxDecoration(color: Bt.fill, borderRadius: BorderRadius.circular(3))),
+                      ),
+                    ),
+                ]),
+              ),
+            ),
+        ]),
+      ),
+    );
+  }
+}
+
+/// Slides a row in from the right once (CSV board `slideL`).
+class _SlideIn extends StatelessWidget {
+  const _SlideIn({required this.child, required this.delay});
+  final Widget child;
+  final int delay;
+  @override
+  Widget build(BuildContext context) {
+    if (Bt.reduceMotion(context)) return child;
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: Duration(milliseconds: 600 + 150 * delay),
+      curve: Bt.ease,
+      child: child,
+      builder: (_, t, c) => t >= 1 ? c! : Transform.translate(offset: Offset(24 * (1 - t), 0), child: c),
+    );
+  }
+}
+
+/// Dashed upload drop-zone (tap to pick a CSV).
+class _UploadDrop extends StatelessWidget {
+  const _UploadDrop({required this.uploading, required this.onTap});
+  final bool uploading;
+  final VoidCallback? onTap;
+  @override
+  Widget build(BuildContext context) {
+    final bt = context.bt;
+    return BtPressable(
+      onTap: onTap,
+      scale: .98,
+      semanticLabel: uploading ? 'Uploading' : 'Upload CSV File',
+      child: CustomPaint(
+        painter: const _DashedBox(),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(color: bt.accentSoft, borderRadius: BorderRadius.circular(Bt.rTile)),
+              alignment: Alignment.center,
+              child: uploading
+                  ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: bt.accentInk))
+                  : Icon(Icons.upload_file_rounded, size: 22, color: bt.accentInk),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(uploading ? 'Uploading…' : 'Upload CSV File', style: BtText.body(context, weight: FontWeight.w600)),
+                Text("We'll show what imported and what didn't", style: BtText.caption(context, color: Bt.ink2)),
+              ]),
+            ),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
+class _DashedBox extends CustomPainter {
+  const _DashedBox();
+  @override
+  void paint(Canvas canvas, Size size) {
+    final p = Paint()
+      ..color = Bt.inputBorder
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+    final path = Path()..addRRect(RRect.fromRectAndRadius(Offset.zero & size, const Radius.circular(18)));
+    for (final m in path.computeMetrics()) {
+      for (double d = 0; d < m.length; d += 10) {
+        canvas.drawPath(m.extractPath(d, (d + 5).clamp(0, m.length)), p);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DashedBox oldDelegate) => false;
+}
+
+/// Non-dismissible progress dialog shown while rows are parsed/uploaded.
+class _ImportProgressDialog extends StatelessWidget {
+  const _ImportProgressDialog({required this.text, required this.value});
+  final String text;
+  final double value;
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Bt.card,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(22, 24, 22, 22),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          const Center(child: BtBrickLoader()),
+          const SizedBox(height: 18),
+          Text('Importing Entries', textAlign: TextAlign.center, style: BtText.d3(context)),
+          const SizedBox(height: 6),
+          Text(text, textAlign: TextAlign.center, style: BtText.num(BtText.subhead(context))),
+          const SizedBox(height: 16),
+          BtProgress(value: value),
+        ]),
+      ),
+    );
+  }
+}
+
+/// Import results: totals, per-type breakdown and every detail/error line.
+class _ImportResultsDialog extends StatelessWidget {
+  const _ImportResultsDialog({
+    required this.successCount,
+    required this.failedCount,
+    required this.materialCount,
+    required this.labourCount,
+    required this.equipmentCount,
+    required this.errorMessages,
+  });
+  final int successCount;
+  final int failedCount;
+  final int materialCount;
+  final int labourCount;
+  final int equipmentCount;
+  final List<String> errorMessages;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget stat(String label, int value, Color color) => Expanded(
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(color: Bt.ground, borderRadius: BorderRadius.circular(16)),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(label.toUpperCase(), style: BtText.mono(context)),
+              const SizedBox(height: 4),
+              Text('$value', style: BtText.d2(context, color: color)),
+            ]),
+          ),
+        );
+    return Dialog(
+      backgroundColor: Bt.card,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * .8),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Flexible(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(22, 22, 22, 8),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                Text('Import Results', style: BtText.d3(context)),
+                const SizedBox(height: 2),
+                Text('Total rows processed: ${successCount + failedCount}', style: BtText.num(BtText.caption(context))),
+                const SizedBox(height: 16),
+                Row(children: [
+                  stat('Imported', successCount, Bt.green),
+                  const SizedBox(width: 8),
+                  stat('Failed', failedCount, failedCount > 0 ? Bt.red : Bt.ink3),
+                ]),
+                const SizedBox(height: 12),
+                BtValueRow(label: 'Materials', value: '$materialCount'),
+                BtValueRow(label: 'Labour', value: '$labourCount'),
+                BtValueRow(label: 'Equipment', value: '$equipmentCount'),
+                if (errorMessages.isNotEmpty) ...[
+                  const SizedBox(height: 14),
+                  Text('DETAILS / ERRORS', style: BtText.mono(context, color: Bt.red)),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(color: Bt.redSoft, borderRadius: BorderRadius.circular(14)),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        for (final msg in errorMessages)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 6),
+                            child: Text(msg, style: BtText.caption(context, color: Bt.red)),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ]),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(22, 8, 22, 20),
+            child: BtButton(label: 'OK', onPressed: () => Navigator.pop(context)),
+          ),
+        ]),
+      ),
+    );
+  }
+}
