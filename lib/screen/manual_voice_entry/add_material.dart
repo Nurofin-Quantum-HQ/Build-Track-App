@@ -21,8 +21,6 @@ class AddMaterialScreen extends StatefulWidget {
   State<AddMaterialScreen> createState() => _AddMaterialScreenState();
 }
 class _AddMaterialScreenState extends State<AddMaterialScreen> {
-  bool _requestEsign = false;
-  final TextEditingController _clientEmailCtrl = TextEditingController();
   String? _selectedProjectId;
   String? _selectedFloor;
   String? _selectedFloorId;
@@ -707,11 +705,9 @@ class _AddMaterialScreenState extends State<AddMaterialScreen> {
               : freshGst.toString())
         : '0';
     _isWithGst = latest['isWithGst'] == true || latest['isWithGst'] == 'true';
-    if (latest['paymentHistory'] != null && latest['paymentHistory'] is List) {
-      _paymentHistory = List<Map<String, dynamic>>.from(
-        (latest['paymentHistory'] as List).map((x) => Map<String, dynamic>.from(x))
-      );
-    }
+    // A repeat is a new entry: never carry the source entry's payments over.
+    _paymentHistory = [];
+    _existingPaidAmount = 0.0;
     debugPrint('REPOPULATED controllers from API. name=${_nameCtrl.text}');
     final rawCtx = latest['executionContext'];
     final bool hasExecutionContext = rawCtx is Map<String, dynamic>;
@@ -1151,14 +1147,6 @@ class _AddMaterialScreenState extends State<AddMaterialScreen> {
       if (apiMode == 'Bank Transfer') apiMode = 'Bank Transfer';
       payload["paidAmount"] = totalPaid;
       payload["paymentMode"] = apiMode;
-      if (apiMode == 'Cash' && _requestEsign) {
-        payload['requestEsign'] = true;
-        payload['clientEmail'] = _clientEmailCtrl.text.trim();
-      }
-      if (apiMode == 'Cash' && _requestEsign) {
-        payload['requestEsign'] = true;
-        payload['clientEmail'] = _clientEmailCtrl.text.trim();
-      }
       payload["paymentStatus"] = totalPaid >= _finalTotal()
           ? "Paid"
           : totalPaid > 0
@@ -1573,30 +1561,8 @@ class _AddMaterialScreenState extends State<AddMaterialScreen> {
                         },
                       ),
               ),
-              if (!_isEditing)
-                BtRow(
-                  leading: BtTile(icon: Icons.draw_outlined, bg: context.bt.accentSoft, fg: context.bt.accentInk),
-                  title: 'Request e-signature for cash receipt',
-                  subtitle: 'Client signs on their phone',
-                  subtitleMaxLines: 2,
-                  onTap: () => setState(() => _requestEsign = !_requestEsign),
-                  trailing: BtSwitch(
-                    value: _requestEsign,
-                    onChanged: (val) => setState(() => _requestEsign = val),
-                  ),
-                ),
             ],
           ),
-          if (!_isEditing && _requestEsign)
-            Padding(
-              padding: const EdgeInsets.only(top: 12.0),
-              child: TextFormField(
-                controller: _clientEmailCtrl,
-                keyboardType: TextInputType.emailAddress,
-                style: BtText.body(context, weight: FontWeight.w500),
-                decoration: btInput(context, hint: 'Client email address', prefix: const Icon(Icons.email_outlined, color: Bt.ink3)),
-              ),
-            ),
           if (!_isEditing && _recordPaymentNow && _paymentResult != null) ...[
             const SizedBox(height: 12),
             _buildPaymentSummary(),

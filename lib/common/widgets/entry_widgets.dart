@@ -1,4 +1,3 @@
-import 'package:buildtrack_mobile/common/themes/app_colors.dart';
 import 'package:buildtrack_mobile/controller/project_provider.dart';
 import 'package:buildtrack_mobile/models/construction_models.dart';
 import 'package:buildtrack_mobile/models/project_model.dart';
@@ -100,9 +99,6 @@ String normalizeUnit(String raw) {
   };
   return aliases[s] ?? s;
 }
-var _kBlue = AppColors.primary;
-const _kGray = AppColors.textLight;
-const _kDark = AppColors.textDark;
 class EntrySectionCard extends StatelessWidget {
   const EntrySectionCard({
     super.key,
@@ -800,11 +796,7 @@ class CostSummaryCard extends StatelessWidget {
                 children: [
                   Text(
                     entry.$1,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: _kGray,
-                      fontWeight: FontWeight.w500,
-                    ),
+                    style: BtText.subhead(context, color: Bt.ink2, weight: FontWeight.w500),
                   ),
                   const SizedBox(width: 12),
                   Flexible(
@@ -813,11 +805,7 @@ class CostSummaryCard extends StatelessWidget {
                       textAlign: TextAlign.end,
                       overflow: TextOverflow.ellipsis,
                       maxLines: 2,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: _kDark,
-                        fontWeight: FontWeight.w600,
-                      ),
+                      style: BtText.subhead(context, color: Bt.ink, weight: FontWeight.w600),
                     ),
                   ),
                 ],
@@ -852,23 +840,14 @@ class VoiceParseCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ts = timestamp ?? TimeOfDay.now().format(context);
+    final bt = context.bt;
     return EntrySectionCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF0B63CE), Color(0xFF0B63CE)],
-                  ),
-                  borderRadius: BorderRadius.circular(13),
-                ),
-                child: const Icon(Icons.mic, color: Colors.white, size: 22),
-              ),
+              BtTile(icon: Icons.mic, size: 44, bg: bt.accentSoft, fg: bt.accentInk),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
@@ -876,66 +855,29 @@ class VoiceParseCard extends StatelessWidget {
                   children: [
                     Text(
                       'Parsed from Voice',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: _kBlue,
-                      ),
+                      style: BtText.headline(context),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       'Confidence: ${confidence.toStringAsFixed(1)}% · $ts',
-                      style: const TextStyle(fontSize: 13, color: _kGray),
+                      style: BtText.caption(context),
                     ),
                   ],
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 5,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE7F6EE),
-                  borderRadius: BorderRadius.circular(Bt.rCard),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.check_circle_outline,
-                      color: Color(0xFF067647),
-                      size: 13,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      entryTypeLabel,
-                      style: const TextStyle(
-                        color: Color(0xFF067647),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.8,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              BtBadge(label: entryTypeLabel, tone: BtTone.green),
             ],
           ),
           const SizedBox(height: 16),
-          const Divider(color: Color(0xFFEEF1F5), thickness: 1),
+          const Divider(color: Bt.line, thickness: 1),
           const SizedBox(height: 14),
           Row(
             children: [
-              Icon(Icons.format_align_left, color: _kBlue, size: 14),
+              Icon(Icons.format_align_left, color: bt.accentInk, size: 14),
               const SizedBox(width: 6),
               Text(
                 'Voice transcript',
-                style: TextStyle(
-                  color: _kBlue,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
+                style: BtText.subhead(context, color: bt.accentInk, weight: FontWeight.w600),
               ),
             ],
           ),
@@ -943,29 +885,24 @@ class VoiceParseCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: const Color(0xFFF6F7F9),
+              color: Bt.fill,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: Bt.line),
             ),
             child: Text(
               '"$transcript"',
-              style: const TextStyle(
-                color: _kDark,
-                fontSize: 13.5,
-                fontStyle: FontStyle.italic,
-                height: 1.65,
-              ),
+              style: BtText.body(context, color: Bt.ink).copyWith(fontStyle: FontStyle.italic, height: 1.65),
             ),
           ),
           const SizedBox(height: 10),
           Row(
             children: [
-              const Icon(Icons.info_outline, size: 13, color: _kGray),
+              const Icon(Icons.info_outline, size: 13, color: Bt.ink3),
               const SizedBox(width: 5),
-              const Expanded(
+              Expanded(
                 child: Text(
                   'Fields have been auto-filled from voice. Review and edit before confirming.',
-                  style: TextStyle(fontSize: 13, color: _kGray),
+                  style: BtText.caption(context),
                 ),
               ),
             ],
@@ -1778,10 +1715,10 @@ Future<Map<String, dynamic>?> showPaymentSheet(
                                     lastDate: DateTime(2100),
                                     builder: (c, child) => Theme(
                                       data: Theme.of(c).copyWith(
-                                        colorScheme: const ColorScheme.light(
+                                        colorScheme: Theme.of(c).colorScheme.copyWith(
                                           primary: Bt.ink,
-                                          onPrimary: Colors.white,
-                                          onSurface: _kDark,
+                                          onPrimary: Bt.card,
+                                          onSurface: Bt.ink,
                                         ),
                                       ),
                                       child: child!,

@@ -51,9 +51,9 @@ class _EntryDetailScreenState extends State<EntryDetailScreen> {
       _paymentHistory = [];
     }
     _customDate = args['date'] as String?;
-    _floor = args['floor'] as String?;
-    _phase = args['phase'] as String?;
-    _activity = args['activity'] as String?;
+    _floor = args['floor']?.toString();
+    _phase = args['phase']?.toString();
+    _activity = args['activity']?.toString();
     _projectName = args['projectName'] as String?;
     _paymentReceiptFile =
         args['paymentReceipt'] as String? ??
@@ -87,6 +87,10 @@ class _EntryDetailScreenState extends State<EntryDetailScreen> {
               : [];
           _paymentReceiptFile = latest['paymentReceipt'] as String? ??
               (_paymentHistory.isNotEmpty ? _paymentHistory.last['receipt'] as String? : null);
+          String? str(dynamic v) => (v == null || v.toString().trim().isEmpty) ? null : v.toString();
+          _phase = str(latest['phase']) ?? _phase;
+          _activity = str(latest['activity']) ?? _activity;
+          _floor = str(latest['floor']) ?? _floor;
         });
       }
     } catch (e) {
@@ -472,7 +476,7 @@ class _EntryDetailScreenState extends State<EntryDetailScreen> {
                 BtGroup(
                   children: [
                     BtValueRow(label: 'Project', value: projectLabel),
-                    if (whereParts.isNotEmpty) BtValueRow(label: 'Where', value: whereParts),
+                    if (whereParts.isNotEmpty) BtValueRow(label: 'Used in', value: whereParts),
                     BtValueRow(label: 'Date', value: displayDate),
                     BtValueRow(label: 'Quantity / value', value: amount, valueColor: isPositive ? null : Bt.red),
                     BtValueRow(label: 'Reference', value: ref),

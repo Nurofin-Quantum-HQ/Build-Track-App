@@ -26,7 +26,6 @@ class _FulfillmentPaymentScreenState extends State<FulfillmentPaymentScreen> {
   late double _totalAmount;
   late double _alreadyPaid;
   late double _outstanding;
-  late String? _existingReceipt;
   late String? _phase;
   late String? _activity;
   late PaymentStatus _selectedStatus;
@@ -116,7 +115,6 @@ class _FulfillmentPaymentScreenState extends State<FulfillmentPaymentScreen> {
     {'label': 'Card', 'icon': Icons.credit_card_outlined},
     {'label': 'Cheque', 'icon': Icons.description_outlined},
   ];
-  static const Color _kDark = Color(0xFF101828);
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -145,7 +143,6 @@ class _FulfillmentPaymentScreenState extends State<FulfillmentPaymentScreen> {
     _outstanding =
         (args['outstandingAmount'] as num?)?.toDouble() ??
         (_totalAmount - _alreadyPaid).clamp(0.0, double.infinity);
-    _existingReceipt = (args['receipt'] ?? args['screenshotUrl']) as String?;
     _selectedStatus = _outstanding > 0
         ? (_alreadyPaid > 0 ? PaymentStatus.partial : PaymentStatus.pending)
         : PaymentStatus.paid;
@@ -165,8 +162,12 @@ class _FulfillmentPaymentScreenState extends State<FulfillmentPaymentScreen> {
         _selectedMethod = 'UPI';
       }
     }
-    _noteCtrl.text = (args['notes'] ?? args['remarks'] ?? '').toString();
-    _uploadedReceipt = _existingReceipt;
+    // Every visit records a NEW payment, so it starts clean: callers pass the entry's
+    // invoice attachment / the previous payment's receipt as args['receipt'], and that
+    // used to show up here as this payment's proof.
+    _noteCtrl.clear();
+    _uploadedReceipt = null;
+    _newReceiptDataUri = null;
     final txDetails = args['transactionDetails'] as Map?;
     _phase = (txDetails?['phase'] ?? txDetails?['phaseName'])?.toString();
     _activity = (txDetails?['activity'] ?? txDetails?['activityName'])?.toString();
@@ -232,7 +233,8 @@ class _FulfillmentPaymentScreenState extends State<FulfillmentPaymentScreen> {
         'paymentStatus': newStatusStr,
         'paidAmount': totalPaid,
         'paymentMode': apiPaymentMode,
-        'notes': _noteCtrl.text.trim(),
+        // Only send remarks when given: an empty 'notes' overwrote the entry's own notes.
+        if (_noteCtrl.text.trim().isNotEmpty) 'notes': _noteCtrl.text.trim(),
         'paymentDate': _selectedPaymentDate.toUtc().toIso8601String(),
         if (apiPaymentMode == 'Cash' && _requestEsign) 'requestEsign': true,
         if (apiPaymentMode == 'Cash' && _requestEsign) 'clientEmail': _clientEmailCtrl.text.trim(),
@@ -322,10 +324,10 @@ class _FulfillmentPaymentScreenState extends State<FulfillmentPaymentScreen> {
       lastDate: DateTime(2100),
       builder: (c, child) => Theme(
         data: Theme.of(c).copyWith(
-          colorScheme: const ColorScheme.light(
+          colorScheme: Theme.of(c).colorScheme.copyWith(
             primary: Bt.ink,
-            onPrimary: Bt.bone,
-            onSurface: _kDark,
+            onPrimary: Bt.card,
+            onSurface: Bt.ink,
           ),
         ),
         child: child!,

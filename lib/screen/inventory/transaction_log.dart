@@ -2,6 +2,7 @@ import 'package:buildtrack_mobile/design/design.dart';
 import 'dart:convert';
 import 'dart:developer' as dev;
 import 'package:buildtrack_mobile/common/widgets/entry_widgets.dart';
+import 'package:buildtrack_mobile/common/widgets/log_sheet.dart';
 import 'package:buildtrack_mobile/controller/entry_permissions.dart';
 import 'package:flutter/material.dart';
 import 'package:buildtrack_mobile/common/utils/currency_formatter.dart';
@@ -464,10 +465,13 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
     final groups = _groupByDate(_filteredLogs);
     final widgets = <Widget>[];
     var revealIndex = 3;
+    // The most recent non-empty group starts open (not just "Today"); otherwise a
+    // project with no entries today opened with every group collapsed and looked empty.
+    final String? firstGroup = groups.keys.isEmpty ? null : groups.keys.first;
     for (final entry in groups.entries) {
       final groupLabel = entry.key;
       final logs = entry.value;
-      final collapsed = _collapsedGroups[groupLabel] ?? (groupLabel != 'Today');
+      final collapsed = _collapsedGroups[groupLabel] ?? (groupLabel != firstGroup);
       widgets.add(
         Semantics(
           button: true,
@@ -646,6 +650,16 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
     );
   }
   Widget _buildEmptyState() {
+    if (_isGeneral) {
+      // Project-wide logs: start the same "Log an entry" flow as the centre + button.
+      return BtEmpty(
+        icon: Icons.receipt_long_outlined,
+        title: 'No entries yet',
+        message: 'Material, labour and equipment entries for this project will appear here.',
+        action: 'New entry',
+        onAction: () => showLogSheet(context),
+      );
+    }
     String title, subtitle;
     IconData icon;
     switch (_itemType) {
@@ -759,6 +773,12 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
         payStatus == PaymentStatus.partial ||
         payStatus == PaymentStatus.overdue;
     final logCategory = log['category'] as String? ?? _itemType;
+    // "Used in": where on site the entry went (phase · activity · floor), from the
+    // transaction's phase/activity/floor fields; the line is hidden when none are set.
+    final usedIn = [log['phase'], log['activity'], log['floor']]
+        .map((v) => v?.toString().trim() ?? '')
+        .where((v) => v.isNotEmpty && v.toLowerCase() != 'null')
+        .join(' · ');
     final String statusLabel;
     final BtTone statusTone;
     switch (payStatus) {
@@ -884,6 +904,18 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
                       overflow: TextOverflow.ellipsis,
                       style: BtText.caption(context),
                     ),
+                    if (usedIn.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text.rich(
+                        TextSpan(children: [
+                          TextSpan(text: 'Used in ', style: BtText.caption(context, weight: FontWeight.w600)),
+                          TextSpan(text: usedIn),
+                        ]),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: BtText.caption(context),
+                      ),
+                    ],
                   ],
                 ),
               ),
