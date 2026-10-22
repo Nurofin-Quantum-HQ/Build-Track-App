@@ -49,15 +49,55 @@ keys compared before/after) and screenshot-tested against a local backend with s
 - Reports: Qty column = Amount ÷ Rate instead of the saved quantity (wrong when GST/overtime is included).
 - Reports: "Generate report" state is unreachable (`_reportGenerated` never resets); full-screen view shows stale rows after an edit; delete doesn't reload report entries.
 - Voice: save errors are set but never shown on the review screen; edit mode writes the project *name* into `projectId`.
-- E-sign polling loops (record money, payment sheet) keep running if the sheet is closed mid-wait.
+- E-sign polling loops (record money, payment sheet) keep running if the sheet is closed mid-wait. *(record money: fixed in the testing round)*
 - Payment section e-sign switch only takes effect in the add-and-pay route.
-- Project detail: `_RecentEntriesSection` hard-codes `isAdmin = true` (every user sees all approved entries).
+- ~~Project detail: `_RecentEntriesSection` hard-codes `isAdmin = true`~~ — fixed in the testing round.
 - Daily update resolves the project as `provider.selectedProject ?? picked` (can target the wrong project).
 - Material history screen is hard-coded demo data (2023 "Portland Type II").
 - Subscription card: active seats hard-coded to 1. Profile version string hard-coded "2.4.0 (2024)".
 - Record Payment is not gated by `canApprovePayments` on the transaction log / inventory cards (it is on entry detail).
 - Signature page: hard-coded 1×1 PNG as the signature; no `mounted` checks after awaits.
 - Unused files: `voice_confirmation_sheet.dart`, `voice_review_widgets.dart`, `review_*.dart` wrappers, `PremiumCtaButton`.
+
+## Fixes from the 15–16 Oct UI testing report (on V2)
+
+| Report item | Status |
+|---|---|
+| Logout shows "Session expired" twice | Fixed — the alert shows once, only when a signed-in token is rejected; never on logout or a wrong password |
+| Dashboard logo too small / no "Powered by Nurofin" | Fixed — 40px logo tile; Powered by Nurofin footer on Home |
+| Guidelines (tour) not proper | Fixed — Home, Projects, Add Entry, Reports tours run in screen order, skip steps not on screen, hand off to the next tab the user can open, never to Inventory. Found: showcaseview 5 never attaches keys to widgets, so on-screen checks use the showcase registry (`lib/common/tour_targets.dart`) |
+| Revenue card/history/edit don't show the uploaded image | Fixed — image loaded from the entry detail; editing no longer wipes it |
+| Recent activity logs empty by default | Fixed — latest group opens by default |
+| "Used in" column empty | Fixed |
+| Empty-state "New Entry" opens wrong page | Fixed — opens the log sheet |
+| Cash + E-sign client email box not visible | Fixed; e-sign polling stops when the sheet closes |
+| Project recent activity layout / empty state | Fixed |
+| Phases need Update Progress + Add Entry (prefilled) | Added on each activity; Add Entry prefills project / phase / activity |
+| Budget field shows "0" | Fixed — blank when 0 |
+| Assign Task title/description blanking | Fixed |
+| Progress update date pickers + Mark as Done & Submit | Fixed (pickers were behind an IgnorePointer; submit resolves the project by id and shows errors) |
+| Project without floor can't continue | Fixed |
+| Standalone "Request E-signature" in Add/Repeat entry | Removed (still available in payments) |
+| Record Payment colours differ | Fixed |
+| New payment prefilled with previous invoice | Fixed — new payments start clean; Repeat resets payment history |
+| Standalone inbox unnecessary | Bell on Home → Notifications; "See all" approvals → Approvals list |
+| "Entry Approved" notification opens logs | Fixed — opens the entry |
+| By Type / Entries layout | By type defaults to the 3-column card grid (list is a toggle); Entries already defaults to the sheet |
+| Reports guidelines should explain all options | Fixed — tour walks every control |
+| Remove Efficiency Report | Removed from Reports |
+| Create Workspace unclear | Explained below — not changed (product decision) |
+| App Guidelines option doesn't work | Fixed — restarts the whole app tour from Home |
+| Tour shows Inventory after login | Fixed |
+| CSV templates differ between Add Entry and Reports | One template, one column picker, one parser (`csv_import_helper.dart`); accepts old templates and Reports exports, dd/mm/yyyy dates, Excel BOM |
+| User restrictions not working | Fixed where the backend restricts: routes `/logs` `/reports` `/assign-role` `/create-workspace` now guarded; Mason buttons, Supervisor Approve and the To approve tab need the permission; project entries list uses the real role; Edit needs entry permission |
+| Budget hidden for non-admins + Assign Role option | Added "Project budget" permission (`view_project_budget`); budgets and Insights hidden without it (UI only — the API still returns the numbers) |
+| Mason recent entries only own | Fixed |
+| Invoice Kannada/Tamil transliterated | Fixed in backend branch `fix/esign-receipt-native-script` (core) — needs native-speaker review |
+| Profile page not opening (teammate) | Not reproducible on V2, main or V3 for any role. Hardened: profile fetch times out after 20 s and falls back to cached data; profile tour no longer starts while loading |
+
+**Create Workspace (Account, admins only):** opens the public sign-up flow and creates a brand-new, separate company + admin account. It does not add anything to the current workspace.
+
+**Backend notes (core, not changed):** POST `/tasks` has no permission check; DELETE `/transactions/:id` only checks project access; approve/reject accept `add_entries` as an approval permission; PUT `/projects/:id` (daily update) returns 403 for users without the listed permissions or a task on that project.
 
 ## Local testing (never against live)
 `flutter run --dart-define=API_BASE_URL=http://localhost:5001/api` points the app at a local backend.
