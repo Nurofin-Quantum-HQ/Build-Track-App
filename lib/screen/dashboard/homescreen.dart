@@ -18,6 +18,7 @@ import 'package:flutter/foundation.dart';
 import 'package:showcaseview/showcaseview.dart';
 import 'package:buildtrack_mobile/controller/showcase_keys.dart';
 import 'package:buildtrack_mobile/controller/nav_controller.dart';
+import 'package:buildtrack_mobile/screen/dashboard/notifications_bell.dart';
 
 String relativeTimeLabel(DateTime date) {
   final now = DateTime.now();
@@ -57,27 +58,27 @@ String relativeTimeLabel(DateTime date) {
 class HomeScreen extends StatelessWidget {
   HomeScreen({super.key});
   final GlobalKey<ShowCaseWidgetState> _showcaseKey = GlobalKey<ShowCaseWidgetState>();
-  
+
   @override
   Widget build(BuildContext context) {
     return ShowCaseWidget(
       key: _showcaseKey,
       globalTooltipActions: [
         TooltipActionButton(
-          type: TooltipDefaultActionType.skip, 
-          backgroundColor: Colors.transparent, 
+          type: TooltipDefaultActionType.skip,
+          backgroundColor: Colors.transparent,
           textStyle: const TextStyle(color: Colors.white70, fontWeight: FontWeight.bold),
           onTap: () {
             UserSession.skipTour();
             _showcaseKey.currentState?.dismiss();
           }
-        ), 
+        ),
         TooltipActionButton(
-          type: TooltipDefaultActionType.next, 
-          backgroundColor: AppColors.primary, 
+          type: TooltipDefaultActionType.next,
+          backgroundColor: AppColors.primary,
           textStyle: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)
         )
-      ], 
+      ],
       enableAutoScroll: true,
       onFinish: () {
         UserSession.markModuleVisited('HomeScreen');
@@ -144,28 +145,19 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
           showDialog(
             context: context,
             barrierDismissible: false,
-            builder: (context) => AlertDialog(
-              title: const Text('Welcome to BuildTrack!'),
-              content: const Text('Do you want an app tour to help you get started?'),
-              actions: [
-                TextButton(
-                  onPressed: () {
-                    UserSession.markAppTourPrompted();
-                    Navigator.pop(context);
-                  },
-                  child: const Text('No'),
-                ),
-                TextButton(
-                  onPressed: () {
-                    UserSession.markAppTourPrompted();
-                    UserSession.resetTour();
-                    UserSession.setGlobalTourActive(true);
-                    Navigator.pop(context);
-                    _startHomeScreenTour();
-                  },
-                  child: const Text('Yes', style: TextStyle(fontWeight: FontWeight.bold)),
-                )
-              ],
+            barrierColor: Bt.scrim,
+            builder: (context) => _WelcomeTourDialog(
+              onNo: () {
+                UserSession.markAppTourPrompted();
+                Navigator.pop(context);
+              },
+              onYes: () {
+                UserSession.markAppTourPrompted();
+                UserSession.resetTour();
+                UserSession.setGlobalTourActive(true);
+                Navigator.pop(context);
+                _startHomeScreenTour();
+              },
             ),
           );
         } else if (UserSession.globalTourActive && !UserSession.visitedModules.contains('HomeScreen')) {
@@ -191,123 +183,480 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
   void _showEntryOptions(BuildContext context, String type) {
     Navigator.pushNamed(context, '/add-entry');
   }
+
+  /// Top row of every role's hero: company caption + greeting, then
+  /// Inbox bell · help/tour · account (same targets as before).
+  Widget _buildHeroTop(BuildContext context) {
+    final company = UserSession.companyName.isNotEmpty ? UserSession.companyName : 'BuildTrack';
+    final hasLogo = UserSession.companyLogo != null && UserSession.companyLogo!.isNotEmpty;
+    return BtReveal(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(children: [
+                  if (hasLogo) ...[
+                    Container(
+                      width: 18,
+                      height: 18,
+                      margin: const EdgeInsets.only(right: 7),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(5),
+                        image: DecorationImage(image: getProfileImageProvider(UserSession.companyLogo)!, fit: BoxFit.contain),
+                      ),
+                    ),
+                  ],
+                  Flexible(
+                    child: Text(
+                      company,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      // The company's chosen name style (Create workspace / Edit profile).
+                      style: UserSession.getCompanyTextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Bt.onNoir2),
+                    ),
+                  ),
+                ]),
+                const SizedBox(height: 3),
+                Text(
+                  _homeGreeting(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: BtText.headline(context).copyWith(color: Bt.bone),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 6),
+          const NotificationsBell(),
+          const SizedBox(width: 6),
+          Showcase(
+            key: ShowcaseKeys.helpButton,
+            description: 'Tap here anytime to replay this tour and get help.',
+            tooltipBackgroundColor: Bt.ink,
+            textColor: Colors.white,
+            tooltipBorderRadius: BorderRadius.circular(16),
+            tooltipPadding: const EdgeInsets.all(16),
+            child: BtIconButton(
+              icon: Icons.help_outline_rounded,
+              semantic: 'App guidelines',
+              size: 21,
+              color: Bt.bone,
+              background: Colors.white.withValues(alpha: .09),
+              onTap: () {
+                final keysToShow = _getShowcaseKeys(isReplay: true);
+                if (keysToShow.isNotEmpty) {
+                  ShowcaseView.get().startShowCase(keysToShow);
+                }
+              },
+            ),
+          ),
+          const SizedBox(width: 6),
+          Showcase(
+            key: ShowcaseKeys.profileIcon,
+            description: 'Tap your profile for your account, team, plan, logs and settings.',
+            tooltipBackgroundColor: Bt.ink,
+            textColor: Colors.white,
+            tooltipBorderRadius: BorderRadius.circular(16),
+            tooltipPadding: const EdgeInsets.all(16),
+            child: Semantics(
+              button: true,
+              label: 'Account',
+              child: BtPressable(
+                scale: .92,
+                onTap: () => Navigator.pushNamed(context, '/profile'),
+                child: Container(
+                  padding: const EdgeInsets.all(2),
+                  decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.white.withValues(alpha: .18), width: 1.5)),
+                  child: const ProfileAvatar(radius: 19),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     _checkTour(context.watch<ProjectProvider>());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) context.read<NavController>().markCurrent('/home');
     });
-    final company = UserSession.companyName.isNotEmpty ? UserSession.companyName : 'BuildTrack';
-    final hasLogo = UserSession.companyLogo != null && UserSession.companyLogo!.isNotEmpty;
+    final top = _buildHeroTop(context);
     return Scaffold(
       backgroundColor: Bt.ground,
-      body: SafeArea(
-        bottom: false,
-        child: Builder(
-          builder: (ctx) => Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 24, 8, 4),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(children: [
-                            if (hasLogo) ...[
-                              Container(
-                                width: 22,
-                                height: 22,
-                                margin: const EdgeInsets.only(right: 8),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(color: Bt.line),
-                                  image: DecorationImage(image: getProfileImageProvider(UserSession.companyLogo)!, fit: BoxFit.contain),
-                                ),
-                              ),
-                            ],
-                            Flexible(
-                              child: Text(
-                                company,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: UserSession.getCompanyTextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Bt.ink2),
-                              ),
-                            ),
-                          ]),
-                          const SizedBox(height: 2),
-                          Text('Today', style: BtText.largeTitle(context)),
-                        ],
-                      ),
-                    ),
-                    Showcase(
-                      key: ShowcaseKeys.helpButton,
-                      description: 'Tap here anytime to replay this tour and get help.',
-                      tooltipBackgroundColor: Bt.ink,
-                      textColor: Colors.white,
-                      tooltipBorderRadius: BorderRadius.circular(16),
-                      tooltipPadding: const EdgeInsets.all(16),
-                      child: BtIconButton(
-                        icon: Icons.help_outline_rounded,
-                        semantic: 'App guidelines',
-                        color: Bt.ink2,
-                        onTap: () {
-                          final keysToShow = _getShowcaseKeys(isReplay: true);
-                          if (keysToShow.isNotEmpty) {
-                            ShowcaseView.get().startShowCase(keysToShow);
-                          }
-                        },
-                      ),
-                    ),
-                    Showcase(
-                      key: ShowcaseKeys.profileIcon,
-                      description: 'Tap your profile for your account, team, plan, logs and settings.',
-                      tooltipBackgroundColor: Bt.ink,
-                      textColor: Colors.white,
-                      tooltipBorderRadius: BorderRadius.circular(16),
-                      tooltipPadding: const EdgeInsets.all(16),
-                      child: Semantics(
-                        button: true,
-                        label: 'Account',
-                        child: InkWell(
-                          customBorder: const CircleBorder(),
-                          onTap: () => Navigator.pushNamed(context, '/profile'),
-                          child: const Padding(padding: EdgeInsets.all(4), child: ProfileAvatar(radius: 20)),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: SingleChildScrollView(
-                    physics: const ClampingScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (UserSession.isAdmin)
-                          _AdminDashboard(onEntryTap: _showEntryOptions)
-                        else if (UserSession.isSupervisor)
-                          const _SupervisorDashboard()
-                        else
-                          _MasonDashboard(onEntryTap: _showEntryOptions),
-                      ],
-                    ),
-                  ),
-              ),
-            ],
-          ),
-        ),
-      ),
+      body: UserSession.isAdmin
+          ? _AdminDashboard(onEntryTap: _showEntryOptions, top: top)
+          : UserSession.isSupervisor
+              ? _SupervisorDashboard(top: top)
+              : _MasonDashboard(onEntryTap: _showEntryOptions, top: top),
       bottomNavigationBar: AppBottomNav(),
     );
   }
 }
+
+// ───────────────────────────────────────────────────────── shared home pieces
+
+String _homeGreeting() {
+  final h = DateTime.now().hour;
+  final part = h < 12 ? 'Good morning' : (h < 17 ? 'Good afternoon' : 'Good evening');
+  return '$part, ${UserSession.roleLabel}';
+}
+
+/// Noir hero used by all three role dashboards (top row + role content).
+class _HomeHero extends StatelessWidget {
+  const _HomeHero({required this.top, required this.children});
+  final Widget top;
+  final List<Widget> children;
+  @override
+  Widget build(BuildContext context) {
+    return BtHero(
+      padding: EdgeInsets.fromLTRB(Bt.gutter, MediaQuery.paddingOf(context).top + 12, Bt.gutter, 26 + 26),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [top, ...children]),
+    );
+  }
+}
+
+/// Same API call + feedback the supervisor dashboard always used.
+Future<bool> _approveTx(BuildContext context, String id) async {
+  final ok = await ApiService.approveTransaction(id);
+  if (!context.mounted) return ok;
+  if (ok) {
+    btToast(context, 'Transaction approved');
+  } else {
+    btToast(context, 'Failed to approve', error: true);
+  }
+  return ok;
+}
+
+/// Same API call + feedback the supervisor dashboard always used.
+Future<bool> _rejectTx(BuildContext context, String id) async {
+  final ok = await ApiService.rejectTransaction(id, 'Rejected by supervisor');
+  if (!context.mounted) return ok;
+  if (ok) {
+    btToast(context, 'Transaction rejected');
+  }
+  return ok;
+}
+
+Future<bool> _confirmRejectTx(BuildContext context) {
+  return btConfirm(context, title: 'Reject this entry?', message: 'The person who logged it will see it as rejected.', confirmLabel: 'Reject');
+}
+
+double _sumAmounts(Iterable<dynamic> txs) => txs.fold<double>(0.0, (s, t) {
+      final a = t is Map ? t['amount'] : null;
+      return s + ((a is num) ? a.toDouble() : (double.tryParse(a?.toString() ?? '') ?? 0.0));
+    });
+
+/// "4 entries need your approval · ₹99,963 waiting" — opens the Inbox.
+class _ApprovalsSummaryCard extends StatelessWidget {
+  const _ApprovalsSummaryCard({required this.count, required this.amount, required this.onTap, this.updates = 0});
+  final int count;
+  final double amount;
+  final int updates;
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) {
+    final bt = context.bt;
+    final sub = <String>[
+      if (amount > 0) '${formatInr(amount)} waiting',
+      if (updates > 0) '$updates project update${updates == 1 ? '' : 's'}',
+    ];
+    return BtCard(
+      variant: BtCardVariant.attention,
+      padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+      onTap: onTap,
+      child: Row(children: [
+        BtTile(icon: Icons.inbox_outlined, bg: bt.accentSoft, fg: bt.accentInk, size: 44),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('$count ${count == 1 ? 'entry needs' : 'entries need'} your approval', style: BtText.headline(context)),
+            if (sub.isNotEmpty) ...[
+              const SizedBox(height: 2),
+              Text(sub.join(' · '), style: BtText.num(BtText.subhead(context))),
+            ],
+          ]),
+        ),
+        const Icon(Icons.chevron_right_rounded, color: Bt.placeholder),
+      ]),
+    );
+  }
+}
+
+/// Pending approvals on Home for anyone who can approve: count + amount,
+/// the top few entries with Approve / Reject…, and "See all" → Inbox.
+class _HomeApprovals extends StatefulWidget {
+  const _HomeApprovals();
+  @override
+  State<_HomeApprovals> createState() => _HomeApprovalsState();
+}
+
+class _HomeApprovalsState extends State<_HomeApprovals> {
+  List<dynamic> _txs = [];
+  int _updates = 0;
+  bool _loaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final data = await ApiService.fetchPendingApprovals();
+    if (!mounted) return;
+    setState(() {
+      _txs = (data?['transactions'] as List?) ?? [];
+      _updates = (data?['projectUpdates'] as List?)?.length ?? 0;
+      _loaded = true;
+    });
+  }
+
+  void _seeAll() {
+    Navigator.pushNamed(context, '/inbox').then((_) {
+      if (mounted) _load();
+    });
+  }
+
+  Future<void> _approve(String id) async {
+    final ok = await _approveTx(context, id);
+    if (ok && mounted) _load();
+  }
+
+  Future<void> _reject(String id) async {
+    final confirmed = await _confirmRejectTx(context);
+    if (!confirmed || !mounted) return;
+    final ok = await _rejectTx(context, id);
+    if (ok && mounted) _load();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_loaded) {
+      return const Padding(padding: EdgeInsets.only(bottom: 16), child: BtSkeleton(height: 76, radius: Bt.rCard));
+    }
+    final total = _txs.length + _updates;
+    if (total == 0) return const SizedBox.shrink();
+    final top = _txs.take(3).toList();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        BtSectionHeader(title: 'Pending approvals', action: 'See all', onAction: _seeAll),
+        _ApprovalsSummaryCard(count: total, amount: _sumAmounts(_txs), updates: _updates, onTap: _seeAll),
+        for (var i = 0; i < top.length; i++)
+          Padding(
+            padding: const EdgeInsets.only(top: 10),
+            child: BtReveal(
+              index: i + 1,
+              child: _PendingTxCard(
+                tx: top[i] as Map<String, dynamic>,
+                onApprove: () => _approve(top[i]['_id']?.toString() ?? ''),
+                onReject: () => _reject(top[i]['_id']?.toString() ?? ''),
+              ),
+            ),
+          ),
+        if (_txs.length > top.length)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: BtButton(label: 'See all ${_txs.length} in Inbox', variant: BtButtonVariant.quiet, icon: Icons.arrow_forward_rounded, onPressed: _seeAll),
+          ),
+      ]),
+    );
+  }
+}
+
+/// Welcome / app-tour prompt (First-Run board): elevation drawing, title,
+/// No / Yes. Same callbacks as the old AlertDialog.
+class _WelcomeTourDialog extends StatelessWidget {
+  const _WelcomeTourDialog({required this.onNo, required this.onYes});
+  final VoidCallback onNo;
+  final VoidCallback onYes;
+  @override
+  Widget build(BuildContext context) {
+    final reduce = Bt.reduceMotion(context);
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: reduce ? 1 : 0, end: 1),
+      duration: reduce ? Duration.zero : const Duration(milliseconds: 600),
+      curve: Bt.spring,
+      builder: (context, t, child) => Transform.scale(scale: .9 + .1 * t, child: Opacity(opacity: t.clamp(0.0, 1.0), child: child)),
+      child: Dialog(
+        backgroundColor: Bt.card,
+        surfaceTintColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Bt.rSheet)),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 22, 20, 18),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            const Center(child: _WelcomeElevation()),
+            const SizedBox(height: 10),
+            Text('Welcome to BuildTrack!', textAlign: TextAlign.center, style: BtText.d3(context)),
+            const SizedBox(height: 6),
+            Text('Do you want an app tour to help you get started?', textAlign: TextAlign.center, style: BtText.body(context, color: Bt.ink2)),
+            const SizedBox(height: 20),
+            Row(children: [
+              Expanded(child: BtButton(label: 'No', variant: BtButtonVariant.secondary, onPressed: onNo)),
+              const SizedBox(width: 10),
+              Expanded(child: BtButton(label: 'Yes, show me', onPressed: onYes)),
+            ]),
+            const SizedBox(height: 12),
+            Text('You can replay the tour anytime from the ? button.', textAlign: TextAlign.center, style: BtText.caption(context)),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
+/// Blueprint elevation of a small building with a crane that draws in once.
+class _WelcomeElevation extends StatelessWidget {
+  const _WelcomeElevation();
+  @override
+  Widget build(BuildContext context) {
+    final bt = context.bt;
+    final reduce = Bt.reduceMotion(context);
+    return RepaintBoundary(
+      child: TweenAnimationBuilder<double>(
+        tween: Tween(begin: reduce ? 1 : 0, end: 1),
+        duration: reduce ? Duration.zero : const Duration(milliseconds: 1200),
+        curve: Bt.ease,
+        builder: (_, t, _) => CustomPaint(
+          size: const Size(180, 150),
+          painter: _ElevationPainter(t: t, line: Bt.ink3, accent: bt.accentInk, fill: bt.accentSoft),
+        ),
+      ),
+    );
+  }
+}
+
+class _ElevationPainter extends CustomPainter {
+  _ElevationPainter({required this.t, required this.line, required this.accent, required this.fill});
+  final double t;
+  final Color line, accent, fill;
+  @override
+  void paint(Canvas canvas, Size size) {
+    final stroke = Paint()
+      ..color = line
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.2
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+    canvas.drawLine(const Offset(6, 144), const Offset(174, 144), stroke);
+    const body = Rect.fromLTWH(36, 62, 88, 82);
+    canvas.drawRect(body, Paint()..color = fill);
+    canvas.drawRect(body, stroke);
+    canvas.drawPath(Path()..moveTo(28, 66)..lineTo(80, 26)..lineTo(132, 66), stroke);
+    canvas.drawRect(const Rect.fromLTWH(68, 106, 24, 38), stroke);
+    canvas.drawRect(const Rect.fromLTWH(46, 78, 16, 16), stroke);
+    canvas.drawRect(const Rect.fromLTWH(98, 78, 16, 16), stroke);
+    final crane = Path()
+      ..moveTo(148, 144)
+      ..lineTo(148, 24)
+      ..lineTo(102, 24)
+      ..moveTo(148, 24)
+      ..lineTo(170, 24)
+      ..moveTo(162, 24)
+      ..lineTo(162, 52);
+    final accentPaint = Paint()
+      ..color = accent
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.6
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+    final metrics = crane.computeMetrics().toList();
+    final total = metrics.fold<double>(0, (s, m) => s + m.length);
+    var remaining = total * t;
+    for (final m in metrics) {
+      if (remaining <= 0) break;
+      final len = remaining.clamp(0.0, m.length);
+      canvas.drawPath(m.extractPath(0, len), accentPaint);
+      remaining -= m.length;
+    }
+  }
+
+  @override
+  bool shouldRepaint(_ElevationPainter old) => old.t != t || old.accent != accent;
+}
+
+/// Small static waveform for the "Speak update" card (no loop on Home).
+class _StaticWave extends StatelessWidget {
+  const _StaticWave({required this.color});
+  final Color color;
+  @override
+  Widget build(BuildContext context) {
+    const heights = [10.0, 18.0, 24.0, 14.0, 8.0];
+    return Row(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.center, children: [
+      for (final h in heights)
+        Container(width: 4, height: h, margin: const EdgeInsets.symmetric(horizontal: 1.5), decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2))),
+    ]);
+  }
+}
+
+/// Money in / Money out switch (Record-Money board).
+class _MoneyDirectionToggle extends StatelessWidget {
+  const _MoneyDirectionToggle({required this.isInflow, required this.onChanged});
+  final bool isInflow;
+  final ValueChanged<bool> onChanged;
+  @override
+  Widget build(BuildContext context) {
+    Widget seg(bool inflow) {
+      final on = inflow == isInflow;
+      final bg = on ? (inflow ? Bt.green : Bt.red) : Colors.transparent;
+      final fg = on ? Colors.white : Bt.ink2;
+      return Expanded(
+        child: Semantics(
+          button: true,
+          selected: on,
+          child: BtPressable(
+            onTap: () => onChanged(inflow),
+            child: AnimatedContainer(
+              duration: Bt.fast,
+              curve: Bt.ease,
+              height: 44,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(12)),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(inflow ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded, size: 18, color: fg),
+                const SizedBox(width: 6),
+                Text(inflow ? 'Money In' : 'Money Out', style: BtText.button(context, size: 15, color: fg)),
+              ]),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(color: Bt.fill, borderRadius: BorderRadius.circular(16)),
+      child: Row(children: [seg(true), const SizedBox(width: 4), seg(false)]),
+    );
+  }
+}
+
+/// Small "×" used to clear a receipt / signature / image in the money sheet.
+class _ClearButton extends StatelessWidget {
+  const _ClearButton({required this.onTap});
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: 'Remove',
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: const Padding(padding: EdgeInsets.all(8), child: Icon(Icons.cancel, color: Bt.red, size: 20)),
+      ),
+    );
+  }
+}
+
 class _TaskCard extends StatelessWidget {
   final TaskModel task;
   final VoidCallback? onEdit;
@@ -320,31 +669,34 @@ class _TaskCard extends StatelessWidget {
       'Assigned to: ${task.assignee ?? "Unassigned"}',
       task.floorName ?? 'On Site',
     ].join(' · ');
-    return BtRow(
-      leading: BtAvatar(name: task.assignee ?? '?', size: 36),
-      title: task.title,
-      titleColor: done ? Bt.ink2 : Bt.ink,
-      subtitle: task.description.isNotEmpty ? '${task.description}\n$meta' : meta,
-      subtitleMaxLines: 3,
-      trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-        BtBadge(label: displayStatus, tone: done ? BtTone.green : (displayStatus == 'Work in Progress' ? BtTone.brand : BtTone.neutral)),
-        if (!done && onEdit != null) ...[const SizedBox(width: 4), Icon(Icons.edit_outlined, size: 18, color: context.bt.brand)],
-      ]),
-      onTap: !done ? onEdit : null,
+    return Opacity(
+      opacity: done ? .62 : 1,
+      child: BtRow(
+        leading: BtAvatar(name: task.assignee ?? '?', size: 36),
+        title: task.title,
+        titleColor: done ? Bt.ink2 : Bt.ink,
+        subtitle: task.description.isNotEmpty ? '${task.description}\n$meta' : meta,
+        subtitleMaxLines: 3,
+        trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+          BtBadge(label: displayStatus, tone: done ? BtTone.green : (displayStatus == 'Work in Progress' ? BtTone.amber : BtTone.neutral)),
+          if (!done && onEdit != null) ...[const SizedBox(width: 4), const Icon(Icons.edit_outlined, size: 18, color: Bt.ink2)],
+        ]),
+        onTap: !done ? onEdit : null,
+      ),
     );
   }
 }
 
+// ───────────────────────────────────────────────────────── admin
+
 class _AdminDashboard extends StatefulWidget {
-  const _AdminDashboard({required this.onEntryTap});
+  const _AdminDashboard({required this.onEntryTap, required this.top});
   final void Function(BuildContext, String) onEntryTap;
+  final Widget top;
   @override
   State<_AdminDashboard> createState() => _AdminDashboardState();
 }
 class _AdminDashboardState extends State<_AdminDashboard> {
-  static var primaryBlue = AppColors.primary;
-  static const textDark = AppColors.textDark;
-  static const textGray = AppColors.textLight;
   List<dynamic> _revenueEntries = [];
   bool _isGlobalView = true;
   bool _loadingRevenue = false;
@@ -437,9 +789,12 @@ class _AdminDashboardState extends State<_AdminDashboard> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      useSafeArea: true,
+      backgroundColor: Bt.ground,
+      barrierColor: Bt.scrim,
+      sheetAnimationStyle: const AnimationStyle(duration: Duration(milliseconds: 520), curve: Bt.ease, reverseDuration: Duration(milliseconds: 260)),
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(Bt.rSheet)),
       ),
       builder: (ctx) {
         bool isSaving = false;
@@ -452,11 +807,11 @@ class _AdminDashboardState extends State<_AdminDashboard> {
         Future<void> startEsignFlow(StateSetter ss) async {
           final amt = double.tryParse(amountCtrl.text.trim()) ?? 0.0;
           if (amt <= 0) {
-            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter a valid amount before requesting an E-Signature')));
+            btToast(context, 'Please enter a valid amount before requesting an E-Signature', error: true);
             return;
           }
           if (clientEmailCtrl.text.isEmpty) {
-            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter client email')));
+            btToast(context, 'Please enter client email', error: true);
             return;
           }
           ss(() {
@@ -499,689 +854,417 @@ class _AdminDashboardState extends State<_AdminDashboard> {
           }
         }
         return StatefulBuilder(
-          builder: (ctx, setModalState) => Padding(
-            padding: EdgeInsets.fromLTRB(
-              20,
-              16,
-              20,
-              MediaQuery.of(ctx).viewInsets.bottom + 24,
-            ),
-            child: SingleChildScrollView(
+          builder: (ctx, setModalState) {
+            Widget preview(Widget child) => Padding(
+                  padding: const EdgeInsets.only(top: 10),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Container(
+                      height: 80,
+                      width: 120,
+                      decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), color: Bt.fill),
+                      child: ClipRRect(borderRadius: BorderRadius.circular(12), child: child),
+                    ),
+                  ),
+                );
+            const brokenImage = Center(child: Icon(Icons.broken_image_outlined, color: Bt.ink3));
+            return Padding(
+              padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE4E7EC),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                    ),
+                  BtSheetHeader(
+                    title: editingTx != null
+                        ? (isInflow ? 'Edit Revenue Inflow' : 'Edit Revenue Outflow')
+                        : (isInflow ? 'Record Revenue Inflow' : 'Record Revenue Outflow'),
                   ),
-                  const SizedBox(height: 16),
-                  Text(
-                    editingTx != null
-                        ? (isInflow
-                              ? 'Edit Revenue Inflow'
-                              : 'Edit Revenue Outflow')
-                        : (isInflow
-                              ? 'Record Revenue Inflow'
-                              : 'Record Revenue Outflow'),
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: textDark,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () {
-                            setModalState(() {
-                              isInflow = true;
-                            });
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            decoration: BoxDecoration(
-                              color: isInflow
-                                  ? const Color(0xFFE7F6EE)
-                                  : Colors.transparent,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: isInflow
-                                    ? const Color(0xFF067647)
-                                    : const Color(0xFFE4E7EC),
-                              ),
+                  Flexible(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(18, 4, 18, 24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _MoneyDirectionToggle(
+                            isInflow: isInflow,
+                            onChanged: (v) => setModalState(() {
+                              isInflow = v;
+                            }),
+                          ),
+                          const SizedBox(height: 16),
+                          BtField(
+                            label: 'Payment title / milestone',
+                            child: TextField(
+                              controller: titleCtrl,
+                              textCapitalization: TextCapitalization.sentences,
+                              style: BtText.body(context),
+                              decoration: btInput(context, hint: 'e.g. Milestone 1 Payment, Advance Payment'),
                             ),
-                            alignment: Alignment.center,
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
+                          ),
+                          const SizedBox(height: 14),
+                          BtField(
+                            label: isInflow ? 'Amount received (₹)' : 'Amount sent (₹)',
+                            child: TextField(
+                              controller: amountCtrl,
+                              keyboardType: TextInputType.number,
+                              style: BtText.amount(context, size: 24),
+                              decoration: btInput(context, hint: 'e.g. 500000', prefixText: '₹  '),
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          BtField(
+                            label: 'Payment mode',
+                            child: Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
                               children: [
-                                Icon(
-                                  Icons.arrow_downward,
-                                  color: isInflow
-                                      ? const Color(0xFF067647)
-                                      : const Color(0xFF667085),
-                                  size: 18,
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  'Money In',
-                                  style: TextStyle(
-                                    color: isInflow
-                                        ? const Color(0xFF067647)
-                                        : const Color(0xFF667085),
-                                    fontWeight: FontWeight.bold,
+                                for (final mode in const ['UPI', 'Bank Transfer', 'Cash', 'Cheque'])
+                                  BtChip(
+                                    label: mode,
+                                    selected: selectedMode == mode,
+                                    onTap: () => setModalState(() {
+                                      selectedMode = mode;
+                                    }),
                                   ),
-                                ),
                               ],
                             ),
                           ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () {
-                            setModalState(() {
-                              isInflow = false;
-                            });
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            decoration: BoxDecoration(
-                              color: !isInflow
-                                  ? const Color(0xFFFDECEF)
-                                  : Colors.transparent,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: !isInflow
-                                    ? const Color(0xFFC01048)
-                                    : const Color(0xFFE4E7EC),
-                              ),
+                          if (selectedMode == 'Cash') ...[
+                            const SizedBox(height: 14),
+                            Container(
+                              padding: const EdgeInsets.fromLTRB(14, 8, 10, 8),
+                              decoration: BoxDecoration(color: Bt.card, borderRadius: BorderRadius.circular(Bt.rInput), border: Border.all(color: Bt.inputBorder)),
+                              child: Row(children: [
+                                const Icon(Icons.draw_outlined, size: 20, color: Bt.ink2),
+                                const SizedBox(width: 10),
+                                Expanded(child: Text('Request E-Signature for Cash Receipt', style: BtText.subhead(context, weight: FontWeight.w600, color: Bt.ink))),
+                                BtSwitch(value: requestEsign, onChanged: (val) => setModalState(() => requestEsign = val)),
+                              ]),
                             ),
-                            alignment: Alignment.center,
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.arrow_upward,
-                                  color: !isInflow ? const Color(0xFFC01048) : const Color(0xFF667085),
-                                  size: 18,
+                            if (requestEsign) ...[
+                              const SizedBox(height: 10),
+                              BtField(
+                                label: 'Client email address',
+                                child: TextField(
+                                  controller: clientEmailCtrl,
+                                  keyboardType: TextInputType.emailAddress,
+                                  style: BtText.body(context),
+                                  decoration: btInput(context, hint: 'client@email.com', prefix: const Icon(Icons.email_outlined, color: Bt.ink3)),
                                 ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  'Money Out',
-                                  style: TextStyle(
-                                    color: !isInflow ? const Color(0xFFC01048) : const Color(0xFF667085),
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: titleCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Payment Title / Milestone',
-                      hintText: 'e.g. Milestone 1 Payment, Advance Payment',
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: amountCtrl,
-                    keyboardType: TextInputType.number,
-                    decoration: InputDecoration(
-                      labelText: isInflow
-                          ? 'Amount Received (₹)'
-                          : 'Amount Sent (₹)',
-                      hintText: 'e.g. 500000',
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  DropdownButtonFormField<String>(
-                    initialValue: selectedMode,
-                    decoration: const InputDecoration(
-                      labelText: 'Payment Mode',
-                    ),
-                    items: const [
-                      DropdownMenuItem(value: 'UPI', child: Text('UPI')),
-                      DropdownMenuItem(
-                        value: 'Bank Transfer',
-                        child: Text('Bank Transfer'),
-                      ),
-                      DropdownMenuItem(value: 'Cash', child: Text('Cash')),
-                      DropdownMenuItem(value: 'Cheque', child: Text('Cheque')),
-                    ],
-                    onChanged: (val) {
-                      if (val != null) {
-                        setModalState(() {
-                          selectedMode = val;
-                        });
-                      }
-                    },
-                  ),
-                  if (selectedMode == 'Cash') ...[
-                    const SizedBox(height: 16),
-                    CheckboxListTile(
-                      title: const Text('Request E-Signature for Cash Receipt', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                      value: requestEsign,
-                      onChanged: (val) => setModalState(() => requestEsign = val ?? false),
-                      controlAffinity: ListTileControlAffinity.leading,
-                      contentPadding: EdgeInsets.zero,
-                      activeColor: const Color(0xFF0B63CE),
-                    ),
-                    if (requestEsign)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 8.0, bottom: 8.0),
-                        child: TextField(
-                          controller: clientEmailCtrl,
-                          keyboardType: TextInputType.emailAddress,
-                          decoration: InputDecoration(
-                            labelText: 'Client Email Address',
-                            prefixIcon: const Icon(Icons.email_outlined),
-                            filled: true,
-                            fillColor: Colors.white,
-                            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: const Color(0xFFE4E7EC))),
-                            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF0B63CE))),
-                          ),
-                        ),
-                      ),
-                    if (requestEsign && !isEsignCompleted) ...[
-                      const SizedBox(height: 8),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: isEsignPolling ? () {
-                            setModalState(() => isEsignPolling = false);
-                          } : () => startEsignFlow(setModalState),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: isEsignPolling ? const Color(0xFFC01048) : const Color(0xFF0B63CE),
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
-                          child: Text(isEsignPolling ? 'Cancel Polling' : 'Send for E-Signature', style: const TextStyle(color: Colors.white)),
-                        ),
-                      ),
-                      if (esignStatusText.isNotEmpty)
-                        Padding(padding: const EdgeInsets.only(top: 8), child: Text(esignStatusText, style: TextStyle(color: isEsignPolling ? const Color(0xFFB54708) : (isEsignCompleted ? const Color(0xFF067647) : const Color(0xFFC01048)), fontWeight: FontWeight.bold)))
-                    ],
-                    if (isEsignCompleted) ...[
-                       const SizedBox(height: 8),
-                       Container(
-                         padding: const EdgeInsets.all(12),
-                         decoration: BoxDecoration(color: Colors.green.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8), border: Border.all(color: const Color(0xFF067647))),
-                         child: const Row(children: [Icon(Icons.check_circle, color: Color(0xFF067647)), SizedBox(width: 8), Text('Signature successfully captured!', style: TextStyle(color: Color(0xFF067647), fontWeight: FontWeight.bold))])
-                       )
-                    ],
-                  ],
-                  const SizedBox(height: 16),
-                  InkWell(
-                    onTap: () async {
-                      final picked = await showDatePicker(
-                        context: context,
-                        initialDate: selectedDate,
-                        firstDate: DateTime(2020),
-                        lastDate: DateTime(2100),
-                      );
-                      if (picked != null) {
-                        final now = DateTime.now();
-                        setModalState(() {
-                          selectedDate = DateTime(
-                            picked.year,
-                            picked.month,
-                            picked.day,
-                            now.hour,
-                            now.minute,
-                            now.second,
-                          );
-                        });
-                      }
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      decoration: const BoxDecoration(
-                        border: Border(
-                          bottom: BorderSide(color: Color(0xFFD0D5DD)),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            'Date Received',
-                            style: TextStyle(color: Color(0xFF475467)),
-                          ),
-                          Text(
-                            '${selectedDate.day.toString().padLeft(2, '0')}/${selectedDate.month.toString().padLeft(2, '0')}/${selectedDate.year}',
-                            style: const TextStyle(fontWeight: FontWeight.w600),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: notesCtrl,
-                    decoration: InputDecoration(
-                      labelText: 'Notes / Remarks (Optional)',
-                      hintText: isInflow
-                          ? 'e.g. Initial payment received for start of work'
-                          : 'e.g. Refund sent for milestone delay',
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  InkWell(
-                    onTap: () async {
-                      final img = await pickImageFromGallery(context);
-                      if (img != null) {
-                        setModalState(() {
-                          pickedImage = img;
-                        });
-                      }
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      decoration: const BoxDecoration(
-                        border: Border(
-                          bottom: BorderSide(color: Color(0xFFD0D5DD)),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Row(
-                            children: [
-                              Icon(
-                                Icons.image_outlined,
-                                color: Color(0xFF475467),
-                                size: 20,
-                              ),
-                              SizedBox(width: 8),
-                              Text(
-                                'Upload Receipt Proof (Optional)',
-                                style: TextStyle(color: Color(0xFF475467)),
                               ),
                             ],
-                          ),
-                          if (pickedImage != null)
-                            Row(
-                              children: [
-                                const Text(
-                                  'Selected',
-                                  style: TextStyle(
-                                    color: Color(0xFF067647),
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                GestureDetector(
-                                  onTap: () {
-                                    setModalState(() {
-                                      pickedImage = null;
-                                    });
-                                  },
-                                  child: const Icon(
-                                    Icons.cancel,
-                                    color: Color(0xFFC01048),
-                                    size: 20,
-                                  ),
-                                ),
-                              ],
-                            )
-                          else if (newReceiptDataUri != null)
-                            Row(
-                              children: [
-                                const Text(
-                                  'E-Signature',
-                                  style: TextStyle(
-                                    color: Color(0xFF1976D2),
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                GestureDetector(
-                                  onTap: () {
-                                    setModalState(() {
-                                      newReceiptDataUri = null;
-                                    });
-                                  },
-                                  child: const Icon(
-                                    Icons.cancel,
-                                    color: Color(0xFFC01048),
-                                    size: 20,
-                                  ),
-                                ),
-                              ],
-                            )
-                          else if (existingImageUrl != null)
-                            Row(
-                              children: [
-                                const Text(
-                                  'Has Image',
-                                  style: TextStyle(
-                                    color: Color(0xFF1976D2),
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                GestureDetector(
-                                  onTap: () {
-                                    setModalState(() {
-                                      existingImageUrl = null;
-                                    });
-                                  },
-                                  child: const Icon(
-                                    Icons.cancel,
-                                    color: Color(0xFFC01048),
-                                    size: 20,
-                                  ),
-                                ),
-                              ],
-                            )
-                          else
-                            const Icon(
-                              Icons.chevron_right,
-                              color: Color(0xFFD0D5DD),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  if (pickedImage != null) ...[
-                    const SizedBox(height: 12),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Container(
-                        height: 80,
-                        width: 120,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Bt.line),
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: FutureBuilder<Uint8List>(
-                            future: pickedImage!.readAsBytes(),
-                            builder: (context, snapshot) {
-                              if (snapshot.hasData) {
-                                return Image.memory(
-                                  snapshot.data!,
-                                  fit: BoxFit.cover,
-                                );
-                              }
-                              return const Center(
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                      ),
-                    ),
-                  ] else if (newReceiptDataUri != null) ...[
-                    const SizedBox(height: 12),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Container(
-                        height: 80,
-                        width: 120,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Bt.line),
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: Image.memory(
-                            base64Decode(newReceiptDataUri!.split(',').last),
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) =>
-                                const Center(
-                                  child: Icon(
-                                    Icons.broken_image_outlined,
-                                    color: Color(0xFF667085),
-                                  ),
-                                ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ] else if (existingImageUrl != null) ...[
-                    const SizedBox(height: 12),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Container(
-                        height: 80,
-                        width: 120,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Bt.line),
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: Image.network(
-                            existingImageUrl!,
-                            fit: BoxFit.cover,
-                            loadingBuilder: (context, child, loadingProgress) {
-                              if (loadingProgress == null) return child;
-                              return const Center(
-                                child: SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                ),
-                              );
-                            },
-                            errorBuilder: (context, error, stackTrace) =>
-                                const Center(
-                                  child: Icon(
-                                    Icons.broken_image_outlined,
-                                    color: Color(0xFF667085),
-                                  ),
-                                ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: primaryBlue,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      onPressed: isSaving
-                          ? null
-                          : () async {
-                              final title = titleCtrl.text.trim();
-                              var amount =
-                                  double.tryParse(amountCtrl.text.trim()) ??
-                                  0.0;
-                              amount = amount.abs();
-                              if (title.isEmpty) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                      'Please enter a payment title',
-                                    ),
-                                  ),
-                                );
-                                return;
-                              }
-                              if (amount <= 0) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                      'Please enter a valid amount',
-                                    ),
-                                  ),
-                                );
-                                return;
-                              }
-                              setModalState(() {
-                                isSaving = true;
-                              });
-                              if (!isInflow) {
-                                amount = -amount;
-                              }
-                              try {
-                                String? base64Image;
-                                if (pickedImage != null) {
-                                  final bytes = await pickedImage!
-                                      .readAsBytes();
-                                  base64Image =
-                                      'data:image/jpeg;base64,${base64Encode(bytes)}';
-                                }
-                                final payload = {
-                                  'title': title,
-                                  'type': 'Income',
-                                  'project': projectId,
-                                  'amount': amount,
-                                  'date': selectedDate.toIso8601String(),
-                                  'paymentStatus': 'Paid',
-                                  'paymentMode': selectedMode,
-                                  'paidAmount': amount,
-                                  'notes': notesCtrl.text.trim(),
-                                  if (newReceiptDataUri != null) 'paymentReceipt': newReceiptDataUri,
-                                  if (newReceiptDataUri != null) 'receiptImage': newReceiptDataUri,
-                                  if (base64Image != null) 'receiptImage': base64Image,
-                                  if (base64Image == null && newReceiptDataUri == null && editingTx != null)
-                                    'attachments': existingImageUrl != null
-                                        ? [existingImageUrl]
-                                        : [],
-                                };
-                                final bool isEdit = editingTx != null;
-                                final bool success;
-                                if (isEdit) {
-                                  final txId =
-                                      editingTx['_id']?.toString() ??
-                                      editingTx['id']?.toString() ??
-                                      '';
-                                  success = await ApiService.updateTransaction(
-                                    txId,
-                                    payload,
-                                  );
-                                } else {
-                                  final result =
-                                      await ApiService.addTransaction(payload);
-                                  success = result != null;
-                                }
-                                if (success) {
-                                  if (context.mounted) {
-                                    Navigator.pop(ctx);
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text(
-                                          isEdit
-                                              ? 'Revenue updated successfully'
-                                              : 'Revenue recorded successfully',
-                                        ),
+                            if (requestEsign && !isEsignCompleted) ...[
+                              const SizedBox(height: 10),
+                              BtButton(
+                                label: isEsignPolling ? 'Cancel Polling' : 'Send for E-Signature',
+                                icon: isEsignPolling ? Icons.close_rounded : Icons.send_rounded,
+                                small: true,
+                                variant: isEsignPolling ? BtButtonVariant.destructive : BtButtonVariant.secondary,
+                                onPressed: isEsignPolling
+                                    ? () {
+                                        setModalState(() => isEsignPolling = false);
+                                      }
+                                    : () => startEsignFlow(setModalState),
+                              ),
+                              if (esignStatusText.isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 8),
+                                  child: Row(children: [
+                                    if (isEsignPolling) ...[
+                                      const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Bt.amber)),
+                                      const SizedBox(width: 8),
+                                    ],
+                                    Expanded(
+                                      child: Text(
+                                        esignStatusText,
+                                        style: BtText.subhead(context, weight: FontWeight.w600, color: isEsignPolling ? Bt.amber : (isEsignCompleted ? Bt.green : Bt.red)),
                                       ),
-                                    );
-                                    context.read<ProjectProvider>().load();
-                                    if (onSave != null) {
-                                      onSave();
-                                    } else {
-                                      _loadRevenue(projectId);
-                                    }
-                                  }
-                                } else {
-                                  if (context.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text(
-                                          isEdit
-                                              ? 'Failed to update revenue'
-                                              : 'Failed to record revenue',
-                                        ),
-                                      ),
-                                    );
-                                  }
-                                }
-                              } catch (e) {
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text('Error: $e')),
-                                  );
-                                }
-                              } finally {
-                                if (ctx.mounted) {
+                                    ),
+                                  ]),
+                                ),
+                            ],
+                            if (isEsignCompleted) ...[
+                              const SizedBox(height: 10),
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(color: Bt.greenSoft, borderRadius: BorderRadius.circular(Bt.rTile)),
+                                child: Row(children: [
+                                  const Icon(Icons.check_circle, color: Bt.green),
+                                  const SizedBox(width: 8),
+                                  Expanded(child: Text('Signature successfully captured!', style: BtText.subhead(context, weight: FontWeight.w600, color: Bt.green))),
+                                ]),
+                              ),
+                            ],
+                          ],
+                          const SizedBox(height: 14),
+                          BtField(
+                            label: 'Date received',
+                            child: BtPickerField(
+                              leading: Icons.calendar_today_outlined,
+                              icon: Icons.chevron_right_rounded,
+                              text: '${selectedDate.day.toString().padLeft(2, '0')}/${selectedDate.month.toString().padLeft(2, '0')}/${selectedDate.year}',
+                              onTap: () async {
+                                final picked = await showDatePicker(
+                                  context: context,
+                                  initialDate: selectedDate,
+                                  firstDate: DateTime(2020),
+                                  lastDate: DateTime(2100),
+                                );
+                                if (picked != null) {
+                                  final now = DateTime.now();
                                   setModalState(() {
-                                    isSaving = false;
+                                    selectedDate = DateTime(
+                                      picked.year,
+                                      picked.month,
+                                      picked.day,
+                                      now.hour,
+                                      now.minute,
+                                      now.second,
+                                    );
                                   });
                                 }
-                              }
-                            },
-                      child: isSaving
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 2,
-                              ),
-                            )
-                          : Text(
-                              editingTx != null ? 'Save Changes' : 'Save',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
+                              },
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          BtField(
+                            label: 'Notes / remarks',
+                            optional: true,
+                            child: TextField(
+                              controller: notesCtrl,
+                              textCapitalization: TextCapitalization.sentences,
+                              style: BtText.body(context),
+                              decoration: btInput(
+                                context,
+                                hint: isInflow
+                                    ? 'e.g. Initial payment received for start of work'
+                                    : 'e.g. Refund sent for milestone delay',
                               ),
                             ),
+                          ),
+                          const SizedBox(height: 14),
+                          Semantics(
+                            button: true,
+                            label: 'Upload receipt proof',
+                            child: BtPressable(
+                              onTap: () async {
+                                final img = await pickImageFromGallery(context);
+                                if (img != null) {
+                                  setModalState(() {
+                                    pickedImage = img;
+                                  });
+                                }
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.fromLTRB(14, 12, 6, 12),
+                                decoration: BoxDecoration(
+                                  color: Bt.card,
+                                  borderRadius: BorderRadius.circular(Bt.rInput),
+                                  border: Border.all(color: Bt.inputBorder, width: 1.2),
+                                ),
+                                child: Row(children: [
+                                  const BtTile(icon: Icons.image_outlined, size: 36),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                      Text('Upload receipt proof', style: BtText.body(context, weight: FontWeight.w600)),
+                                      Text('Optional', style: BtText.caption(context)),
+                                    ]),
+                                  ),
+                                  if (pickedImage != null) ...[
+                                    Text('Selected', style: BtText.subhead(context, weight: FontWeight.w600, color: Bt.green)),
+                                    _ClearButton(onTap: () => setModalState(() {
+                                          pickedImage = null;
+                                        })),
+                                  ] else if (newReceiptDataUri != null) ...[
+                                    Text('E-Signature', style: BtText.subhead(context, weight: FontWeight.w600, color: context.bt.accentInk)),
+                                    _ClearButton(onTap: () => setModalState(() {
+                                          newReceiptDataUri = null;
+                                        })),
+                                  ] else if (existingImageUrl != null) ...[
+                                    Text('Has Image', style: BtText.subhead(context, weight: FontWeight.w600, color: context.bt.accentInk)),
+                                    _ClearButton(onTap: () => setModalState(() {
+                                          existingImageUrl = null;
+                                        })),
+                                  ] else
+                                    const Padding(padding: EdgeInsets.only(right: 8), child: Icon(Icons.chevron_right_rounded, color: Bt.placeholder)),
+                                ]),
+                              ),
+                            ),
+                          ),
+                          if (pickedImage != null)
+                            preview(
+                              FutureBuilder<Uint8List>(
+                                future: pickedImage!.readAsBytes(),
+                                builder: (context, snapshot) {
+                                  if (snapshot.hasData) {
+                                    return Image.memory(snapshot.data!, fit: BoxFit.cover);
+                                  }
+                                  return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+                                },
+                              ),
+                            )
+                          else if (newReceiptDataUri != null)
+                            preview(
+                              Image.memory(
+                                base64Decode(newReceiptDataUri!.split(',').last),
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) => brokenImage,
+                              ),
+                            )
+                          else if (existingImageUrl != null)
+                            preview(
+                              Image.network(
+                                existingImageUrl!,
+                                fit: BoxFit.cover,
+                                loadingBuilder: (context, child, loadingProgress) {
+                                  if (loadingProgress == null) return child;
+                                  return const Center(child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)));
+                                },
+                                errorBuilder: (context, error, stackTrace) => brokenImage,
+                              ),
+                            ),
+                          const SizedBox(height: 22),
+                          BtButton(
+                            label: editingTx != null ? 'Save Changes' : 'Save',
+                            loading: isSaving,
+                            onPressed: isSaving
+                                ? null
+                                : () async {
+                                    final title = titleCtrl.text.trim();
+                                    var amount =
+                                        double.tryParse(amountCtrl.text.trim()) ??
+                                        0.0;
+                                    amount = amount.abs();
+                                    if (title.isEmpty) {
+                                      btToast(context, 'Please enter a payment title', error: true);
+                                      return;
+                                    }
+                                    if (amount <= 0) {
+                                      btToast(context, 'Please enter a valid amount', error: true);
+                                      return;
+                                    }
+                                    setModalState(() {
+                                      isSaving = true;
+                                    });
+                                    if (!isInflow) {
+                                      amount = -amount;
+                                    }
+                                    try {
+                                      String? base64Image;
+                                      if (pickedImage != null) {
+                                        final bytes = await pickedImage!
+                                            .readAsBytes();
+                                        base64Image =
+                                            'data:image/jpeg;base64,${base64Encode(bytes)}';
+                                      }
+                                      final payload = {
+                                        'title': title,
+                                        'type': 'Income',
+                                        'project': projectId,
+                                        'amount': amount,
+                                        'date': selectedDate.toIso8601String(),
+                                        'paymentStatus': 'Paid',
+                                        'paymentMode': selectedMode,
+                                        'paidAmount': amount,
+                                        'notes': notesCtrl.text.trim(),
+                                        if (newReceiptDataUri != null) 'paymentReceipt': newReceiptDataUri,
+                                        if (newReceiptDataUri != null) 'receiptImage': newReceiptDataUri,
+                                        if (base64Image != null) 'receiptImage': base64Image,
+                                        if (base64Image == null && newReceiptDataUri == null && editingTx != null)
+                                          'attachments': existingImageUrl != null
+                                              ? [existingImageUrl]
+                                              : [],
+                                      };
+                                      final bool isEdit = editingTx != null;
+                                      final bool success;
+                                      if (isEdit) {
+                                        final txId =
+                                            editingTx['_id']?.toString() ??
+                                            editingTx['id']?.toString() ??
+                                            '';
+                                        success = await ApiService.updateTransaction(
+                                          txId,
+                                          payload,
+                                        );
+                                      } else {
+                                        final result =
+                                            await ApiService.addTransaction(payload);
+                                        success = result != null;
+                                      }
+                                      if (success) {
+                                        if (context.mounted) {
+                                          Navigator.pop(ctx);
+                                          await showBtSuccess(
+                                            context,
+                                            kind: BtSuccessKind.money,
+                                            title: isEdit ? 'Revenue updated' : 'Revenue recorded',
+                                            message: isEdit
+                                                ? 'Revenue updated successfully'
+                                                : 'Revenue recorded successfully',
+                                            label: '${amount < 0 ? 'Money out' : 'Money in'} · ${formatInr(amount.abs())}',
+                                          );
+                                          if (!context.mounted) return;
+                                          context.read<ProjectProvider>().load();
+                                          if (onSave != null) {
+                                            onSave();
+                                          } else {
+                                            _loadRevenue(projectId);
+                                          }
+                                        }
+                                      } else {
+                                        if (context.mounted) {
+                                          btToast(
+                                            context,
+                                            isEdit
+                                                ? 'Failed to update revenue'
+                                                : 'Failed to record revenue',
+                                            error: true,
+                                          );
+                                        }
+                                      }
+                                    } catch (e) {
+                                      if (context.mounted) {
+                                        btToast(context, 'Error: $e', error: true);
+                                      }
+                                    } finally {
+                                      if (ctx.mounted) {
+                                        setModalState(() {
+                                          isSaving = false;
+                                        });
+                                      }
+                                    }
+                                  },
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],
               ),
-            ),
-          ),
+            );
+          },
         );
       },
     );
   }
+
+  /// Footer line of the Client money card → opens the revenue timeline.
   Widget _buildRevenueHistory(BuildContext context) {
     if (_loadingRevenue) {
-      return const BtSkeleton(height: 64, radius: 16);
+      return const BtSkeleton(height: 16, width: 110, radius: 6);
     }
     final project = Provider.of<ProjectProvider>(
       context,
       listen: false,
     ).selectedProject;
-    final projectName = project?.name ?? 'Project';
     if (project == null) return const SizedBox.shrink();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const BtSectionHeader(title: 'Revenue inflow timeline'),
-        BtGroup(children: [
-          BtRow(
-            leading: const BtTile(icon: Icons.receipt_long_outlined, bg: Bt.greenSoft, fg: Bt.green),
-            title: 'View full revenue timeline',
-            subtitle: _revenueEntries.isEmpty ? 'Click to view all logged inflows' : '${_revenueEntries.length} payments · ${formatInr(_totalRevenueSum, compact: true)} received',
-            showChevron: true,
-            onTap: () => _showAllRevenueHistory(context, projectName, project.id),
-          ),
-        ]),
-      ],
+    return Text(
+      _revenueEntries.isEmpty ? 'View revenue timeline ›' : '${_revenueEntries.length} payments · History ›',
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: BtText.caption(context, color: context.bt.accentInk, weight: FontWeight.w600),
     );
   }
   void _showAllRevenueHistory(
@@ -1192,198 +1275,140 @@ class _AdminDashboardState extends State<_AdminDashboard> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      useSafeArea: true,
+      backgroundColor: Bt.ground,
+      barrierColor: Bt.scrim,
+      sheetAnimationStyle: const AnimationStyle(duration: Duration(milliseconds: 520), curve: Bt.ease, reverseDuration: Duration(milliseconds: 260)),
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(Bt.rSheet)),
       ),
       builder: (ctx) {
         return StatefulBuilder(
           builder: (ctx, setSheetState) {
             return DraggableScrollableSheet(
-              initialChildSize: 0.6,
+              initialChildSize: 0.7,
               minChildSize: 0.4,
               maxChildSize: 0.9,
               expand: false,
               builder: (_, scrollController) {
+                final balance = _totalRevenueSum;
+                final balanceText = balance == 0
+                    ? '₹0'
+                    : (balance < 0
+                        ? '-${formatCurrency(balance.abs())}'
+                        : '+${formatCurrency(balance)}');
+                // Month groups (entries are already newest-first).
+                final groups = <String, List<dynamic>>{};
+                for (final tx in _revenueEntries) {
+                  DateTime d = DateTime.now();
+                  if (tx['date'] != null) {
+                    try {
+                      d = DateTime.parse(tx['date'].toString()).toLocal();
+                    } catch (_) {}
+                  }
+                  groups.putIfAbsent('${_getMonthName(d.month)} ${d.year}'.toUpperCase(), () => []).add(tx);
+                }
+                Future<void> refresh() async {
+                  await _loadRevenue(projectId);
+                  setSheetState(() {});
+                }
                 return SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const SizedBox(height: 12),
-                        Center(
-                          child: Container(
-                            width: 40,
-                            height: 4,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFE4E7EC),
-                              borderRadius: BorderRadius.circular(2),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          crossAxisAlignment: CrossAxisAlignment.center,
+                  top: false,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const SizedBox(height: 10),
+                      Center(
+                        child: Container(width: 40, height: 5, decoration: BoxDecoration(color: Bt.inputBorder, borderRadius: BorderRadius.circular(3))),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(18, 14, 10, 12),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    'Revenue History',
-                                    style: TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                      color: textDark,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    projectName,
-                                    style: const TextStyle(
-                                      fontSize: 13,
-                                      color: textGray,
-                                    ),
-                                  ),
-                                ],
-                              ),
+                              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                Text('Revenue History', style: BtText.d3(context)),
+                                const SizedBox(height: 2),
+                                Text(projectName, maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.caption(context)),
+                              ]),
                             ),
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                GestureDetector(
-                                  onTap: () {
-                                    _showAddRevenueDialog(
-                                      context,
-                                      projectId,
-                                      onSave: () async {
-                                        await _loadRevenue(projectId);
-                                        setSheetState(() {});
-                                      },
-                                    );
-                                  },
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 8,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: primaryBlue,
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: const Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(
-                                          Icons.add,
-                                          size: 14,
-                                          color: Colors.white,
-                                        ),
-                                        SizedBox(width: 4),
-                                        Text(
-                                          'Record Payment',
-                                          style: TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                IconButton(
-                                  icon: const Icon(
-                                    Icons.close,
-                                    color: textDark,
-                                  ),
-                                  onPressed: () => Navigator.pop(ctx),
-                                ),
-                              ],
-                            ),
+                            BtIconButton(icon: Icons.close_rounded, size: 18, semantic: 'Close', background: Bt.fill, onTap: () => Navigator.pop(ctx)),
                           ],
                         ),
-                        const Divider(height: 24),
-                        Expanded(
-                          child: ListView.builder(
-                            controller: scrollController,
-                            itemCount: _revenueEntries.length,
-                            itemBuilder: (context, index) {
-                              return _revenueTile(
-                                context,
-                                _revenueEntries[index],
-                                onRefresh: () async {
-                                  await _loadRevenue(projectId);
-                                  setSheetState(() {});
-                                },
-                              );
-                            },
-                          ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                        child: BtCard(
+                          variant: BtCardVariant.ink,
+                          padding: const EdgeInsets.fromLTRB(18, 16, 16, 16),
+                          child: Row(children: [
+                            Expanded(
+                              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                Text('TOTAL BALANCE', style: BtText.mono(context, color: Bt.onNoir2)),
+                                const SizedBox(height: 4),
+                                FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  alignment: Alignment.centerLeft,
+                                  child: Text(
+                                    balanceText,
+                                    style: BtText.d2(context, color: balance > 0 ? Bt.greenBright : (balance < 0 ? Bt.redBright : Bt.bone)),
+                                  ),
+                                ),
+                              ]),
+                            ),
+                            const SizedBox(width: 12),
+                            BtButton(
+                              label: 'Record Payment',
+                              icon: Icons.add_rounded,
+                              small: true,
+                              expand: false,
+                              variant: BtButtonVariant.accent,
+                              onPressed: () {
+                                _showAddRevenueDialog(
+                                  context,
+                                  projectId,
+                                  onSave: () async {
+                                    await _loadRevenue(projectId);
+                                    setSheetState(() {});
+                                  },
+                                );
+                              },
+                            ),
+                          ]),
                         ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            vertical: 16,
-                            horizontal: 16,
-                          ),
-                          margin: const EdgeInsets.only(top: 8, bottom: 8),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF8F9FA),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: Bt.line),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Row(
+                      ),
+                      Expanded(
+                        child: _revenueEntries.isEmpty
+                            ? ListView(
+                                controller: scrollController,
+                                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                                children: const [
+                                  BtEmpty(icon: Icons.receipt_long_outlined, title: 'No payments recorded yet', message: 'Money received from or sent to the client shows here.'),
+                                ],
+                              )
+                            : ListView(
+                                controller: scrollController,
+                                padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
                                 children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(8),
-                                    decoration: BoxDecoration(
-                                      color: primaryBlue.withValues(alpha: 0.1),
-                                      shape: BoxShape.circle,
+                                  for (final entry in groups.entries) ...[
+                                    Padding(
+                                      padding: const EdgeInsets.fromLTRB(4, 10, 4, 8),
+                                      child: Text(entry.key, style: BtText.mono(context)),
                                     ),
-                                    child: Icon(
-                                      Icons.account_balance_wallet,
-                                      color: primaryBlue,
-                                      size: 20,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  const Text(
-                                    'Total Balance',
-                                    style: TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.bold,
-                                      color: textDark,
-                                    ),
-                                  ),
+                                    BtGroup(children: [
+                                      for (final tx in entry.value)
+                                        _revenueTile(
+                                          context,
+                                          tx as Map<String, dynamic>,
+                                          onRefresh: refresh,
+                                        ),
+                                    ]),
+                                  ],
                                 ],
                               ),
-                              Text(
-                                _totalRevenueSum == 0
-                                    ? '₹0'
-                                    : (_totalRevenueSum < 0
-                                          ? '-${formatCurrency(_totalRevenueSum.abs())}'
-                                          : '+${formatCurrency(_totalRevenueSum)}'),
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w700,
-                                  color: _totalRevenueSum > 0
-                                      ? const Color(0xFF067647)
-                                      : (_totalRevenueSum < 0
-                                            ? const Color(0xFFC01048)
-                                            : textDark),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 );
               },
@@ -1403,7 +1428,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
     final bool isOutflow = amount < 0;
     final absAmount = amount.abs();
     final formattedAmt = formatCurrency(absAmount);
-    final textColor = isOutflow ? const Color(0xFFC01048) : const Color(0xFF067647);
+    final textColor = isOutflow ? Bt.red : Bt.green;
     final paymentMode = tx['paymentMode']?.toString() ?? 'Cash';
     final paymentStatus = tx['paymentStatus']?.toString() ?? 'Paid';
     final rawId = tx['_id']?.toString() ?? tx['id']?.toString() ?? '';
@@ -1429,410 +1454,240 @@ class _AdminDashboardState extends State<_AdminDashboard> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
+      useSafeArea: true,
+      backgroundColor: Bt.card,
+      barrierColor: Bt.scrim,
+      sheetAnimationStyle: const AnimationStyle(duration: Duration(milliseconds: 520), curve: Bt.ease, reverseDuration: Duration(milliseconds: 260)),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(Bt.rSheet)),
+      ),
       builder: (ctx) {
-        return Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-          ),
-          padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
-          child: SafeArea(
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
+        return SafeArea(
+          top: false,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const SizedBox(width: 44),
+                    Container(width: 40, height: 5, decoration: BoxDecoration(color: Bt.inputBorder, borderRadius: BorderRadius.circular(3))),
+                    BtIconButton(icon: Icons.close_rounded, size: 18, semantic: 'Close', background: Bt.fill, onTap: () => Navigator.pop(ctx)),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Center(
+                  child: Container(
+                    width: 64,
+                    height: 64,
+                    decoration: BoxDecoration(color: isOutflow ? Bt.redSoft : Bt.greenSoft, shape: BoxShape.circle),
+                    child: Icon(Icons.check_circle_rounded, color: textColor, size: 40),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  isOutflow ? 'Payment Sent' : 'Revenue Received',
+                  textAlign: TextAlign.center,
+                  style: BtText.d3(context),
+                ),
+                const SizedBox(height: 4),
+                Text(title, textAlign: TextAlign.center, style: BtText.subhead(context)),
+                const SizedBox(height: 14),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    isOutflow ? '-$formattedAmt' : '+$formattedAmt',
+                    style: BtText.d1(context, color: textColor).copyWith(fontFeatures: BtText.tnum),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  children: List.generate(
+                    30,
+                    (index) => Expanded(
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 2),
+                        height: 1.2,
+                        color: index % 2 == 0 ? Bt.inputBorder : Colors.transparent,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _receiptRow('PROJECT', projectName),
+                _receiptRow('PAYMENT METHOD', paymentMode),
+                _receiptRow(
+                  isOutflow ? 'DATE SENT' : 'DATE RECEIVED',
+                  dateStr,
+                ),
+                _receiptRow('TIME RECEIVED', timeStr),
+                _receiptRow('REFERENCE ID', refId),
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const SizedBox(width: 32),
-                      Container(
-                        width: 40,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFE4E7EC),
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                      GestureDetector(
-                        onTap: () => Navigator.pop(ctx),
-                        child: Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: const BoxDecoration(
-                            color: Color(0xFFF1F3F5),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.close,
-                            color: textGray,
-                            size: 16,
-                          ),
-                        ),
+                      Text('STATUS', style: BtText.mono(context)),
+                      BtBadge(
+                        label: paymentStatus.toUpperCase(),
+                        tone: paymentStatus.toLowerCase() == 'paid' ? BtTone.green : BtTone.amber,
                       ),
                     ],
                   ),
-                  const SizedBox(height: 24),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: isOutflow
-                          ? const Color(0xFFFDECEF)
-                          : const Color(0xFFE7F6EE),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      Icons.check_circle_rounded,
-                      color: isOutflow ? const Color(0xFFC01048) : const Color(0xFF067647),
-                      size: 52,
-                    ),
-                  ),
+                ),
+                if (tx['notes'] != null &&
+                    tx['notes'].toString().trim().isNotEmpty) ...[
                   const SizedBox(height: 12),
-                  Text(
-                    isOutflow ? 'Payment Sent' : 'Revenue Received',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: textDark,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    title,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: textGray,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    isOutflow ? '-$formattedAmt' : '+$formattedAmt',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 32,
-                      color: textColor,
-                      letterSpacing: -0.5,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  Row(
-                    children: List.generate(
-                      30,
-                      (index) => Expanded(
-                        child: Container(
-                          margin: const EdgeInsets.symmetric(horizontal: 2),
-                          height: 1,
-                          color: index % 2 == 0
-                              ? const Color(0xFFE4E7EC)
-                              : Colors.transparent,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  _receiptRow('PROJECT', projectName),
-                  _receiptRow('PAYMENT METHOD', paymentMode),
-                  _receiptRow(
-                    isOutflow ? 'DATE SENT' : 'DATE RECEIVED',
-                    dateStr,
-                  ),
-                  _receiptRow('TIME RECEIVED', timeStr),
-                  _receiptRow('REFERENCE ID', refId),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(color: Bt.fill, borderRadius: BorderRadius.circular(Bt.rInput)),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Status',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: textGray,
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: paymentStatus.toLowerCase() == 'paid'
-                                ? const Color(0xFFE7F6EE)
-                                : const Color(0xFFFEF3E7),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            paymentStatus.toUpperCase(),
-                            style: TextStyle(
-                              color: paymentStatus.toLowerCase() == 'paid'
-                                  ? const Color(0xFF067647)
-                                  : const Color(0xFFB54708),
-                              fontWeight: FontWeight.bold,
-                              fontSize: 13,
-                            ),
+                        Text('NOTES / REMARKS', style: BtText.mono(context)),
+                        const SizedBox(height: 6),
+                        Text(tx['notes'].toString().trim(), style: BtText.subhead(context, color: Bt.ink)),
+                      ],
+                    ),
+                  ),
+                ],
+                if (attachments.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(color: Bt.fill, borderRadius: BorderRadius.circular(Bt.rInput)),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('PROOF OF PAYMENT', style: BtText.mono(context)),
+                        const SizedBox(height: 8),
+                        BtPressable(
+                          onTap: () {
+                            Navigator.pushNamed(
+                              context,
+                              '/receipt-viewer',
+                              arguments: {
+                                'receipt': attachments.first.toString(),
+                              },
+                            );
+                          },
+                          child: Stack(
+                            alignment: Alignment.bottomRight,
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(12),
+                                child: Image.network(
+                                  attachments.first.toString(),
+                                  height: 150,
+                                  width: double.infinity,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return Container(
+                                      height: 150,
+                                      color: Bt.card,
+                                      alignment: Alignment.center,
+                                      child: Column(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          const Icon(Icons.broken_image_outlined, color: Bt.ink3, size: 32),
+                                          const SizedBox(height: 8),
+                                          Text('Error loading proof image', style: BtText.caption(context)),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                  loadingBuilder:
+                                      (context, child, loadingProgress) {
+                                        if (loadingProgress == null) {
+                                          return child;
+                                        }
+                                        return Container(
+                                          height: 150,
+                                          color: Bt.card,
+                                          alignment: Alignment.center,
+                                          child:
+                                              const CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                              ),
+                                        );
+                                      },
+                                ),
+                              ),
+                              Container(
+                                margin: const EdgeInsets.all(8),
+                                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                                decoration: BoxDecoration(color: Bt.noir.withValues(alpha: .72), borderRadius: BorderRadius.circular(8)),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.fullscreen, color: Bt.bone, size: 14),
+                                    const SizedBox(width: 4),
+                                    Text('Tap to zoom', style: BtText.caption(context, color: Bt.bone, weight: FontWeight.w600)),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
                     ),
                   ),
-                  if (tx['notes'] != null &&
-                      tx['notes'].toString().trim().isNotEmpty) ...[
-                    const SizedBox(height: 16),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF8F9FA),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: Bt.line),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Notes / remarks',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: textGray,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            tx['notes'].toString().trim(),
-                            style: const TextStyle(
-                              fontSize: 13,
-                              color: textDark,
-                              height: 1.4,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                  if (attachments.isNotEmpty) ...[
-                    const SizedBox(height: 16),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF8F9FA),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: Bt.line),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Proof of payment',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: textGray,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          GestureDetector(
-                            onTap: () {
-                              Navigator.pushNamed(
-                                context,
-                                '/receipt-viewer',
-                                arguments: {
-                                  'receipt': attachments.first.toString(),
-                                },
-                              );
-                            },
-                            child: Stack(
-                              alignment: Alignment.bottomRight,
-                              children: [
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: Image.network(
-                                    attachments.first.toString(),
-                                    height: 150,
-                                    width: double.infinity,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (context, error, stackTrace) {
-                                      return Container(
-                                        height: 150,
-                                        color: const Color(0xFFF6F7F9),
-                                        alignment: Alignment.center,
-                                        child: const Column(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          children: [
-                                            Icon(
-                                              Icons.broken_image_outlined,
-                                              color: Color(0xFF667085),
-                                              size: 32,
-                                            ),
-                                            SizedBox(height: 8),
-                                            Text(
-                                              'Error loading proof image',
-                                              style: TextStyle(
-                                                color: Color(0xFF667085),
-                                                fontSize: 13,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      );
-                                    },
-                                    loadingBuilder:
-                                        (context, child, loadingProgress) {
-                                          if (loadingProgress == null) {
-                                            return child;
-                                          }
-                                          return Container(
-                                            height: 150,
-                                            color: const Color(0xFFF6F7F9),
-                                            alignment: Alignment.center,
-                                            child:
-                                                const CircularProgressIndicator(
-                                                  strokeWidth: 2,
-                                                ),
-                                          );
-                                        },
-                                  ),
-                                ),
-                                Container(
-                                  margin: const EdgeInsets.all(8),
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 4,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.black.withValues(alpha: 0.6),
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: const Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        Icons.fullscreen,
-                                        color: Colors.white,
-                                        size: 14,
-                                      ),
-                                      SizedBox(width: 4),
-                                      Text(
-                                        'Tap to zoom',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 24),
-                  OutlinedButton.icon(
-                    onPressed: () {
-                      _shareTransactionReceipt(
-                        context,
-                        tx,
-                        projectName,
-                        title,
-                        formattedAmt,
-                        isOutflow,
-                        dateStr,
-                        timeStr,
-                        refId,
-                        attachments,
-                      );
-                    },
-                    icon: Icon(Icons.share_outlined, color: primaryBlue),
-                    label: Text(
-                      'Share Receipt Summary',
-                      style: TextStyle(
-                        color: primaryBlue,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      side: BorderSide(color: primaryBlue, width: 1.5),
-                      minimumSize: const Size(double.infinity, 48),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () {
-                            _confirmDeleteTransaction(context, tx, onRefresh);
-                          },
-                          icon: const Icon(
-                            Icons.delete_outline,
-                            color: Color(0xFFC01048),
-                          ),
-                          label: Text(
-                            isOutflow ? 'Delete Outflow' : 'Delete Inflow',
-                            style: const TextStyle(
-                              color: Color(0xFFC01048),
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            side: const BorderSide(color: Color(0xFFC01048)),
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: () {
-                            Navigator.pop(ctx);
-                            _showAddRevenueDialog(
-                              context,
-                              project?.id ?? tx['project']?.toString() ?? '',
-                              editingTx: tx,
-                              onSave: onRefresh,
-                            );
-                          },
-                          icon: const Icon(
-                            Icons.edit_outlined,
-                            color: Colors.white,
-                          ),
-                          label: Text(
-                            isOutflow ? 'Edit Outflow' : 'Edit Inflow',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: primaryBlue,
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
                 ],
-              ),
+                const SizedBox(height: 20),
+                BtButton(
+                  label: 'Share Receipt Summary',
+                  icon: Icons.share_outlined,
+                  variant: BtButtonVariant.secondary,
+                  onPressed: () {
+                    _shareTransactionReceipt(
+                      context,
+                      tx,
+                      projectName,
+                      title,
+                      formattedAmt,
+                      isOutflow,
+                      dateStr,
+                      timeStr,
+                      refId,
+                      attachments,
+                    );
+                  },
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: BtButton(
+                        label: isOutflow ? 'Delete Outflow…' : 'Delete Inflow…',
+                        icon: Icons.delete_outline,
+                        variant: BtButtonVariant.destructive,
+                        onPressed: () {
+                          _confirmDeleteTransaction(context, tx, onRefresh);
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: BtButton(
+                        label: isOutflow ? 'Edit Outflow' : 'Edit Inflow',
+                        icon: Icons.edit_outlined,
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          _showAddRevenueDialog(
+                            context,
+                            project?.id ?? tx['project']?.toString() ?? '',
+                            editingTx: tx,
+                            onSave: onRefresh,
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
         );
@@ -1891,115 +1746,70 @@ class _AdminDashboardState extends State<_AdminDashboard> {
       );
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error sharing receipt: $e')));
+        btToast(context, 'Error sharing receipt: $e', error: true);
       }
     }
   }
-  void _confirmDeleteTransaction(
+  Future<void> _confirmDeleteTransaction(
     BuildContext context,
     Map<String, dynamic> tx,
     VoidCallback? onRefresh,
-  ) {
+  ) async {
     final amount = double.tryParse(tx['amount']?.toString() ?? '0') ?? 0.0;
     final bool isOutflow = amount < 0;
     final String label = isOutflow ? 'outflow' : 'revenue inflow';
-    showDialog(
-      context: context,
-      builder: (BuildContext ctx) {
-        return AlertDialog(
-          title: Text(isOutflow ? 'Delete Outflow' : 'Delete Inflow'),
-          content: Text(
-            'Are you sure you want to delete this $label record? This action cannot be undone.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel', style: TextStyle(color: Color(0xFF667085))),
-            ),
-            TextButton(
-              onPressed: () async {
-                Navigator.pop(ctx);
-                final txId =
-                    tx['_id']?.toString() ?? tx['id']?.toString() ?? '';
-                final success = await ApiService.deleteTransaction(txId);
-                if (success) {
-                  if (context.mounted) {
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          '${isOutflow ? 'Outflow' : 'Revenue inflow'} record deleted successfully',
-                        ),
-                      ),
-                    );
-                    context.read<ProjectProvider>().load();
-                    if (onRefresh != null) {
-                      onRefresh();
-                    }
-                  }
-                } else {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          'Failed to delete ${isOutflow ? 'outflow' : 'revenue inflow'} record',
-                        ),
-                      ),
-                    );
-                  }
-                }
-              },
-              child: const Text(
-                'Delete',
-                style: TextStyle(
-                  color: Color(0xFFC01048),
-                  fontWeight: FontWeight.bold,
-                ),
+    final confirmed = await btConfirm(
+      context,
+      title: isOutflow ? 'Delete Outflow' : 'Delete Inflow',
+      message: 'Are you sure you want to delete this $label record? This action cannot be undone.',
+      confirmLabel: 'Delete',
+    );
+    if (!confirmed) return;
+    final txId = tx['_id']?.toString() ?? tx['id']?.toString() ?? '';
+    final success = await ApiService.deleteTransaction(txId);
+    if (success) {
+      if (context.mounted) {
+        Navigator.pop(context);
+        btToast(context, '${isOutflow ? 'Outflow' : 'Revenue inflow'} record deleted successfully');
+        context.read<ProjectProvider>().load();
+        if (onRefresh != null) {
+          onRefresh();
+        }
+      }
+    } else {
+      if (context.mounted) {
+        btToast(context, 'Failed to delete ${isOutflow ? 'outflow' : 'revenue inflow'} record', error: true);
+      }
+    }
+  }
+  Widget _receiptRow(String label, String value) {
+    return Builder(
+      builder: (context) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(label, style: BtText.mono(context)),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Text(
+                value,
+                textAlign: TextAlign.end,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: BtText.num(BtText.subhead(context, weight: FontWeight.w600, color: Bt.ink)),
               ),
             ),
           ],
-        );
-      },
-    );
-  }
-  Widget _receiptRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: textGray,
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Text(
-              value,
-              textAlign: TextAlign.end,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
-                color: textDark,
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
   void _showFullScreenImageDialog(BuildContext context, String imageUrl) {
     showDialog(
       context: context,
+      barrierColor: Colors.black.withValues(alpha: .88),
       builder: (BuildContext ctx) {
         return Dialog(
           backgroundColor: Colors.transparent,
@@ -2015,49 +1825,44 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                   minScale: 0.5,
                   maxScale: 4.0,
                   child: Center(
-                    child: Image.network(
-                      imageUrl,
-                      fit: BoxFit.contain,
-                      loadingBuilder: (context, child, loadingProgress) {
-                        if (loadingProgress == null) return child;
-                        return const Center(
-                          child: CircularProgressIndicator(color: Colors.white),
-                        );
-                      },
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
-                          padding: const EdgeInsets.all(20),
-                          color: Colors.white,
-                          child: const Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.broken_image_outlined,
-                                color: Color(0xFFC01048),
-                                size: 40,
-                              ),
-                              SizedBox(height: 8),
-                              Text(
-                                'Failed to load image',
-                                style: TextStyle(color: Colors.black),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(14),
+                      child: Image.network(
+                        imageUrl,
+                        fit: BoxFit.contain,
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return const Center(
+                            child: CircularProgressIndicator(color: Colors.white),
+                          );
+                        },
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            padding: const EdgeInsets.all(20),
+                            color: Bt.card,
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.broken_image_outlined, color: Bt.red, size: 40),
+                                const SizedBox(height: 8),
+                                Text('Failed to load image', style: BtText.subhead(context, color: Bt.ink)),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
                     ),
                   ),
                 ),
                 Positioned(
                   top: 10,
                   right: 10,
-                  child: IconButton(
-                    icon: const Icon(
-                      Icons.close,
-                      color: Colors.white,
-                      size: 30,
-                    ),
-                    onPressed: () => Navigator.of(ctx).pop(),
+                  child: BtIconButton(
+                    icon: Icons.close_rounded,
+                    semantic: 'Close',
+                    color: Bt.bone,
+                    background: Colors.white.withValues(alpha: .12),
+                    onTap: () => Navigator.of(ctx).pop(),
                   ),
                 ),
               ],
@@ -2077,7 +1882,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
     final bool isOutflow = amount < 0;
     final absAmount = amount.abs();
     final formattedAmt = formatCurrency(absAmount);
-    final textColor = isOutflow ? const Color(0xFFC01048) : const Color(0xFF067647);
+    final textColor = isOutflow ? Bt.ink : Bt.green;
     final paymentMode = tx['paymentMode']?.toString() ?? 'Cash';
     final List<dynamic> attachments = tx['attachments'] is List
         ? tx['attachments'] as List
@@ -2094,7 +1899,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
     final dateStr =
         '${date.day.toString().padLeft(2, '0')} ${_getMonthName(date.month)}';
     final timeStr = _formatTime12Hour(date);
-    Widget thumbnail;
+    Widget? thumbnail;
     if (hasImage) {
       final imageUrl = attachments.first.toString();
       thumbnail = GestureDetector(
@@ -2102,14 +1907,11 @@ class _AdminDashboardState extends State<_AdminDashboard> {
           _showFullScreenImageDialog(context, imageUrl);
         },
         child: Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Bt.line),
-          ),
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(color: Bt.fill, borderRadius: BorderRadius.circular(10)),
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(10),
             child: Image.network(
               imageUrl,
               fit: BoxFit.cover,
@@ -2125,94 +1927,44 @@ class _AdminDashboardState extends State<_AdminDashboard> {
               },
               errorBuilder: (context, error, stackTrace) {
                 return const Center(
-                  child: Icon(
-                    Icons.broken_image_outlined,
-                    color: Color(0xFF667085),
-                    size: 20,
-                  ),
+                  child: Icon(Icons.broken_image_outlined, color: Bt.ink3, size: 20),
                 );
               },
             ),
           ),
         ),
       );
-    } else {
-      thumbnail = Container(
-        width: 44,
-        height: 44,
-        decoration: BoxDecoration(
-          color: const Color(0xFFF8F9FA),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Bt.line),
-        ),
-        alignment: Alignment.center,
-        child: Icon(
-          Icons.image_not_supported_outlined,
-          color: const Color(0xFFE4E7EC),
-          size: 20,
-        ),
-      );
     }
-    return GestureDetector(
+    return InkWell(
       onTap: () {
         _showRevenueDetailDialog(context, tx, onRefresh: onRefresh);
       },
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-        ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         child: Row(
           children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: const Color(0xFFE7F6EE),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                dateStr,
-                style: const TextStyle(
-                  color: Color(0xFF067647),
-                  fontWeight: FontWeight.w700,
-                  fontSize: 13,
-                ),
-              ),
+            BtTile(
+              icon: isOutflow ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
+              bg: isOutflow ? Bt.fill : Bt.greenSoft,
+              fg: isOutflow ? Bt.ink2 : Bt.green,
+              size: 40,
             ),
-            const SizedBox(width: 12),
-            thumbnail,
             const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14,
-                      color: textDark,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                  Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.body(context, weight: FontWeight.w600)),
                   const SizedBox(height: 2),
-                  Text(
-                    'via $paymentMode • $timeStr',
-                    style: const TextStyle(fontSize: 13, color: textGray),
-                  ),
+                  Text('$dateStr · via $paymentMode · $timeStr', maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.caption(context)),
                 ],
               ),
             ),
+            if (thumbnail != null) ...[const SizedBox(width: 8), thumbnail],
+            const SizedBox(width: 10),
             Text(
               isOutflow ? '-$formattedAmt' : '+$formattedAmt',
-              style: TextStyle(
-                fontWeight: FontWeight.w700,
-                fontSize: 15,
-                color: textColor,
-              ),
+              style: BtText.num(BtText.body(context, weight: FontWeight.w700, color: textColor)),
             ),
           ],
         ),
@@ -2249,6 +2001,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
   Widget build(BuildContext context) {
     final provider = context.watch<ProjectProvider>();
     final project = _isGlobalView ? null : provider.selectedProject;
+    final bt = context.bt;
 
     double gBudget = 0;
     double gSpent = 0;
@@ -2280,14 +2033,17 @@ class _AdminDashboardState extends State<_AdminDashboard> {
     final progress = _isGlobalView ? gProg : (project?.progress ?? 0.0);
     final usedPct = budget > 0 ? (spent / budget) : 0.0;
     final over = budget > 0 && spent > budget * 0.9;
+    final hasData = _isGlobalView || project != null;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    final hero = _HomeHero(
+      top: widget.top,
       children: [
-        _buildProjectSelector(context, provider),
-        const SizedBox(height: 16),
-        const ApprovalsAlertWidget(),
-        // ── Money card: total cost, budget, revenue, net cash flow, planned ──
+        const SizedBox(height: 18),
+        BtReveal(
+          index: 1,
+          child: Align(alignment: Alignment.centerLeft, child: _buildProjectSelector(context, provider)),
+        ),
+        const SizedBox(height: 20),
         Showcase(
           key: ShowcaseKeys.dashboardTotalCost,
           description: 'Track your total funds spent across all categories for this project.',
@@ -2295,282 +2051,256 @@ class _AdminDashboardState extends State<_AdminDashboard> {
           textColor: Colors.white,
           tooltipBorderRadius: BorderRadius.circular(16),
           tooltipPadding: const EdgeInsets.all(16),
-          child: BtCard(
+          child: BtReveal(
+            index: 2,
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Expanded(child: Text('Total cost', style: BtText.subhead(context))),
-                if (budget > 0) Text('of ${formatInr(budget, compact: true)} budget', style: BtText.num(BtText.caption(context))),
-              ]),
-              const SizedBox(height: 2),
-              Text(_isGlobalView || project != null ? formatInr(spent, compact: true) : '—', style: BtText.amount(context)),
-              const SizedBox(height: 12),
-              BtProgress(value: usedPct.toDouble(), color: over ? Bt.red : null),
+              Text('Total cost so far', style: BtText.subhead(context, color: Bt.onNoir2)),
+              const SizedBox(height: 4),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: hasData
+                    ? BtCountUp(value: spent, format: (v) => formatInr(v, compact: true), style: BtText.d0(context, color: Bt.bone))
+                    : Text('—', style: BtText.d0(context, color: Bt.bone)),
+              ),
               const SizedBox(height: 6),
-              Text(budget > 0 ? '${(usedPct * 100).toStringAsFixed(0)}% of budget used' : 'No budget set', style: BtText.caption(context, color: over ? Bt.red : Bt.ink3)),
-              const SizedBox(height: 14),
-              const Divider(height: 1),
-              const SizedBox(height: 12),
-              Row(children: [
-                Expanded(
-                  child: Showcase(
-                    key: ShowcaseKeys.dashboardTotalBudget,
-                    description: 'Track the total allocated budget and remaining balance for this project.',
-                    tooltipBackgroundColor: Bt.ink,
-                    textColor: Colors.white,
-                    tooltipBorderRadius: BorderRadius.circular(16),
-                    tooltipPadding: const EdgeInsets.all(16),
-                    child: _stat(context, 'Budget left', budget > 0 ? formatInr(remaining, compact: true) : '—', color: remaining < 0 ? Bt.red : Bt.ink),
-                  ),
-                ),
-                Expanded(child: _stat(context, 'Upcoming / planned', budget > 0 ? formatInr(remaining < 0 ? 0 : remaining, compact: true) : '—')),
-              ]),
-              const SizedBox(height: 12),
-              Row(children: [
-                Expanded(
-                  child: Showcase(
-                    key: ShowcaseKeys.dashboardTotalRevenue,
-                    description: 'View the total revenue inflow recorded for this project.',
-                    tooltipBackgroundColor: Bt.ink,
-                    textColor: Colors.white,
-                    tooltipBorderRadius: BorderRadius.circular(16),
-                    tooltipPadding: const EdgeInsets.all(16),
-                    child: _stat(context, 'Total revenue', formatInr(revenue, compact: true), color: Bt.green),
-                  ),
-                ),
-                Expanded(
-                  child: Showcase(
-                    key: ShowcaseKeys.dashboardNetCashFlow,
-                    description: 'See your net profit or loss calculated instantly.',
-                    tooltipBackgroundColor: Bt.ink,
-                    textColor: Colors.white,
-                    tooltipBorderRadius: BorderRadius.circular(16),
-                    tooltipPadding: const EdgeInsets.all(16),
-                    child: _stat(context, isLoss ? 'Net cash flow · loss' : 'Net cash flow · profit', formatInr(netCash, compact: true), color: isLoss ? Bt.red : Bt.green),
-                  ),
-                ),
-              ]),
-            ]),
-          ),
-        ),
-        const SizedBox(height: 16),
-        // ── Overall progress ──
-        Showcase(
-          key: ShowcaseKeys.progress,
-          description: 'Track your overall project completion here',
-          tooltipBackgroundColor: Bt.ink,
-          textColor: Colors.white,
-          tooltipBorderRadius: BorderRadius.circular(16),
-          tooltipPadding: const EdgeInsets.all(16),
-          child: BtCard(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(children: [
-                Expanded(
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text('Overall progress', style: BtText.subhead(context)),
-                    const SizedBox(height: 2),
-                    Text(
-                      _isGlobalView ? 'All projects' : (project?.name ?? 'No project'),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: BtText.body(context, weight: FontWeight.w600),
+              if (budget > 0)
+                Text.rich(
+                  TextSpan(children: [
+                    TextSpan(text: 'of ${formatInr(budget, compact: true)} budget · '),
+                    TextSpan(
+                      text: '${(usedPct * 100).toStringAsFixed(0)}% used',
+                      style: TextStyle(color: over ? Bt.redBright : bt.accent, fontWeight: FontWeight.w600),
                     ),
-                    if (project != null && project.city.isNotEmpty)
-                      Text('${project.city[0].toUpperCase()}${project.city.substring(1)}', style: BtText.caption(context)),
                   ]),
-                ),
-                Text(_isGlobalView || project != null ? '${(progress * 100).toStringAsFixed(1)}%' : '--', style: BtText.amount(context, size: 28)),
-              ]),
-              const SizedBox(height: 12),
-              BtProgress(value: progress.toDouble(), work: true),
+                  style: BtText.num(BtText.subhead(context, color: Bt.onNoir2)),
+                )
+              else
+                Text('No budget set', style: BtText.subhead(context, color: Bt.onNoir2)),
             ]),
           ),
         ),
         const SizedBox(height: 16),
-        if (project != null) ...[
-          _buildRevenueHistory(context),
-          const SizedBox(height: 16),
-        ],
-        _buildSpeakUpdate(context),
-        const SizedBox(height: 24),
+        BtReveal(
+          index: 3,
+          child: BtBricks(value: usedPct.clamp(0.0, 1.0).toDouble(), onDark: true, color: over ? Bt.redBright : null),
+        ),
+        const SizedBox(height: 16),
+        BtReveal(
+          index: 4,
+          child: Row(children: [
+            Expanded(
+              child: Showcase(
+                key: ShowcaseKeys.dashboardTotalBudget,
+                description: 'Track the total allocated budget and remaining balance for this project.',
+                tooltipBackgroundColor: Bt.ink,
+                textColor: Colors.white,
+                tooltipBorderRadius: BorderRadius.circular(16),
+                tooltipPadding: const EdgeInsets.all(16),
+                child: BtGlassTile(
+                  label: 'Budget left',
+                  value: Text(budget > 0 ? formatInr(remaining, compact: true) : '—', maxLines: 1, overflow: TextOverflow.ellipsis),
+                  valueColor: remaining < 0 ? Bt.redBright : null,
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: BtGlassTile(
+                label: 'Upcoming · planned',
+                value: Text(budget > 0 ? formatInr(remaining < 0 ? 0 : remaining, compact: true) : '—', maxLines: 1, overflow: TextOverflow.ellipsis),
+              ),
+            ),
+          ]),
+        ),
+      ],
+    );
+
+    final workDone = Showcase(
+      key: ShowcaseKeys.progress,
+      description: 'Track your overall project completion here',
+      tooltipBackgroundColor: Bt.ink,
+      textColor: Colors.white,
+      tooltipBorderRadius: BorderRadius.circular(16),
+      tooltipPadding: const EdgeInsets.all(16),
+      child: BtCard(
+        padding: const EdgeInsets.all(16),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          BtRing(
+            value: hasData ? progress.clamp(0.0, 1.0).toDouble() : 0,
+            size: 68,
+            stroke: 7,
+            child: Text(
+              hasData ? '${(progress * 100).toStringAsFixed(1)}%' : '--',
+              style: BtText.num(BtText.caption(context, color: Bt.ink, weight: FontWeight.w700)),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text('Work done', style: BtText.body(context, weight: FontWeight.w600)),
+          Text(
+            _isGlobalView ? 'All projects' : (project?.name ?? 'No project'),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: BtText.caption(context),
+          ),
+          if (project != null && project.city.isNotEmpty)
+            Text('${project.city[0].toUpperCase()}${project.city.substring(1)}', maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.caption(context)),
+        ]),
+      ),
+    );
+
+    final clientMoney = BtCard(
+      padding: const EdgeInsets.all(16),
+      onTap: project != null ? () => _showAllRevenueHistory(context, project.name, project.id) : null,
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('CLIENT MONEY', style: BtText.mono(context)),
+        const SizedBox(height: 10),
         Showcase(
-          key: ShowcaseKeys.recentEntries,
-          description: 'Quickly view or edit your most recently added entries',
+          key: ShowcaseKeys.dashboardTotalRevenue,
+          description: 'View the total revenue inflow recorded for this project.',
           tooltipBackgroundColor: Bt.ink,
           textColor: Colors.white,
           tooltipBorderRadius: BorderRadius.circular(16),
           tooltipPadding: const EdgeInsets.all(16),
-          child: _buildRecentActivity(context),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Total revenue', style: BtText.caption(context)),
+            Text(formatInr(revenue, compact: true), maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.num(BtText.headline(context).copyWith(color: Bt.green))),
+          ]),
+        ),
+        const SizedBox(height: 8),
+        Showcase(
+          key: ShowcaseKeys.dashboardNetCashFlow,
+          description: 'See your net profit or loss calculated instantly.',
+          tooltipBackgroundColor: Bt.ink,
+          textColor: Colors.white,
+          tooltipBorderRadius: BorderRadius.circular(16),
+          tooltipPadding: const EdgeInsets.all(16),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(isLoss ? 'Net cash flow · loss' : 'Net cash flow · profit', maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.caption(context)),
+            Text(formatInr(netCash, compact: true), maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.num(BtText.headline(context).copyWith(color: isLoss ? Bt.red : Bt.green))),
+          ]),
+        ),
+        if (project != null) ...[
+          const SizedBox(height: 10),
+          _buildRevenueHistory(context),
+        ],
+      ]),
+    );
+
+    return BtHeroScroll(
+      hero: hero,
+      children: [
+        if (RoleManager.canApproveUpdates) const _HomeApprovals(),
+        BtReveal(index: 1, child: _buildSpeakUpdate(context)),
+        const SizedBox(height: 12),
+        BtReveal(
+          index: 2,
+          child: IntrinsicHeight(
+            child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              Expanded(child: workDone),
+              const SizedBox(width: 12),
+              Expanded(child: clientMoney),
+            ]),
+          ),
+        ),
+        const SizedBox(height: 28),
+        BtReveal(
+          index: 3,
+          child: Showcase(
+            key: ShowcaseKeys.recentEntries,
+            description: 'Quickly view or edit your most recently added entries',
+            tooltipBackgroundColor: Bt.ink,
+            textColor: Colors.white,
+            tooltipBorderRadius: BorderRadius.circular(16),
+            tooltipPadding: const EdgeInsets.all(16),
+            child: _buildRecentActivity(context),
+          ),
         ),
       ],
     );
   }
 
-  Widget _stat(BuildContext context, String label, String value, {Color color = Bt.ink}) {
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.caption(context)),
-        const SizedBox(height: 2),
-        Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.num(BtText.body(context, weight: FontWeight.w600, color: color))),
-      ]),
-    );
-  }
   Widget _buildProjectSelector(BuildContext context, ProjectProvider provider) {
     final selectedName = _isGlobalView ? 'Global Financial Overview' : (provider.selectedProject?.name ?? 'Select Project');
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: BtChip(
-        icon: Icons.apartment_outlined,
-        label: selectedName.length > 34 ? '${selectedName.substring(0, 32)}…' : selectedName,
-        trailingIcon: Icons.expand_more_rounded,
-        onTap: () => _showProjectPicker(context, provider),
-      ),
+    return BtChip(
+      onDark: true,
+      icon: _isGlobalView ? Icons.public : Icons.apartment_outlined,
+      label: selectedName.length > 34 ? '${selectedName.substring(0, 32)}…' : selectedName,
+      trailingIcon: Icons.expand_more_rounded,
+      onTap: () => _showProjectPicker(context, provider),
     );
   }
   void _showProjectPicker(BuildContext context, ProjectProvider provider) {
     final projects = provider.projects;
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (_) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 16),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE4E7EC),
-                    borderRadius: BorderRadius.circular(4),
+    Widget option({required bool selected, required IconData icon, required String label, required VoidCallback onTap}) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 6),
+        child: Semantics(
+          button: true,
+          selected: selected,
+          child: BtPressable(
+            onTap: onTap,
+            child: AnimatedContainer(
+              duration: Bt.fast,
+              curve: Bt.ease,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+              decoration: BoxDecoration(
+                color: selected ? Bt.ink : Bt.ground,
+                borderRadius: BorderRadius.circular(Bt.rInput),
+              ),
+              child: Row(
+                children: [
+                  Icon(icon, color: selected ? Bt.bone : Bt.ink2, size: 20),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      label,
+                      style: BtText.body(context, weight: selected ? FontWeight.w600 : FontWeight.w500, color: selected ? Bt.bone : Bt.ink),
+                    ),
                   ),
-                ),
+                  if (selected) Icon(Icons.check_circle_rounded, color: context.bt.accent, size: 20),
+                ],
               ),
-              Text(
-                'Select Project',
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w700,
-                  color: textDark,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Flexible(
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      InkWell(
-                        onTap: () {
-                          setState(() { _isGlobalView = true; });
-                          Navigator.pop(context);
-                        },
-                        borderRadius: BorderRadius.circular(12),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                          decoration: BoxDecoration(
-                            color: _isGlobalView ? AppColors.primary.withOpacity(0.08) : Colors.transparent,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: _isGlobalView ? AppColors.primary.withOpacity(0.3) : Colors.transparent,
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(Icons.public, color: _isGlobalView ? AppColors.primary : const Color(0xFF475467), size: 20),
-                              const SizedBox(width: 14),
-                              Expanded(
-                                child: Text(
-                                  'Global Financial Overview (All Projects)',
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: _isGlobalView ? FontWeight.w700 : FontWeight.w500,
-                                    color: _isGlobalView ? AppColors.primary : AppColors.textDark,
-                                  ),
-                                ),
-                              ),
-                              if (_isGlobalView)
-                                Icon(Icons.check_circle_rounded, color: AppColors.primary, size: 20)
-                              else
-                                const Icon(Icons.chevron_right, color: Color(0xFFD0D5DD)),
-                            ],
-                          ),
-                        ),
-                      ),
-                      ...projects.map((p) {
-                      final selected = !_isGlobalView && p.id == provider.selectedProject?.id;
-                      return InkWell(
-                        onTap: () {
-                          setState(() { _isGlobalView = false; }); provider.selectProject(p);
-                          Navigator.pop(context);
-                        },
-                        borderRadius: BorderRadius.circular(12),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 150),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 14,
-                          ),
-                          margin: const EdgeInsets.only(bottom: 6),
-                          decoration: BoxDecoration(
-                            color: selected
-                                ? primaryBlue.withValues(alpha: 0.08)
-                                : Colors.transparent,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: selected
-                                  ? primaryBlue
-                                  : Colors.transparent,
-                              width: 1.5,
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                selected
-                                    ? Icons.radio_button_checked
-                                    : Icons.radio_button_off,
-                                size: 18,
-                                color: selected ? primaryBlue : textGray,
-                              ),
-                              const SizedBox(width: 12),
-                              Flexible(
-                                child: Text(
-                                  p.name,
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: selected
-                                        ? FontWeight.w700
-                                        : FontWeight.w500,
-                                    color: selected ? primaryBlue : textDark,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                    ],
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
         ),
+      );
+    }
+
+    showBtSheet<void>(
+      context,
+      title: 'Select Project',
+      builder: (_) => Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          option(
+            selected: _isGlobalView,
+            icon: Icons.public,
+            label: 'Global Financial Overview (All Projects)',
+            onTap: () {
+              setState(() { _isGlobalView = true; });
+              Navigator.pop(context);
+            },
+          ),
+          ...projects.map((p) {
+            final selected = !_isGlobalView && p.id == provider.selectedProject?.id;
+            return option(
+              selected: selected,
+              icon: Icons.apartment_outlined,
+              label: p.name,
+              onTap: () {
+                setState(() { _isGlobalView = false; }); provider.selectProject(p);
+                Navigator.pop(context);
+              },
+            );
+          }),
+        ],
       ),
     );
   }
   Widget _buildSpeakUpdate(BuildContext context) {
+    final bt = context.bt;
     return Showcase(
       key: ShowcaseKeys.quickAddEntry,
       description: 'Quickly add a new entry from here.',
@@ -2578,11 +2308,31 @@ class _AdminDashboardState extends State<_AdminDashboard> {
       textColor: Colors.white,
       tooltipBorderRadius: BorderRadius.circular(16),
       tooltipPadding: const EdgeInsets.all(16),
-      child: BtButton(
+      child: Semantics(
+        button: true,
         label: 'Speak Update',
-        icon: Icons.mic_rounded,
-        variant: BtButtonVariant.accent,
-        onPressed: () => Navigator.pushNamed(context, '/add-entry'),
+        child: BtCard(
+          variant: BtCardVariant.ink,
+          padding: const EdgeInsets.fromLTRB(16, 14, 18, 14),
+          onTap: () => Navigator.pushNamed(context, '/add-entry'),
+          child: Row(children: [
+            Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(color: bt.accent, shape: BoxShape.circle),
+              child: Icon(Icons.mic_rounded, color: bt.onAccent, size: 24),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('Speak Update', style: BtText.headline(context).copyWith(color: Bt.bone)),
+                Text('Say what happened — we fill the form', maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.subhead(context, color: Bt.onNoir2)),
+              ]),
+            ),
+            const SizedBox(width: 8),
+            _StaticWave(color: bt.accent),
+          ]),
+        ),
       ),
     );
   }
@@ -2610,7 +2360,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
           ),
         ),
         _TeamApprovalHistoryWidget(projectId: selectedProjectId),
-        const SizedBox(height: 20),
+        const SizedBox(height: 24),
         const BtSectionHeader(title: 'Recent entries'),
         if (recent.isEmpty)
           const BtCard(
@@ -2649,8 +2399,12 @@ class _AdminDashboardState extends State<_AdminDashboard> {
     );
   }
 }
+
+// ───────────────────────────────────────────────────────── supervisor
+
 class _SupervisorDashboard extends StatefulWidget {
-  const _SupervisorDashboard();
+  const _SupervisorDashboard({required this.top});
+  final Widget top;
   @override
   State<_SupervisorDashboard> createState() => _SupervisorDashboardState();
 }
@@ -2691,44 +2445,27 @@ class _SupervisorDashboardState extends State<_SupervisorDashboard> {
     });
   }
   Future<void> _handleApprove(String id) async {
-    final ok = await ApiService.approveTransaction(id);
+    final ok = await _approveTx(context, id);
     if (!mounted) return;
     if (ok) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Transaction approved'),
-          backgroundColor: Color(0xFF067647),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
       _loadAll();
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Failed to approve'),
-          backgroundColor: Color(0xFFC01048),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
     }
   }
   Future<void> _handleReject(String id) async {
-    final ok = await ApiService.rejectTransaction(id, 'Rejected by supervisor');
+    final ok = await _rejectTx(context, id);
     if (!mounted) return;
     if (ok) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Transaction rejected'),
-          backgroundColor: Color(0xFFC01048),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
       _loadAll();
     }
   }
   Future<void> _confirmReject(String id) async {
-    final ok = await btConfirm(context, title: 'Reject this entry?', message: 'The person who logged it will see it as rejected.', confirmLabel: 'Reject');
+    final ok = await _confirmRejectTx(context);
     if (ok) _handleReject(id);
+  }
+  void _openInbox() {
+    Navigator.pushNamed(context, '/inbox').then((_) {
+      if (mounted) _loadAll();
+    });
   }
   @override
   Widget build(BuildContext context) {
@@ -2739,28 +2476,109 @@ class _SupervisorDashboardState extends State<_SupervisorDashboard> {
     final rejectedCount = _historyTransactions
         .where((t) => t['approvalStatus'] == 'Rejected')
         .length;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    final pendingSum = _sumAmounts(_pendingTransactions);
+
+    Widget counter(String key, String label, int count) => Expanded(
+          child: Semantics(
+            selected: _activeTab == key,
+            child: BtGlassTile(
+              label: label,
+              selected: _activeTab == key,
+              value: BtCountUp(value: count.toDouble(), format: (v) => '${v.round()}', duration: const Duration(milliseconds: 800)),
+              onTap: () => setState(() => _activeTab = key),
+            ),
+          ),
+        );
+
+    final hero = _HomeHero(
+      top: widget.top,
       children: [
-        BtSegmented<String>(
-          segments: {
-            'pending': 'Pending · $pendingCount',
-            'approved': 'Approved · $approvedCount',
-            'rejected': 'Rejected · $rejectedCount',
-          },
-          value: _activeTab,
-          onChanged: (v) => setState(() => _activeTab = v),
-        ),
-        const SizedBox(height: 12),
-        Row(children: [
-          if (RoleManager.canAssignTasks) ...[
-            Expanded(child: BtButton(label: 'Assign Task', icon: Icons.assignment_turned_in_outlined, small: true, onPressed: () => Navigator.pushNamed(context, '/assign-task'))),
-            const SizedBox(width: 8),
-          ],
-          Expanded(child: BtButton(label: 'Refresh', icon: Icons.refresh_rounded, small: true, variant: BtButtonVariant.secondary, onPressed: _loadAll)),
-        ]),
         const SizedBox(height: 24),
-        const BtSectionHeader(title: 'Tasks assigned'),
+        BtReveal(
+          index: 1,
+          child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+            BtCountUp(
+              value: pendingCount.toDouble(),
+              format: (v) => '${v.round()}',
+              style: BtText.d0(context, color: Bt.bone).copyWith(fontSize: 72, letterSpacing: -3),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('waiting for you', style: BtText.headline(context).copyWith(color: Bt.bone)),
+                  Text(
+                    _isLoading
+                        ? 'Checking approvals…'
+                        : '${formatInr(pendingSum)} across $pendingCount ${pendingCount == 1 ? 'entry' : 'entries'}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: BtText.num(BtText.subhead(context, color: Bt.onNoir2)),
+                  ),
+                ]),
+              ),
+            ),
+          ]),
+        ),
+        const SizedBox(height: 18),
+        BtReveal(
+          index: 2,
+          child: Row(children: [
+            counter('pending', 'Pending', pendingCount),
+            const SizedBox(width: 8),
+            counter('approved', 'Approved', approvedCount),
+            const SizedBox(width: 8),
+            counter('rejected', 'Rejected', rejectedCount),
+          ]),
+        ),
+      ],
+    );
+
+    return BtHeroScroll(
+      hero: hero,
+      onRefresh: _loadAll,
+      children: [
+        BtReveal(
+          index: 1,
+          child: Row(children: [
+            if (RoleManager.canAssignTasks) ...[
+              Expanded(child: BtButton(label: 'Assign Task', icon: Icons.assignment_turned_in_outlined, onPressed: () => Navigator.pushNamed(context, '/assign-task'))),
+              const SizedBox(width: 10),
+              Semantics(
+                button: true,
+                label: 'Refresh',
+                child: BtPressable(
+                  onTap: _loadAll,
+                  child: Container(
+                    width: Bt.buttonH,
+                    height: Bt.buttonH,
+                    decoration: BoxDecoration(color: Bt.card, borderRadius: BorderRadius.circular(Bt.rButton), boxShadow: Bt.shadow),
+                    child: const Icon(Icons.refresh_rounded, color: Bt.ink),
+                  ),
+                ),
+              ),
+            ] else
+              Expanded(child: BtButton(label: 'Refresh', icon: Icons.refresh_rounded, variant: BtButtonVariant.secondary, onPressed: _loadAll)),
+          ]),
+        ),
+        const SizedBox(height: 24),
+        if (_isLoading)
+          const BtSkeletonList(count: 3)
+        else if (_error != null)
+          BtErrorCard(message: _error!, onRetry: _loadAll)
+        else
+          _buildActiveTabContent(
+            pendingCount: pendingCount,
+            approvedCount: approvedCount,
+            rejectedCount: rejectedCount,
+            pendingSum: pendingSum,
+          ),
+        const SizedBox(height: 28),
+        BtSectionHeader(
+          title: 'Tasks assigned',
+          action: _tasks.isEmpty ? null : '${_tasks.where((t) => t.status != 'Completed').length} open',
+        ),
         if (_tasks.isEmpty)
           const BtCard(child: BtEmpty(icon: Icons.task_alt, title: 'No tasks currently active.'))
         else
@@ -2773,17 +2591,10 @@ class _SupervisorDashboardState extends State<_SupervisorDashboard> {
                 }),
               ),
           ]),
-        const SizedBox(height: 24),
-        if (_isLoading)
-          const BtSkeletonList(count: 3)
-        else if (_error != null)
-          BtErrorCard(message: _error!, onRetry: _loadAll)
-        else
-          _buildActiveTabContent(
-            pendingCount: pendingCount,
-            approvedCount: approvedCount,
-            rejectedCount: rejectedCount,
-          ),
+        if (!_isLoading && _error == null && _activeTab == 'pending') ...[
+          const SizedBox(height: 28),
+          _buildRecentHistorySection(),
+        ],
       ],
     );
   }
@@ -2791,6 +2602,7 @@ class _SupervisorDashboardState extends State<_SupervisorDashboard> {
     required int pendingCount,
     required int approvedCount,
     required int rejectedCount,
+    required double pendingSum,
   }) {
     switch (_activeTab) {
       case 'approved':
@@ -2817,21 +2629,24 @@ class _SupervisorDashboardState extends State<_SupervisorDashboard> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            BtSectionHeader(title: 'Pending approvals', action: 'See all', onAction: _openInbox),
             if (pendingCount == 0)
               const BtCard(child: BtEmpty(icon: Icons.check_circle_outline, title: 'No pending approvals', message: 'Pull down to refresh'))
             else ...[
-              const BtSectionHeader(title: 'Pending approvals'),
-              BtGroup(children: [
-                for (final tx in _pendingTransactions)
-                  _PendingTxCard(
-                    tx: tx as Map<String, dynamic>,
-                    onApprove: () => _handleApprove(tx['_id']?.toString() ?? ''),
-                    onReject: () => _confirmReject(tx['_id']?.toString() ?? ''),
+              _ApprovalsSummaryCard(count: pendingCount, amount: pendingSum, onTap: _openInbox),
+              for (var i = 0; i < _pendingTransactions.length; i++)
+                Padding(
+                  padding: const EdgeInsets.only(top: 10),
+                  child: BtReveal(
+                    index: i < 8 ? i + 1 : 0,
+                    child: _PendingTxCard(
+                      tx: _pendingTransactions[i] as Map<String, dynamic>,
+                      onApprove: () => _handleApprove(_pendingTransactions[i]['_id']?.toString() ?? ''),
+                      onReject: () => _confirmReject(_pendingTransactions[i]['_id']?.toString() ?? ''),
+                    ),
                   ),
-              ]),
+                ),
             ],
-            const SizedBox(height: 24),
-            _buildRecentHistorySection(),
           ],
         );
     }
@@ -2904,25 +2719,25 @@ class _PendingTxCard extends StatelessWidget {
     final type = tx['type']?.toString() ?? '';
     final role = _txRole(tx);
     final dateStr = _txDate(tx['date'] ?? tx['createdAt']);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+    return BtCard(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
           BtTypeTile(type: _txTypeWord(type, title)),
           const SizedBox(width: 12),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(title, maxLines: 2, overflow: TextOverflow.ellipsis, style: BtText.body(context, weight: FontWeight.w500)),
-              Text('${_txWho(tx)}${role.isNotEmpty ? ' · $role' : ''}', style: BtText.caption(context)),
+              Text(title, maxLines: 2, overflow: TextOverflow.ellipsis, style: BtText.body(context, weight: FontWeight.w600)),
+              Text('${_txWho(tx)}${role.isNotEmpty ? ' · $role' : ''}', maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.caption(context)),
               Text([_txProject(tx), dateStr].where((x) => x.isNotEmpty).join(' · '), maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.caption(context)),
             ]),
           ),
           const SizedBox(width: 8),
-          Text(formatInr(amount), style: BtText.num(BtText.body(context, weight: FontWeight.w600))),
+          Text(formatInr(amount), style: BtText.num(BtText.headline(context))),
         ]),
         const SizedBox(height: 12),
         Row(children: [
-          Expanded(child: BtButton(label: 'Reject', variant: BtButtonVariant.destructive, small: true, onPressed: onReject)),
+          Expanded(child: BtButton(label: 'Reject…', variant: BtButtonVariant.destructive, small: true, onPressed: onReject)),
           const SizedBox(width: 10),
           Expanded(child: BtButton(label: 'Approve', icon: Icons.check_rounded, small: true, onPressed: onApprove)),
         ]),
@@ -2963,9 +2778,48 @@ class _HistoryTxCard extends StatelessWidget {
     );
   }
 }
+
+// ───────────────────────────────────────────────────────── mason
+
+/// Big square action on the Mason home (Home-Mason board).
+class _BigAction extends StatelessWidget {
+  const _BigAction({required this.icon, required this.title, required this.subtitle, required this.onTap, this.ink = false});
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+  final bool ink;
+  @override
+  Widget build(BuildContext context) {
+    final bt = context.bt;
+    return Semantics(
+      button: true,
+      label: title,
+      child: BtCard(
+        variant: ink ? BtCardVariant.ink : BtCardVariant.plain,
+        padding: const EdgeInsets.all(18),
+        onTap: onTap,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 132),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+            BtTile(icon: icon, bg: ink ? bt.accent : bt.accentSoft, fg: ink ? bt.onAccent : bt.accentInk),
+            const SizedBox(height: 24),
+            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(title, style: BtText.headline(context).copyWith(color: ink ? Bt.bone : Bt.ink)),
+              const SizedBox(height: 2),
+              Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis, style: BtText.subhead(context, color: ink ? Bt.onNoir2 : Bt.ink2)),
+            ]),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
 class _MasonDashboard extends StatefulWidget {
-  const _MasonDashboard({required this.onEntryTap});
+  const _MasonDashboard({required this.onEntryTap, required this.top});
   final void Function(BuildContext, String) onEntryTap;
+  final Widget top;
   @override
   State<_MasonDashboard> createState() => _MasonDashboardState();
 }
@@ -2999,47 +2853,82 @@ class _MasonDashboardState extends State<_MasonDashboard> {
   }
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    final projectName = context.watch<ProjectProvider>().selectedProject?.name;
+    final openTasks = _tasks.where((t) => t.status != 'Completed').length;
+    final hero = _HomeHero(
+      top: widget.top,
       children: [
-        BtCard(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Text('Good Morning, ${UserSession.roleLabel}', style: BtText.headline(context)),
-            Text('Ready for today\'s work', style: BtText.subhead(context)),
-            const SizedBox(height: 14),
-            BtButton(
-              label: 'Add Daily Update',
-              icon: Icons.add_task_rounded,
-              onPressed: () => Navigator.pushNamed(context, '/update-progress'),
-            ),
-            const SizedBox(height: 10),
-            BtButton(
-              label: 'Add Material Entry',
-              icon: Icons.inventory_2_outlined,
-              variant: BtButtonVariant.secondary,
-              onPressed: () => widget.onEntryTap(context, 'material'),
-            ),
-          ]),
+        const SizedBox(height: 26),
+        BtReveal(
+          index: 1,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 320),
+            child: Text('What did you do today?', style: BtText.d1(context, color: Bt.bone)),
+          ),
+        ),
+        const SizedBox(height: 8),
+        BtReveal(
+          index: 2,
+          child: Text(
+            (projectName != null && projectName.isNotEmpty) ? projectName : 'Ready for today\'s work',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: BtText.body(context, color: Bt.onNoir2),
+          ),
+        ),
+      ],
+    );
+    return BtHeroScroll(
+      hero: hero,
+      children: [
+        BtReveal(
+          index: 1,
+          child: IntrinsicHeight(
+            child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              Expanded(
+                child: _BigAction(
+                  ink: true,
+                  icon: Icons.add_task_rounded,
+                  title: 'Add Daily Update',
+                  subtitle: 'Work, photos, notes',
+                  onTap: () => Navigator.pushNamed(context, '/update-progress'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _BigAction(
+                  icon: Icons.inventory_2_outlined,
+                  title: 'Add Material Entry',
+                  subtitle: 'Cement, steel, bricks…',
+                  onTap: () => widget.onEntryTap(context, 'material'),
+                ),
+              ),
+            ]),
+          ),
         ),
         const SizedBox(height: 24),
-        const BtSectionHeader(title: 'Tasks assigned'),
+        if (RoleManager.canApproveUpdates) const _HomeApprovals(),
+        BtSectionHeader(title: 'Tasks assigned', action: _isLoadingTasks || _tasks.isEmpty ? null : '$openTasks open'),
         if (_isLoadingTasks)
           const BtSkeletonList(count: 2)
         else if (_tasks.isEmpty)
           const BtCard(child: BtEmpty(icon: Icons.task_alt, title: 'No tasks currently active.'))
         else
-          BtGroup(children: [
-            for (final task in _tasks)
-              _TaskCard(
-                task: task,
-                onEdit: task.status != 'Completed'
-                    ? () => Navigator.pushNamed(context, '/update-progress', arguments: {'task': task}).then((_) {
-                        if (context.mounted) _loadTasks();
-                      })
-                    : null,
-              ),
-          ]),
-        const SizedBox(height: 24),
+          BtReveal(
+            index: 2,
+            child: BtGroup(children: [
+              for (final task in _tasks)
+                _TaskCard(
+                  task: task,
+                  onEdit: task.status != 'Completed'
+                      ? () => Navigator.pushNamed(context, '/update-progress', arguments: {'task': task}).then((_) {
+                          if (context.mounted) _loadTasks();
+                        })
+                      : null,
+                ),
+            ]),
+          ),
+        const SizedBox(height: 28),
         BtSectionHeader(
           title: 'Recent entries',
           action: 'View all',
@@ -3058,9 +2947,12 @@ class _MasonDashboardState extends State<_MasonDashboard> {
             if (entries.isEmpty) {
               return const BtCard(child: BtEmpty(icon: Icons.inbox_outlined, title: 'No entries yet'));
             }
-            return BtGroup(children: [
-              for (final e in entries.take(5)) _recentEntryTile(e as Map<String, dynamic>),
-            ]);
+            return BtReveal(
+              index: 3,
+              child: BtGroup(children: [
+                for (final e in entries.take(5)) _recentEntryTile(e as Map<String, dynamic>),
+              ]),
+            );
           },
         ),
       ],
@@ -3091,6 +2983,8 @@ class _MasonDashboardState extends State<_MasonDashboard> {
     );
   }
 }
+
+/// Kept for compatibility (public). Home now shows [_HomeApprovals] instead.
 class ApprovalsAlertWidget extends StatefulWidget {
   const ApprovalsAlertWidget({super.key});
   @override
@@ -3124,7 +3018,7 @@ class _ApprovalsAlertWidgetState extends State<ApprovalsAlertWidget> {
         variant: BtCardVariant.attention,
         onTap: () => Navigator.pushNamed(context, '/approvals'),
         child: Row(children: [
-          BtTile(icon: Icons.inbox_outlined, bg: context.bt.brandSoft, fg: context.bt.brand, size: 44),
+          BtTile(icon: Icons.inbox_outlined, bg: context.bt.accentSoft, fg: context.bt.accentInk, size: 44),
           const SizedBox(width: 14),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -3251,7 +3145,7 @@ class _TeamApprovalHistoryWidgetState
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const BtSkeleton(height: 120, radius: 16);
+      return const BtSkeleton(height: 120, radius: Bt.rCard);
     }
     final shown = _expanded ? _history : _history.take(3).toList();
     return BtGroup(
@@ -3260,20 +3154,28 @@ class _TeamApprovalHistoryWidgetState
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 4, 8),
           child: Row(children: [
-            const Icon(Icons.groups_outlined, size: 20, color: Bt.ink2),
+            const BtTile(icon: Icons.groups_outlined, size: 32),
             const SizedBox(width: 10),
             Expanded(child: Text('Team approval history', style: BtText.body(context, weight: FontWeight.w600))),
             if (_history.isNotEmpty)
               TextButton(
                 onPressed: () => setState(() => _expanded = !_expanded),
-                child: Text(_expanded ? 'Show less' : 'Show all', style: BtText.subhead(context, weight: FontWeight.w600, color: context.bt.brand)),
+                style: TextButton.styleFrom(minimumSize: const Size(44, 40), foregroundColor: Bt.ink2),
+                child: Text(_expanded ? 'Show less' : 'Show all', style: BtText.subhead(context, weight: FontWeight.w600, color: context.bt.accentInk)),
               ),
           ]),
         ),
         if (_history.isEmpty)
           const BtEmpty(icon: Icons.fact_check_outlined, title: 'No approval requests yet')
         else
-          for (final tx in shown) _historyTile(tx as Map<String, dynamic>),
+          AnimatedSize(
+            duration: Bt.medium,
+            curve: Bt.ease,
+            alignment: Alignment.topCenter,
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              for (final tx in shown) _historyTile(tx as Map<String, dynamic>),
+            ]),
+          ),
       ],
     );
   }

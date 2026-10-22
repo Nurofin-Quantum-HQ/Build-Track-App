@@ -2,12 +2,12 @@ import 'package:buildtrack_mobile/design/design.dart';
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:buildtrack_mobile/common/controllers/voice_recording_controller.dart';
-import 'package:buildtrack_mobile/common/themes/app_colors.dart';
 import 'package:buildtrack_mobile/controller/project_provider.dart';
 import 'package:buildtrack_mobile/controller/user_session.dart';
 import 'package:buildtrack_mobile/models/project_model.dart';
 import 'package:buildtrack_mobile/services/api_service.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 class VoiceResponseModel {
   final String status;
@@ -189,7 +189,7 @@ class _BlinkingCursorState extends State<_BlinkingCursor>
   Widget build(BuildContext context) {
     return FadeTransition(
       opacity: _ctrl,
-      child: Container(width: 2, height: 18, color: AppColors.primary),
+      child: Container(width: 3, height: 28, color: context.bt.accent),
     );
   }
 }
@@ -274,19 +274,19 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
     _micPulseCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1100),
-    )..repeat(reverse: true);
+    );
     _bubbleCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 900),
-    )..repeat();
+    );
     _micOrbCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1400),
-    )..repeat(reverse: true);
+    );
     _waveCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1200),
-    )..repeat();
+    );
     _voiceCtrl = VoiceRecordingController();
     _voiceCtrl.addListener(_onVoiceChanged);
     _voiceCtrl.preInitialize();
@@ -473,6 +473,7 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
     await _voiceCtrl.startListening();
     if (mounted) setState(() {});
   }
+  // ignore: unused_element — kept from the original (not reachable there either).
   Future<void> _stopInitialRecording() async {
     if (_voiceCtrl.engineState != VoiceEngineState.listening) {
       debugPrint(
@@ -1804,133 +1805,127 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
     TextInputType? keyboardType,
   }) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label.toUpperCase(),
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textLight,
-              letterSpacing: 0.5,
-            ),
-          ),
-          const SizedBox(height: 4),
-          TextField(
-            controller: controller,
-            keyboardType: keyboardType,
-            style: const TextStyle(
-              fontSize: 14.5,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textDark,
-            ),
-            decoration: const InputDecoration(
-              isDense: true,
-              contentPadding: EdgeInsets.symmetric(horizontal: 0, vertical: 4),
-              border: InputBorder.none,
-              enabledBorder: InputBorder.none,
-              focusedBorder: InputBorder.none,
-            ),
-            onChanged: (_) => setState(() {}),
-          ),
-          const Divider(height: 1, color: Color(0xFFF7F5FC)),
-        ],
+      padding: const EdgeInsets.only(bottom: 14),
+      child: BtField(
+        label: label,
+        child: TextField(
+          controller: controller,
+          keyboardType: keyboardType,
+          style: BtText.num(BtText.body(context, weight: FontWeight.w500)),
+          decoration: btInput(context),
+          onChanged: (_) => setState(() {}),
+        ),
       ),
     );
   }
   Widget _buildEditFormFields() {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _buildEditField(
-          label: 'Project',
-          controller: _editControllers['project']!,
-        ),
-        if (_entryType == 'material') ...[
-          _buildEditField(
-            label: 'Material',
-            controller: _editControllers['material']!,
-          ),
-          _buildEditField(
-            label: 'Quantity',
-            controller: _editControllers['quantity']!,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          ),
-          _buildEditField(label: 'Unit', controller: _editControllers['unit']!),
-        ] else if (_entryType == 'labour') ...[
-          _buildEditField(
-            label: 'Labour Type',
-            controller: _editControllers['labourType']!,
-          ),
-          _buildEditField(
-            label: 'Workers Count',
-            controller: _editControllers['workers']!,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          ),
-          _buildEditField(
-            label: 'Hours Worked',
-            controller: _editControllers['hours']!,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          ),
-        ] else ...[
-          _buildEditField(
-            label: 'Equipment',
-            controller: _editControllers['equipment']!,
-          ),
-          _buildEditField(
-            label: 'Hours Used',
-            controller: _editControllers['hours']!,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          ),
-        ],
-        _buildEditField(
-          label: 'Rate (₹)',
-          controller: _editControllers['rate']!,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        ),
-        _buildEditField(label: 'Floor', controller: _editControllers['floor']!),
-        if (_entryType == 'material')
-          _buildEditField(
-            label: 'Phase',
-            controller: _editControllers['phase']!,
-          ),
-        _buildEditField(
-          label: 'Activity',
-          controller: _editControllers['activity']!,
-        ),
-        if (_editError != null) ...[
-          const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFDECEF),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFFFCA5A5)),
-            ),
-            child: Row(
-              children: [
-                const Icon(
-                  Icons.error_outline,
-                  color: Color(0xFFC01048),
-                  size: 14,
+        BtSectionHeader(title: 'Details', caption: true),
+        BtCard(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 2),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (_entryType == 'material') ...[
+                _buildEditField(
+                  label: 'Material',
+                  controller: _editControllers['material']!,
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    _editError!,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: Color(0xFFC01048),
-                    ),
-                  ),
+                _buildEditField(
+                  label: 'Quantity',
+                  controller: _editControllers['quantity']!,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                ),
+                _buildEditField(label: 'Unit', controller: _editControllers['unit']!),
+              ] else if (_entryType == 'labour') ...[
+                _buildEditField(
+                  label: 'Labour Type',
+                  controller: _editControllers['labourType']!,
+                ),
+                _buildEditField(
+                  label: 'Workers Count',
+                  controller: _editControllers['workers']!,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                ),
+                _buildEditField(
+                  label: 'Hours Worked',
+                  controller: _editControllers['hours']!,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                ),
+              ] else ...[
+                _buildEditField(
+                  label: 'Equipment',
+                  controller: _editControllers['equipment']!,
+                ),
+                _buildEditField(
+                  label: 'Hours Used',
+                  controller: _editControllers['hours']!,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 ),
               ],
+              _buildEditField(
+                label: 'Rate (₹)',
+                controller: _editControllers['rate']!,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 24),
+        BtSectionHeader(title: 'Where', caption: true),
+        BtCard(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 2),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _buildEditField(
+                label: 'Project',
+                controller: _editControllers['project']!,
+              ),
+              _buildEditField(label: 'Floor', controller: _editControllers['floor']!),
+              if (_entryType == 'material')
+                _buildEditField(
+                  label: 'Phase',
+                  controller: _editControllers['phase']!,
+                ),
+              _buildEditField(
+                label: 'Activity',
+                controller: _editControllers['activity']!,
+              ),
+            ],
+          ),
+        ),
+        if (_editError != null) ...[
+          const SizedBox(height: 14),
+          _inlineError(_editError!, onDark: false),
+        ],
+      ],
+    );
+  }
+  /// Red notice used for save / edit / mic errors (light or noir surface).
+  Widget _inlineError(String message, {required bool onDark}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: onDark ? Bt.redBright.withValues(alpha: .14) : Bt.redSoft,
+        borderRadius: BorderRadius.circular(Bt.rTile),
+        border: onDark ? Border.all(color: Bt.redBright.withValues(alpha: .28)) : null,
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.error_outline_rounded, color: onDark ? Bt.redBright : Bt.red, size: 18),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message,
+              style: BtText.subhead(context, color: onDark ? Bt.bone : Bt.red),
             ),
           ),
         ],
-      ],
+      ),
     );
   }
   void _scrollToBottom() {
@@ -2065,30 +2060,72 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
     final hasAct = _data.activity != null && _data.activity!.trim().isNotEmpty;
     return hasProj && hasFloor && hasPhase && hasAct;
   }
+  /// Listening, processing and the saved moment sit on the noir surface
+  /// (Voice-Listening / Saved-Success boards); the AI chat and the review
+  /// receipt sit on bone (Voice-Question / Voice-Review boards).
+  bool get _isNoirStage {
+    switch (_response.status) {
+      case VoiceStatus.idle:
+      case VoiceStatus.listening:
+      case VoiceStatus.processing:
+      case VoiceStatus.thinking:
+      case VoiceStatus.completed:
+        return true;
+      default:
+        return false;
+    }
+  }
+  String get _entryTypeLabel => _entryType == 'material'
+      ? 'Material'
+      : _entryType == 'labour'
+      ? 'Labour'
+      : 'Equipment';
   @override
   Widget build(BuildContext context) {
     Provider.of<ProjectProvider>(context);
-    return Scaffold(
-      backgroundColor: const Color(0xFFF6F7F9),
-      body: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            _buildTopBar(),
-            Expanded(
-              child: Stack(
-                children: [
-                  _buildMainBody(),
-                  Positioned(
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    child: _buildBottomInputArea(),
-                  ),
-                ],
+    final noir = _isNoirStage;
+    final isReview =
+        _response.status == VoiceStatus.summary ||
+        _response.status == VoiceStatus.saving;
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: noir ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
+      child: Scaffold(
+        backgroundColor: noir ? Bt.noir : Bt.ground,
+        body: AnimatedContainer(
+          duration: Bt.medium,
+          curve: Bt.ease,
+          color: noir ? Bt.noir : Bt.ground,
+          child: Stack(
+            children: [
+              if (noir)
+                const Positioned.fill(
+                  child: IgnorePointer(child: _NoirGlow()),
+                ),
+              SafeArea(
+                bottom: false,
+                child: Column(
+                  children: [
+                    _buildTopBar(),
+                    Expanded(
+                      child: Stack(
+                        children: [
+                          _buildMainBody(),
+                          Positioned(
+                            bottom: 0,
+                            left: 0,
+                            right: 0,
+                            child: isReview
+                                ? _buildReviewCtaBar()
+                                : _buildBottomInputArea(),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -2100,12 +2137,7 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
       case VoiceStatus.listening:
       case VoiceStatus.idle:
         title = 'BuildTrack AI';
-        final label = _entryType == 'material'
-            ? 'Material'
-            : _entryType == 'labour'
-            ? 'Labour'
-            : 'Equipment';
-        subtitle = 'AI Voice Entry • $label';
+        subtitle = 'AI Voice Entry • $_entryTypeLabel';
         break;
       case VoiceStatus.processing:
       case VoiceStatus.thinking:
@@ -2117,10 +2149,13 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
         subtitle = 'Review details';
         break;
       case VoiceStatus.waitingForUser:
+        title = 'BuildTrack AI';
+        subtitle = '$_entryTypeLabel entry';
+        break;
       case VoiceStatus.summary:
       case VoiceStatus.saving:
-        title = 'AI Assistant';
-        subtitle = 'Smart conversational flow';
+        title = 'Review entry';
+        subtitle = '$_entryTypeLabel · from your voice';
         break;
       case VoiceStatus.completed:
         title = 'Success';
@@ -2135,44 +2170,96 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
     if (_response.status == VoiceStatus.listening || _response.status == VoiceStatus.idle) {
       title = 'Speak an update';
     }
+    final noir = _isNoirStage;
     return SizedBox(
-      height: 56,
-      child: Row(
-        children: [
-          const SizedBox(width: 4),
-          BtIconButton(
-            icon: Icons.close_rounded,
-            size: 24,
-            semantic: 'Close',
-            onTap: () => Navigator.maybePop(context),
-          ),
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.navTitle(context)),
-                Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.caption(context)),
-              ],
+      height: 60,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: Row(
+          children: [
+            BtIconButton(
+              icon: Icons.close_rounded,
+              size: 22,
+              semantic: 'Close',
+              color: noir ? Bt.bone : Bt.ink,
+              background: noir ? Colors.white.withValues(alpha: .09) : null,
+              onTap: () => Navigator.maybePop(context),
             ),
-          ),
-          SizedBox(width: 92, child: Center(child: _buildStatusBadge(isListening))),
-        ],
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  AnimatedSwitcher(
+                    duration: Bt.fast,
+                    child: Text(
+                      title,
+                      key: ValueKey(title),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: BtText.navTitle(context).copyWith(color: noir ? Bt.bone : Bt.ink),
+                    ),
+                  ),
+                  Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: BtText.caption(context, color: noir ? Bt.onNoir2 : Bt.ink3),
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(width: 92, child: Center(child: _buildStatusBadge(isListening))),
+          ],
+        ),
       ),
     );
   }
   Widget _buildStatusBadge(bool isListening) {
-    return BtBadge(label: isListening ? '● Listening' : 'Ready', tone: isListening ? BtTone.red : BtTone.neutral);
+    final label = isListening ? 'Listening' : 'Ready';
+    if (!_isNoirStage) {
+      return BtBadge(label: label, tone: isListening ? BtTone.red : BtTone.neutral);
+    }
+    return AnimatedContainer(
+      duration: Bt.fast,
+      height: 24,
+      padding: const EdgeInsets.symmetric(horizontal: 9),
+      decoration: BoxDecoration(
+        color: isListening ? Bt.redBright.withValues(alpha: .18) : Colors.white.withValues(alpha: .08),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (isListening) ...[
+            Container(width: 6, height: 6, decoration: const BoxDecoration(color: Bt.redBright, shape: BoxShape.circle)),
+            const SizedBox(width: 6),
+          ],
+          Text(
+            label,
+            maxLines: 1,
+            style: BtText.caption(context, color: isListening ? Bt.bone : Bt.onNoir2, weight: FontWeight.w600).copyWith(fontSize: 12),
+          ),
+        ],
+      ),
+    );
   }
   Widget _buildMainBody() {
     Widget content;
+    String stage;
+    double bottomPad;
     final curData = _currentData;
     switch (_response.status) {
       case VoiceStatus.processing:
       case VoiceStatus.thinking:
+        stage = 'processing';
+        bottomPad = 40;
         content = _buildProcessingCard();
         break;
       case VoiceStatus.completed:
+        stage = 'saved';
+        bottomPad = 32;
         content = Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _buildSuccessCard(),
             if (_saveError != null) _buildErrorCard(),
@@ -2181,28 +2268,65 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
         break;
       case VoiceStatus.summary:
       case VoiceStatus.saving:
+        stage = 'review';
+        bottomPad = 132;
         content = _buildSummaryCard();
         break;
       default:
-        content = Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (_saveError != null) _buildErrorCard(),
-            _buildVoiceListeningCard(),
-            _buildExampleHintCard(),
-            _buildAiQuestionCard(),
-            _buildAiUnderstandingPanel(curData),
-            _buildMissingInformationPanel(curData),
-          ],
-        );
+        if (_isNoirStage) {
+          stage = 'voice';
+          bottomPad = 360;
+          content = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (_saveError != null) _buildErrorCard(),
+              _buildVoiceListeningCard(),
+              _buildExampleHintCard(),
+              _buildAiUnderstandingPanel(curData),
+              _buildMissingInformationPanel(curData),
+            ],
+          );
+        } else {
+          stage = 'chat';
+          bottomPad = 120;
+          content = Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _buildAiUnderstandingPanel(curData),
+              if (_saveError != null) _buildErrorCard(),
+              _buildExampleHintCard(),
+              _buildVoiceListeningCard(),
+              _buildAiQuestionCard(),
+              _buildMissingInformationPanel(curData),
+            ],
+          );
+        }
         break;
     }
     return SingleChildScrollView(
       controller: _scrollCtrl,
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 220),
-      child: content,
+      padding: EdgeInsets.fromLTRB(Bt.gutter, 8, Bt.gutter, bottomPad),
+      child: AnimatedSwitcher(
+        duration: Bt.medium,
+        switchInCurve: Bt.ease,
+        switchOutCurve: Curves.easeOut,
+        layoutBuilder: (current, previous) => Stack(
+          alignment: Alignment.topCenter,
+          children: [...previous, ?current],
+        ),
+        transitionBuilder: (child, anim) => FadeTransition(
+          opacity: anim,
+          child: SlideTransition(
+            position: Tween(begin: const Offset(0, .03), end: Offset.zero).animate(anim),
+            child: child,
+          ),
+        ),
+        child: KeyedSubtree(key: ValueKey(stage), child: content),
+      ),
     );
   }
+  /// Noir: the live transcript in big display type, older words dimmed.
+  /// Chat: what the user said, as ink bubbles.
   Widget _buildVoiceListeningCard() {
     final isListening = _voiceCtrl.engineState == VoiceEngineState.listening;
     final hasContent = _partialAnswer.isNotEmpty || _rawTranscript.isNotEmpty;
@@ -2210,60 +2334,122 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
     final displayText = hasContent
         ? (_partialAnswer.isNotEmpty ? _partialAnswer : _rawTranscript)
         : 'Listening for voice input...';
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 24),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        if (isListening) ...[_buildLiveWaveform(), const SizedBox(height: 12)],
-        Text(
-        hasContent ? '"$displayText"' : displayText,
-        style: BtText.title(context, size: 24).copyWith(
-          color: hasContent ? Bt.ink : Bt.placeholder,
-          height: 1.3,
-          fontWeight: FontWeight.w600,
+    if (_isNoirStage) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 22, bottom: 26),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (isListening)
+              _buildSmallMicListening()
+            else
+              Text('YOU SAID', style: BtText.mono(context, color: Bt.onNoir2)),
+            const SizedBox(height: 16),
+            _buildLiveTranscript(displayText, hasContent: hasContent, isListening: isListening),
+          ],
         ),
+      );
+    }
+    final bubbles = <Widget>[];
+    if (_rawTranscript.isNotEmpty) bubbles.add(_meBubble(_rawTranscript));
+    if (_partialAnswer.isNotEmpty && _partialAnswer != _rawTranscript) {
+      bubbles.add(_meBubble(_partialAnswer, live: isListening));
+    } else if (isListening && _partialAnswer.isEmpty) {
+      bubbles.add(_meBubble('Listening for voice input...', live: true, placeholder: true));
+    }
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          for (var i = 0; i < bubbles.length; i++) ...[
+            if (i > 0) const SizedBox(height: 10),
+            bubbles[i],
+          ],
+        ],
       ),
-      ]),
     );
   }
-  Widget _buildLiveWaveform() {
-    final isListening = _voiceCtrl.engineState == VoiceEngineState.listening;
-    if (!isListening) return const SizedBox.shrink();
-    final level = _voiceCtrl.soundLevel;
-    final vol = ((level + 2.0) / 12.0).clamp(0.1, 1.0);
-    return AnimatedBuilder(
-      animation: _waveCtrl,
-      builder: (_, _) {
-        return SizedBox(
-          height: 36,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: List.generate(24, (i) {
-              final phase = _waveCtrl.value * 2 * math.pi;
-              final offset = i * (math.pi / 10);
-              final baseHeight = 4.0 + (math.sin(phase + offset).abs() * 14.0);
-              final randNoise = math.sin(phase * 4.0 + i).abs() * 4.0;
-              final finalHeight = ((baseHeight + randNoise) * vol).clamp(
-                4.0,
-                32.0,
-              );
-              return AnimatedContainer(
-                duration: const Duration(milliseconds: 100),
-                margin: const EdgeInsets.symmetric(horizontal: 2.0),
-                width: 3.0,
-                height: finalHeight,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF0B63CE), Color(0xFF0B63CE)],
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                  ),
-                  borderRadius: BorderRadius.circular(3),
-                ),
-              );
-            }),
+  Widget _buildLiveTranscript(String text, {required bool hasContent, required bool isListening}) {
+    final base = BtText.display(const TextStyle(
+      fontSize: 29,
+      height: 1.22,
+      fontWeight: FontWeight.w600,
+      letterSpacing: -.9,
+      color: Bt.bone,
+    ));
+    final spans = <InlineSpan>[];
+    if (!hasContent) {
+      spans.add(TextSpan(text: text, style: base.copyWith(color: Bt.onNoir3)));
+    } else {
+      final words = text.trim().split(RegExp(r'\s+'));
+      final dimCount = isListening ? math.max(0, words.length - 6) : 0;
+      if (dimCount > 0) {
+        spans.add(TextSpan(
+          text: '${words.take(dimCount).join(' ')} ',
+          style: base.copyWith(color: Bt.bone.withValues(alpha: .42)),
+        ));
+      }
+      spans.add(TextSpan(text: words.skip(dimCount).join(' '), style: base));
+    }
+    if (isListening) {
+      spans.add(const WidgetSpan(
+        alignment: PlaceholderAlignment.middle,
+        child: Padding(padding: EdgeInsets.only(left: 4), child: _BlinkingCursor()),
+      ));
+    }
+    return Text.rich(TextSpan(children: spans));
+  }
+  Widget _meBubble(String text, {bool live = false, bool placeholder = false}) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 290),
+      child: AnimatedContainer(
+        duration: Bt.fast,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: live ? Bt.ink.withValues(alpha: .82) : Bt.ink,
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(20),
+            topRight: Radius.circular(20),
+            bottomLeft: Radius.circular(20),
+            bottomRight: Radius.circular(6),
           ),
-        );
-      },
+        ),
+        child: Text(
+          text,
+          style: BtText.subhead(context, color: placeholder ? Bt.onNoir2 : Bt.bone).copyWith(
+            fontStyle: live ? FontStyle.italic : FontStyle.normal,
+          ),
+        ),
+      ),
+    );
+  }
+  Widget _aiBubble(Widget child, {bool mark = true}) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        if (mark) const _BrickMark() else const SizedBox(width: 28),
+        const SizedBox(width: 10),
+        Flexible(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 320),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: const BoxDecoration(
+                color: Bt.card,
+                boxShadow: Bt.shadow,
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(20),
+                  topRight: Radius.circular(20),
+                  bottomLeft: Radius.circular(6),
+                  bottomRight: Radius.circular(20),
+                ),
+              ),
+              child: child,
+            ),
+          ),
+        ),
+      ],
     );
   }
   Widget _buildAiUnderstandingPanel(_ExtractedData currentData) {
@@ -2274,35 +2460,74 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
       if (_isVoiceFieldPresent(key, val)) completed++;
     });
     final isComplete = completed >= total;
+    final noir = _isNoirStage;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 20),
+      padding: EdgeInsets.only(top: noir ? 0 : 4, bottom: noir ? 20 : 22),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
-            child: Row(children: [
-              Expanded(child: Text('Understood so far', style: BtText.caption(context))),
-              Text(
-                '$completed of $total',
-                style: BtText.caption(context, color: isComplete ? Bt.green : Bt.ink3, weight: FontWeight.w600),
-              ),
-            ]),
-          ),
-          BtGroup(
+          Row(children: [
+            Expanded(
+              child: Text('UNDERSTOOD SO FAR', style: BtText.mono(context, color: noir ? Bt.onNoir2 : Bt.ink3)),
+            ),
+            Text(
+              '$completed OF $total',
+              style: BtText.num(BtText.mono(
+                context,
+                color: isComplete ? (noir ? Bt.greenBright : Bt.green) : (noir ? Bt.onNoir2 : Bt.ink3),
+              )),
+            ),
+          ]),
+          const SizedBox(height: 10),
+          BtBricks(value: total > 0 ? completed / total : 0, count: 20, height: 9, onDark: noir),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
             children: voiceFields.entries.map((e) {
               final isPresent = _isVoiceFieldPresent(e.key, e.value);
               final displayVal = e.value is num
                   ? (e.value as num).toStringAsFixed(e.value % 1 == 0 ? 0 : 2)
                   : e.value?.toString() ?? '';
-              return BtValueRow(
-                label: e.key,
-                value: isPresent ? displayVal : 'Still needed',
-                valueColor: isPresent ? Bt.ink : Bt.placeholder,
-                trailing: Icon(
-                  isPresent ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
-                  size: 18,
-                  color: isPresent ? Bt.green : Bt.inputBorder,
+              return AnimatedContainer(
+                duration: Bt.fast,
+                curve: Bt.ease,
+                padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+                decoration: BoxDecoration(
+                  color: isPresent
+                      ? (noir ? Colors.white.withValues(alpha: .08) : Bt.card)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(Bt.rChip),
+                  border: Border.all(
+                    color: isPresent
+                        ? (noir ? Colors.white.withValues(alpha: .12) : Bt.line)
+                        : (noir ? Colors.white.withValues(alpha: .14) : Bt.inputBorder),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      isPresent ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+                      size: 14,
+                      color: isPresent
+                          ? (noir ? Bt.greenBright : Bt.green)
+                          : (noir ? Bt.onNoir3 : Bt.placeholder),
+                    ),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                        isPresent ? '${e.key}: $displayVal' : e.key,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: BtText.caption(
+                          context,
+                          weight: isPresent ? FontWeight.w600 : FontWeight.w500,
+                          color: isPresent ? (noir ? Bt.bone : Bt.ink) : (noir ? Bt.onNoir3 : Bt.ink3),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               );
             }).toList(),
@@ -2311,7 +2536,7 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
       ),
     );
   }
-  /// Missing fields are shown inline in "Understood so far" (as "Still needed").
+  /// Missing fields are shown inline in "Understood so far" (unchecked pills).
   Widget _buildMissingInformationPanel(_ExtractedData currentData) => const SizedBox.shrink();
   Widget _buildExampleHintCard() {
     String example = "";
@@ -2324,8 +2549,31 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
     }
     final hasContent = _partialAnswer.isNotEmpty || _rawTranscript.isNotEmpty;
     if (hasContent) return const SizedBox.shrink();
+    final noir = _isNoirStage;
+    if (noir) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 22, bottom: 28),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('TRY SAYING', style: BtText.mono(context, color: Bt.onNoir2)),
+            const SizedBox(height: 14),
+            Text(
+              example,
+              style: BtText.display(const TextStyle(
+                fontSize: 26,
+                height: 1.24,
+                fontWeight: FontWeight.w600,
+                letterSpacing: -.8,
+                color: Bt.onNoir3,
+              )),
+            ),
+          ],
+        ),
+      );
+    }
     return Padding(
-      padding: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.only(bottom: 16),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -2355,131 +2603,70 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
       '[AI DEBUG] _buildAiQuestionCard: showing question="$question" for field=$field',
     );
     final confirmed = _getDetectedFieldsWithLabels(_data).take(3).toList();
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF0B63CE), Color(0xFF7B3FE4)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(Bt.rCard),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
-            child: Row(
-              children: [
-                const Text(
-                  'BuildTrack AI',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (confirmed.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    confirmed.length == 1 ? 'Great. I found:' : 'I have:',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.white.withValues(alpha: 0.7),
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 5),
-                  ...confirmed.map(
-                    (f) => Padding(
-                      padding: const EdgeInsets.only(bottom: 3),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.check_circle_rounded,
-                            size: 13,
-                            color: Colors.white.withValues(alpha: 0.85),
-                          ),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              '${f.label}: ${f.value}',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.white.withValues(alpha: 0.9),
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
+    return KeyedSubtree(
+      key: ValueKey('q:$question'),
+      child: Padding(
+        padding: const EdgeInsets.only(top: 4, bottom: 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (confirmed.isNotEmpty) ...[
+              BtReveal(
+                index: 0,
+                child: _aiBubble(
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        confirmed.length == 1 ? 'Great. I found:' : 'I have:',
+                        style: BtText.subhead(context),
                       ),
-                    ),
+                      const SizedBox(height: 6),
+                      ...confirmed.map(
+                        (f) => Padding(
+                          padding: const EdgeInsets.only(bottom: 3),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.check_circle_rounded, size: 14, color: Bt.green),
+                              const SizedBox(width: 6),
+                              Flexible(
+                                child: Text(
+                                  '${f.label}: ${f.value}',
+                                  overflow: TextOverflow.ellipsis,
+                                  style: BtText.num(BtText.subhead(context, color: Bt.ink, weight: FontWeight.w600)),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            child: Divider(
-              color: Colors.white.withValues(alpha: 0.15),
-              height: 1,
-            ),
-          ),
-          Padding(
-            padding: EdgeInsets.fromLTRB(
-              16,
-              0,
-              16,
-              suggestions.isEmpty ? 16 : 0,
-            ),
-            child: Text(
-              question,
-              style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
-                height: 1.4,
-              ),
-            ),
-          ),
-          if (suggestions.isNotEmpty)
-            Container(
-              margin: const EdgeInsets.only(top: 10),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.08),
-                borderRadius: const BorderRadius.vertical(
-                  bottom: Radius.circular(20),
+                  mark: false,
                 ),
               ),
-              padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Quick answers:',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white.withValues(alpha: 0.6),
-                      letterSpacing: 0.3,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  _buildSuggestionsChips(suggestions),
-                ],
+              const SizedBox(height: 8),
+            ],
+            BtReveal(
+              index: 1,
+              child: _aiBubble(
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(question, style: BtText.headline(context)),
+                    if (suggestions.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      Text('COMMON OPTIONS', style: BtText.mono(context)),
+                      const SizedBox(height: 8),
+                      _buildSuggestionsChips(suggestions),
+                    ],
+                  ],
+                ),
               ),
             ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -2488,32 +2675,7 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
       spacing: 6,
       runSpacing: 6,
       children: options
-          .map(
-            (opt) => GestureDetector(
-              onTap: () => _handleTypedAnswer(opt),
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 7,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.18),
-                  borderRadius: BorderRadius.circular(Bt.rCard),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.4),
-                  ),
-                ),
-                child: Text(
-                  opt,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-            ),
-          )
+          .map((opt) => BtChip(label: opt, onTap: () => _handleTypedAnswer(opt)))
           .toList(),
     );
   }
@@ -2556,203 +2718,139 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
       stages.add(hasRate ? 'Rate detected' : 'Detecting rate');
       states.add(hasRate);
     }
+    final accent = context.bt.accent;
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Container(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(Bt.rCard),
-            border: Border.all(color: Bt.line),
-          ),
+        const SizedBox(height: 22),
+        BtReveal(
+          index: 0,
           child: Row(
             children: [
+              Text('BUILDTRACK AI', style: BtText.mono(context, color: Bt.onNoir2)),
+              const SizedBox(width: 10),
               Container(
-                padding: const EdgeInsets.all(10),
-                decoration: const BoxDecoration(
-                  color: Color(0xFFF0EDFF),
-                  shape: BoxShape.circle,
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: .16),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(
-                  Icons.cloud_upload_outlined,
-                  color: AppColors.primary,
-                  size: 22,
-                ),
+                child: Text(_entryType.toUpperCase(), style: BtText.mono(context, color: accent)),
               ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+        BtReveal(
+          index: 1,
+          child: Text('Analyzing Entry...', style: BtText.d1(context, color: Bt.bone)),
+        ),
+        if (_rawTranscript.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          BtReveal(
+            index: 2,
+            child: Text(
+              _rawTranscript,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: BtText.body(context, color: Bt.onNoir2),
+            ),
+          ),
+        ],
+        const SizedBox(height: 28),
+        BtReveal(
+          index: 3,
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(18, 18, 18, 8),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: .06),
+              borderRadius: BorderRadius.circular(Bt.rCard),
+              border: Border.all(color: Colors.white.withValues(alpha: .08)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('EXTRACTING DETAILS...', style: BtText.mono(context, color: Bt.onNoir2)),
+                const SizedBox(height: 8),
+                ...List.generate(stages.length, (i) {
+                  final label = stages[i];
+                  final isCompleted = i < _processingStage;
+                  final isCurrent = i == _processingStage;
+                  Widget indicator;
+                  Color textColor;
+                  FontWeight fontWeight;
+                  if (isCompleted) {
+                    if (states[i]) {
+                      indicator = const Icon(Icons.check_circle_rounded, color: Bt.greenBright, size: 18);
+                      textColor = Bt.bone;
+                      fontWeight = FontWeight.w600;
+                    } else {
+                      indicator = Icon(Icons.refresh_rounded, color: accent, size: 18);
+                      textColor = Bt.onNoir2;
+                      fontWeight = FontWeight.w500;
+                    }
+                  } else if (isCurrent) {
+                    indicator = SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(accent),
+                      ),
+                    );
+                    textColor = accent;
+                    fontWeight = FontWeight.w600;
+                  } else {
+                    indicator = Container(
+                      width: 14,
+                      height: 14,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white.withValues(alpha: .28), width: 1.5),
+                      ),
+                    );
+                    textColor = Bt.onNoir3;
+                    fontWeight = FontWeight.w500;
+                  }
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 10.0),
+                    child: Row(
                       children: [
-                        const Text(
-                          'BuildTrack AI',
-                          style: TextStyle(
-                            fontSize: 14.5,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.textDark,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            _entryType.toUpperCase(),
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.primary,
+                        SizedBox(width: 20, child: Center(child: indicator)),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: AnimatedDefaultTextStyle(
+                            duration: Bt.fast,
+                            style: BtText.subhead(context, color: textColor, weight: fontWeight),
+                            child: Text(
+                              isCompleted
+                                  ? (states[i]
+                                        ? label
+                                        : 'Finding ${stages[i].split(" ").last}...')
+                                  : (isCurrent ? '$label...' : label),
                             ),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Analyzing Entry...',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+                  );
+                }),
+              ],
+            ),
           ),
         ),
         const SizedBox(height: 20),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(Bt.rCard),
-            border: Border.all(color: Bt.line),
-          ),
-          child: Column(
+        BtReveal(
+          index: 4,
+          child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Extracting details...',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textDark,
-                ),
-              ),
-              const SizedBox(height: 16),
-              ...List.generate(stages.length, (i) {
-                final label = stages[i];
-                final isCompleted = i < _processingStage;
-                final isCurrent = i == _processingStage;
-                Widget indicator;
-                Color textColor;
-                FontWeight fontWeight;
-                if (isCompleted) {
-                  if (states[i]) {
-                    indicator = const Icon(
-                      Icons.check_circle_rounded,
-                      color: Color(0xFF067647),
-                      size: 18,
-                    );
-                    textColor = AppColors.textDark;
-                    fontWeight = FontWeight.w600;
-                  } else {
-                    indicator = Icon(
-                      Icons.refresh_rounded,
-                      color: AppColors.primary,
-                      size: 18,
-                    );
-                    textColor = AppColors.textLight;
-                    fontWeight = FontWeight.w500;
-                  }
-                } else if (isCurrent) {
-                  indicator = SizedBox(
-                    width: 14,
-                    height: 14,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        AppColors.primary,
-                      ),
-                    ),
-                  );
-                  textColor = AppColors.primary;
-                  fontWeight = FontWeight.bold;
-                } else {
-                  indicator = Container(
-                    width: 14,
-                    height: 14,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: AppColors.textLight.withValues(alpha: 0.5),
-                        width: 1.5,
-                      ),
-                    ),
-                  );
-                  textColor = AppColors.textLight;
-                  fontWeight = FontWeight.w500;
-                }
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 10.0),
-                  child: Row(
-                    children: [
-                      SizedBox(width: 20, child: Center(child: indicator)),
-                      const SizedBox(width: 12),
-                      Text(
-                        isCompleted
-                            ? (states[i]
-                                  ? label
-                                  : 'Finding ${stages[i].split(" ").last}...')
-                            : (isCurrent ? '$label...' : label),
-                        style: TextStyle(
-                          fontSize: 13.5,
-                          color: textColor,
-                          fontWeight: fontWeight,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }),
-            ],
-          ),
-        ),
-        const SizedBox(height: 24),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF9F8FF),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFEBE8FF)),
-          ),
-          child: Row(
-            children: [
-              Icon(
-                Icons.lightbulb_outline_rounded,
-                color: AppColors.primary,
-                size: 18,
-              ),
-              SizedBox(width: 10),
+              const Icon(Icons.lightbulb_outline_rounded, color: Bt.onNoir3, size: 18),
+              const SizedBox(width: 10),
               Expanded(
                 child: Text(
                   'Tip: You can keep the app open. We\'ll notify you when ready.',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: BtText.caption(context, color: Bt.onNoir2),
                 ),
               ),
             ],
@@ -2761,335 +2859,229 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
       ],
     );
   }
+  /// Review "receipt" (Voice-Review board): ink card with perforation, the
+  /// voice-filled figures marked with an accent dot, then the Where group.
   Widget _buildSummaryCard() {
-    final isSaving = _response.status == VoiceStatus.saving;
     final amount = _isEditing
         ? _getLiveEditAmount()
         : _data.getComputedAmount(_entryType);
-    final details = <Map<String, String>>[
-      {
-        'label': 'Project',
-        'value': _data.projectName ?? _data.projectId ?? '—',
-      },
-      {'label': 'Floor', 'value': _data.floor ?? '—'},
-      if (_entryType == 'material')
-        {'label': 'Phase', 'value': _data.phase ?? '—'},
-      {'label': 'Activity', 'value': _data.activity ?? '—'},
+    final accent = context.bt.accent;
+    final title = _data.itemName ??
+        (_entryType == 'labour'
+            ? 'Labour Log'
+            : _entryType == 'equipment'
+            ? 'Equipment Entry'
+            : 'Material Entry');
+    // Figures on the receipt — same labels/values as the original summary.
+    final figures = <(String, String, bool)>[
       if (_entryType == 'material') ...[
-        {'label': 'Material', 'value': _data.itemName ?? '—'},
-        {
-          'label': 'Quantity',
-          'value': _data.hasQuantity
-              ? '${_data.quantity} ${_data.unit ?? ''}'
-              : '—',
-        },
+        (
+          'Quantity',
+          _data.hasQuantity ? '${_data.quantity} ${_data.unit ?? ''}'.trim() : '—',
+          _data.hasQuantity,
+        ),
       ] else if (_entryType == 'labour') ...[
-        {'label': 'Labour Type', 'value': _data.workType ?? '—'},
-        {
-          'label': 'Worker Count',
-          'value': _data.hasWorkerCount ? '${_data.workerCount}' : '—',
-        },
-        {
-          'label': 'Hours',
-          'value': _data.hasHours
-              ? '${_data.hours} ${_data.unit ?? 'Hours'}'
-              : '—',
-        },
+        ('Labour Type', _data.workType ?? '—', _data.workType != null),
+        ('Worker Count', _data.hasWorkerCount ? '${_data.workerCount}' : '—', _data.hasWorkerCount),
+        ('Hours', _data.hasHours ? '${_data.hours} ${_data.unit ?? 'Hours'}' : '—', _data.hasHours),
       ] else ...[
-        {'label': 'Equipment', 'value': _data.itemName ?? '—'},
-        {
-          'label': 'Hours',
-          'value': _data.hasQuantity
-              ? '${_data.quantity} ${_data.unit ?? 'Hours'}'
-              : '—',
-        },
+        ('Hours', _data.hasQuantity ? '${_data.quantity} ${_data.unit ?? 'Hours'}' : '—', _data.hasQuantity),
       ],
-      {
-        'label': 'Rate',
-        'value': _data.hasRate ? '₹ ${_data.rate!.toStringAsFixed(0)}' : '—',
-      },
+      ('Rate', _data.hasRate ? '₹ ${_data.rate!.toStringAsFixed(0)}' : '—', _data.hasRate),
       if (_entryType == 'equipment' && _data.hasFuelCost)
-        {
-          'label': 'Fuel Cost',
-          'value': '₹ ${_data.fuelCost!.toStringAsFixed(0)}',
-        },
-      {
-        'label': 'Amount',
-        'value': amount > 0 ? '₹ ${amount.toStringAsFixed(0)}' : '—',
-        'highlight': 'true',
-      },
+        ('Fuel Cost', '₹ ${_data.fuelCost!.toStringAsFixed(0)}', true),
     ];
-    return Container(
+    final where = <(String, String)>[
+      ('Project', _data.projectName ?? _data.projectId ?? '—'),
+      ('Floor', _data.floor ?? '—'),
+      if (_entryType == 'material') ('Phase', _data.phase ?? '—'),
+      ('Activity', _data.activity ?? '—'),
+    ];
+    final typeLine = _entryType == 'material'
+        ? 'MATERIAL'
+        : _entryType == 'labour'
+        ? 'LABOUR'
+        : 'EQUIPMENT';
+    Widget aiDot() => Container(
+      width: 6,
+      height: 6,
+      margin: const EdgeInsets.only(right: 7),
+      decoration: BoxDecoration(color: accent, shape: BoxShape.circle),
+    );
+    final receipt = Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Bt.noir,
         borderRadius: BorderRadius.circular(Bt.rCard),
-        border: Border.all(color: Bt.line),
+        boxShadow: Bt.shadowLg,
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFF0B63CE), Color(0xFF7B3FE4)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-            ),
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.2),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.receipt_long,
-                        color: Colors.white,
-                        size: 16,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    const Text(
-                      'Entry summary',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                        letterSpacing: 1.0,
-                      ),
-                    ),
-                  ],
-                ),
-                if (amount > 0) ...[
-                  const SizedBox(height: 14),
-                  Text(
-                    '\u20b9 ${amount.toStringAsFixed(0)}',
-                    style: const TextStyle(
-                      fontSize: 26,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                      letterSpacing: -0.5,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    _data.itemName ??
-                        (_entryType == 'labour'
-                            ? 'Labour Log'
-                            : _entryType == 'equipment'
-                            ? 'Equipment Entry'
-                            : 'Material Entry'),
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.white.withValues(alpha: 0.75),
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          const Divider(height: 1, color: Color(0xFFEEF1F5)),
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: _isEditing
-                ? _buildEditFormFields()
-                : Column(
-                    children: List.generate(details.length, (idx) {
-                      final item = details[idx];
-                      final isHighlight = item['highlight'] == 'true';
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              item['label']!.toUpperCase(),
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.textLight,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              item['value']!,
-                              style: TextStyle(
-                                fontSize: isHighlight ? 18 : 14.5,
-                                fontWeight: FontWeight.w700,
-                                color: isHighlight
-                                    ? AppColors.primary
-                                    : AppColors.textDark,
-                              ),
-                            ),
-                            if (idx < details.length - 1) ...[
-                              const SizedBox(height: 10),
-                              const Divider(
-                                height: 1,
-                                color: Color(0xFFF7F5FC),
-                              ),
-                            ],
-                          ],
-                        ),
-                      );
-                    }),
-                  ),
-          ),
-          if (!_isEditing) ...[
-            const SizedBox(height: 24),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF9F8FF),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFEBE8FF)),
-              ),
-              child: Row(
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(Bt.rCard),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 18, 18, 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(
-                    Icons.lightbulb_outline_rounded,
-                    color: AppColors.primary,
-                    size: 18,
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text('$typeLine · FROM YOUR VOICE', style: BtText.mono(context, color: Bt.onNoir2)),
+                      ),
+                      Container(
+                        height: 22,
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(color: accent, borderRadius: BorderRadius.circular(11)),
+                        child: Text(
+                          'AI filled',
+                          style: BtText.caption(context, color: context.bt.onAccent, weight: FontWeight.w600).copyWith(fontSize: 11.5),
+                        ),
+                      ),
+                    ],
                   ),
-                  SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      'Tip: You can keep the app open. We\'ll notify you when ready.',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.w600,
+                  const SizedBox(height: 14),
+                  Text(title, style: BtText.d3(context, color: Bt.bone)),
+                  const SizedBox(height: 2),
+                  Text('Entry summary', style: BtText.caption(context, color: Bt.onNoir2)),
+                ],
+              ),
+            ),
+            const _Perforation(),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (final f in figures)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Row(
+                        children: [
+                          Text(f.$1, style: BtText.subhead(context, color: Bt.onNoir2)),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                if (f.$3) aiDot(),
+                                Flexible(
+                                  child: Text(
+                                    f.$2,
+                                    textAlign: TextAlign.right,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: BtText.num(BtText.subhead(context, color: Bt.bone, weight: FontWeight.w600)),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     ),
+                  const SizedBox(height: 6),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                    textBaseline: TextBaseline.alphabetic,
+                    children: [
+                      Text('Amount', style: BtText.headline(context).copyWith(color: Bt.bone)),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Align(
+                          alignment: Alignment.centerRight,
+                          child: amount > 0
+                              ? BtCountUp(
+                                  value: amount,
+                                  format: (v) => '₹ ${v.toStringAsFixed(0)}',
+                                  style: BtText.d2(context, color: Bt.bone),
+                                )
+                              : Text('—', style: BtText.d2(context, color: Bt.onNoir3)),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
             ),
           ],
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-            child: _isEditing
-                ? Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: _cancelEdit,
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: const Color(0xFFC01048),
-                            side: const BorderSide(
-                              color: Color(0xFFFCA5A5),
-                              width: 1.5,
-                            ),
-                            minimumSize: const Size(0, 48),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          child: const Text(
-                            'Cancel',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: _saveEditChanges,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            foregroundColor: Colors.white,
-                            minimumSize: const Size(0, 48),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            elevation: 0,
-                          ),
-                          child: const Text(
-                            'Save Changes',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  )
-                : Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: isSaving ? null : _enterEditMode,
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: AppColors.textDark,
-                            side: const BorderSide(
-                              color: Color(0xFFE4E7EC),
-                              width: 1.5,
-                            ),
-                            minimumSize: const Size(0, 48),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          child: const Text(
-                            'Edit Details',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: isSaving ? null : _saveEntry,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            foregroundColor: Colors.white,
-                            minimumSize: const Size(0, 48),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            elevation: 0,
-                          ),
-                          child: isSaving
-                              ? const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2.5,
-                                    valueColor: AlwaysStoppedAnimation<Color>(
-                                      Colors.white,
-                                    ),
-                                  ),
-                                )
-                              : const Text(
-                                  'Confirm & Save',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                        ),
-                      ),
-                    ],
-                  ),
-          ),
-        ],
+        ),
       ),
     );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: 4),
+        BtReveal(index: 0, child: receipt),
+        const SizedBox(height: 26),
+        if (_isEditing)
+          BtReveal(index: 1, child: _buildEditFormFields())
+        else ...[
+          BtReveal(
+            index: 1,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                BtSectionHeader(title: 'Where', caption: true),
+                BtGroup(
+                  children: [
+                    for (final w in where) BtValueRow(label: w.$1, value: w.$2),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
+          BtReveal(
+            index: 2,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                aiDot(),
+                const SizedBox(width: 2),
+                Expanded(
+                  child: Text(
+                    'Marked figures were filled from your voice. Tip: You can keep the app open. We\'ll notify you when ready.',
+                    style: BtText.caption(context),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+  Widget _buildReviewCtaBar() {
+    final isSaving = _response.status == VoiceStatus.saving;
+    if (_isEditing) {
+      return BtCtaBar(children: [
+        SizedBox(
+          width: 116,
+          child: BtButton(label: 'Cancel', variant: BtButtonVariant.destructive, onPressed: _cancelEdit),
+        ),
+        Expanded(child: BtButton(label: 'Save Changes', icon: Icons.check_rounded, onPressed: _saveEditChanges)),
+      ]);
+    }
+    return BtCtaBar(children: [
+      SizedBox(
+        width: 116,
+        child: BtButton(
+          label: 'Edit',
+          icon: Icons.edit_outlined,
+          variant: BtButtonVariant.secondary,
+          onPressed: isSaving ? null : _enterEditMode,
+        ),
+      ),
+      Expanded(
+        child: BtButton(
+          label: 'Confirm & Save',
+          icon: Icons.check_rounded,
+          loading: isSaving,
+          onPressed: isSaving ? null : _saveEntry,
+        ),
+      ),
+    ]);
   }
   Widget _buildBottomInputArea() {
     if (_response.status == VoiceStatus.completed) {
@@ -3108,236 +3100,252 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
         _response.status == VoiceStatus.listening ||
         _response.status == VoiceStatus.idle;
     final isAskingStep = _response.status == VoiceStatus.waitingForUser;
-    return Container(
+    if (isInitialVoice) {
+      // Voice-Listening dock: waveform, accent orb with ripples, actions.
+      return DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.bottomCenter,
+            end: Alignment.topCenter,
+            stops: const [.78, 1],
+            colors: [Bt.noir, Bt.noir.withValues(alpha: 0)],
+          ),
+        ),
+        child: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(Bt.gutter, 36, Bt.gutter, 14),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AnimatedOpacity(
+                  duration: Bt.fast,
+                  opacity: isListening ? 1 : 0,
+                  child: BtWave(active: isListening, bars: 18, height: 48, barWidth: 4),
+                ),
+                const SizedBox(height: 26),
+                _buildLargeMicButtonRedesigned(isListening),
+                const SizedBox(height: 26),
+                AnimatedSwitcher(
+                  duration: Bt.fast,
+                  child: KeyedSubtree(
+                    key: ValueKey('dock:$isListening'),
+                    child: isListening
+                        ? Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              ConstrainedBox(
+                                constraints: const BoxConstraints(maxWidth: 260),
+                                child: Text(
+                                  'Tap to stop. We\'ll fill in the details from what you said.',
+                                  textAlign: TextAlign.center,
+                                  style: BtText.subhead(context, color: Bt.onNoir2),
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              Row(
+                                children: [
+                                  Expanded(child: _buildCancelRecordingButton()),
+                                  const SizedBox(width: 10),
+                                  Expanded(child: _buildRedStopAnalyzeButton()),
+                                ],
+                              ),
+                            ],
+                          )
+                        : Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: _buildRecordingStatusLeft(isListening),
+                          ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+    if (!isAskingStep) return const SizedBox.shrink();
+    // Voice-Question composer: text field + round accent mic.
+    final bt = context.bt;
+    Widget row;
+    String mode;
+    if (isListening) {
+      mode = 'listening';
+      row = Row(
+        children: [
+          BtWave(active: isListening, bars: 5, height: 22),
+          const SizedBox(width: 12),
+          Expanded(child: _buildSmallMicListening(onDark: false)),
+          BtButton(
+            label: 'Done Answering',
+            icon: Icons.stop_rounded,
+            small: true,
+            expand: false,
+            variant: BtButtonVariant.accent,
+            onPressed: _stopAnswerListening,
+          ),
+        ],
+      );
+    } else if (_showKeyboardInput) {
+      mode = 'keyboard';
+      OutlineInputBorder pill(Color c, [double w = 1]) => OutlineInputBorder(
+        borderRadius: BorderRadius.circular(25),
+        borderSide: BorderSide(color: c, width: w),
+      );
+      row = Row(
+        children: [
+          _roundAction(
+            icon: Icons.mic_rounded,
+            semantic: 'Answer by voice',
+            background: Bt.card,
+            foreground: Bt.ink,
+            onTap: () => setState(() => _showKeyboardInput = false),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: TextField(
+              controller: _textCtrl,
+              focusNode: _focusNode,
+              style: BtText.body(context),
+              textInputAction: TextInputAction.send,
+              decoration: btInput(context, hint: _hintForCurrentStep).copyWith(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                border: pill(Bt.inputBorder),
+                enabledBorder: pill(Bt.inputBorder),
+                focusedBorder: pill(Bt.ink, 2),
+              ),
+              onSubmitted: _handleTypedAnswer,
+            ),
+          ),
+          const SizedBox(width: 8),
+          _roundAction(
+            icon: Icons.arrow_upward_rounded,
+            semantic: 'Send answer',
+            background: bt.accent,
+            foreground: bt.onAccent,
+            onTap: () => _handleTypedAnswer(_textCtrl.text),
+          ),
+        ],
+      );
+    } else {
+      mode = 'voice';
+      row = Row(
+        children: [
+          Expanded(
+            child: BtPressable(
+              semanticLabel: 'Type an answer',
+              onTap: () {
+                setState(() => _showKeyboardInput = true);
+                _focusNode.requestFocus();
+              },
+              child: Container(
+                height: 50,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                decoration: BoxDecoration(
+                  color: Bt.card,
+                  borderRadius: BorderRadius.circular(25),
+                  border: Border.all(color: Bt.inputBorder),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.keyboard_outlined, color: Bt.ink3, size: 20),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Type an answer…',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: BtText.body(context, color: Bt.placeholder),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          _buildMicWithWaves(),
+        ],
+      );
+    }
+    return DecoratedBox(
       decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        border: Border(top: BorderSide(color: Color(0xFFEEF1F5))),
+        color: Bt.ground,
+        boxShadow: [BoxShadow(color: Bt.line, offset: Offset(0, -1))],
       ),
       child: SafeArea(
         top: false,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (isInitialVoice) ...[
-                if (isListening) ...[
-                  _buildSmallMicListening(),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(child: _buildCancelRecordingButton()),
-                      const SizedBox(width: 12),
-                      Expanded(child: _buildRedStopAnalyzeButton()),
-                    ],
-                  ),
-                ] else ...[
-                  _buildLargeMicButtonRedesigned(isListening),
-                  const SizedBox(height: 10),
-                  _buildRecordingStatusLeft(isListening),
-                ],
-              ] else if (isAskingStep) ...[
-                if (isListening) ...[
-                  _buildSmallMicListening(),
-                  const SizedBox(height: 12),
-                  OutlinedButton.icon(
-                    onPressed: _stopAnswerListening,
-                    icon: const Icon(Icons.stop_circle_outlined, size: 16),
-                    label: const Text(
-                      'Done Answering',
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.primary,
-                      side: BorderSide(
-                        color: AppColors.primary.withValues(alpha: 0.4),
-                        width: 1.5,
-                      ),
-                      minimumSize: const Size(double.infinity, 46),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                ] else ...[
-                  const SizedBox(height: 6),
-                  if (_showKeyboardInput) ...[
-                    Row(
-                      children: [
-                        GestureDetector(
-                          onTap: () =>
-                              setState(() => _showKeyboardInput = false),
-                          child: Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              color: AppColors.primary.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Icon(
-                              Icons.mic_rounded,
-                              color: AppColors.primary,
-                              size: 20,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF6F7F9),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: const Color(0xFFE4E7EC),
-                              ),
-                            ),
-                            child: TextField(
-                              controller: _textCtrl,
-                              focusNode: _focusNode,
-                              style: const TextStyle(fontSize: 14),
-                              decoration: InputDecoration(
-                                hintText: _hintForCurrentStep,
-                                hintStyle: const TextStyle(
-                                  color: AppColors.textLight,
-                                  fontSize: 13,
-                                ),
-                                border: InputBorder.none,
-                                contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 14,
-                                  vertical: 12,
-                                ),
-                              ),
-                              onSubmitted: _handleTypedAnswer,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        GestureDetector(
-                          onTap: () => _handleTypedAnswer(_textCtrl.text),
-                          child: Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [Color(0xFF0B63CE), Color(0xFF0B63CE)],
-                              ),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Icon(
-                              Icons.send_rounded,
-                              color: Colors.white,
-                              size: 18,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ] else ...[
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        GestureDetector(
-                          onTap: () {
-                            setState(() => _showKeyboardInput = true);
-                            _focusNode.requestFocus();
-                          },
-                          child: Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF6F7F9),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: const Color(0xFFE4E7EC),
-                              ),
-                            ),
-                            child: const Icon(
-                              Icons.keyboard_outlined,
-                              color: AppColors.textDark,
-                              size: 20,
-                            ),
-                          ),
-                        ),
-                        Expanded(child: _buildMicWithWaves()),
-                        const SizedBox(width: 44),
-                      ],
-                    ),
-                  ],
-                ],
-              ],
-            ],
+          padding: const EdgeInsets.fromLTRB(Bt.gutter, 12, Bt.gutter, 12),
+          child: AnimatedSwitcher(
+            duration: Bt.fast,
+            child: KeyedSubtree(key: ValueKey(mode), child: row),
           ),
         ),
       ),
     );
   }
+  Widget _roundAction({
+    required IconData icon,
+    required String semantic,
+    required Color background,
+    required Color foreground,
+    required VoidCallback onTap,
+  }) {
+    return BtPressable(
+      onTap: onTap,
+      scale: .92,
+      semanticLabel: semantic,
+      child: Container(
+        width: 50,
+        height: 50,
+        decoration: BoxDecoration(
+          color: background,
+          shape: BoxShape.circle,
+          border: background == Bt.card ? Border.all(color: Bt.inputBorder) : null,
+        ),
+        child: Icon(icon, color: foreground, size: 22),
+      ),
+    );
+  }
   Widget _buildRecordingStatusLeft(bool isListening) {
     if (!_isProjectContextSelected) {
-      return const Column(
+      return Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            'Recording Status',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: AppColors.textLight,
-            ),
-          ),
-          SizedBox(height: 4),
-          Text(
-            'Context Locked',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.bold,
-              color: AppColors.textLight,
-            ),
+          Text('RECORDING STATUS', style: BtText.mono(context, color: Bt.onNoir3)),
+          const SizedBox(height: 6),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.lock_outline_rounded, size: 15, color: Bt.amberBright),
+              const SizedBox(width: 6),
+              Text('Context Locked', style: BtText.subhead(context, color: Bt.bone, weight: FontWeight.w600)),
+            ],
           ),
         ],
       );
     }
     if (!isListening) {
-      return Text('Ready · tap the mic and speak', textAlign: TextAlign.center, style: BtText.subhead(context));
+      return Text('Ready · tap the mic and speak', textAlign: TextAlign.center, style: BtText.subhead(context, color: Bt.onNoir2));
     }
     return AnimatedBuilder(
-      animation: _waveCtrl,
+      animation: _voiceCtrl,
       builder: (context, _) {
         final timer = _voiceCtrl.elapsedDisplay;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text(
-              'Recording Status',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textLight,
-              ),
-            ),
-            const SizedBox(height: 4),
+            Text('RECORDING STATUS', style: BtText.mono(context, color: Bt.onNoir3)),
+            const SizedBox(height: 6),
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: const BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Color(0xFFC01048),
-                  ),
-                ),
+                Container(width: 8, height: 8, decoration: const BoxDecoration(shape: BoxShape.circle, color: Bt.redBright)),
                 const SizedBox(width: 6),
-                Text(
-                  'Listening ($timer)',
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFFC01048),
-                  ),
-                ),
+                Text('Listening ($timer)', style: BtText.num(BtText.subhead(context, color: Bt.bone, weight: FontWeight.w600))),
               ],
             ),
           ],
@@ -3345,35 +3353,57 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
       },
     );
   }
+  /// The accent voice orb (Voice-Listening board). Ripples + glow only while
+  /// the engine is actually listening.
   Widget _buildLargeMicButtonRedesigned(bool isListening) {
     final isEnabled = _isProjectContextSelected;
-    final bt = context.bt;
+    final accent = context.bt.accent;
+    const size = 112.0;
     return Center(
       child: Semantics(
         button: true,
-        label: isListening ? 'Stop recording' : 'Start recording',
-        child: GestureDetector(
-          onTap: isEnabled
-              ? (isListening ? _stopInitialRecording : _startInitialRecording)
-              : null,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            width: 96,
-            height: 96,
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: !isEnabled ? Bt.fill : (isListening ? Bt.redSoft : bt.brandSoft),
-            ),
-            child: Container(
+        label: isListening ? 'Listening' : 'Start recording',
+        child: BtPulse(
+          active: isListening,
+          size: size,
+          color: accent.withValues(alpha: .7),
+          child: BtPressable(
+            scale: .94,
+            // As in the original: while listening the orb is display-only;
+            // Cancel / Stop & Analyze are the controls.
+            onTap: isEnabled && !isListening ? _startInitialRecording : null,
+            child: AnimatedContainer(
+              duration: Bt.medium,
+              curve: Bt.ease,
+              width: size,
+              height: size,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: !isEnabled ? Bt.line : (isListening ? Bt.red : bt.brand),
+                color: isEnabled ? null : Colors.white.withValues(alpha: .07),
+                border: isEnabled ? null : Border.all(color: Colors.white.withValues(alpha: .14)),
+                gradient: isEnabled
+                    ? RadialGradient(
+                        center: const Alignment(-.3, -.4),
+                        radius: .9,
+                        colors: [
+                          Color.lerp(accent, Colors.white, .32)!,
+                          accent,
+                          Color.lerp(accent, Colors.black, .3)!,
+                        ],
+                        stops: const [0, .55, 1],
+                      )
+                    : null,
+                boxShadow: isEnabled
+                    ? [
+                        BoxShadow(color: accent.withValues(alpha: .14), spreadRadius: 10),
+                        BoxShadow(color: accent.withValues(alpha: isListening ? .38 : .22), blurRadius: 70, spreadRadius: 6),
+                      ]
+                    : null,
               ),
               child: Icon(
                 isListening ? Icons.stop_rounded : Icons.mic_rounded,
-                color: !isEnabled ? Bt.placeholder : Colors.white,
-                size: 36,
+                color: isEnabled ? Bt.noir : Bt.onNoir3,
+                size: 40,
               ),
             ),
           ),
@@ -3382,124 +3412,57 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
     );
   }
   Widget _buildRedStopAnalyzeButton() {
-    return OutlinedButton(
+    return BtButton(
+      label: 'Stop & Analyze',
+      icon: Icons.auto_awesome_rounded,
+      variant: BtButtonVariant.accent,
       onPressed: _stopAndAnalyze,
-      style: OutlinedButton.styleFrom(
-        foregroundColor: const Color(0xFFC01048),
-        side: const BorderSide(color: Color(0xFFC01048), width: 1.5),
-        minimumSize: const Size(double.infinity, 48),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-      child: const Text(
-        'Stop & Analyze',
-        style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-      ),
     );
   }
   Widget _buildCancelRecordingButton() {
-    return OutlinedButton(
+    return BtButton(
+      label: 'Cancel',
+      variant: BtButtonVariant.onDark,
       onPressed: _cancelRecording,
-      style: OutlinedButton.styleFrom(
-        backgroundColor: Colors.white,
-        foregroundColor: const Color(0xFF667085),
-        side: const BorderSide(color: Color(0xFFD0D5DD), width: 1.5),
-        minimumSize: const Size(double.infinity, 48),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-      child: const Text(
-        'Cancel',
-        style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-      ),
     );
   }
+  /// Round accent mic in the chat composer (Voice-Question board).
   Widget _buildMicWithWaves() {
     final isListening = _voiceCtrl.engineState == VoiceEngineState.listening;
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        if (isListening)
-          _buildWaveSide(isLeft: true)
-        else
-          const SizedBox(width: 50),
-        const SizedBox(width: 14),
-        GestureDetector(
-          onTap: isListening ? _stopAnswerListening : _startAnswerListening,
-          child: Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: const LinearGradient(
-                colors: [Color(0xFF0B63CE), Color(0xFF0B63CE)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-            ),
-            child: Icon(
-              isListening ? Icons.stop : Icons.mic_rounded,
-              color: Colors.white,
-              size: 24,
-            ),
-          ),
-        ),
-        const SizedBox(width: 14),
-        if (isListening)
-          _buildWaveSide(isLeft: false)
-        else
-          const SizedBox(width: 50),
-      ],
+    final bt = context.bt;
+    return BtPulse(
+      active: isListening,
+      size: 50,
+      child: _roundAction(
+        icon: isListening ? Icons.stop_rounded : Icons.mic_rounded,
+        semantic: isListening ? 'Done answering' : 'Answer by voice',
+        background: bt.accent,
+        foreground: bt.onAccent,
+        onTap: isListening ? _stopAnswerListening : _startAnswerListening,
+      ),
     );
   }
-  Widget _buildWaveSide({required bool isLeft}) {
-    return AnimatedBuilder(
-      animation: _waveCtrl,
-      builder: (_, _) {
-        return Row(
-          mainAxisSize: MainAxisSize.min,
-          children: List.generate(4, (i) {
-            final idx = isLeft ? i : 3 - i;
-            final phase = _waveCtrl.value * 2 * math.pi;
-            final h = 6.0 + math.sin(phase + idx * math.pi / 4).abs() * 16.0;
-            return Container(
-              margin: const EdgeInsets.symmetric(horizontal: 2),
-              width: 3,
-              height: h,
-              decoration: BoxDecoration(
-                color: AppColors.primary,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            );
-          }),
-        );
-      },
-    );
-  }
-  Widget _buildSmallMicListening() {
+  /// "● LISTENING · 0:07" — live recording line with the session timer.
+  Widget _buildSmallMicListening({bool onDark = true}) {
     return AnimatedBuilder(
       animation: _voiceCtrl,
       builder: (_, _) {
         final timer = _voiceCtrl.elapsedDisplay;
         return Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('🎤', style: TextStyle(fontSize: 14)),
-            const SizedBox(width: 6),
-            Text(
-              timer,
-              style: TextStyle(
-                fontSize: 13.5,
-                fontWeight: FontWeight.bold,
-                color: AppColors.primary,
-                fontFeatures: [FontFeature.tabularFigures()],
-              ),
+            Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(shape: BoxShape.circle, color: onDark ? Bt.redBright : Bt.red),
             ),
-            const SizedBox(width: 5),
-            Text(
-              'Listening',
-              style: TextStyle(
-                fontSize: 13.5,
-                fontWeight: FontWeight.bold,
-                color: AppColors.primary,
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                'LISTENING · $timer',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: BtText.num(BtText.mono(context, color: onDark ? Bt.onNoir2 : Bt.ink2, size: 11)),
               ),
             ),
           ],
@@ -3507,6 +3470,8 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
       },
     );
   }
+  /// Saved moment (Saved-Success board): bags drop and stack on the noir
+  /// surface, then the entry receipt and the two existing next steps.
   Widget _buildSuccessCard() {
     final now = DateTime.now();
     final dateStr =
@@ -3516,152 +3481,101 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
         ':${now.minute.toString().padLeft(2, '0')}'
         ' ${now.hour >= 12 ? 'PM' : 'AM'}';
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: const Color(0xFFE7F6EE)),
-          ),
+        const SizedBox(height: 28),
+        Center(child: _SavedBagsStack(label: _entryType.toUpperCase())),
+        const SizedBox(height: 36),
+        BtReveal(
+          index: 6,
           child: Column(
             children: [
-              Container(
-                width: 64,
-                height: 64,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: LinearGradient(
-                    colors: [Color(0xFF067647), Color(0xFF067647)],
-                  ),
-                ),
-                child: const Icon(
-                  Icons.check_rounded,
-                  color: Colors.white,
-                  size: 36,
-                ),
-              ),
-              const SizedBox(height: 18),
-              const Text(
-                'Entry Saved Successfully!',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textDark,
-                ),
-              ),
-              const SizedBox(height: 6),
+              Text('ENTRY SAVED', textAlign: TextAlign.center, style: BtText.mono(context, color: context.bt.accent)),
+              const SizedBox(height: 10),
               Text(
-                'Your $_entryType entry has been saved and added to today\'s log.',
+                'Entry Saved Successfully!',
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 13,
-                  color: AppColors.textLight,
-                  height: 1.5,
-                ),
+                style: BtText.d2(context, color: Bt.bone),
               ),
-              const SizedBox(height: 20),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE7F6EE),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFFBBF7D0)),
-                ),
-                child: Column(
-                  children: [
-                    _successDetailRow(
-                      'Entry ID',
-                      '#${_savedEntryId?.substring(math.max(0, (_savedEntryId?.length ?? 4) - 8)) ?? 'NEW'}',
-                    ),
-                    const Divider(height: 12, color: Color(0xFFE7F6EE)),
-                    _successDetailRow('Date & Time', dateStr),
-                  ],
+              const SizedBox(height: 10),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 300),
+                child: Text(
+                  'Your $_entryType entry has been saved and added to today\'s log.',
+                  textAlign: TextAlign.center,
+                  style: BtText.body(context, color: Bt.onNoir2),
                 ),
               ),
             ],
           ),
         ),
-        const SizedBox(height: 24),
-        ElevatedButton(
-          onPressed: () => Navigator.pushNamed(context, '/add-entry'),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primary,
-            foregroundColor: Colors.white,
-            minimumSize: const Size(double.infinity, 48),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+        const SizedBox(height: 26),
+        BtReveal(
+          index: 7,
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: .06),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: Colors.white.withValues(alpha: .08)),
             ),
-            elevation: 0,
-          ),
-          child: const Text(
-            'Add Another Entry',
-            style: TextStyle(fontWeight: FontWeight.bold),
+            child: Column(
+              children: [
+                _successDetailRow(
+                  'Entry ID',
+                  '#${_savedEntryId?.substring(math.max(0, (_savedEntryId?.length ?? 4) - 8)) ?? 'NEW'}',
+                ),
+                Container(height: 1, color: Colors.white.withValues(alpha: .08)),
+                _successDetailRow('Date & Time', dateStr),
+              ],
+            ),
           ),
         ),
-        const SizedBox(height: 12),
-        OutlinedButton(
-          onPressed: () => Navigator.pushNamed(context, '/logs'),
-          style: OutlinedButton.styleFrom(
-            foregroundColor: AppColors.primary,
-            side: BorderSide(color: AppColors.primary, width: 1.5),
-            minimumSize: const Size(double.infinity, 48),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-          child: const Text(
-            'View All Entries',
-            style: TextStyle(fontWeight: FontWeight.bold),
+        const SizedBox(height: 28),
+        BtReveal(
+          index: 8,
+          child: Column(
+            children: [
+              BtButton(
+                label: 'Add Another Entry',
+                variant: BtButtonVariant.accent,
+                onPressed: () => Navigator.pushNamed(context, '/add-entry'),
+              ),
+              const SizedBox(height: 10),
+              BtButton(
+                label: 'View All Entries',
+                variant: BtButtonVariant.onDark,
+                onPressed: () => Navigator.pushNamed(context, '/logs'),
+              ),
+            ],
           ),
         ),
       ],
     );
   }
   Widget _buildErrorCard() {
-    return Container(
-      margin: const EdgeInsets.only(top: 14),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFDECEF),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFFCA5A5)),
-      ),
+    final completed = _response.status == VoiceStatus.completed;
+    return Padding(
+      padding: EdgeInsets.only(top: completed ? 14 : 4, bottom: completed ? 0 : 14),
+      child: _inlineError(_saveError ?? '', onDark: _isNoirStage),
+    );
+  }
+  Widget _successDetailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
       child: Row(
         children: [
-          const Icon(Icons.error_outline, color: Color(0xFFC01048), size: 18),
-          const SizedBox(width: 10),
+          Text(label, style: BtText.subhead(context, color: Bt.onNoir2)),
+          const SizedBox(width: 12),
           Expanded(
             child: Text(
-              _saveError ?? '',
-              style: const TextStyle(fontSize: 13, color: Color(0xFFC01048)),
+              value,
+              textAlign: TextAlign.right,
+              overflow: TextOverflow.ellipsis,
+              style: BtText.num(BtText.subhead(context, color: Bt.bone, weight: FontWeight.w600)),
             ),
           ),
         ],
       ),
-    );
-  }
-  Widget _successDetailRow(String label, String value) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 13,
-            color: AppColors.textLight,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.bold,
-            color: AppColors.textDark,
-          ),
-        ),
-      ],
     );
   }
   String get _hintForCurrentStep {
@@ -3714,5 +3628,211 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
       'Dec',
     ];
     return months[(m - 1).clamp(0, 11)];
+  }
+}
+/// Soft accent glow behind the noir voice surface (static — no animation).
+class _NoirGlow extends StatelessWidget {
+  const _NoirGlow();
+  @override
+  Widget build(BuildContext context) {
+    final accent = context.bt.accent;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: RadialGradient(
+          center: const Alignment(0, 1.05),
+          radius: 1.1,
+          colors: [accent.withValues(alpha: .16), accent.withValues(alpha: 0)],
+        ),
+      ),
+    );
+  }
+}
+/// Small BuildTrack "brick" avatar for AI chat bubbles.
+class _BrickMark extends StatelessWidget {
+  const _BrickMark();
+  @override
+  Widget build(BuildContext context) {
+    final accent = context.bt.accent;
+    Widget brick() => Container(
+      width: 6,
+      height: 3,
+      margin: const EdgeInsets.all(1),
+      decoration: BoxDecoration(color: accent, borderRadius: BorderRadius.circular(1)),
+    );
+    return Container(
+      width: 28,
+      height: 28,
+      decoration: BoxDecoration(color: Bt.ink, borderRadius: BorderRadius.circular(9)),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          brick(),
+          Row(mainAxisAlignment: MainAxisAlignment.center, children: [brick(), brick()]),
+        ],
+      ),
+    );
+  }
+}
+/// Receipt perforation: a row of bone "punch holes" across the ink card.
+class _Perforation extends StatelessWidget {
+  const _Perforation();
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      child: SizedBox(
+        height: 14,
+        width: double.infinity,
+        child: CustomPaint(painter: _PerforationPainter(Bt.ground)),
+      ),
+    );
+  }
+}
+class _PerforationPainter extends CustomPainter {
+  _PerforationPainter(this.color);
+  final Color color;
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = color;
+    for (double x = 0; x <= size.width + 9; x += 18) {
+      canvas.drawCircle(Offset(x, size.height / 2), 6, paint);
+    }
+  }
+  @override
+  bool shouldRepaint(covariant _PerforationPainter old) => old.color != color;
+}
+/// Saved-Success board: cement bags drop and stack, then a check pops.
+/// Plays once per mount; static under reduce-motion.
+class _SavedBagsStack extends StatefulWidget {
+  const _SavedBagsStack({required this.label});
+  final String label;
+  @override
+  State<_SavedBagsStack> createState() => _SavedBagsStackState();
+}
+class _SavedBagsStackState extends State<_SavedBagsStack>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 2000),
+  );
+  // (left, bottom, start) — positions from the board's 260×200 stage.
+  static const _bags = <(double, double, double)>[
+    (4, 1, .07),
+    (92, 1, .15),
+    (180, 1, .22),
+    (48, 42, .32),
+    (136, 42, .40),
+    (92, 83, .50),
+  ];
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (Bt.reduceMotion(context)) {
+      _c.value = 1;
+    } else if (_c.value == 0 && !_c.isAnimating) {
+      _c.forward();
+    }
+  }
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+  double _iv(double a, double b, Curve curve) =>
+      curve.transform(((_c.value - a) / (b - a)).clamp(0.0, 1.0));
+  Widget _bag({required bool top, required Color accent}) {
+    return Container(
+      width: 76,
+      height: 40,
+      decoration: BoxDecoration(
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(12),
+          topRight: Radius.circular(12),
+          bottomLeft: Radius.circular(10),
+          bottomRight: Radius.circular(10),
+        ),
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: top
+              ? [Color.lerp(accent, Colors.white, .15)!, accent]
+              : const [Color(0xFFE9E4D8), Color(0xFFCFC7B5)],
+        ),
+        boxShadow: const [
+          BoxShadow(color: Color(0x99000000), offset: Offset(0, 10), blurRadius: 18, spreadRadius: -10),
+        ],
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            left: 8,
+            right: 8,
+            top: 6,
+            child: Container(height: 1, color: Colors.black.withValues(alpha: .12)),
+          ),
+          if (top)
+            Center(
+              child: Text(
+                widget.label,
+                maxLines: 1,
+                style: BtText.mono(context, color: Bt.noir, size: 8.5),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+  @override
+  Widget build(BuildContext context) {
+    final accent = context.bt.accent;
+    return RepaintBoundary(
+      child: SizedBox(
+        width: 260,
+        height: 200,
+        child: AnimatedBuilder(
+          animation: _c,
+          builder: (_, _) => Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Positioned(
+                left: -30,
+                right: -30,
+                bottom: 0,
+                child: Container(height: 1, color: Bt.bone.withValues(alpha: .25)),
+              ),
+              for (var i = 0; i < _bags.length; i++)
+                Positioned(
+                  left: _bags[i].$1,
+                  bottom: _bags[i].$2,
+                  child: Opacity(
+                    opacity: _iv(_bags[i].$3, _bags[i].$3 + .06, Curves.linear),
+                    child: Transform.translate(
+                      offset: Offset(0, -150 * (1 - _iv(_bags[i].$3, _bags[i].$3 + .26, Curves.bounceOut))),
+                      child: _bag(top: i == _bags.length - 1, accent: accent),
+                    ),
+                  ),
+                ),
+              Positioned(
+                right: -6,
+                top: 4,
+                child: Transform.scale(
+                  scale: _iv(.68, .86, Bt.spring),
+                  child: Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: Bt.greenBright,
+                      shape: BoxShape.circle,
+                      boxShadow: [BoxShadow(color: Bt.greenBright.withValues(alpha: .18), spreadRadius: 8)],
+                    ),
+                    child: const Icon(Icons.check_rounded, color: Colors.white, size: 30),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
