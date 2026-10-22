@@ -385,7 +385,7 @@ class _ProjectsScreenContentState extends State<_ProjectsScreenContent> {
                       Text.rich(
                         TextSpan(children: [
                           TextSpan(text: p.formattedSpent, style: BtText.num(BtText.subhead(context, weight: FontWeight.w600, color: Bt.ink))),
-                          TextSpan(text: ' of ${p.formattedBudget}', style: BtText.num(BtText.subhead(context))),
+                          TextSpan(text: p.totalBudget > 0 ? ' of ${p.formattedBudget}' : ' spent · no budget set', style: BtText.num(BtText.subhead(context))),
                         ]),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -421,7 +421,7 @@ class _ProjectsScreenContentState extends State<_ProjectsScreenContent> {
   Widget _miniCard(BuildContext context, ProjectModel p, ProjectProvider provider) {
     final pct = (p.progress * 100).toStringAsFixed(0);
     final status = _ProjectStatus.fromString(p.projectStatus);
-    final sub = UserSession.isAdmin ? '$pct% · ${p.formattedSpent} of ${p.formattedBudget}' : '$pct% · ${status.label}';
+    final sub = UserSession.isAdmin ? (p.totalBudget > 0 ? '$pct% · ${p.formattedSpent} of ${p.formattedBudget}' : '$pct% · ${p.formattedSpent} spent') : '$pct% · ${status.label}';
     return Semantics(
       button: true,
       label: '${p.name}, $pct percent done. View details',

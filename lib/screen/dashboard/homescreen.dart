@@ -305,7 +305,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
 String _homeGreeting() {
   final h = DateTime.now().hour;
   final part = h < 12 ? 'Good morning' : (h < 17 ? 'Good afternoon' : 'Good evening');
-  return '$part, ${UserSession.roleLabel}';
+  return part; // the session has no user name; role shows on Account
 }
 
 /// Noir hero used by all three role dashboards (top row + role content).
@@ -390,7 +390,7 @@ class _ApprovalsSummaryCard extends StatelessWidget {
 }
 
 /// Pending approvals on Home for anyone who can approve: count + amount,
-/// the top few entries with Approve / Reject…, and "See all" → Inbox.
+/// the top two entries with Approve / Reject…, and "See all" → Inbox.
 class _HomeApprovals extends StatefulWidget {
   const _HomeApprovals();
   @override
@@ -443,7 +443,7 @@ class _HomeApprovalsState extends State<_HomeApprovals> {
     }
     final total = _txs.length + _updates;
     if (total == 0) return const SizedBox.shrink();
-    final top = _txs.take(3).toList();
+    final top = _txs.take(2).toList();
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [

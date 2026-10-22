@@ -1615,7 +1615,7 @@ class _ReportsViewState extends State<_ReportsView> {
         Expanded(
           child: SingleChildScrollView(
             scrollDirection: Axis.horizontal,
-            clipBehavior: Clip.none,
+            clipBehavior: Clip.hardEdge,
             child: Row(
               children: [
                 _ToolChip(
