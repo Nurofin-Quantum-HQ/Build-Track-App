@@ -1,3 +1,4 @@
+import 'package:buildtrack_mobile/common/tour_targets.dart';
 import 'package:buildtrack_mobile/common/themes/app_colors.dart';
 import 'package:buildtrack_mobile/models/task_model.dart';
 import 'package:buildtrack_mobile/services/task_service.dart';
@@ -127,7 +128,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
       if (isReplay || !UserSession.hasAddedEntry) ShowcaseKeys.addEntry,
       if (isReplay || !UserSession.hasViewedReports) ShowcaseKeys.reports,
     ];
-    return ordered.where((k) => k.currentContext != null).toList();
+    return renderedTourKeys(context, ordered);
   }
 
   bool _tourChecked = false;
@@ -142,7 +143,10 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
     if (!provider.projectsLoaded) return;
     _tourChecked = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (provider.projects.isNotEmpty || UserSession.hasAddedEntry) {
+      // Existing users skip the first-run prompt — unless they restarted the
+      // tour themselves (Account › App Guidelines).
+      if (!UserSession.globalTourActive &&
+          (provider.projects.isNotEmpty || UserSession.hasAddedEntry)) {
         UserSession.markAllModulesVisited();
       } else {
         if (!UserSession.appTourPrompted) {

@@ -1,3 +1,4 @@
+import 'package:buildtrack_mobile/common/tour_targets.dart';
 import 'package:buildtrack_mobile/design/design.dart';
 import 'package:provider/provider.dart';
 import 'package:buildtrack_mobile/common/themes/app_colors.dart';
@@ -89,13 +90,13 @@ class _AddEntryScreenContentState extends State<_AddEntryScreenContent> {
 
   /// Tour steps in visual order; only widgets that are on screen.
   void _startTour() {
-    final keys = <GlobalKey>[
+    final keys = renderedTourKeys(context, <GlobalKey>[
       ShowcaseKeys.addEntryMaterial,
       ShowcaseKeys.addEntryLabour,
       ShowcaseKeys.addEntryEquipment,
       ShowcaseKeys.addEntryCSV,
       _csvKey,
-    ].where((k) => k.currentContext != null).toList();
+    ]);
     if (keys.isNotEmpty) ShowCaseWidget.of(context).startShowCase(keys);
   }
   List<Map<String, dynamic>> get _entries {

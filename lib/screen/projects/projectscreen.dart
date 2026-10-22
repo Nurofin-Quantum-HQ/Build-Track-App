@@ -1,3 +1,4 @@
+import 'package:buildtrack_mobile/common/tour_targets.dart';
 import 'package:buildtrack_mobile/design/design.dart';
 import 'package:buildtrack_mobile/common/themes/app_colors.dart';
 import 'package:buildtrack_mobile/controller/nav_controller.dart';
@@ -134,7 +135,7 @@ class _ProjectsScreenContentState extends State<_ProjectsScreenContent> {
     // Only showcase widgets that are actually on screen for this user/state
     // (e.g. the project card isn't mounted while loading or on an error),
     // otherwise the tour jumps or stalls.
-    return keys.where((k) => k.currentContext != null).toList();
+    return renderedTourKeys(context, keys);
   }
 
   @override

@@ -1,3 +1,4 @@
+import 'package:buildtrack_mobile/common/tour_targets.dart';
 import 'package:buildtrack_mobile/controller/nav_controller.dart';
 import 'package:buildtrack_mobile/design/design.dart';
 import 'dart:convert';
@@ -242,7 +243,7 @@ class _ReportsViewState extends State<_ReportsView> {
 
   /// Every Reports control in visual order (top to bottom, left to right).
   /// Only keys whose widgets are on screen right now are used.
-  List<GlobalKey> _tourKeys() => [
+  List<GlobalKey> _tourKeys() => renderedTourKeys(context, [
         _kProject,
         _kPeriod,
         ShowcaseKeys.reportFilters,
@@ -269,7 +270,7 @@ class _ReportsViewState extends State<_ReportsView> {
         ShowcaseKeys.reportCSV,
         _kCsvRevert,
         ShowcaseKeys.helpButton,
-      ].where((k) => k.currentContext != null).toList();
+      ]);
 
   void _startTour() {
     final keys = _tourKeys();
