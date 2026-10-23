@@ -27,6 +27,8 @@ class EntryPermissions {
   }) {
     if (UserSession.isAdmin) return true;
     if (status == 'approved') return false;
+    // DELETE /transactions/:id needs `delete_entry`.
+    if (!RoleManager.canDeleteEntries) return false;
     if (UserSession.isSupervisor) {
       return UserSession.hasProjectAccess(projectId);
     }

@@ -35,8 +35,10 @@ class RoleManager {
       isAdmin || UserSession.hasPermission('assign_roles');
   static bool get canAssignProject =>
       isAdmin || UserSession.hasPermission('assign_project');
+  /// Assign Role › "Assign Tasks" (POST /tasks needs `assign_tasks`).
+  static const assignTasksKey = 'assign_tasks';
   static bool get canAssignTasks =>
-      isAdmin || isSupervisor || UserSession.hasPermission('assign_tasks');
+      isAdmin || UserSession.hasPermission(assignTasksKey);
   static bool get canAssignRole => canAssignRoles;
   static bool get canManageTeam =>
       isAdmin || UserSession.hasPermission('manage_team');
@@ -66,12 +68,11 @@ class RoleManager {
       isAdmin ||
       UserSession.hasPermission('manage_expenses') ||
       UserSession.hasPermission('add_entries');
-  /// Daily update / progress (PUT /projects/:id). Backend allows Admins and
-  /// Supervisors by role, these permission keys, or anyone with a task on that
-  /// project (the task case is checked by the screen that has the tasks).
+  /// Daily update / progress (PUT /projects/:id). Backend allows Admins, these
+  /// permission keys, or anyone with a task on that project (the task case is
+  /// checked by the screen that has the tasks).
   static bool get canSubmitProjectUpdate =>
       isAdmin ||
-      isSupervisor ||
       UserSession.hasPermission('edit_project') ||
       UserSession.hasPermission('manage_team') ||
       UserSession.hasPermission('add_entry') ||
@@ -135,7 +136,10 @@ class RoleManager {
       isAdmin || UserSession.hasPermission('view_contractor_performance');
   static bool get canViewNotifications => true;
   static bool get canEditProfile => true;
-  static bool get canDeleteEntries => isAdmin || canApprovePayments;
+  /// Assign Role › Activities & Entries › Delete (DELETE /transactions/:id
+  /// needs `delete_entry`).
+  static bool get canDeleteEntries =>
+      isAdmin || UserSession.hasPermission('delete_entry');
   static bool get canApproveEntries => isAdmin || canApprovePayments;
   static bool get canUpdateProgress => canAddEntries;
   static bool get canViewTeamAccess => isAdmin;
@@ -149,9 +153,8 @@ class RoleManager {
   // backend, so the `assign_roles` permission alone can't use the screen.
   static bool _checkAssignRole() => isAdmin;
   static bool _checkReports() => canViewReports;
-  // Sign-up is public: reachable when logged out (Login screen); once logged
-  // in, only Admins create another workspace (Profile row).
-  static bool _checkCreateWorkspace() => UserSession.userId.isEmpty || isAdmin;
+  // Sign-up only (Login screen, logged out). Removed from Account.
+  static bool _checkCreateWorkspace() => UserSession.userId.isEmpty;
   // GET /transactions is open to every signed-in user (scoped server-side).
   static bool _checkLogs() => UserSession.userId.isNotEmpty;
   static bool canNavigate(String route) {

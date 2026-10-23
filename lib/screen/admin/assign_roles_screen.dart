@@ -63,6 +63,12 @@ class _AssignRolesScreenState extends State<AssignRolesScreen> {
       'desc': 'Can file a daily update with photos and checklist',
       'key': 'submit_daily_update',
     },
+    {
+      'type': 'toggle',
+      'label': 'Assign Tasks',
+      'desc': 'Can give work to team members (e.g. pre-construction)',
+      'key': RoleManager.assignTasksKey,
+    },
     {'section': 'Approvals & Payments'},
     {
       'type': 'toggle',
@@ -113,6 +119,7 @@ class _AssignRolesScreenState extends State<AssignRolesScreen> {
     'manage_expenses': false,
     'manage_equipment_master': false,
     'submit_daily_update': false,
+    RoleManager.assignTasksKey: false,
     'approve_payments': false,
     'approve_updates': false,
     'view_reports': false,
@@ -267,6 +274,7 @@ class _AssignRolesScreenState extends State<AssignRolesScreen> {
         'manage_expenses',
         'manage_equipment_master',
         'submit_daily_update',
+        RoleManager.assignTasksKey,
         'approve_payments',
         'approve_updates',
         'view_reports',

@@ -85,7 +85,7 @@ keys compared before/after) and screenshot-tested against a local backend with s
 | By Type / Entries layout | By type defaults to the 3-column card grid (list is a toggle); Entries already defaults to the sheet |
 | Reports guidelines should explain all options | Fixed — tour walks every control |
 | Remove Efficiency Report | Removed from Reports |
-| Create Workspace unclear | Fixed — row says "A separate company account"; tapping it first explains a workspace is a separate company (own admin, projects, team, plan) and points to Assign Role for adding people |
+| Create Workspace unclear | Removed from Account (sign-up stays on the Login screen for new companies). Logged-in users can't open `/create-workspace` |
 | App Guidelines option doesn't work | Fixed — restarts the whole app tour from Home |
 | Tour shows Inventory after login | Fixed |
 | CSV templates differ between Add Entry and Reports | One template, one column picker, one parser (`csv_import_helper.dart`); accepts old templates and Reports exports, dd/mm/yyyy dates, Excel BOM |
@@ -95,9 +95,11 @@ keys compared before/after) and screenshot-tested against a local backend with s
 | Invoice Kannada/Tamil transliterated | Fixed in backend branch `fix/esign-receipt-native-script` (core) — needs native-speaker review |
 | Profile page not opening (teammate) | Not reproducible on V2, main or V3 for any role. Hardened: profile fetch times out after 20 s and falls back to cached data; profile tour no longer starts while loading |
 
-**Create Workspace (Account, admins only):** opens the public sign-up flow and creates a brand-new, separate company + admin account. It does not add anything to the current workspace.
+**Permissions follow the Assign Role switches, not role names** (app + backend branch `fix/role-permission-checks`): Assign Tasks (`assign_tasks`, new switch, on in the Supervisor preset), Delete entries (`delete_entry`), Approve (Approve Payments / Approve Updates only). Run `backend/scripts/grant_assign_tasks_to_supervisors.js` once after deploying so existing Supervisors keep assigning tasks.
 
-**Backend notes (core, not changed):** POST `/tasks` has no permission check; DELETE `/transactions/:id` only checks project access; approve/reject accept `add_entries` as an approval permission; PUT `/projects/:id` (daily update) returns 403 for users without the listed permissions or a task on that project.
+**Release build:** the GitHub APK workflow used an unpinned Flutter; newer Flutter no longer exports `CupertinoPageTransitionsBuilder` from `material.dart` → compile error in `app_theme.dart`. Fixed by importing `cupertino.dart` and pinning the workflow to Flutter 3.41.9.
+
+**Backend notes:** tasks, entry delete, approve/reject, e-sign request, inventory, workers, project edit and daily-update routes now check permissions (`fix/role-permission-checks`). Still open: daily progress sends the whole project, so anyone allowed to submit progress can also change project details; budgets are hidden in the app only.
 
 ## Local testing (never against live)
 `flutter run --dart-define=API_BASE_URL=http://localhost:5001/api` points the app at a local backend.
