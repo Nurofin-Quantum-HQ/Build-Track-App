@@ -58,8 +58,16 @@ class ReportProvider extends ChangeNotifier {
     _selectedProjectId = projectId;
     notifyListeners();
   }
+  /// Reload projects, then the entries for the project this report shows
+  /// (all projects for 'all'). load() alone only fetches the app's selected
+  /// project's entries, which emptied an all-projects / other-project report.
   Future<void> refresh() async {
-    await _projectProvider?.load();
+    final provider = _projectProvider;
+    if (provider == null) return;
+    await provider.load();
+    await provider.loadEntriesForProject(
+      _selectedProjectId == 'all' ? null : _selectedProjectId,
+    );
     notifyListeners();
   }
   DateTime? _periodStart() {

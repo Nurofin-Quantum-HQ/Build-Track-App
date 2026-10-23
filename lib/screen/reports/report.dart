@@ -70,7 +70,6 @@ class ReportFilterState {
   static String? selectedActivityName;
   static String searchQuery = '';
   static String? selectedItemName;
-  static bool reportGenerated = true;
   static Set<EntryType> selectedTypes = {
     EntryType.material,
     EntryType.labour,
@@ -90,6 +89,19 @@ class ReportFilterState {
   /// "By type" shows the 3-column cost-card grid (true, default) or the list.
   static bool byTypeGrid = true;
 
+  /// Reload what Reports shows, in order: projects (and the global project's
+  /// entries), then the entries for the project Reports is filtered to (all
+  /// projects when 'all'). Awaited in sequence so a later global-project load
+  /// can no longer overwrite the Reports list and leave every total at 0.
+  static Future<void> reloadEntries(BuildContext context) async {
+    final projectProvider = context.read<ProjectProvider>();
+    await projectProvider.load();
+    await projectProvider.loadEntriesForProject(
+      selectedProjectId == 'all' ? null : selectedProjectId,
+    );
+  }
+
+  /// Clear every saved Reports filter (call on logout / account switch).
   static void reset() {
     selectedProjectId = 'all';
     selectedFloor = null;
@@ -97,7 +109,6 @@ class ReportFilterState {
     selectedActivityName = null;
     searchQuery = '';
     selectedItemName = null;
-    reportGenerated = true;
     selectedTypes = {
       EntryType.material,
       EntryType.labour,
@@ -112,6 +123,8 @@ class ReportFilterState {
     currentPage = 1;
     lastKnownProjectProviderId = null;
     hasSavedFilters = false;
+    tableView = true;
+    byTypeGrid = true;
   }
 }
 
@@ -154,7 +167,6 @@ class _ReportsViewState extends State<_ReportsView> {
   String? _selectedActivityName = ReportFilterState.selectedActivityName;
   String _searchQuery = ReportFilterState.searchQuery;
   String? _selectedItemName = ReportFilterState.selectedItemName;
-  bool _reportGenerated = ReportFilterState.reportGenerated;
   bool _showSuggestions = false;
   /// Search field shown under the toolbar (always shown while a search is active).
   bool _searchOpen = false;
@@ -230,6 +242,11 @@ class _ReportsViewState extends State<_ReportsView> {
   void initState() {
     super.initState();
     _loadActiveColumns();
+    // Highlight the Reports tab after the first frame (notifying the nav
+    // controller inside build() marks other widgets dirty mid-build).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.read<NavController>().markCurrent('/reports');
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!UserSession.hasSkippedTour && !UserSession.visitedModules.contains('ReportsScreen')) {
         // Let the first entries arrive so the sheet steps can be shown too.
@@ -338,21 +355,21 @@ class _ReportsViewState extends State<_ReportsView> {
       reportProvider.linkProjectProvider(projectProvider);
       
       final currentGlobalProjId = projectProvider.selectedProject?.id;
-      if (!ReportFilterState.hasSavedFilters) {
-        if (currentGlobalProjId != null) {
-          ReportFilterState.selectedProjectId = currentGlobalProjId;
-          ReportFilterState.selectedFloor = projectProvider.selectedFloor;
-          ReportFilterState.selectedPhaseId = projectProvider.selectedPhaseId;
-          ReportFilterState.selectedActivityName = projectProvider.selectedActivity;
-          ReportFilterState.lastKnownProjectProviderId = currentGlobalProjId;
+      // Follow the app's selected project only. The floor / phase / activity
+      // picked while adding an entry are not Reports filters, so they are not
+      // copied (that narrowed Reports to one activity after every save).
+      final followGlobal = currentGlobalProjId != null &&
+          (!ReportFilterState.hasSavedFilters ||
+              (ReportFilterState.lastKnownProjectProviderId != null &&
+                  currentGlobalProjId != ReportFilterState.lastKnownProjectProviderId));
+      if (followGlobal) {
+        if (ReportFilterState.selectedProjectId != currentGlobalProjId) {
+          ReportFilterState.selectedFloor = null;
+          ReportFilterState.selectedPhaseId = null;
+          ReportFilterState.selectedActivityName = null;
+          ReportFilterState.currentPage = 1;
         }
-      } else if (currentGlobalProjId != null &&
-          ReportFilterState.lastKnownProjectProviderId != null &&
-          currentGlobalProjId != ReportFilterState.lastKnownProjectProviderId) {
         ReportFilterState.selectedProjectId = currentGlobalProjId;
-        ReportFilterState.selectedFloor = projectProvider.selectedFloor;
-        ReportFilterState.selectedPhaseId = projectProvider.selectedPhaseId;
-        ReportFilterState.selectedActivityName = projectProvider.selectedActivity;
         ReportFilterState.lastKnownProjectProviderId = currentGlobalProjId;
       }
 
@@ -365,7 +382,6 @@ class _ReportsViewState extends State<_ReportsView> {
         _searchController.text = ReportFilterState.searchQuery;
       }
       _selectedItemName = ReportFilterState.selectedItemName;
-      _reportGenerated = ReportFilterState.reportGenerated;
       _selectedTypes = Set.from(ReportFilterState.selectedTypes);
       _selectedStatus = ReportFilterState.selectedStatus;
       _startDate = ReportFilterState.startDate;
@@ -940,12 +956,13 @@ class _ReportsViewState extends State<_ReportsView> {
     
     setState(() => _isImportingCsv = true);
     final success = await ApiService.revertCsv();
+    if (!mounted) return;
     setState(() => _isImportingCsv = false);
     
     if (success) {
       if (mounted) {
         btToast(context, 'Successfully reverted last CSV import');
-        context.read<ReportProvider>().refresh();
+        ReportFilterState.reloadEntries(context);
       }
     } else {
       if (mounted) {
@@ -968,8 +985,7 @@ class _ReportsViewState extends State<_ReportsView> {
             : projectProvider.projects.where((p) => p.id == _selectedProjectId).firstOrNull,
       );
       if (result == null || !mounted) return; // picker cancelled
-      context.read<ProjectProvider>().load();
-      context.read<ReportProvider>().refresh();
+      ReportFilterState.reloadEntries(context);
       showDialog(
         context: context,
         barrierColor: Bt.scrim,
@@ -1119,7 +1135,6 @@ class _ReportsViewState extends State<_ReportsView> {
     ReportFilterState.selectedActivityName = _selectedActivityName;
     ReportFilterState.searchQuery = _searchQuery;
     ReportFilterState.selectedItemName = _selectedItemName;
-    ReportFilterState.reportGenerated = _reportGenerated;
     ReportFilterState.selectedTypes = Set.from(_selectedTypes);
     ReportFilterState.selectedStatus = _selectedStatus;
     ReportFilterState.startDate = _startDate;
@@ -1376,7 +1391,6 @@ class _ReportsViewState extends State<_ReportsView> {
         ? filtered.sublist(startIndex, endIndex)
         : [];
     final List<String> activeCols = _getActiveColumnsForTab(quickCategoryTab);
-    context.read<NavController>().markCurrent('/reports');
     final bt = context.bt;
     final entriesTitle = quickCategoryTab == 'All' || quickCategoryTab.isEmpty
         ? 'Entries'
@@ -1394,21 +1408,23 @@ class _ReportsViewState extends State<_ReportsView> {
       Navigator.of(context).push(
         MaterialPageRoute(
           builder: (context) => _FullScreenLogsViewer(
-            filteredEntries: filtered,
+            // Re-filtered from the live entry list on every rebuild, so rows
+            // edited / added / paid from here show their new values.
+            entriesOf: (pp) => _filterEntries(pp, quickCategoryTab),
             getProjectName: getProjectName,
             statusOf: statusOf,
             quickCategoryTab: quickCategoryTab,
             title: quickCategoryTab == 'All'
                 ? 'Report Logs'
                 : '$quickCategoryTab Report Logs',
-            onExportCsv: () => _handleCsvExport(
-              filtered,
+            onExportCsv: (rows) => _handleCsvExport(
+              rows,
               getProjectName,
               quickCategoryTab,
               activeColumns: activeCols,
             ),
-            onExportPdf: () => _handlePdfExport(
-              filtered,
+            onExportPdf: (rows) => _handlePdfExport(
+              rows,
               getProjectName,
               quickCategoryTab,
               activeColumns: activeCols,
@@ -1567,8 +1583,7 @@ class _ReportsViewState extends State<_ReportsView> {
     final periodChip = _datePreset == 'Custom' && (_startDate != null || _endDate != null)
         ? '${_startDate == null ? '…' : formatShortDate(_startDate)} – ${_endDate == null ? '…' : formatShortDate(_endDate)}'
         : _sentence(_datePreset);
-    final notGenerated = quickCategoryTab != 'All' && !_reportGenerated;
-    final showSheet = _tableView && !notGenerated && paginatedEntries.isNotEmpty;
+    final showSheet = _tableView && paginatedEntries.isNotEmpty;
     final extraFilters = [
       _selectedFloor,
       _selectedPhaseId,
@@ -1822,7 +1837,7 @@ class _ReportsViewState extends State<_ReportsView> {
             color: Bt.noir,
             backgroundColor: bt.accent,
             edgeOffset: topInset,
-            onRefresh: provider.refresh,
+            onRefresh: () => ReportFilterState.reloadEntries(context),
             child: ListView(
               controller: _scrollController,
               physics: const AlwaysScrollableScrollPhysics(parent: ClampingScrollPhysics()),
@@ -1862,12 +1877,11 @@ class _ReportsViewState extends State<_ReportsView> {
                       const SizedBox(height: 12),
                       summary,
                       const SizedBox(height: 12),
-                      if (notGenerated)
-                        BtCard(
-                          child: BtEmpty(
-                            icon: Icons.analytics_outlined,
-                            title: 'Set your filters',
-                            message: 'Configure filters above and tap "Generate report" to view logs.',
+                      if (paginatedEntries.isEmpty && projectProvider.entriesLoading)
+                        const BtCard(
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(vertical: 28),
+                            child: Center(child: BtBrickLoader(label: 'Loading entries…')),
                           ),
                         )
                       else if (paginatedEntries.isEmpty)
@@ -1911,7 +1925,7 @@ class _ReportsViewState extends State<_ReportsView> {
                             children: _buildEntryGroups(context, paginatedEntries, getProjectName),
                           ),
                         ),
-                      if (!notGenerated && paginatedEntries.isNotEmpty && (showSheet || totalCount > _rowsPerPage || _rowsPerPage != 10))
+                      if (paginatedEntries.isNotEmpty && (showSheet || totalCount > _rowsPerPage || _rowsPerPage != 10))
                         _tour(
                           _kPager,
                           'Pages',
@@ -1993,7 +2007,6 @@ class _ReportsViewState extends State<_ReportsView> {
     setState(() {
       _currentPage = 1;
       _selectedItemName = null;
-      _reportGenerated = true;
       _showSuggestions = false;
       if (newTab == 'All') {
         _selectedTypes.addAll({
@@ -2022,7 +2035,20 @@ class _ReportsViewState extends State<_ReportsView> {
       _selectedActivityName = null;
       _currentPage = 1;
     });
-    context.read<ProjectProvider>().loadEntriesForProject(val == 'all' ? null : val);
+    ReportFilterState.lastKnownProjectProviderId = val == 'all' ? null : val;
+    final projectProvider = context.read<ProjectProvider>();
+    final match = val == 'all'
+        ? null
+        : projectProvider.projects.where((p) => p.id == val).firstOrNull;
+    if (match != null) {
+      // Make it the app's selected project too (as on main): every later
+      // ProjectProvider.load() then refetches this project's entries instead
+      // of replacing them with another project's and zeroing the report.
+      // selectProject() also loads this project's entries.
+      projectProvider.selectProject(match);
+    } else {
+      projectProvider.loadEntriesForProject(val == 'all' ? null : val);
+    }
     context.read<ReportProvider>().selectProject(val);
   }
 
@@ -2586,22 +2612,6 @@ class _ReportsViewState extends State<_ReportsView> {
         },
       ),
       ),
-      if (!_reportGenerated) ...[
-        const SizedBox(width: 8),
-        BtButton(
-          label: 'Generate report',
-          small: true,
-          expand: false,
-          icon: Icons.analytics_outlined,
-          onPressed: () {
-            setState(() {
-              _reportGenerated = true;
-              _currentPage = 1;
-              _showSuggestions = false;
-            });
-          },
-        ),
-      ],
     ];
   }
 
@@ -3254,7 +3264,7 @@ class _DetailAction extends StatelessWidget {
 /// Full-screen sheet with a rotate (landscape) / straight view switch.
 class _FullScreenLogsViewer extends StatefulWidget {
   const _FullScreenLogsViewer({
-    required this.filteredEntries,
+    required this.entriesOf,
     required this.getProjectName,
     required this.statusOf,
     required this.quickCategoryTab,
@@ -3270,13 +3280,13 @@ class _FullScreenLogsViewer extends StatefulWidget {
     required this.onRecordPayment,
     required this.onEdit,
   });
-  final List<EntryModel> filteredEntries;
+  final List<EntryModel> Function(ProjectProvider) entriesOf;
   final String Function(String) getProjectName;
   final String Function(EntryModel) statusOf;
   final String quickCategoryTab;
   final String title;
-  final VoidCallback onExportCsv;
-  final VoidCallback onExportPdf;
+  final void Function(List<EntryModel> rows) onExportCsv;
+  final void Function(List<EntryModel> rows) onExportPdf;
   final List<String> activeColumns;
   final String sortColumn;
   final bool sortAscending;
@@ -3293,7 +3303,8 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
   int _quarterTurns = 0;
   late String _sortColumn = widget.sortColumn;
   late bool _sortAscending = widget.sortAscending;
-  late List<EntryModel> _rows = _sorted();
+  /// Rows as last built (refiltered + sorted in build from the live entries).
+  List<EntryModel> _rows = const [];
 
   void _toggleRotation() {
     setState(() {
@@ -3301,8 +3312,8 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
     });
   }
 
-  List<EntryModel> _sorted() {
-    final list = List<EntryModel>.from(widget.filteredEntries);
+  List<EntryModel> _sorted(List<EntryModel> source) {
+    final list = List<EntryModel>.from(source);
     list.sort((a, b) {
       int cmp = 0;
       if (_sortColumn == 'date') {
@@ -3331,7 +3342,7 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
             showChevron: true,
             onTap: () {
               Navigator.pop(sheetCtx);
-              widget.onExportCsv();
+              widget.onExportCsv(_rows);
             },
           ),
           BtRow(
@@ -3341,7 +3352,7 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
             showChevron: true,
             onTap: () {
               Navigator.pop(sheetCtx);
-              widget.onExportPdf();
+              widget.onExportPdf(_rows);
             },
           ),
         ],
@@ -3431,7 +3442,6 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
                           setState(() {
                             _sortColumn = column;
                             _sortAscending = ascending;
-                            _rows = _sorted();
                           });
                           widget.onSort(column, ascending);
                         },
@@ -3450,6 +3460,7 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
 
   @override
   Widget build(BuildContext context) {
+    _rows = _sorted(widget.entriesOf(context.watch<ProjectProvider>()));
     final rotated = _quarterTurns != 0;
     return Scaffold(
       backgroundColor: Bt.ground,
@@ -3546,14 +3557,8 @@ class _ReportActions {
         route = '/add-material';
         break;
     }
-    Navigator.pushNamed(context, route, arguments: dupArgs).then((val) {
-      if (context.mounted) {
-        final loadId = ReportFilterState.selectedProjectId == 'all'
-            ? null
-            : ReportFilterState.selectedProjectId;
-        context.read<ProjectProvider>().loadEntriesForProject(loadId);
-        context.read<ProjectProvider>().load();
-      }
+    Navigator.pushNamed(context, route, arguments: dupArgs).then((_) {
+      if (context.mounted) ReportFilterState.reloadEntries(context);
     });
   }
 
@@ -3575,14 +3580,8 @@ class _ReportActions {
         route = '/add-material';
         break;
     }
-    Navigator.pushNamed(context, route, arguments: editArgs).then((val) {
-      if (context.mounted) {
-        final loadId = ReportFilterState.selectedProjectId == 'all'
-            ? null
-            : ReportFilterState.selectedProjectId;
-        context.read<ProjectProvider>().loadEntriesForProject(loadId);
-        context.read<ProjectProvider>().load();
-      }
+    Navigator.pushNamed(context, route, arguments: editArgs).then((_) {
+      if (context.mounted) ReportFilterState.reloadEntries(context);
     });
   }
 
@@ -3609,7 +3608,7 @@ class _ReportActions {
         Navigator.of(context).pop(); // pop progress
         if (success) {
           btToast(context, 'Entry deleted successfully');
-          context.read<ProjectProvider>().load();
+          ReportFilterState.reloadEntries(context);
         } else {
           btToast(context, 'Failed to delete entry', error: true);
         }
@@ -3685,7 +3684,7 @@ class _ReportActions {
         arguments: payArgs,
       ).then((updated) {
         if (updated == true && context.mounted) {
-          context.read<ProjectProvider>().load();
+          ReportFilterState.reloadEntries(context);
         }
       });
     }
