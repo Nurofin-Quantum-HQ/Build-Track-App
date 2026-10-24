@@ -54,9 +54,13 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
   void initState() {
     super.initState();
     _catalogue = buildDefaultPhases();
-    _selectedProjectId = UserSession.projectId;
     final provider = context.read<ProjectProvider>();
-    _completionProgress = provider.selectedProject?.progress ?? 0.0;
+    // Default: the app's selected project (Home's current project), else the
+    // only project. UserSession.projectId alone could be '' / not in the list.
+    _selectedProjectId = provider.defaultProjectForForm?.id ??
+        (UserSession.projectId.isNotEmpty ? UserSession.projectId : null);
+    _completionProgress = provider.projectById(_selectedProjectId)?.progress ??
+        provider.selectedProject?.progress ?? 0.0;
     _fetchDailyTasks();
   }
   Future<void> _fetchDailyTasks() async {
@@ -293,7 +297,35 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) _hydrateProject(projectId);
         });
+      } else if (projectId != null && projectId.isNotEmpty) {
+        // Partial context (project, maybe phase): pre-fill what was given and
+        // leave the rest editable (not the locked tracker layout).
+        _selectedProjectId = projectId;
+        if (floor != null && floor.isNotEmpty) _selectedFloor = floor;
+        if (phaseName != null && phaseName.isNotEmpty) _selectedPhaseName = phaseName;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _hydrateProject(projectId);
+        });
       }
+    }
+  }
+
+  /// Fill empty floor / phase / activity when the project has exactly one
+  /// (build-safe: local fields only, no setState).
+  void _autoPickSingles(ProjectModel? project) {
+    if (_launchedFromTracker || project == null) return;
+    final floors = project.floors ?? const <String>[];
+    if (floors.length == 1 && _selectedFloor == null) _selectedFloor = floors.first;
+    if (floors.isNotEmpty && _selectedFloor == null) return;
+    if (_selectedPhaseName == null) {
+      final phases = _phasesFor(project);
+      if (phases.length == 1) _selectedPhaseName = phases.first;
+    }
+    if (_selectedPhaseName == null || _selectedActivityName != null) return;
+    final acts = _activitiesFor(project, _selectedPhaseName);
+    if (acts.length == 1) {
+      _selectedActivityName = acts.first;
+      _prefillActivityId = null;
     }
   }
 
@@ -432,6 +464,7 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
                 (p) => p?.id == _selectedProjectId,
                 orElse: () => null,
               );
+        _autoPickSingles(selProject);
         final floors = (selProject?.floors?.isNotEmpty ?? false)
             ? List<String>.from(selProject!.floors!)
             : <String>[];

@@ -4,6 +4,7 @@ import 'package:buildtrack_mobile/common/themes/app_colors.dart';
 import 'package:buildtrack_mobile/common/widgets/entry_widgets.dart';
 import 'package:buildtrack_mobile/services/task_service.dart';
 import 'package:buildtrack_mobile/models/project_model.dart';
+import 'package:buildtrack_mobile/models/construction_models.dart';
 import 'package:buildtrack_mobile/controller/project_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:showcaseview/showcaseview.dart';
@@ -56,6 +57,10 @@ class _AssignTaskScreenContentState extends State<_AssignTaskScreenContent> {
   String? _selectedUserId;
   bool _isLoading = false;
   List<Map<String, dynamic>> _users = [];
+  bool _argsLoaded = false;
+  /// Phase/activity came from the caller (e.g. "Assign task" on an activity):
+  /// picking the floor then keeps them — phases aren't per-floor.
+  bool _phasePrefilled = false;
   @override
   void initState() {
     super.initState();
@@ -69,6 +74,93 @@ class _AssignTaskScreenContentState extends State<_AssignTaskScreenContent> {
         ShowCaseWidget.of(context).startShowCase([_helpKey]);
       }
     });
+  }
+  /// Pre-selection. Route arguments (all optional): projectId, floor/floorId,
+  /// phase/phaseName + phaseId, activity/activityName + activityId. Without a
+  /// project argument the form starts on [initialProject], else the app's
+  /// selected project (or the only project) — it only reads that selection.
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_argsLoaded) return;
+    _argsLoaded = true;
+    final args = ModalRoute.of(context)?.settings.arguments;
+    String? str(String k) {
+      if (args is! Map) return null;
+      final v = args[k]?.toString().trim();
+      return (v == null || v.isEmpty) ? null : v;
+    }
+    final provider = context.read<ProjectProvider>();
+    final pid = str('projectId');
+    _selectedProjectId = pid ?? _selectedProjectId ?? provider.defaultProjectForForm?.id;
+    if (pid != null) {
+      final floor = str('floor');
+      if (floor != null) {
+        _selectedFloor = floor;
+        _selectedFloorId = str('floorId') ?? floor;
+      }
+      final phase = str('phase') ?? str('phaseName');
+      if (phase != null) {
+        _phasePrefilled = true;
+        _selectedPhase = phase;
+        _selectedPhaseId = str('phaseId');
+        final activity = str('activity') ?? str('activityName');
+        if (activity != null) {
+          _selectedActivity = activity;
+          _selectedActivityId = str('activityId');
+        }
+      }
+      // Project may not be in the local list yet (or has stale phases).
+      provider.refreshProject(pid);
+    }
+  }
+
+  /// When the chosen project has exactly one floor / phase / activity, pick
+  /// it (only fills empty values; called from build, no setState needed).
+  void _autoPickSingles(ProjectProvider provider) {
+    final project = provider.projectById(_selectedProjectId);
+    if (project == null) return;
+    final floors = project.floors ?? const <String>[];
+    if (floors.length == 1 && (_selectedFloor == null || _selectedFloor!.isEmpty)) {
+      _selectedFloor = floors.first;
+      _selectedFloorId = floors.first;
+    }
+    if (floors.isNotEmpty && (_selectedFloor == null || _selectedFloor!.isEmpty)) return;
+    final phases = project.selectedPhases ?? const <ProjectPhase>[];
+    final phaseNames = <String>{
+      ...phases.where((p) => p.activities.isNotEmpty).map((p) => p.phaseName),
+      ...?project.selectedPhaseNames,
+    };
+    if (phaseNames.isEmpty) phaseNames.addAll(buildDefaultPhases().map((p) => p.name));
+    if ((_selectedPhase == null || _selectedPhase!.isEmpty) && phaseNames.length == 1) {
+      _selectedPhase = phaseNames.first;
+      _selectedPhaseId = null;
+      for (final p in phases) {
+        if (p.phaseName == _selectedPhase) _selectedPhaseId = p.id;
+      }
+    }
+    if (_selectedPhase == null || _selectedPhase!.isEmpty) return;
+    if (_selectedActivity != null && _selectedActivity!.isNotEmpty) return;
+    ProjectPhase? phase;
+    for (final p in phases) {
+      if (p.phaseName == _selectedPhase) phase = p;
+    }
+    List<String> activities;
+    if (phase != null) {
+      activities = phase.activities.map((a) => a.name).toSet().toList();
+    } else {
+      activities = <String>[];
+      for (final d in buildDefaultPhases()) {
+        if (d.name == _selectedPhase) activities = d.allActivities.map((a) => a.name).toList();
+      }
+    }
+    if (activities.length == 1) {
+      _selectedActivity = activities.first;
+      _selectedActivityId = null;
+      for (final a in phase?.activities ?? const <ProjectActivity>[]) {
+        if (a.name == _selectedActivity) _selectedActivityId = a.id;
+      }
+    }
   }
   @override
   void dispose() {
@@ -198,6 +290,7 @@ class _AssignTaskScreenContentState extends State<_AssignTaskScreenContent> {
   }
   @override
   Widget build(BuildContext context) {
+    _autoPickSingles(context.watch<ProjectProvider>());
     final users = _users;
     String? userName;
     for (final u in users) {
@@ -226,6 +319,7 @@ class _AssignTaskScreenContentState extends State<_AssignTaskScreenContent> {
         phaseError: _phaseError,
         activityError: _activityError,
         onProjectChanged: (v) {
+          _phasePrefilled = false;
           setState(() {
             _selectedProjectId = v;
             _selectedFloor = null;
@@ -241,10 +335,12 @@ class _AssignTaskScreenContentState extends State<_AssignTaskScreenContent> {
           setState(() {
             _selectedFloor = v;
             _selectedFloorId = v;
-            _selectedPhase = null;
-            _selectedPhaseId = null;
-            _selectedActivity = null;
-            _selectedActivityId = null;
+            if (!_phasePrefilled) {
+              _selectedPhase = null;
+              _selectedPhaseId = null;
+              _selectedActivity = null;
+              _selectedActivityId = null;
+            }
             _floorError = null;
           });
         },

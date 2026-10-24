@@ -405,7 +405,8 @@ class _DetailHero extends StatelessWidget {
                   semantic: 'Assign task',
                   color: Bt.bone,
                   background: glass,
-                  onTap: () => Navigator.pushNamed(context, '/assign-task'),
+                  // Opened from this project → it is pre-selected.
+                  onTap: () => Navigator.pushNamed(context, '/assign-task', arguments: {'projectId': project.id}),
                 ),
             ],
           ),
@@ -817,6 +818,23 @@ class _TrackerActivityRowState extends State<_TrackerActivityRow> {
     return '${dt.day} ${_months[dt.month - 1]} ${dt.year}';
   }
   bool get _canAddEntry => logEntryKinds.any((k) => logKindAllowed(k.$1));
+  /// Assign a task for this activity: project, phase and activity are
+  /// pre-selected (floor too when the project has exactly one).
+  void _openAssignTask(BuildContext context) {
+    final floors = widget.project.floors ?? const <String>[];
+    Navigator.pushNamed(
+      context,
+      '/assign-task',
+      arguments: <String, dynamic>{
+        'projectId': widget.project.id,
+        if (floors.length == 1) 'floor': floors.first,
+        'phase': widget.phaseName,
+        'phaseId': widget.phase.id,
+        'activity': widget.activity.name,
+        'activityId': widget.activity.id,
+      },
+    );
+  }
   void _openUpdateProgress(BuildContext context) {
     final floors = widget.project.floors ?? [];
     Navigator.pushNamed(
@@ -1279,6 +1297,8 @@ class _TrackerActivityRowState extends State<_TrackerActivityRow> {
                                     activity: widget.activity,
                                   ),
                                 ),
+                              if (!done && RoleManager.canAssignTasks)
+                                _rowAction(context, Icons.assignment_outlined, 'Assign task', Bt.ink2, () => _openAssignTask(context)),
                               if (done) _rowAction(context, Icons.visibility_outlined, 'View', Bt.ink2, () => _showActivityDetails(context)),
                             ],
                           ),

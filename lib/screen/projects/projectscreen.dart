@@ -403,7 +403,8 @@ class _ProjectsScreenContentState extends State<_ProjectsScreenContent> {
                         const Spacer(),
                         if (RoleManager.canAssignTasks)
                           TextButton(
-                            onPressed: () => Navigator.pushNamed(context, '/assign-task'),
+                            // From this project's card → this project pre-selected.
+                            onPressed: () => Navigator.pushNamed(context, '/assign-task', arguments: {'projectId': p.id}),
                             style: TextButton.styleFrom(minimumSize: const Size(44, 40), padding: const EdgeInsets.symmetric(horizontal: 8)),
                             child: Text('Assign task', style: BtText.subhead(context, weight: FontWeight.w600, color: bt.accentInk)),
                           )

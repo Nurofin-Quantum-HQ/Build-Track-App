@@ -708,10 +708,39 @@ class ProjectProvider extends ChangeNotifier {
       throw Exception('Failed to save project');
     }
     _projects.add(saved);
+    // The project just created becomes the app's selected project (Home,
+    // Projects, Reports pick it up). Clear the old floor/phase/activity and
+    // persist both the choice and the list: before, neither was saved, so the
+    // next load() restored the previously cached project id and the new
+    // project silently lost the selection.
     _selectedProject = saved;
     UserSession.projectId = saved.id;
+    _selectedFloor = null;
+    _selectedPhase = null;
+    _selectedPhaseId = null;
+    _selectedActivity = null;
+    _selectedActivityId = null;
     notifyListeners();
+    await _saveContextPrefs();
+    await _persistProjects();
     unawaited(loadEntriesForProject(saved.id));
+  }
+
+  /// A project from the loaded list by id (null when absent).
+  ProjectModel? projectById(String? id) {
+    if (id == null || id.trim().isEmpty) return null;
+    for (final p in _projects) {
+      if (p.id.trim() == id.trim()) return p;
+    }
+    return null;
+  }
+
+  /// The project a new form should start on: the app's selected project,
+  /// else the only project the user has.
+  ProjectModel? get defaultProjectForForm {
+    final sel = projectById(_selectedProject?.id);
+    if (sel != null) return sel;
+    return _projects.length == 1 ? _projects.first : null;
   }
   /// Saves the edited project. Throws with the server's message when the
   /// save fails (callers show it) — before, failures were stored in [error]

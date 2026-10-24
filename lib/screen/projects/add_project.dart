@@ -412,7 +412,10 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
           label: _projectCode,
         );
         if (!mounted) return;
-        Navigator.pop(context);
+        // addProject made the new project the app's selected project; open
+        // its detail (in place of this form) so the user lands on it instead
+        // of the list with another project still selected.
+        Navigator.pushReplacementNamed(context, '/project-detail');
       }
     } catch (e) {
       if (mounted) {

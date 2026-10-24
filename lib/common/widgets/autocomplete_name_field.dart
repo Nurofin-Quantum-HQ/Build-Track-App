@@ -202,9 +202,20 @@ class _AutocompleteNameFieldState extends State<AutocompleteNameField> {
             showAddNew: showAddNew,
             onSelect: _onSelectSuggestion,
             onAddNew: () {
+              // "Add new": the typed name is the value — commit it (trimmed)
+              // and close the list so it reads as chosen.
+              final name = widget.controller.text.trim();
               setState(() {
                 _showSuggestions = false;
               });
+              if (name != widget.controller.text) {
+                widget.controller.removeListener(_onTextChanged);
+                widget.controller.text = name;
+                widget.controller.selection = TextSelection.collapsed(offset: name.length);
+                widget.controller.addListener(_onTextChanged);
+              }
+              widget.onChanged(name);
+              _focusNode.unfocus();
             },
           ),
                 ),

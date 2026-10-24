@@ -42,7 +42,8 @@ class _ExecutionContextScreenState extends State<ExecutionContextScreen> {
       _entryType = args['type']?.toString() ?? 'material';
     }
     final provider = Provider.of<ProjectProvider>(context, listen: false);
-    _selectedProjectId = provider.selectedProject?.id;
+    // Default: the app's selected project, else the only project.
+    _selectedProjectId = provider.defaultProjectForForm?.id ?? provider.selectedProject?.id;
     _selectedFloor = provider.selectedFloor;
     _selectedFloorId = provider.selectedFloor;
     _selectedPhase = provider.selectedPhase;
@@ -414,9 +415,47 @@ class _ExecutionContextScreenState extends State<ExecutionContextScreen> {
     }
   }
 
+  /// Fill empty picks that have exactly one choice (project, floor, phase,
+  /// activity) so a single-floor / single-phase project needs no taps. Only
+  /// local state changes here (build-safe); [_onContinue] syncs the provider.
+  void _autoPickSingles(ProjectProvider provider) {
+    if (_selectedProjectId == null || _selectedProjectId!.isEmpty) {
+      final p = provider.defaultProjectForForm;
+      if (p == null) return;
+      _selectedProjectId = p.id;
+    }
+    var o = _options(provider);
+    if (o.selProject == null) return;
+    if (o.floors.length == 1 && (_selectedFloor == null || _selectedFloor!.isEmpty)) {
+      _selectedFloor = o.floors.first;
+      _selectedFloorId = o.floors.first;
+    }
+    if (o.floors.isNotEmpty && (_selectedFloor == null || _selectedFloor!.isEmpty)) return;
+    if ((_selectedPhase == null || _selectedPhase!.isEmpty) && o.phases.length == 1) {
+      _selectedPhase = o.phases.first;
+      _selectedPhaseId = null;
+      for (final ph in o.selProject!.selectedPhases ?? const <ProjectPhase>[]) {
+        if (ph.phaseName == _selectedPhase) _selectedPhaseId = ph.id;
+      }
+      o = _options(provider);
+    }
+    if (_selectedPhase == null || _selectedPhase!.isEmpty) return;
+    if ((_selectedActivity == null || _selectedActivity!.isEmpty) && o.activities.length == 1) {
+      _selectedActivity = o.activities.first;
+      _selectedActivityId = null;
+      for (final ph in o.selProject!.selectedPhases ?? const <ProjectPhase>[]) {
+        if (ph.phaseName != _selectedPhase) continue;
+        for (final a in ph.activities) {
+          if (a.name == _selectedActivity) _selectedActivityId = a.id;
+        }
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<ProjectProvider>();
+    _autoPickSingles(provider);
     final o = _options(provider);
     if (!_openInit) {
       _openInit = true;
