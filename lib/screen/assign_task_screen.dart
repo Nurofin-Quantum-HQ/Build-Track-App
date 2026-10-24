@@ -61,17 +61,10 @@ class _AssignTaskScreenContentState extends State<_AssignTaskScreenContent> {
     super.initState();
     _selectedProjectId = widget.initialProject?.id;
     _fetchUsers();
+    // The pickers here are local to this form: they must not change the
+    // app's selected project/floor/phase (that switched Project detail and
+    // the Home/Reports context behind this screen).
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_selectedProjectId != null) {
-        final provider = Provider.of<ProjectProvider>(context, listen: false);
-        final project = provider.projects.cast<ProjectModel?>().firstWhere(
-          (p) => p?.id == _selectedProjectId,
-          orElse: () => null,
-        );
-        if (project != null) {
-          provider.selectProject(project);
-        }
-      }
       if (!UserSession.hasSkippedTour && !UserSession.visitedModules.contains('AssignTaskScreen')) {
         ShowCaseWidget.of(context).startShowCase([_helpKey]);
       }
@@ -139,7 +132,15 @@ class _AssignTaskScreenContentState extends State<_AssignTaskScreenContent> {
         _projectError = 'Please select a project';
         valid = false;
       }
-      if (_selectedFloor == null || _selectedFloor!.isEmpty) {
+      // Floor is only required when the project has floors (otherwise the
+      // picker is disabled and its error hidden, so the tap did nothing).
+      final provider = context.read<ProjectProvider>();
+      final project = provider.projects.cast<ProjectModel?>().firstWhere(
+        (p) => p?.id == _selectedProjectId,
+        orElse: () => null,
+      );
+      final hasFloors = project?.floors?.isNotEmpty ?? false;
+      if (hasFloors && (_selectedFloor == null || _selectedFloor!.isEmpty)) {
         _floorError = 'Please select a floor';
         valid = false;
       }
@@ -235,16 +236,6 @@ class _AssignTaskScreenContentState extends State<_AssignTaskScreenContent> {
             _selectedActivityId = null;
             _projectError = null;
           });
-          final provider = Provider.of<ProjectProvider>(
-            context,
-            listen: false,
-          );
-          if (v != null) {
-            final project = provider.projects.firstWhere(
-              (p) => p.id == v,
-            );
-            provider.selectProject(project);
-          }
         },
         onFloorChanged: (v) {
           setState(() {
@@ -256,10 +247,6 @@ class _AssignTaskScreenContentState extends State<_AssignTaskScreenContent> {
             _selectedActivityId = null;
             _floorError = null;
           });
-          Provider.of<ProjectProvider>(
-            context,
-            listen: false,
-          ).selectFloor(v);
         },
         onPhaseChanged: (v) {
           final phaseName = v?.toString();
@@ -273,10 +260,6 @@ class _AssignTaskScreenContentState extends State<_AssignTaskScreenContent> {
             _selectedActivityId = null;
             _phaseError = null;
           });
-          Provider.of<ProjectProvider>(
-            context,
-            listen: false,
-          ).selectPhase(phaseName, phaseId);
         },
         onActivityChanged: (v) {
           final activityName = v?.toString();
@@ -288,10 +271,6 @@ class _AssignTaskScreenContentState extends State<_AssignTaskScreenContent> {
             _selectedActivityId = activityId;
             _activityError = null;
           });
-          Provider.of<ProjectProvider>(
-            context,
-            listen: false,
-          ).selectActivity(activityName, activityId);
         },
       ),
       EntryLabeled(

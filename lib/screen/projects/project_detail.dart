@@ -11,6 +11,7 @@ import 'dart:convert';
 import 'package:buildtrack_mobile/common/widgets/entry_widgets.dart';
 import 'package:buildtrack_mobile/common/widgets/log_sheet.dart';
 import 'package:buildtrack_mobile/services/api_service.dart';
+import 'package:buildtrack_mobile/services/task_service.dart';
 import 'package:buildtrack_mobile/screen/projects/edit_project.dart';
 import 'package:buildtrack_mobile/screen/project_insights/project_insights_screen.dart';
 import 'package:file_picker/file_picker.dart';
@@ -30,6 +31,45 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
   // which opens automatically; tapping a phase header folds/unfolds it.
   final Set<String> _toggled = {};
   _DetailTab _tab = _DetailTab.overview;
+
+  /// PUT /projects/:id also accepts anyone with a task on the project, so
+  /// those users keep the update controls even without the permission.
+  bool _hasMyTask = false;
+  String? _taskCheckFor;
+
+  void _checkMyTask(String projectId) {
+    if (_taskCheckFor == projectId) return;
+    _taskCheckFor = projectId;
+    _hasMyTask = false;
+    if (RoleManager.canSubmitProjectUpdate) return;
+    final me = UserSession.userId;
+    TaskService.getProjectTasks(projectId).then((tasks) {
+      final mine = tasks.any((t) => me.isNotEmpty && (t.assignedTo?['_id'] ?? t.assignedTo?['id'])?.toString() == me);
+      if (mounted && _taskCheckFor == projectId && mine) setState(() => _hasMyTask = true);
+    }).catchError((_) {});
+  }
+
+  /// Phases-tab tick. Un-marking clears the activity's notes and photos, so it
+  /// asks first; the result is always reported.
+  Future<void> _toggleActivity(ProjectModel project, ProjectActivity activity) async {
+    if (activity.completed) {
+      final ok = await btConfirm(
+        context,
+        title: 'Mark "${activity.name}" as not done?',
+        message: 'Its completion date, notes and photos will be removed.',
+        confirmLabel: 'Mark not done',
+      );
+      if (!ok || !mounted) return;
+    }
+    final provider = context.read<ProjectProvider>();
+    final success = await provider.toggleActivityCompletion(project.id, activity.id);
+    if (!mounted) return;
+    if (success) {
+      btToast(context, activity.completed ? '${activity.name} marked not done' : '${activity.name} marked done');
+    } else {
+      btToast(context, provider.lastSaveError ?? 'Could not save. Try again.', error: true);
+    }
+  }
   @override
   void initState() {
     super.initState();
@@ -75,6 +115,8 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
         ),
       );
     }
+    _checkMyTask(project.id);
+    final canUpdate = RoleManager.canSubmitProjectUpdate || _hasMyTask;
     final selectedPhases = project.selectedPhases;
     final hasNewTracker = selectedPhases != null && selectedPhases.isNotEmpty;
     final int trackerTotal = hasNewTracker
@@ -151,14 +193,8 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                     _toggled.add(id);
                   }
                 }),
-                onToggleActivity: (activityId) {
-                  context
-                      .read<ProjectProvider>()
-                      .toggleActivityCompletion(
-                        project.id,
-                        activityId,
-                      );
-                },
+                canUpdate: canUpdate,
+                onToggleActivity: (activity) => _toggleActivity(project, activity),
               )
           else
             const BtCard(
@@ -585,14 +621,17 @@ class _TrackerPhaseCard extends StatelessWidget {
     required this.isExpanded,
     required this.onToggleExpand,
     required this.onToggleActivity,
+    this.canUpdate = true,
   });
+  /// False → no tick / "Update progress" controls (the user can't save them).
+  final bool canUpdate;
   final int index;
   final ProjectPhase phase;
   final ProjectModel project;
   final bool isActive;
   final bool isExpanded;
   final VoidCallback onToggleExpand;
-  final void Function(String activityId) onToggleActivity;
+  final void Function(ProjectActivity activity) onToggleActivity;
   @override
   Widget build(BuildContext context) {
     final done = phase.completedCount;
@@ -698,7 +737,7 @@ class _TrackerPhaseCard extends StatelessWidget {
                               phaseName: phase.phaseName,
                               isFirst: i == 0,
                               isLast: i == phase.activities.length - 1,
-                              onToggle: () => onToggleActivity(phase.activities[i].id),
+                              onToggle: canUpdate ? () => onToggleActivity(phase.activities[i]) : null,
                             ),
                         ],
                       ),
@@ -740,11 +779,13 @@ class _TrackerActivityRow extends StatefulWidget {
     this.isFirst = false,
     this.isLast = false,
   });
+  bool get canUpdate => onToggle != null;
   final ProjectActivity activity;
   final ProjectModel project;
   final ProjectPhase phase;
   final String phaseName;
-  final VoidCallback onToggle;
+  /// Null when the user can't update progress (controls hidden).
+  final VoidCallback? onToggle;
   final bool isFirst, isLast;
   @override
   State<_TrackerActivityRow> createState() => _TrackerActivityRowState();
@@ -841,7 +882,10 @@ class _TrackerActivityRowState extends State<_TrackerActivityRow> {
             top: 10,
             bottom: MediaQuery.of(modalContext).viewInsets.bottom + MediaQuery.of(modalContext).padding.bottom + 16,
           ),
-          child: Column(
+          // Scrolls so the fields and Save stay reachable with the keyboard open.
+          child: SingleChildScrollView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -904,12 +948,13 @@ class _TrackerActivityRowState extends State<_TrackerActivityRow> {
                     if (success) {
                       btToast(context, 'Budget updated successfully!');
                     } else {
-                      btToast(context, 'Failed to update budget. Please try again.', error: true);
+                      btToast(context, context.read<ProjectProvider>().lastSaveError ?? 'Failed to update budget. Please try again.', error: true);
                     }
                   }
                 },
               ),
             ],
+          ),
           ),
         );
       },
@@ -1219,7 +1264,8 @@ class _TrackerActivityRowState extends State<_TrackerActivityRow> {
                             spacing: 8,
                             runSpacing: 6,
                             children: [
-                              _rowAction(context, Icons.trending_up_rounded, 'Update progress', bt.accentInk, () => _openUpdateProgress(context)),
+                              if (widget.canUpdate)
+                                _rowAction(context, Icons.trending_up_rounded, 'Update progress', bt.accentInk, () => _openUpdateProgress(context)),
                               if (_canAddEntry)
                                 _rowAction(
                                   context,
@@ -1405,6 +1451,7 @@ class _TrackerActivityRowState extends State<_TrackerActivityRow> {
                     ),
                   ),
                 ),
+                if (widget.canUpdate)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
                   child: BtButton(

@@ -575,13 +575,20 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
               phaseName: ph.name,
               isCustom: ph.isCustom,
               activities: ph.allActivities.where((a) => a.isSelected).map((a) {
-                final prev = _existingActivityById[a.key];
+                // Same lookup as _populateFrom (id, then phase::name), so an
+                // activity matched by name keeps its id, completion and the
+                // daily-update notes/photos ($set replaces selectedPhases).
+                final prev = _existingActivityById[a.key] ??
+                    _existingActivityById['${ph.name.trim().toLowerCase()}::${a.name.trim().toLowerCase()}'];
                 return ProjectActivity(
-                  id: a.key,
+                  id: (prev != null && prev.id.isNotEmpty) ? prev.id : a.key,
                   name: a.name,
                   isCustom: a.isCustom,
                   completed: prev?.completed ?? false,
                   completedAt: prev?.completedAt,
+                  notes: prev?.notes,
+                  photo: prev?.photo,
+                  photos: prev?.photos,
                   budgetMaterial: a.budgetMaterial ?? prev?.budgetMaterial,
                   budgetLabour: a.budgetLabour ?? prev?.budgetLabour,
                   budgetEquipment: a.budgetEquipment ?? prev?.budgetEquipment,
@@ -655,7 +662,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
       }
     } catch (e) {
       if (mounted) {
-        btToast(context, 'Error: $e', error: true);
+        btToast(context, 'Could not update the project: ${e.toString().replaceFirst('Exception: ', '')}', error: true);
       }
     } finally {
       if (mounted) setState(() => _saving = false);
