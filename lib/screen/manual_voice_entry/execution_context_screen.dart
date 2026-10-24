@@ -30,6 +30,8 @@ class _ExecutionContextScreenState extends State<ExecutionContextScreen> {
   /// Which numbered pick row is expanded (0 project · 1 floor · 2 phase · 3 activity).
   int? _open;
   bool _openInit = false;
+  /// Where the entry form goes after saving (see finishEntrySave).
+  String _entryExit = 'dock';
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -56,6 +58,8 @@ class _ExecutionContextScreenState extends State<ExecutionContextScreen> {
         return (v == null || v.isEmpty) ? null : v;
       }
       final pid = str('projectId');
+      // Started from a screen (project activity) → return there after saving.
+      if (pid != null) _entryExit = 'origin';
       if (pid != null) {
         if (pid != _selectedProjectId) {
           _selectedFloor = null;
@@ -208,6 +212,7 @@ class _ExecutionContextScreenState extends State<ExecutionContextScreen> {
         'phaseId': phaseId ?? '',
         'activity': _selectedActivity,
         'activityId': activityId ?? '',
+        'entryExit': _entryExit,
       },
     );
   }

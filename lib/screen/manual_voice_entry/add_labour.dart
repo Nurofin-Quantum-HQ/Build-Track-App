@@ -29,7 +29,8 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
   String? _selectedActivityId;
   Map<String, dynamic>? _duplicateContext;
   bool _isDuplicate = false;
-  bool _fromReport = false;
+  /// Where to go after saving (route arg from the entry flow; see finishEntrySave).
+  String? _entryExit;
   String? _sourceTransactionId;
   List<String> _floors = [];
   List<String> _phases = [];
@@ -119,7 +120,8 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
     final args = ModalRoute.of(context)?.settings.arguments;
     if (args is Map) {
       _isEditing = args['isEditing'] as bool? ?? false;
-      if (_isEditing && (args['status'] as String?) == 'approved') {
+      if (_isEditing &&
+          ((args['status'] ?? args['approvalStatus'])?.toString().toLowerCase() == 'approved')) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           Navigator.maybePop(context);
           btToast(context, 'Approved entries cannot be edited', error: true);
@@ -146,15 +148,14 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
         final preActivity = projectProvider.selectedActivity;
         if (preProjectId != null &&
             preProjectId.isNotEmpty &&
-            preFloor != null &&
-            preFloor.isNotEmpty &&
             prePhase != null &&
             prePhase.isNotEmpty &&
             preActivity != null &&
             preActivity.isNotEmpty) {
           _selectedProjectId = preProjectId;
-          _selectedFloor = preFloor;
-          _selectedFloorId = preFloor;
+          // Projects without floors have no floor; phase/activity still apply.
+          _selectedFloor = (preFloor != null && preFloor.isNotEmpty) ? preFloor : null;
+          _selectedFloorId = _selectedFloor;
           _selectedPhase = prePhase;
           _selectedPhaseId = projectProvider.selectedPhaseId;
           _selectedActivity = preActivity;
@@ -171,15 +172,13 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
           final routePhase = args['phase']?.toString();
           final routeActivity = args['activity']?.toString();
           if (routeProjectId.isNotEmpty &&
-              routeFloor != null &&
-              routeFloor.isNotEmpty &&
               routePhase != null &&
               routePhase.isNotEmpty &&
               routeActivity != null &&
               routeActivity.isNotEmpty) {
             _selectedProjectId = routeProjectId;
-            _selectedFloor = routeFloor;
-            _selectedFloorId = args['floorId']?.toString() ?? routeFloor;
+            _selectedFloor = (routeFloor != null && routeFloor.isNotEmpty) ? routeFloor : null;
+            _selectedFloorId = _selectedFloor == null ? null : (args['floorId']?.toString() ?? routeFloor);
             _selectedPhase = routePhase;
             _selectedPhaseId = args['phaseId']?.toString();
             _selectedActivity = routeActivity;
@@ -189,7 +188,7 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
           }
         }
         _isDuplicate = args['isDuplicate'] as bool? ?? false;
-        _fromReport = args['fromReport'] as bool? ?? false;
+        _entryExit = args['entryExit']?.toString();
         _sourceTransactionId = args['sourceTransactionId']?.toString();
         final prefill = args['prefill'] as String?;
         if (prefill != null) _nameCtrl.text = prefill;
@@ -1084,7 +1083,10 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
         "sourceTransactionId": _sourceTransactionId,
     };
     if (_isEditing) {
-      if (_paymentHistory.isNotEmpty) {
+      // Payment history is only sent by users allowed to record payments; for
+      // everyone else the server keeps the entry's payments as they are.
+      if (!RoleManager.canRecordPayments) {
+      } else if (_paymentHistory.isNotEmpty) {
         payload["paymentHistory"] = _paymentHistory.map((p) {
           final rawDate = p['date'] ?? p['paymentDate'];
           String finalDate = DateTime.now().toUtc().toIso8601String();
@@ -1098,7 +1100,9 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
             "method": p['method'] ?? p['paymentMode'] ?? 'Cash',
             "amount": _parseDouble(p['amount']),
             "note": p['note'] ?? '',
-            "receipt": p['receipt'] ?? p['receiptDataUri'] ?? '',
+            // The sheet returns the picked file's name in 'receipt' and the
+            // image itself in 'receiptDataUri' — send the image, not the name.
+            "receipt": p['receiptDataUri'] ?? p['receipt'] ?? '',
           };
         }).toList();
       } else {
@@ -1120,10 +1124,10 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
       if (apiMode == 'Bank Transfer') apiMode = 'Bank Transfer';
       payload["paidAmount"] = totalPaid;
       payload["paymentMode"] = apiMode;
-      final bool esignReq = (_paymentResult!['requestEsign'] as bool?) ?? false;
+      final bool esignReq = (_paymentResult?['requestEsign'] as bool?) ?? false;
       if (apiMode == 'Cash' && esignReq) {
         payload['requestEsign'] = true;
-        payload['clientEmail'] = (_paymentResult!['clientEmail'] as String?) ?? '';
+        payload['clientEmail'] = (_paymentResult?['clientEmail'] as String?) ?? '';
       }
       payload["paymentStatus"] = totalPaid >= _totalCost()
           ? "Paid"
@@ -1181,65 +1185,51 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
     debugPrint(
       'SAVE PATH CHECK: _isEditing=$_isEditing  _editingTransactionId=$_editingTransactionId  condition=${_isEditing && _editingTransactionId != null}',
     );
-    final bool success;
+    final EntrySaveResult result;
     if (_isEditing && _editingTransactionId != null) {
-      debugPrint('>>> SAVE PATH: updateTransaction($_editingTransactionId)');
-      success = await ApiService.updateTransaction(
-        _editingTransactionId!,
-        payload,
-      );
+      final ok = await ApiService.updateTransaction(_editingTransactionId!, payload);
+      result = EntrySaveResult(ok ? EntrySaveOutcome.saved : EntrySaveOutcome.failed);
     } else {
-      debugPrint(
-        '>>> SAVE PATH: addMaterial (CREATE NEW) — WARNING: not updating!',
-      );
-      success = await ApiService.addMaterial(payload);
+      result = await postTransaction(payload);
     }
     if (!mounted) return;
-    if (success) {
-      context.read<InventoryProvider>().loadInventory(_selectedProjectId!);
-      context.read<ProjectProvider>().load();
-      final savedTitle = _nameCtrl.text.trim();
-      final savedTotal = _totalCost();
-      await showBtSuccess(
-        context,
-        kind: BtSuccessKind.bags,
-        label: _isEditing
-            ? 'Entry updated'
-            : RoleManager.canApprovePayments
-            ? 'Entry saved'
-            : 'Submitted to supervisor',
-        title: _isEditing ? 'Labour entry updated.' : 'Labour entry saved.',
-        message: [
-          if (savedTitle.isNotEmpty) savedTitle,
-          if (savedTotal > 0) formatInr(savedTotal),
-        ].join(' · '),
-      );
-      if (!mounted) return;
-      if (_fromReport && Navigator.canPop(context)) {
-        Navigator.pop(context, true);
-      } else if (_fromReport) {
-        Navigator.pushNamedAndRemoveUntil(
-          context,
-          '/reports',
-          (route) => route.settings.name == '/' || route.isFirst,
-        );
-      } else if (UserSession.hasPermission('view_inventory')) {
-        Navigator.pushNamedAndRemoveUntil(
-          context,
-          '/reports',
-          (route) => route.settings.name == '/' || route.isFirst,
-        );
-      } else {
-        Navigator.pushNamedAndRemoveUntil(
-          context,
-          '/add-entry',
-          (route) => route.settings.name == '/' || route.isFirst,
-        );
-      }
-    } else {
-      btToast(context, 'Error saving to server. Please try again.', error: true);
+    if (result.offline) {
+      // Queued by the offline queue: no success animation for money that isn't saved yet.
+      btToast(context, result.message ?? EntrySaveResult.offlineMessage);
+      finishEntrySave(context, exit: _entryExit);
+      return;
     }
-    setState(() => _isSaving = false);
+    if (!result.saved) {
+      btToast(context, result.message ?? 'Error saving to server. Please try again.', error: true);
+      setState(() => _isSaving = false);
+      return;
+    }
+    final projectId = _selectedProjectId;
+    if (projectId != null && projectId.isNotEmpty) {
+      context.read<InventoryProvider>().loadInventory(projectId);
+    }
+    // When this screen pops with `true` the caller reloads; the dock / origin exits refresh here.
+    if (_entryExit != null || !Navigator.canPop(context)) {
+      context.read<ProjectProvider>().load();
+    }
+    final savedTitle = _nameCtrl.text.trim();
+    final savedTotal = _totalCost();
+    await showBtSuccess(
+      context,
+      kind: BtSuccessKind.bags,
+      label: _isEditing
+          ? 'Entry updated'
+          : RoleManager.isAdmin
+          ? 'Entry saved'
+          : 'Submitted to supervisor',
+      title: _isEditing ? 'Labour entry updated.' : 'Labour entry saved.',
+      message: [
+        if (savedTitle.isNotEmpty) savedTitle,
+        if (savedTotal > 0) formatInr(savedTotal),
+      ].join(' · '),
+    );
+    if (!mounted) return;
+    finishEntrySave(context, exit: _entryExit);
   }
   Widget _buildPaymentSection() {
     return Padding(
@@ -1796,7 +1786,8 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
         }
         context.read<ProjectProvider>().load();
         btToast(context, 'Entry deleted successfully');
-        Navigator.pop(context); // Pop edit screen
+        // 'deleted' tells the entry detail screen to close as well.
+        Navigator.pop(context, 'deleted');
       } else if (context.mounted) {
         btToast(context, 'Failed to delete entry', error: true);
       }
@@ -1815,7 +1806,7 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
       backgroundColor: Bt.ground,
       appBar: BtNavBar(
         title: title,
-        trailing: _isEditing
+        trailing: _isEditing && RoleManager.canDeleteEntries
             ? BtIconButton(
                 icon: Icons.delete_outline_rounded,
                 semantic: 'Delete entry',
@@ -2050,7 +2041,7 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
               ),
             ]),
           ),
-          if (RoleManager.canApprovePayments) BtReveal(index: 7, child: _buildPaymentSection()),
+          if (RoleManager.canRecordPayments) BtReveal(index: 7, child: _buildPaymentSection()),
           BtReveal(index: 8, child: EntryFormSection(
             title: 'Bill or invoice',
             caption: 'optional',
@@ -2086,7 +2077,7 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
       ),
       bottomNavigationBar: EntryBottomBar(
         child: EntrySubmitButton(
-          label: RoleManager.canApprovePayments
+          label: RoleManager.isAdmin
               ? 'Save Labour Entry'
               : 'Submit to Supervisor',
           icon: Icons.check_circle,

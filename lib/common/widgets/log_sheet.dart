@@ -26,15 +26,14 @@ const logEntryKinds = <(String, String, String)>[
   ('equipment', 'Equipment', 'Machines, fuel, hire'),
 ];
 
-/// Same permission gates as the Add Entry page's type list.
+/// POST /transactions accepts `manage_expenses` or `add_entries` (Admins always)
+/// for every entry type, so all three use the same gate as the backend.
 bool logKindAllowed(String type) {
   switch (type) {
     case 'material':
-      return RoleManager.canManageExpenses;
     case 'labour':
-      return RoleManager.canAddEntries;
     case 'equipment':
-      return RoleManager.canManageEquipmentMaster;
+      return RoleManager.canAddTransactions;
   }
   return false;
 }
@@ -99,7 +98,8 @@ class _LogSheetState extends State<_LogSheet> {
             ],
           ]),
         const SizedBox(height: 14),
-        BtReveal(
+        // Bulk import (POST /transactions/bulk) has the same backend gate.
+        if (RoleManager.canAddTransactions) BtReveal(
           index: 4,
           child: _ImportRow(
             onTap: () {

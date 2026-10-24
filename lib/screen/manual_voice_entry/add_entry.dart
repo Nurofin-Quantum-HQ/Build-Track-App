@@ -101,7 +101,7 @@ class _AddEntryScreenContentState extends State<_AddEntryScreenContent> {
   }
   List<Map<String, dynamic>> get _entries {
     final items = <Map<String, dynamic>>[];
-    if (RoleManager.canManageExpenses) {
+    if (RoleManager.canAddTransactions) {
       items.add({
         'icon': Icons.category,
         'title': 'Material',
@@ -111,7 +111,7 @@ class _AddEntryScreenContentState extends State<_AddEntryScreenContent> {
         'short': 'Concrete, steel, lumber & site items',
       });
     }
-    if (RoleManager.canAddEntries) {
+    if (RoleManager.canAddTransactions) {
       items.add({
         'icon': Icons.people,
         'title': 'Labour',
@@ -121,7 +121,7 @@ class _AddEntryScreenContentState extends State<_AddEntryScreenContent> {
         'short': 'Crew hours, trades, site presence',
       });
     }
-    if (RoleManager.canManageEquipmentMaster) {
+    if (RoleManager.canAddTransactions) {
       items.add({
         'icon': Icons.precision_manufacturing,
         'title': 'Equipment',
@@ -375,8 +375,11 @@ class _AddEntryScreenContentState extends State<_AddEntryScreenContent> {
                         Expanded(child: _entryCard(context, i)),
                       ],
                     ]),
-                  const SizedBox(height: 36),
-                  _buildCsvImportCard(context),
+                  // Bulk import (POST /transactions/bulk) needs manage_expenses / add_entries.
+                  if (RoleManager.canAddTransactions) ...[
+                    const SizedBox(height: 36),
+                    _buildCsvImportCard(context),
+                  ],
                 ],
               ),
             ),

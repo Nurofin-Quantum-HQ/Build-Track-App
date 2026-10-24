@@ -5,7 +5,9 @@ import 'package:buildtrack_mobile/common/controllers/voice_recording_controller.
 import 'package:buildtrack_mobile/controller/project_provider.dart';
 import 'package:buildtrack_mobile/controller/user_session.dart';
 import 'package:buildtrack_mobile/models/project_model.dart';
-import 'package:buildtrack_mobile/services/api_service.dart';
+import 'package:buildtrack_mobile/common/widgets/entry_widgets.dart'
+    show postTransaction, EntrySaveResult, finishEntrySave;
+import 'package:buildtrack_mobile/controller/inventory_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -291,12 +293,15 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
     _voiceCtrl.addListener(_onVoiceChanged);
     _voiceCtrl.preInitialize();
   }
+  /// Where to go when leaving the saved screen (route arg; see finishEntrySave).
+  String? _entryExit;
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     final args =
         ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
     _entryType = (args?['type'] as String?) ?? 'material';
+    _entryExit = args?['entryExit']?.toString();
     _rebuildResponse();
   }
   @override
@@ -1612,22 +1617,30 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
           'fuelCost': fuel,
         'createdBy': UserSession.userId,
       };
-      final result = await ApiService.addTransaction(payload);
-      if (result != null) {
-        final serverTx = result['transaction'] ?? result;
-        _savedEntryId =
-            serverTx?['_id']?.toString() ??
-            'VOICE-${DateTime.now().millisecondsSinceEpoch}';
+      final result = await postTransaction(payload);
+      if (result.offline) {
+        // Queued for sync: no saved screen / fake entry id for an unsaved entry.
+        _isProcessing = false;
+        if (!mounted) return;
+        btToast(context, result.message ?? EntrySaveResult.offlineMessage);
+        finishEntrySave(context, exit: _entryExit);
+        return;
+      }
+      if (result.saved) {
+        final serverTx = result.body?['transaction'] ?? result.body;
+        final savedId = serverTx is Map ? serverTx['_id']?.toString() : null;
         if (mounted) {
+          final projectId = _data.projectId;
+          if (projectId != null && projectId.isNotEmpty) {
+            context.read<InventoryProvider>().loadInventory(projectId);
+          }
           await Provider.of<ProjectProvider>(context, listen: false).load();
         }
         _isProcessing = false;
         if (!mounted) return;
         setState(() {
           _status = VoiceStatus.completed;
-          _savedEntryId =
-              serverTx?['_id']?.toString() ??
-              'VOICE-${DateTime.now().millisecondsSinceEpoch}';
+          _savedEntryId = savedId ?? 'NEW';
           _rebuildResponse();
         });
       } else {
@@ -1635,7 +1648,7 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
         if (!mounted) return;
         setState(() {
           _status = VoiceStatus.summary;
-          _saveError = 'Failed to save. Please try again.';
+          _saveError = result.message ?? 'Failed to save. Please try again.';
           _rebuildResponse();
         });
       }
@@ -1719,8 +1732,22 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
       setState(() => _editError = 'Please complete all required fields.');
       return;
     }
-    _data.projectName = _editControllers['project']!.text.trim();
-    _data.projectId = _editControllers['project']!.text.trim();
+    // The field holds the project NAME: resolve it to the project's id (copying
+    // the name into projectId saved the entry with no project).
+    final typedProject = _editControllers['project']!.text.trim();
+    final matchedProject = _projects.cast<ProjectModel?>().firstWhere(
+      (p) =>
+          p!.id == typedProject ||
+          p.name.trim().toLowerCase() == typedProject.toLowerCase(),
+      orElse: () => null,
+    );
+    if (matchedProject == null) {
+      setState(() => _editError =
+          'No project named "$typedProject". Type the name as it appears in your projects.');
+      return;
+    }
+    _data.projectName = matchedProject.name;
+    _data.projectId = matchedProject.id;
     _data.floor = _editControllers['floor']!.text.trim();
     _data.activity = _editControllers['activity']!.text.trim();
     if (_entryType == 'material') {
@@ -3538,13 +3565,18 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
               BtButton(
                 label: 'Add Another Entry',
                 variant: BtButtonVariant.accent,
-                onPressed: () => Navigator.pushNamed(context, '/add-entry'),
+                // Leave the finished flow instead of stacking another Add Entry page on it.
+                onPressed: () => finishEntrySave(context, exit: _entryExit ?? 'dock'),
               ),
               const SizedBox(height: 10),
               BtButton(
                 label: 'View All Entries',
                 variant: BtButtonVariant.onDark,
-                onPressed: () => Navigator.pushNamed(context, '/logs'),
+                onPressed: () {
+                  final nav = Navigator.of(context);
+                  finishEntrySave(context, exit: _entryExit ?? 'dock');
+                  nav.pushNamed('/logs');
+                },
               ),
             ],
           ),

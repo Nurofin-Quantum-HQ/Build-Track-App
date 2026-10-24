@@ -8,6 +8,8 @@ import 'package:provider/provider.dart';
 import 'package:buildtrack_mobile/common/utils/currency_formatter.dart';
 import 'package:buildtrack_mobile/common/utils/image_pick_helper.dart';
 import 'package:buildtrack_mobile/services/api_service.dart';
+import 'dart:convert';
+import 'package:buildtrack_mobile/controller/nav_controller.dart';
 const Map<String, List<String>> kInventoryUnits = {
   'Weight': ['kg', 'ton', 'gram'],
   'Volume': ['litre', 'm³', 'cum'],
@@ -1090,7 +1092,11 @@ Future<Map<String, dynamic>?> showPaymentSheet(
   bool isEsignPolling = false;
   bool isEsignCompleted = false;
   String esignStatusText = '';
-  Future<void> startEsignFlow(StateSetter ss) async {
+  // Polling can outlive the sheet (drag-dismiss, Back, Cancel, Confirm): it stops
+  // when the sheet closes and never calls the sheet's setState after that.
+  bool sheetOpen = true;
+  Future<void> startEsignFlow(StateSetter setSheet) async {
+    void ss(VoidCallback f) => sheetOpen ? setSheet(f) : f();
     final amt = double.tryParse(amountCtrl.text);
     if (amt == null || amt <= 0) {
       ss(() => amountError = 'Please enter a valid amount before requesting an E-Signature.');
@@ -1121,9 +1127,12 @@ Future<Map<String, dynamic>?> showPaymentSheet(
       esignStatusText = 'Waiting for client to sign...';
     });
     final reqId = res['requestId'];
-    while (isEsignPolling) {
+    int attempts = 0;
+    const maxAttempts = 60; // 3 minutes (60 × 3 s), same as the payment screen
+    while (isEsignPolling && sheetOpen && attempts < maxAttempts) {
+      attempts++;
       await Future.delayed(const Duration(seconds: 3));
-      if (!isEsignPolling) break;
+      if (!isEsignPolling || !sheetOpen) break;
       final statusRes = await ApiService.checkEsignatureStatus(reqId);
       if (statusRes != null && statusRes['status'] == 'signed') {
         ss(() {
@@ -1134,6 +1143,12 @@ Future<Map<String, dynamic>?> showPaymentSheet(
         });
         break;
       }
+    }
+    if (isEsignPolling) {
+      ss(() {
+        isEsignPolling = false;
+        esignStatusText = sheetOpen ? 'Signing timed out. You can retry or proceed.' : '';
+      });
     }
   }
   const pMethods = [
@@ -1817,7 +1832,10 @@ Future<Map<String, dynamic>?> showPaymentSheet(
         );
       },
     ),
-  );
+  ).whenComplete(() {
+    sheetOpen = false;
+    isEsignPolling = false;
+  });
 }
 class _SheetSectionLabel extends StatelessWidget {
   const _SheetSectionLabel(this.label);
@@ -2540,4 +2558,70 @@ class EntryBottomBar extends StatelessWidget {
       ),
     );
   }
+}
+
+// ─── Entry save helpers (shared by add material / labour / equipment + voice) ───
+
+enum EntrySaveOutcome { saved, offline, failed }
+
+class EntrySaveResult {
+  const EntrySaveResult(this.outcome, {this.body, this.message});
+  final EntrySaveOutcome outcome;
+  final Map<String, dynamic>? body;
+  final String? message;
+  bool get saved => outcome == EntrySaveOutcome.saved;
+  bool get offline => outcome == EntrySaveOutcome.offline;
+  static const offlineMessage = ApiService.offlineSavedMessage;
+}
+
+/// POST /transactions. Distinguishes a real save (200/201), a request queued by
+/// the offline queue (202 or `{offline: true}`) and a failure (server message).
+Future<EntrySaveResult> postTransaction(Map<String, dynamic> payload) async {
+  try {
+    final res = await ApiService.post('/transactions', payload);
+    Map<String, dynamic>? body;
+    try {
+      final d = jsonDecode(res.body);
+      if (d is Map<String, dynamic>) body = d;
+    } catch (_) {}
+    if (ApiService.isOfflineQueued(res) || body?['offline'] == true) {
+      return EntrySaveResult(
+        EntrySaveOutcome.offline,
+        body: body,
+        message: body?['message']?.toString() ?? EntrySaveResult.offlineMessage,
+      );
+    }
+    if (res.statusCode == 200 || res.statusCode == 201) {
+      return EntrySaveResult(EntrySaveOutcome.saved, body: body);
+    }
+    return EntrySaveResult(EntrySaveOutcome.failed, body: body, message: body?['message']?.toString());
+  } catch (e) {
+    debugPrint('postTransaction error: $e');
+    return const EntrySaveResult(EntrySaveOutcome.failed);
+  }
+}
+
+/// How an add / edit screen leaves after a successful save (route arg `entryExit`):
+/// * `'dock'`   — started from the + sheet / Add Entry tab → the Add Entry tab.
+/// * `'origin'` — started from a screen (e.g. a project's activity) via
+///   /execution-context → back to that screen.
+/// * anything else (edit, Add More, repeat…) → `Navigator.pop(context, true)` so the
+///   caller reloads; only when nothing can pop does it fall back to the Add Entry tab.
+void finishEntrySave(BuildContext context, {String? exit}) {
+  final nav = Navigator.of(context);
+  if (exit == 'origin') {
+    var passed = false;
+    nav.popUntil((r) {
+      if (passed || r.isFirst) return true;
+      if (r.settings.name == '/execution-context') passed = true;
+      return false;
+    });
+    return;
+  }
+  if (exit != 'dock' && nav.canPop()) {
+    nav.pop(true);
+    return;
+  }
+  final navCtl = context.read<NavController>();
+  navCtl.setRoute(navCtl.isRouteEnabled('/add-entry') ? '/add-entry' : '/home', context);
 }

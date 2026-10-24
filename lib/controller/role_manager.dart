@@ -88,6 +88,12 @@ class RoleManager {
       UserSession.hasPermission('approve_payments');
   static bool get canAddSupervisorRemarks =>
       isAdmin || UserSession.hasPermission('add_supervisor_remarks');
+  /// Recording a payment / marking paid (POST/PUT /transactions with paidAmount or
+  /// paymentStatus Paid): the backend allows Admins, approve_payments or mark_paid.
+  static bool get canRecordPayments =>
+      isAdmin ||
+      UserSession.hasPermission('approve_payments') ||
+      UserSession.hasPermission('mark_paid');
   static bool get canApprovePayments =>
       isAdmin ||
       UserSession.hasPermission('approve_payments') ||

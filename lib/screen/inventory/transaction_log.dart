@@ -4,6 +4,7 @@ import 'dart:developer' as dev;
 import 'package:buildtrack_mobile/common/widgets/entry_widgets.dart';
 import 'package:buildtrack_mobile/common/widgets/log_sheet.dart';
 import 'package:buildtrack_mobile/controller/entry_permissions.dart';
+import 'package:buildtrack_mobile/controller/role_manager.dart';
 import 'package:flutter/material.dart';
 import 'package:buildtrack_mobile/common/utils/currency_formatter.dart';
 import 'package:provider/provider.dart';
@@ -214,11 +215,14 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
     }
   }
   Future<void> _fetchRealLogs() async {
+    // Also called from `.then` of pushed screens, which may outlive this one.
+    if (!mounted) return;
     setState(() {
       _isLoading = true;
     });
     try {
       final response = await ApiService.get('/transactions?limit=10000');
+      if (!mounted) return;
       if (response.statusCode == 200) {
         final decoded = json.decode(response.body);
         List<dynamic> raw = [];
@@ -335,6 +339,9 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
             'projectId': pId,
             'createdBy': t['createdBy'] ?? '',
             'id': tId,
+            // Approval status (pending / approved / rejected): entry detail and the
+            // edit screens use it to block editing approved entries.
+            'status': (t['approvalStatus'] ?? 'pending').toString().toLowerCase(),
             'category': category,
             'unit': t['unit']?.toString(),
             'paymentHistory': t['paymentHistory'],
@@ -371,12 +378,14 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
           _isLoading = false;
         });
       } else {
+        if (!mounted) return;
         setState(() {
           _isLoading = false;
         });
       }
     } catch (e, stack) {
       dev.log('Error fetching logs', error: e, stackTrace: stack);
+      if (!mounted) return;
       setState(() {
         _isLoading = false;
       });
@@ -798,7 +807,8 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
         statusLabel = 'Pending';
         statusTone = BtTone.red;
     }
-    final VoidCallback? onRecordPayment = canSettle
+    // Recording a payment needs approve_payments / mark_paid on the backend.
+    final VoidCallback? onRecordPayment = canSettle && RoleManager.canRecordPayments
         ? () {
                             final projectProvider = context
                                 .read<ProjectProvider>();
@@ -962,7 +972,7 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
                 ),
               ),
               const SizedBox(width: 8),
-              if (canSettle)
+              if (canSettle && onRecordPayment != null)
                 BtButton(
                   label: 'Record Payment',
                   icon: Icons.receipt_long_outlined,
@@ -971,7 +981,7 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
                   expand: false,
                   onPressed: onRecordPayment,
                 )
-              else
+              else if (!canSettle)
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
