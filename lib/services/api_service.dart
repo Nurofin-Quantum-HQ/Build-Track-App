@@ -1232,22 +1232,25 @@ class ApiService {
     }
     return null;
   }
+  /// Throws on failure so the Activity list can show "Couldn't load · Retry"
+  /// instead of a false "All caught up".
   static Future<Map<String, dynamic>> fetchNotificationPage({int page = 1, int limit = 50}) async {
-    try {
-      final response = await get('/notifications?page=$page&limit=$limit');
-      if (response.statusCode == 200) {
-        final decoded = json.decode(response.body);
-        if (decoded is Map<String, dynamic>) return decoded;
-      }
-    } catch (e) {
-      if (kDebugMode) debugPrint('fetchNotificationPage error: $e');
+    final response = await get('/notifications?page=$page&limit=$limit');
+    if (response.statusCode == 200) {
+      final decoded = json.decode(response.body);
+      if (decoded is Map<String, dynamic>) return decoded;
     }
-    return {'items': <dynamic>[], 'total': 0, 'unreadCount': 0, 'page': 1, 'pages': 1};
+    throw Exception('Failed to load notifications (${response.statusCode})');
   }
 
   static Future<List<dynamic>> getNotifications() async {
-    final data = await fetchNotificationPage();
-    return (data['items'] as List?) ?? [];
+    try {
+      final data = await fetchNotificationPage();
+      return (data['items'] as List?) ?? [];
+    } catch (e) {
+      if (kDebugMode) debugPrint('getNotifications error: $e');
+      return [];
+    }
   }
 
   static Future<int> getUnreadNotificationCount() async {

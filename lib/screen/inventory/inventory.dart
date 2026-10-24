@@ -806,7 +806,7 @@ class _InventoryScreenContentState extends State<_InventoryScreenContent> {
     );
     final groups = _groupByDate(filtered);
     final kpis = _buildKpis(filtered, 'material');
-    return _TimelineTabContent(
+    return _withLoadErrorBanner(provider, _TimelineTabContent(
       groups: groups,
       kpis: kpis,
       chips: chips,
@@ -823,6 +823,38 @@ class _InventoryScreenContentState extends State<_InventoryScreenContent> {
         _matCustomRange = cr;
       }),
       onNavigate: (route, args) => _openAndReload(ctx, route, args),
+    ));
+  }
+  /// A failed refresh keeps the previous items; say they may be out of date.
+  Widget _withLoadErrorBanner(InventoryProvider provider, Widget content) {
+    if (!provider.hasError) return content;
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          child: BtCard(
+            padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
+            child: Row(children: [
+              const Icon(Icons.cloud_off_rounded, size: 18, color: Bt.red),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  "Couldn't refresh — showing the last loaded items.",
+                  style: BtText.caption(context, color: Bt.ink2),
+                ),
+              ),
+              BtButton(
+                label: 'Retry',
+                variant: BtButtonVariant.quiet,
+                small: true,
+                expand: false,
+                onPressed: provider.retry,
+              ),
+            ]),
+          ),
+        ),
+        Expanded(child: content),
+      ],
     );
   }
   /// Add More / Edit open an entry form; it pops with `true` after saving.
@@ -856,7 +888,7 @@ class _InventoryScreenContentState extends State<_InventoryScreenContent> {
     );
     final groups = _groupByDate(filtered);
     final kpis = _buildKpis(filtered, 'labour');
-    return _TimelineTabContent(
+    return _withLoadErrorBanner(provider, _TimelineTabContent(
       groups: groups,
       kpis: kpis,
       chips: chips,
@@ -873,7 +905,7 @@ class _InventoryScreenContentState extends State<_InventoryScreenContent> {
         _labCustomRange = cr;
       }),
       onNavigate: (route, args) => _openAndReload(ctx, route, args),
-    );
+    ));
   }
   Widget _buildEquipmentTab(BuildContext ctx) {
     final provider = ctx.watch<InventoryProvider>();
@@ -892,7 +924,7 @@ class _InventoryScreenContentState extends State<_InventoryScreenContent> {
     );
     final groups = _groupByDate(filtered);
     final kpis = _buildKpis(filtered, 'equipment');
-    return _TimelineTabContent(
+    return _withLoadErrorBanner(provider, _TimelineTabContent(
       groups: groups,
       kpis: kpis,
       chips: chips,
@@ -909,7 +941,7 @@ class _InventoryScreenContentState extends State<_InventoryScreenContent> {
         _eqpCustomRange = cr;
       }),
       onNavigate: (route, args) => _openAndReload(ctx, route, args),
-    );
+    ));
   }
 }
 class _PurchaseRecord {
