@@ -120,7 +120,10 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
     final args = ModalRoute.of(context)?.settings.arguments;
     if (args is Map) {
       _isEditing = args['isEditing'] as bool? ?? false;
+      // Only non-admins are locked out of approved entries (an admin's own
+      // entries are approved the moment they're saved).
       if (_isEditing &&
+          !UserSession.isAdmin &&
           ((args['status'] ?? args['approvalStatus'])?.toString().toLowerCase() == 'approved')) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           Navigator.maybePop(context);

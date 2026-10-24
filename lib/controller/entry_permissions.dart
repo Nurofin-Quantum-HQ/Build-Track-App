@@ -8,8 +8,9 @@ class EntryPermissions {
     required String createdBy,
     required String projectId,
   }) {
-    if (status == 'approved') return false;
+    // Admins can always edit (their own entries are approved on save).
     if (UserSession.isAdmin) return true;
+    if (status == 'approved') return false;
     // PUT /transactions/:id needs manage_expenses or add_entries on the backend.
     if (!RoleManager.canAddTransactions) return false;
     if (UserSession.isSupervisor) {
