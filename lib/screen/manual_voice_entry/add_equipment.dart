@@ -1294,7 +1294,7 @@ class _AddEquipmentScreenState extends State<AddEquipmentScreen> {
     final savedTotal = _finalTotal();
     await showBtSuccess(
       context,
-      kind: BtSuccessKind.bags,
+      kind: BtSuccessKind.check,
       label: _isEditing
           ? 'Entry updated'
           : RoleManager.isAdmin

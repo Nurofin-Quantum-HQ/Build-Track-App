@@ -198,7 +198,7 @@ class _AddEntryScreenContentState extends State<_AddEntryScreenContent> {
       if (result.successCount > 0) {
         await showBtSuccess(
           context,
-          kind: BtSuccessKind.bags,
+          kind: BtSuccessKind.check,
           title: 'Entries imported',
           message: '${result.successCount} ${result.successCount == 1 ? 'entry' : 'entries'} added from your spreadsheet',
         );

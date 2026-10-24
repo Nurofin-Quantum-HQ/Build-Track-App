@@ -335,11 +335,22 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
         }
       }
     }
+    // Keep the project's own floor names ("First", "Roof"…): renaming or
+    // dropping a floor on save detaches every entry recorded on it. A preset chip
+    // that means the same floor shows the project's name instead.
     final rawFloors = p.floors ?? [];
-    _selectedFloorChips = rawFloors
-        .map((f) => _normalizeFloor(f))
-        .where((f) => _floorChipOptions.contains(f))
-        .toList();
+    _selectedFloorChips = [];
+    for (final f in rawFloors) {
+      final orig = f.trim();
+      if (orig.isEmpty || _selectedFloorChips.contains(orig)) continue;
+      final i = _floorChipOptions.indexOf(_normalizeFloor(orig));
+      if (i != -1) {
+        _floorChipOptions[i] = orig;
+      } else if (!_floorChipOptions.contains(orig)) {
+        _floorChipOptions.add(orig);
+      }
+      _selectedFloorChips.add(orig);
+    }
     _room1BHKCount = p.room1BHK ?? 0;
     _room2BHKCount = p.room2BHK ?? 0;
     _room3BHKCount = p.room3BHK ?? 0;
@@ -1143,7 +1154,17 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
               icon: Icons.check_rounded,
               variant: BtButtonVariant.accent,
               loading: _saving,
-              onPressed: (_saving || _mainBuildingType == null) ? null : _finish,
+              onPressed: _saving
+                  ? null
+                  : () {
+                      if (_mainBuildingType == null) {
+                        // Was a silently disabled button.
+                        btToast(context, 'Pick what you\'re building (Building step) before saving.', error: true);
+                        _goStep(1);
+                        return;
+                      }
+                      _finish();
+                    },
             ),
           ),
         ],
@@ -1837,13 +1858,19 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
               final name = ctrl.text.trim();
               if (name.isEmpty) return;
               setState(
-                () => phase.activities.add(
-                  ConstructionActivity(
+                () {
+                  // A newly added activity is part of the plan: select it (and its
+                  // phase). Unselected activities are dropped on save, so before
+                  // this the new activity silently disappeared.
+                  final act = ConstructionActivity(
                     key: '${phase.name}::Custom::$name',
                     name: name,
                     isCustom: true,
-                  ),
-                ),
+                  );
+                  act.isSelected = true;
+                  phase.activities.add(act);
+                  phase.isSelected = true;
+                },
               );
               Navigator.pop(ctx);
             },

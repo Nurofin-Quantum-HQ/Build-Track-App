@@ -1239,7 +1239,8 @@ class _AddMaterialScreenState extends State<AddMaterialScreen> {
     final savedTotal = _finalTotal();
     await showBtSuccess(
       context,
-      kind: BtSuccessKind.bags,
+      // Bags only for a new material entry; an edit is a plain check.
+      kind: _isEditing ? BtSuccessKind.check : BtSuccessKind.bags,
       label: _isEditing
           ? 'Entry updated'
           : RoleManager.isAdmin

@@ -1217,7 +1217,7 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
     final savedTotal = _totalCost();
     await showBtSuccess(
       context,
-      kind: BtSuccessKind.bags,
+      kind: BtSuccessKind.check,
       label: _isEditing
           ? 'Entry updated'
           : RoleManager.isAdmin

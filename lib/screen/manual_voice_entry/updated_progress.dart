@@ -1261,7 +1261,7 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
               '${_selectedDate.day} ${months[_selectedDate.month - 1]} ${_selectedDate.year}';
           await showBtSuccess(
             context,
-            kind: BtSuccessKind.bags,
+            kind: BtSuccessKind.check,
             title: activity != null
                 ? '${activity.name} marked done'
                 : 'Progress updated',

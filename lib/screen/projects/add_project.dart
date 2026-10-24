@@ -1484,13 +1484,19 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
               FocusManager.instance.primaryFocus?.unfocus();
               Navigator.pop(ctx);
               setState(
-                () => phase.activities.add(
-                  ConstructionActivity(
+                () {
+                  // A newly added activity is part of the plan: select it (and its
+                  // phase). Unselected activities are dropped on save, so before
+                  // this the new activity silently disappeared.
+                  final act = ConstructionActivity(
                     key: '${phase.name}::Custom::$name',
                     name: name,
                     isCustom: true,
-                  ),
-                ),
+                  );
+                  act.isSelected = true;
+                  phase.activities.add(act);
+                  phase.isSelected = true;
+                },
               );
             },
             style: ElevatedButton.styleFrom(
