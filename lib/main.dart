@@ -42,6 +42,7 @@ import 'dart:async';
 import 'package:buildtrack_mobile/services/api_service.dart';
 import 'package:buildtrack_mobile/screen/esign/signature_page.dart';
 import 'package:flutter/material.dart';
+import 'package:buildtrack_mobile/design/design.dart';
 import 'package:provider/provider.dart';
 import 'package:buildtrack_mobile/controller/theme_provider.dart';
 import 'package:buildtrack_mobile/controller/user_session.dart';
@@ -66,49 +67,26 @@ void main() {
       debugPrint('App Started');
       WidgetsFlutterBinding.ensureInitialized();
       debugPrint('Flutter Initialized');
-      
+
       try {
         await Firebase.initializeApp(
           options: DefaultFirebaseOptions.currentPlatform,
-        );
+        ).timeout(const Duration(seconds: 10));
         FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
         debugPrint('Firebase Initialized');
       } catch (e) {
         debugPrint('Failed to initialize Firebase: $e');
       }
 
+      // Local only (no network): cached session, then drop anything older
+      // builds queued that must never be replayed (auth, approvals, PUTs…).
       await UserSession.loadFromPrefs();
-      // Validate session using AuthService instead of just checking if token exists
-      bool isLoggedIn = await AuthService.validateSession();
-      if (!isLoggedIn) {
-        // Just to be safe, clear any stale data if validation failed
-        final token = await AuthService.getToken(); // [BT-SEC-05]
-        if (token != null && token.isNotEmpty) {
-           await AuthService.logout(sessionExpired: false); // Clear without showing snackbar at startup
-        }
-      }
+      await ApiService.purgeOfflineQueue();
+      final hasToken = await AuthService.isLoggedIn();
       final projectProvider = ProjectProvider();
-      
-      // Initialize Push Notifications
-      if (isLoggedIn) {
-        debugPrint('API Initialized: Endpoint is ${ApiService.baseUrl}');
-        await projectProvider.load().timeout(
-          const Duration(seconds: 30),
-          onTimeout: () {
-            debugPrint('[main] projectProvider.load timed out after 30s');
-          },
-        );
-        try {
-          await PushNotificationService.init();
-        } catch (e) {
-          debugPrint('Failed to initialize push notifications: $e');
-        }
-      } else {
-        debugPrint(
-          'API Initialized: Endpoint is ${ApiService.baseUrl} (not logged in)',
-        );
-      }
-      debugPrint('Providers Initialized');
+      debugPrint('API Initialized: Endpoint is ${ApiService.baseUrl}');
+      // Draw the app right away; the network checks run behind the splash
+      // (_StartupGate) instead of before runApp (that could take ~2 minutes).
       runApp(
         MultiProvider(
           providers: [
@@ -119,7 +97,7 @@ void main() {
             ChangeNotifierProvider(create: (_) => InventoryProvider()),
             ChangeNotifierProvider(create: (_) => ThemeProvider()),
           ],
-          child: MyApp(isLoggedIn: isLoggedIn),
+          child: MyApp(isLoggedIn: hasToken),
         ),
       );
     },
@@ -128,6 +106,82 @@ void main() {
     },
   );
 }
+
+/// First screen while a stored session is checked: validates the token
+/// (short timeout; offline / 5xx keep the user signed in, a rejected token
+/// goes to Login), loads plan + projects, starts push, then opens Home.
+class _StartupGate extends StatefulWidget {
+  const _StartupGate();
+  @override
+  State<_StartupGate> createState() => _StartupGateState();
+}
+
+class _StartupGateState extends State<_StartupGate> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _start());
+  }
+
+  Future<void> _start() async {
+    final valid = await AuthService.validateSession();
+    if (!mounted) return;
+    if (!valid) {
+      // Rejected/expired token: clear everything and show Login (logout
+      // navigates there itself and says the session expired).
+      await AuthService.logout(sessionExpired: true);
+      return;
+    }
+    final projects = context.read<ProjectProvider>();
+    final subscription = context.read<SubscriptionProvider>();
+    final theme = context.read<ThemeProvider>();
+    unawaited(theme.reload()); // account themePreference refreshed by /auth/me
+    unawaited(subscription.fetchStatus()); // paid plan after restart (cached, then server)
+    unawaited(PushNotificationService.init().catchError((Object e) {
+      debugPrint('Failed to initialize push notifications: $e');
+    }));
+    unawaited(ApiService.syncOfflineEntries());
+    // Give the project list a moment so Home doesn't flash empty; it keeps
+    // loading in the background if slow.
+    try {
+      await projects.load().timeout(const Duration(seconds: 8));
+    } catch (e) {
+      debugPrint('[startup] projects still loading: $e');
+    }
+    if (!mounted) return;
+    Navigator.of(context).pushReplacementNamed('/home');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Bt.noir,
+      body: Center(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(14),
+            child: Container(
+              color: Colors.white,
+              padding: const EdgeInsets.all(6),
+              child: Image.asset(
+                'assets/images/buildtrack-logo.png',
+                width: 44,
+                height: 44,
+                fit: BoxFit.contain,
+                errorBuilder: (_, _, _) => const SizedBox(width: 44, height: 44),
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          Text('BuildTrack', style: BtText.d3(context, color: Bt.bone)),
+          const SizedBox(height: 24),
+          const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Bt.bone)),
+        ]),
+      ),
+    );
+  }
+}
+
 class MyApp extends StatelessWidget {
   const MyApp({super.key, required this.isLoggedIn});
   final bool isLoggedIn;
@@ -148,7 +202,7 @@ class MyApp extends StatelessWidget {
             settings: RouteSettings(name: initialRouteName),
             builder: (context) {
               if (initialRouteName == '/home') {
-                return HomeScreen();
+                return const _StartupGate();
               }
               return const LoginScreen();
             },

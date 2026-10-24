@@ -1,3 +1,4 @@
+import 'package:buildtrack_mobile/common/utils/date_parse.dart';
 import 'package:flutter/material.dart';
 import 'package:buildtrack_mobile/services/billing_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -125,13 +126,21 @@ class SubscriptionProvider extends ChangeNotifier {
     await _fetchStatusFromNetwork();
   }
 
+  /// Ask the server now and wait for the answer (Restore, after a payment or
+  /// a cancel). [fetchStatus] may answer from the cached plan instead.
+  Future<void> refreshFromNetwork() async {
+    _isLoading = true;
+    notifyListeners();
+    await _fetchStatusFromNetwork();
+  }
+
   Future<void> _fetchStatusFromNetwork() async {
     try {
       final data = await BillingService.fetchStatus();
       if (data != null && data['hasSubscription'] == true) {
         _currentPlan = SubscriptionPlanX.fromString(data['plan']?.toString());
         if (data['endDate'] != null) {
-          _expiryDate = DateTime.tryParse(data['endDate'].toString())?.toLocal();
+          _expiryDate = parseFlexibleDate(data['endDate']);
         } else {
           _expiryDate = null;
         }
@@ -150,8 +159,9 @@ class SubscriptionProvider extends ChangeNotifier {
       _error = '';
       await _persistSubscription();
     } catch (e) {
+      // Keep the last known plan (cached or fetched) — a failed check is not
+      // a downgrade to Free.
       _error = 'Could not fetch subscription status';
-      _status = SubscriptionStatus.unknown;
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -185,10 +195,8 @@ class SubscriptionProvider extends ChangeNotifier {
     _error = '';
     notifyListeners();
     try {
-      await fetchStatus();
-      if (_currentPlan == SubscriptionPlan.free) {
-        _error = '';
-      }
+      // Restore must reflect the server, not the cached plan.
+      await _fetchStatusFromNetwork();
     } catch (e) {
       _error = 'Restore failed. Please try again.';
     } finally {
@@ -203,7 +211,7 @@ class SubscriptionProvider extends ChangeNotifier {
     notifyListeners();
     try {
       final success = await BillingService.cancelSubscription();
-      await fetchStatus();
+      await _fetchStatusFromNetwork();
       return success;
     } catch (e) {
       _error = 'Cancellation failed: ${e.toString()}';
@@ -217,7 +225,7 @@ class SubscriptionProvider extends ChangeNotifier {
   Future<void> handlePaymentResult(bool success) async {
     _pendingPaymentParams = null;
     if (success) {
-      await fetchStatus();
+      await _fetchStatusFromNetwork();
     } else {
       _error = 'Payment was not completed. Please try again.';
       notifyListeners();

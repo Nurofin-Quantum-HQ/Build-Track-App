@@ -1,3 +1,5 @@
+import 'package:buildtrack_mobile/common/utils/date_parse.dart';
+
 enum EntryType { material, labour, equipment }
 enum EntryStatus { pending, approved, rejected }
 class Entry {
@@ -56,12 +58,8 @@ class Entry {
         orElse: () => EntryStatus.pending,
       ),
       approvedBy: map['approvedBy'] as String?,
-      approvedAt: map['approvedAt'] != null
-          ? DateTime.parse(map['approvedAt'] as String).toLocal()
-          : null,
-      createdAt: map['createdAt'] != null
-          ? DateTime.parse(map['createdAt'] as String).toLocal()
-          : null,
+      approvedAt: parseFlexibleDate(map['approvedAt']),
+      createdAt: parseFlexibleDate(map['createdAt']),
     );
   }
   Map<String, dynamic> toMap() {

@@ -119,6 +119,7 @@ class UserSession extends ChangeNotifier {
     _appTourPrompted = true;
     _globalTourActive = true;
     await _persist();
+    await _rememberTourPrompted();
     _instance.notifyListeners();
   }
 
@@ -131,7 +132,16 @@ class UserSession extends ChangeNotifier {
   static Future<void> markAppTourPrompted() async {
     _appTourPrompted = true;
     await _persist();
+    await _rememberTourPrompted();
     _instance.notifyListeners();
+  }
+
+  static Future<void> _rememberTourPrompted() async {
+    if (_userId.isEmpty) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_tourPromptKey(_userId), true);
+    } catch (_) {}
   }
 
   static Future<void> markModuleVisited(String moduleName) async {
@@ -193,8 +203,14 @@ class UserSession extends ChangeNotifier {
     if (isAdmin) return true;
     return _permissions.contains(key);
   }
+  /// Per-user "the welcome-tour question was answered" flag. Kept in its own
+  /// key so it survives logout (prefs are cleared) and session refreshes.
+  static String _tourPromptKey(String userId) => 'app_tour_prompted_$userId';
+
   static Future<void> fromLoginResponse(Map<String, dynamic> user) async {
-    _userId = user['id']?.toString() ?? '';
+    final newUserId = (user['id'] ?? user['_id'])?.toString() ?? '';
+    final sameUser = newUserId.isNotEmpty && newUserId == _userId;
+    _userId = newUserId;
     final rawRoleStr = user['role']?.toString() ?? '';
     
     // Sync themePreference from backend
@@ -215,9 +231,20 @@ class UserSession extends ChangeNotifier {
     }
     _rawRoleName = _toDisplayName(rawRoleStr);
     _role = _parseRole(rawRoleStr);
-    _globalTourActive = false;
-    _appTourPrompted = false;
-    
+    // A session refresh (startup /auth/me, Account page, profile save) must
+    // not reset the tour state — that re-showed the welcome-tour dialog on
+    // every launch. Only a different user starts fresh.
+    if (!sameUser) {
+      _globalTourActive = false;
+      _appTourPrompted = false;
+    }
+    if (!_appTourPrompted && newUserId.isNotEmpty) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        _appTourPrompted = prefs.getBool(_tourPromptKey(newUserId)) ?? false;
+      } catch (_) {}
+    }
+
     final rawIds = user['projectIds'];
     if (rawIds is List) {
       _projectIds = rawIds
@@ -339,6 +366,9 @@ class UserSession extends ChangeNotifier {
       _hasCreatedProject = data['hasCreatedProject'] == true;
       _hasAddedEntry = data['hasAddedEntry'] == true;
       _hasViewedReports = data['hasViewedReports'] == true;
+      _globalTourActive = data['globalTourActive'] == true;
+      _appTourPrompted = data['appTourPrompted'] == true ||
+          (_userId.isNotEmpty && (prefs.getBool(_tourPromptKey(_userId)) ?? false));
       if (data['visitedModules'] is List) {
         _visitedModules = (data['visitedModules'] as List).map((e) => e.toString()).toList();
       } else {
@@ -387,8 +417,22 @@ class UserSession extends ChangeNotifier {
         if (val != null) columnPrefs[key] = val;
       }
     }
-    
+    final tourPrompted = <String>[
+      for (final key in allKeys)
+        if (key.startsWith('app_tour_prompted_') && prefs.getBool(key) == true) key,
+    ];
+    // Unsynced offline entries belong to the user who made them (each item
+    // carries its userId) — keep them so they sync on that user's next login.
+    final offlineQueue = prefs.getString('offline_post_queue');
+
     await prefs.clear();
+
+    for (final key in tourPrompted) {
+      await prefs.setBool(key, true);
+    }
+    if (offlineQueue != null && offlineQueue != '[]') {
+      await prefs.setString('offline_post_queue', offlineQueue);
+    }
     
     if (cachedEmail != null) {
       await prefs.setString('cached_email', cachedEmail);

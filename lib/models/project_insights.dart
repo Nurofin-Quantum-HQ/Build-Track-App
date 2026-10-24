@@ -1,9 +1,10 @@
+import 'package:buildtrack_mobile/common/utils/date_parse.dart';
 // Typed view of GET /api/projects/:id/insights (project insights screen).
 // Mirrors core/backend/services/projectInsights.js.
 
 double _d(dynamic v) => v is num ? v.toDouble() : double.tryParse('$v') ?? 0;
 double? _dn(dynamic v) => v == null ? null : _d(v);
-DateTime? _dt(dynamic v) => v == null ? null : DateTime.tryParse('$v')?.toLocal();
+DateTime? _dt(dynamic v) => parseFlexibleDate(v);
 Map<String, dynamic> _m(dynamic v) => v is Map<String, dynamic> ? v : const {};
 List<dynamic> _l(dynamic v) => v is List ? v : const [];
 

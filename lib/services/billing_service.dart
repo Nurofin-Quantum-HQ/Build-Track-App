@@ -47,16 +47,14 @@ class BillingService {
       return null;
     }
   }
+  /// Throws on a network error or non-200, so a failed check never looks
+  /// like "no subscription" (that showed paid users as Free).
   static Future<Map<String, dynamic>?> fetchStatus() async {
-    try {
-      final response = await ApiService.get('/subscriptions/status');
-      if (response.statusCode == 200) {
-        return json.decode(response.body) as Map<String, dynamic>;
-      }
-      return null;
-    } catch (e) {
-      return null;
+    final response = await ApiService.get('/subscriptions/status', timeout: const Duration(seconds: 20));
+    if (response.statusCode == 200) {
+      return json.decode(response.body) as Map<String, dynamic>;
     }
+    throw Exception('Subscription status failed (HTTP ${response.statusCode})');
   }
 
   static Future<bool> cancelSubscription() async {

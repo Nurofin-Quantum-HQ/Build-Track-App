@@ -5,6 +5,14 @@ import 'package:buildtrack_mobile/services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:buildtrack_mobile/config/navigator_key.dart';
+import 'package:buildtrack_mobile/controller/inventory_provider.dart';
+import 'package:buildtrack_mobile/controller/project_provider.dart';
+import 'package:buildtrack_mobile/controller/subscription_provider.dart';
+import 'package:buildtrack_mobile/controller/theme_provider.dart';
+import 'package:buildtrack_mobile/screen/reports/report.dart' show ReportFilterState;
+import 'package:buildtrack_mobile/services/push_notification_service.dart';
+import 'package:http/http.dart' as http;
+import 'package:provider/provider.dart';
 
 class AuthService {
   // [BT-SEC-05] The JWT lives in OS-backed secure storage (Keystore/Keychain),
@@ -81,13 +89,31 @@ class AuthService {
     // Set synchronously, before any await, so 401s that race with this logout
     // are recognised as part of it.
     _sessionEnded = true;
+    // Stop pushes for this account on this device (needs the JWT, so before
+    // it is deleted). Time-boxed; never throws.
+    await PushNotificationService.unregister();
     await _secure.delete(key: _kTokenKey); // [BT-SEC-05]
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('token');       // clear any pre-migration plaintext token
     await prefs.remove('jwt_token');
     await prefs.remove('user_role');
     await UserSession.clear();
+    ReportFilterState.reset();
     debugPrint('[AuthService] Logged out — session cleared');
+
+    final ctx = globalNavigatorKey.currentContext;
+    if (ctx != null) {
+      // Every logout path (button, session expiry, delete account) clears the
+      // previous account's in-memory data and theme.
+      try {
+        ctx.read<ProjectProvider>().clear();
+        ctx.read<InventoryProvider>().clear();
+        ctx.read<SubscriptionProvider>().clear();
+        ctx.read<ThemeProvider>().reload();
+      } catch (e) {
+        debugPrint('[AuthService] provider reset after logout failed: $e');
+      }
+    }
 
     if (globalNavigatorKey.currentContext != null) {
       if (sessionExpired) {
@@ -102,34 +128,46 @@ class AuthService {
     }
   }
 
-  static Future<bool> validateSession() async {
+  /// Startup check of the stored token against GET /auth/me.
+  ///
+  /// * true  — the server accepted it (session refreshed), **or** the server
+  ///   couldn't be asked (offline, timeout, 5xx): keep the user signed in.
+  /// * false — no token, or the server rejected it (401/403/404 …): the
+  ///   caller sends the user to Login.
+  ///
+  /// Uses a plain request (not ApiService.get) so a 401 here doesn't fire the
+  /// global "session expired" logout before the app is even drawn — and so
+  /// a 401 is never mistaken for "offline" (that left expired sessions stuck
+  /// on an empty Home).
+  static Future<bool> validateSession({Duration timeout = const Duration(seconds: 8)}) async {
+    final token = await getToken();
+    if (token == null || token.isEmpty) return false;
+    http.Response response;
     try {
-      final token = await getToken();
-      if (token == null || token.isEmpty) return false;
-
-      // We call the API directly here to avoid interceptor loops if needed, 
-      // but using ApiService.get is fine since the interceptor will just call logout() on 401 anyway.
-      // Wait, let's use the underlying http package to avoid circular dependency if ApiService calls AuthService.logout().
-      // Actually, we can just use ApiService.get, but let's make sure ApiService is ready.
-      // Alternatively, just make an http request directly.
-      final response = await ApiService.get('/auth/me');
-      if (response.statusCode == 200) {
+      response = await http.get(
+        Uri.parse('${ApiService.baseUrl}/auth/me'),
+        headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $token'},
+      ).timeout(timeout);
+    } catch (e) {
+      debugPrint('[AuthService] Session check failed (offline?): $e');
+      return true;
+    }
+    if (response.statusCode == 200) {
+      try {
         final data = jsonDecode(response.body);
-        if (data != null && data['user'] != null) {
-          final Map<String, dynamic> user = Map<String, dynamic>.from(data['user']);
-          await UserSession.fromLoginResponse(user);
+        if (data is Map && data['user'] is Map) {
+          await UserSession.fromLoginResponse(Map<String, dynamic>.from(data['user'] as Map));
+          _sessionEnded = false;
           return true;
         }
+      } catch (e) {
+        debugPrint('[AuthService] /auth/me parse error: $e');
       }
-      // If 401, the interceptor will trigger logout. So we just return false here.
-      return false;
-    } catch (e) {
-      debugPrint('[AuthService] Session validation error: $e');
-      // On network error, we don't necessarily want to log out. We might be offline.
-      // We assume valid if we have a token but are offline, until the first 401 happens.
-      // Returning true here allows the app to proceed if it's an offline scenario.
-      return true; 
+      return true; // reachable + accepted, odd body: keep the cached session
     }
+    if (response.statusCode >= 500) return true; // server trouble ≠ signed out
+    debugPrint('[AuthService] Session rejected (${response.statusCode})');
+    return false;
   }
 
   static Future<String?> getToken() async {

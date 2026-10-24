@@ -69,6 +69,11 @@
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="paytmmp" />
         </intent>
+        <!-- url_launcher: canLaunchUrl(https) is false on Android 11+ without this (Account › Web Portal) -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" />
+        </intent>
     </queries>
 
 </manifest>

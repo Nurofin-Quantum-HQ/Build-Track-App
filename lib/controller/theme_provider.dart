@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
-import 'package:buildtrack_mobile/config/api_config.dart';
+import 'package:buildtrack_mobile/services/api_service.dart';
+import 'package:buildtrack_mobile/services/auth_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:buildtrack_mobile/common/themes/app_colors.dart';
 import 'package:buildtrack_mobile/design/bt_theme.dart';
@@ -51,6 +50,18 @@ class ThemeProvider extends ChangeNotifier {
     }
   }
 
+  /// Re-read the saved theme. Call after login (the account's
+  /// `themePreference` is written to prefs by UserSession) and after logout
+  /// (prefs cleared → back to the default), so a user never keeps the
+  /// previous account's colour.
+  Future<void> reload() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedColor = prefs.getInt(_themeKey);
+    _currentColor = (savedColor != null && (savedColor >> 24) != 0) ? Color(savedColor) : BtTheme.brass;
+    AppColors.primary = btTheme.brand;
+    notifyListeners();
+  }
+
   Future<void> setPreset(BtPreset p) async {
     if (p == BtPreset.custom) return;
     await setTheme(presetColors[p]!);
@@ -66,17 +77,15 @@ class ThemeProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final token = prefs.getString('auth_token') ?? '';
-      if (token.isNotEmpty) {
+      // Save to the account (PUT /auth/profile → themePreference) so it
+      // follows the user to other devices and survives logout. (Before: read
+      // a never-written 'auth_token' pref, so nothing was ever sent.)
+      if (await AuthService.isLoggedIn()) {
         final hexColor = '#${(color.toARGB32() & 0xFFFFFF).toRadixString(16).padLeft(6, '0').toUpperCase()}';
-        await http.put(
-          Uri.parse('${ApiConfig.baseUrl}/auth/profile'),
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer $token',
-          },
-          body: json.encode({'themePreference': hexColor}),
-        );
+        final res = await ApiService.put('/auth/profile', {'themePreference': hexColor});
+        if (res.statusCode != 200) {
+          debugPrint('Theme sync failed: ${res.statusCode} ${res.body}');
+        }
       }
     } catch (e) {
       debugPrint('Failed to sync theme to backend: $e');
