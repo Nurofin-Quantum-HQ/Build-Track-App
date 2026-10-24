@@ -1153,7 +1153,7 @@ class _AddEquipmentScreenState extends State<AddEquipmentScreen> {
       "isWithGst": _isWithGst,
       "gstPercentage": _isWithGst ? (double.tryParse(_gstCtrl.text) ?? 0) : 0,
       "totalAmount": _finalTotal(),
-      "amount": _finalTotal(),
+      "amount": (_finalTotal() * 100).round() / 100, // no float noise (3600.0030000000006)
       "brand": _typeCtrl.text.trim(),
       "supplier": _operatorCtrl.text.trim(),
       "notes": _notesCtrl.text.trim(),

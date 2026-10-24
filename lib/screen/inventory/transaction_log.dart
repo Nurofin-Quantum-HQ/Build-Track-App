@@ -255,6 +255,10 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
           if (rawType == 'income' || rawType == 'revenue') {
             continue;
           }
+          // Home "Money Out" records are cash flow, not site entries.
+          if (rawType == 'expense' && (t['category'] ?? '').toString() == 'Money Out') {
+            continue;
+          }
           String category = 'material';
           if (rawCat == 'labour' ||
               rawCat == 'wages' ||

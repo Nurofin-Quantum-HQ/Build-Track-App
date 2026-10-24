@@ -917,6 +917,14 @@ class _AdminDashboardState extends State<_AdminDashboard> {
     });
   }
 
+  /// Money returned to the client (mapped to negative amounts in _loadRevenue).
+  double get _moneyOutSum {
+    return _revenueEntries.fold<double>(0.0, (sum, tx) {
+      final amount = double.tryParse(tx['amount']?.toString() ?? '0') ?? 0.0;
+      return amount < 0 ? sum - amount : sum;
+    });
+  }
+
   static List<dynamic> _txList(String body) {
     final decoded = json.decode(body);
     if (decoded is List) return decoded;
@@ -2248,7 +2256,9 @@ class _AdminDashboardState extends State<_AdminDashboard> {
     // Project revenue failed to load and nothing was loaded before: don't
     // show ₹0 / a fake loss.
     final revenueUnknown = !_isGlobalView && project != null && _revenueError && _revenueEntries.isEmpty;
-    final netCash = revenue - spent;
+    // Project view: money out isn't a site cost (excluded from entries), so it's
+    // subtracted here. Global view uses the server totals, whose cost includes it.
+    final netCash = _isGlobalView ? revenue - spent : revenue - _moneyOutSum - spent;
     final isLoss = netCash < 0;
     final progress = _isGlobalView ? gProg : (project?.progress ?? 0.0);
     final usedPct = budget > 0 ? (spent / budget) : 0.0;

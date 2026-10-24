@@ -324,6 +324,7 @@ class SpendLine {
   static SpendLine? tryParse(Map<String, dynamic> j) {
     final type = _s(j['type']).toLowerCase();
     if (type == 'income' || type == 'revenue') return null;
+    if (type == 'expense' && _s(j['category']) == 'Money Out') return null; // Home money-out record
     final approval = _s(j['approvalStatus']).toLowerCase();
     if (approval == 'rejected') return null;
     // Same type mapping as ProjectProvider (unknown types count as material).

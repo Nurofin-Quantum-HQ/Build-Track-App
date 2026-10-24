@@ -205,6 +205,9 @@ class ProjectProvider extends ChangeNotifier {
     final filtered = apiMaterials.where((json) {
       final rawType = (json['type'] ?? '').toString().toLowerCase();
       if (rawType == 'income' || rawType == 'revenue') return false;
+      // Home's "Money Out" records (client money returned) are stored as Expense
+      // rows; they're cash flow, not a site cost/entry.
+      if (rawType == 'expense' && (json['category'] ?? '').toString() == 'Money Out') return false;
       final approvalStatus = (json['approvalStatus'] ?? '')
           .toString()
           .toLowerCase()

@@ -1103,7 +1103,7 @@ class _AddMaterialScreenState extends State<AddMaterialScreen> {
               : null),
       "gst": double.tryParse(_gstCtrl.text) ?? 0,
       "isWithGst": _isWithGst,
-      "amount": _finalTotal(),
+      "amount": (_finalTotal() * 100).round() / 100, // no float noise (3600.0030000000006)
       if (_sourceTransactionId != null)
         "sourceTransactionId": _sourceTransactionId,
       if (_selectedFloor != null ||

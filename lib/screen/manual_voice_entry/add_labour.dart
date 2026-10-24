@@ -1076,7 +1076,7 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
           (_selectedActivity != null && _selectedActivity!.isNotEmpty
               ? _deriveActivityId(_selectedActivity)
               : null),
-      "amount": _totalCost(),
+      "amount": (_totalCost() * 100).round() / 100, // no float noise
       "overtime": double.tryParse(_overtimeCtrl.text) ?? 0,
       "remarks": _workTypeCtrl.text.trim(),
       "notes": _notesCtrl.text.trim(),
