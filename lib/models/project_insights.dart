@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:buildtrack_mobile/common/utils/date_parse.dart';
 // Typed view of GET /api/projects/:id/insights (project insights screen).
 // Mirrors core/backend/services/projectInsights.js.
@@ -280,5 +282,226 @@ class ProjectInsights {
       alerts: _l(j['alerts']).whereType<Map<String, dynamic>>().map(InsightAlert.fromJson).toList(),
       bridge: j['bridge'] is Map<String, dynamic> ? BudgetBridge.fromJson(j['bridge']) : null,
     );
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// SPEND BY TYPE — computed on the device from GET /transactions (works with
+// the live server, which has no breakdown endpoint).
+// ═════════════════════════════════════════════════════════════════════════════
+
+/// One expense entry, reduced to what the breakdown needs. Parses both the
+/// server's transaction JSON and the app's cached `EntryModel.toJson()` shape.
+class SpendLine {
+  final String id, projectId, name, unit, worker, contractor;
+  final CostCategory category;
+  final double amount, paid, quantity;
+  final DateTime? date;
+  final bool approved;
+  final Map<String, dynamic> raw;
+
+  const SpendLine({
+    required this.id,
+    required this.projectId,
+    required this.name,
+    required this.unit,
+    required this.worker,
+    required this.contractor,
+    required this.category,
+    required this.amount,
+    required this.paid,
+    required this.quantity,
+    required this.date,
+    required this.approved,
+    required this.raw,
+  });
+
+  double get pending => math.max(0, amount - paid);
+
+  static String _s(dynamic v) => v == null ? '' : '$v'.trim();
+
+  /// Null for entries the breakdown ignores (income, rejected, no amount).
+  static SpendLine? tryParse(Map<String, dynamic> j) {
+    final type = _s(j['type']).toLowerCase();
+    if (type == 'income' || type == 'revenue') return null;
+    final approval = _s(j['approvalStatus']).toLowerCase();
+    if (approval == 'rejected') return null;
+    // Same type mapping as ProjectProvider (unknown types count as material).
+    final cat = (type == 'labour' || type == 'wages')
+        ? CostCategory.labour
+        : (type == 'equipment' || type == 'expense')
+        ? CostCategory.equipment
+        : CostCategory.material;
+    final qty = _d(j['quantity']);
+    var amount = _d(j['amount']);
+    if (amount <= 0) {
+      final rate = _d(j['rate'] ?? j['ratePerUnit']);
+      if (qty > 0 && rate > 0) amount = qty * rate;
+    }
+    if (amount <= 0) return null;
+    final p = j['project'] ?? j['projectId'];
+    final projectId = p is Map ? _s(p['_id'] ?? p['id']) : _s(p);
+    final w = j['worker'];
+    final worker = w is Map ? _s(w['name']) : _s(j['workerName']);
+    var contractor = _s(j['contractor'] ?? j['contractorName']);
+    if (contractor.isEmpty) contractor = cat == CostCategory.labour ? _s(j['category']) : _s(j['supplier']);
+    if (contractor.isEmpty && cat == CostCategory.labour) contractor = _s(j['supplier']);
+    var name = _s(j['title']);
+    if (name.isEmpty) name = _s(j['materialName']);
+    if (name.isEmpty) name = _s(j['description']);
+    if (name.isEmpty) name = _s(j['name']);
+    return SpendLine(
+      id: _s(j['_id'] ?? j['id']),
+      projectId: projectId,
+      name: name,
+      unit: _s(j['unit']),
+      worker: worker,
+      contractor: contractor,
+      category: cat,
+      amount: amount,
+      paid: _d(j['paidAmount']).clamp(0, amount).toDouble(),
+      quantity: qty,
+      date: _dt(j['date']) ?? _dt(j['createdAt']),
+      approved: approval == 'approved',
+      raw: j,
+    );
+  }
+}
+
+/// A group of entries sharing a (normalised) name.
+class SpendGroup {
+  final String name;
+  final List<SpendLine> lines;
+  final double amount, paid, share;
+
+  /// Total quantity + unit, only when every entry uses the same unit.
+  final double? quantity;
+  final String? unit;
+
+  const SpendGroup({
+    required this.name,
+    required this.lines,
+    required this.amount,
+    required this.paid,
+    required this.share,
+    this.quantity,
+    this.unit,
+  });
+
+  double get pending => math.max(0, amount - paid);
+  int get count => lines.length;
+  double? get avgRate => (quantity != null && quantity! > 0) ? amount / quantity! : null;
+}
+
+class SpendCategoryBreakdown {
+  final CostCategory category;
+  final double total, paid;
+  final int count, awaitingApproval;
+
+  /// By item name (labour type / material / equipment), largest first.
+  final List<SpendGroup> byName;
+
+  /// Labour only: by worker, else contractor / team.
+  final List<SpendGroup> byPerson;
+
+  const SpendCategoryBreakdown({
+    required this.category,
+    required this.total,
+    required this.paid,
+    required this.count,
+    required this.awaitingApproval,
+    required this.byName,
+    required this.byPerson,
+  });
+
+  double get pending => math.max(0, total - paid);
+}
+
+class SpendBreakdown {
+  final Map<CostCategory, SpendCategoryBreakdown> byCategory;
+  const SpendBreakdown(this.byCategory);
+
+  static String _key(String s) => s.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+
+  static List<SpendGroup> _group(List<SpendLine> lines, String Function(SpendLine) nameOf, double total, String fallback) {
+    final buckets = <String, List<SpendLine>>{};
+    final spellings = <String, Map<String, int>>{};
+    for (final l in lines) {
+      final raw = nameOf(l).trim().replaceAll(RegExp(r'\s+'), ' ');
+      final k = raw.isEmpty ? '' : _key(raw);
+      (buckets[k] ??= []).add(l);
+      if (raw.isNotEmpty) {
+        final m = spellings[k] ??= {};
+        m[raw] = (m[raw] ?? 0) + 1;
+      }
+    }
+    final out = <SpendGroup>[];
+    buckets.forEach((k, ls) {
+      var name = fallback;
+      final sp = spellings[k];
+      if (sp != null && sp.isNotEmpty) {
+        name = sp.entries.reduce((a, b) => b.value > a.value ? b : a).key;
+      }
+      var amount = 0.0, paid = 0.0, qty = 0.0;
+      final units = <String>{};
+      for (final l in ls) {
+        amount += l.amount;
+        paid += l.paid;
+        qty += l.quantity;
+        units.add(l.unit.toLowerCase());
+      }
+      final oneUnit = units.length == 1 && units.first.isNotEmpty && qty > 0;
+      ls.sort((a, b) => (b.date ?? DateTime(0)).compareTo(a.date ?? DateTime(0)));
+      out.add(SpendGroup(
+        name: name,
+        lines: ls,
+        amount: amount,
+        paid: paid,
+        share: total > 0 ? amount / total : 0,
+        quantity: oneUnit ? qty : null,
+        unit: oneUnit ? ls.first.unit : null,
+      ));
+    });
+    out.sort((a, b) => b.amount.compareTo(a.amount));
+    return out;
+  }
+
+  /// [from] inclusive, [to] exclusive; null = open-ended.
+  static SpendBreakdown compute(Iterable<SpendLine> all, {String? projectId, DateTime? from, DateTime? to}) {
+    final per = {for (final c in CostCategory.values) c: <SpendLine>[]};
+    for (final l in all) {
+      if (projectId != null && l.projectId.isNotEmpty && l.projectId != projectId) continue;
+      if (from != null || to != null) {
+        final d = l.date;
+        if (d == null) continue;
+        if (from != null && d.isBefore(from)) continue;
+        if (to != null && !d.isBefore(to)) continue;
+      }
+      per[l.category]!.add(l);
+    }
+    return SpendBreakdown({
+      for (final c in CostCategory.values)
+        c: () {
+          final ls = per[c]!;
+          var total = 0.0, paid = 0.0;
+          var awaiting = 0;
+          for (final l in ls) {
+            total += l.amount;
+            paid += l.paid;
+            if (!l.approved) awaiting++;
+          }
+          return SpendCategoryBreakdown(
+            category: c,
+            total: total,
+            paid: paid,
+            count: ls.length,
+            awaitingApproval: awaiting,
+            byName: _group(ls, (l) => l.name, total, 'Unnamed'),
+            byPerson: c == CostCategory.labour
+                ? _group(ls, (l) => l.worker.isNotEmpty ? l.worker : l.contractor, total, 'Not recorded')
+                : const [],
+          );
+        }(),
+    });
   }
 }

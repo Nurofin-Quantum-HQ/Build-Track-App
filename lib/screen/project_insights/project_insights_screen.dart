@@ -2,12 +2,13 @@ import 'package:buildtrack_mobile/models/project_insights.dart';
 import 'package:buildtrack_mobile/screen/project_insights/insights_money.dart';
 import 'package:buildtrack_mobile/screen/project_insights/insights_overview.dart';
 import 'package:buildtrack_mobile/screen/project_insights/insights_phases.dart';
+import 'package:buildtrack_mobile/screen/project_insights/insights_spend_types.dart';
 import 'package:buildtrack_mobile/screen/project_insights/insights_theme.dart';
 import 'package:buildtrack_mobile/services/api_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show SystemUiOverlayStyle;
 
-/// Project insights — light, tabbed (Overview · Phases · Money).
+/// Project insights — light, tabbed (Overview · Phases · Money · By type).
 ///
 /// Mobile UX choices: three bottom tabs in the thumb zone instead of one long
 /// scroll (Hick's law / progressive disclosure), ≥48dp targets, phase detail as
@@ -30,6 +31,9 @@ class _ProjectInsightsScreenState extends State<ProjectInsightsScreen> {
   late Future<ProjectInsights> _future;
   int _tab = 0;
 
+  /// Bumped on pull-to-refresh so the By-type tab refetches its entries too.
+  int _reloadTick = 0;
+
   @override
   void initState() {
     super.initState();
@@ -41,7 +45,10 @@ class _ProjectInsightsScreenState extends State<ProjectInsightsScreen> {
 
   Future<void> _refresh() async {
     final f = _load();
-    setState(() => _future = f);
+    setState(() {
+      _future = f;
+      _reloadTick++;
+    });
     await f;
   }
 
@@ -117,6 +124,11 @@ class _ProjectInsightsScreenState extends State<ProjectInsightsScreen> {
                             selectedIcon: Icon(Icons.payments),
                             label: 'Money',
                           ),
+                          NavigationDestination(
+                            icon: Icon(Icons.donut_small_outlined),
+                            selectedIcon: Icon(Icons.donut_small),
+                            label: 'By type',
+                          ),
                         ],
                       ),
                     ),
@@ -178,20 +190,27 @@ class _ProjectInsightsScreenState extends State<ProjectInsightsScreen> {
         InsCashCard(data: d),
         InsSuppliersCard(suppliers: d.suppliers),
       ],
+      // By type — spend per labour type / material / equipment item.
+      [
+        InsSpendByTypeView(projectId: widget.projectId, projectName: d.name, reloadTick: _reloadTick),
+      ],
     ];
     final children = tabs[_tab];
     return LayoutBuilder(
       builder: (context, c) {
-        final wide = c.maxWidth >= 900;
+        // One self-contained section: no two-column split, just a readable width.
+        final wide = c.maxWidth >= 900 && _tab != 3;
         final pad = c.maxWidth < 400 ? Ins.gutter : 24.0;
         if (!wide) {
-          return ListView.separated(
+          final list = ListView.separated(
             physics: const AlwaysScrollableScrollPhysics(),
             padding: EdgeInsets.fromLTRB(pad, 16, pad, 32),
             itemCount: children.length,
             separatorBuilder: (_, _) => const SizedBox(height: 12),
             itemBuilder: (_, i) => children[i],
           );
+          if (_tab != 3 || c.maxWidth < 760) return list;
+          return Center(child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 760), child: list));
         }
         // Two balanced columns on tablets / wide windows.
         final left = <Widget>[], right = <Widget>[];
@@ -309,12 +328,12 @@ class _Error extends StatelessWidget {
   );
 }
 
-/// Overview · Phases · Money as a segmented control (embedded mode).
+/// Overview · Phases · Money · By type as a segmented control (embedded mode).
 class _EmbeddedTabs extends StatelessWidget {
   const _EmbeddedTabs({required this.value, required this.onChanged});
   final int value;
   final ValueChanged<int> onChanged;
-  static const _labels = ['Overview', 'Phases', 'Money'];
+  static const _labels = ['Overview', 'Phases', 'Money', 'By type'];
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -336,7 +355,7 @@ class _EmbeddedTabs extends StatelessWidget {
                   decoration: i == value
                       ? BoxDecoration(color: Ins.card, borderRadius: BorderRadius.circular(10), boxShadow: const [BoxShadow(color: Color(0x1A0F172A), blurRadius: 3, offset: Offset(0, 1))])
                       : null,
-                  child: Text(_labels[i], style: Ins.t(14, w: i == value ? FontWeight.w600 : FontWeight.w500, c: i == value ? Ins.ink : Ins.ink3)),
+                  child: Text(_labels[i], maxLines: 1, overflow: TextOverflow.ellipsis, style: Ins.t(14, w: i == value ? FontWeight.w600 : FontWeight.w500, c: i == value ? Ins.ink : Ins.ink3)),
                 ),
               ),
             ),
