@@ -52,11 +52,16 @@ class _AiChatReportScreenState extends State<AiChatReportScreen> {
       );
     }
     return ChangeNotifierProvider(
-      create: (ctx) => AiChatReportProvider(
-        projectProvider: ctx.read<ProjectProvider>(),
-        authToken: token!,
-        baseUrl: baseUrl,
-      ),
+      create: (ctx) {
+        final args = ModalRoute.of(ctx)?.settings.arguments;
+        final scope = args is Map ? args['projectId']?.toString() : null;
+        return AiChatReportProvider(
+          projectProvider: ctx.read<ProjectProvider>(),
+          authToken: token!,
+          baseUrl: baseUrl,
+          scopeProjectId: (scope == null || scope.isEmpty) ? null : scope,
+        );
+      },
       child: const _AiDashboardView(),
     );
   }

@@ -2966,7 +2966,7 @@ class _AskAiBanner extends StatelessWidget {
         onTap: () => Navigator.pushNamed(
           context,
           '/ai-chat',
-          arguments: {'projectName': projectName},
+          arguments: {'projectName': projectName, 'projectId': ReportFilterState.selectedProjectId},
         ),
         child: Row(
           children: [

@@ -934,6 +934,7 @@ class ProjectProvider extends ChangeNotifier {
     final project = _projects[projectIndex];
     final phases = List<ProjectPhase>.from(project.selectedPhases ?? []);
     bool found = false;
+    String? foundPhaseId;
     DateTime? stampedDate;
     bool newCompletedStatus = true;
 
@@ -943,6 +944,7 @@ class ProjectProvider extends ChangeNotifier {
       final aIndex = activities.indexWhere((a) => a.id == activityId);
       if (aIndex != -1) {
         final current = activities[aIndex];
+        foundPhaseId = phase.id;
         newCompletedStatus =
             isCompleted ??
             (notes != null ||
@@ -1014,11 +1016,32 @@ class ProjectProvider extends ChangeNotifier {
       // buildingType ('' failed the enum → 400) and every other field.
       // `progress` only when the user set it — otherwise the server derives
       // it from completed / total activities.
-      final response = await ApiService.put('/projects/$projectId', {
-        'selectedPhases': phases.map((ph) => ph.toJson()).toList(),
-        'completedActivityKeys': completedKeys,
+      // One activity only (PUT /projects/:id/activities/:activityId): photos go
+      // to file storage and the reply is just this activity + progress, instead
+      // of re-sending every activity's photos both ways.
+      final changed = phases
+          .firstWhere((ph) => ph.id == foundPhaseId)
+          .activities
+          .firstWhere((a) => a.id == activityId);
+      var response = await ApiService.put('/projects/$projectId/activities/$activityId', {
+        if (foundPhaseId != null) 'phaseId': foundPhaseId,
+        'completed': newCompletedStatus,
+        if (newCompletedStatus && stampedDate != null) 'completedAt': stampedDate.toUtc().toIso8601String(),
+        if (newCompletedStatus && notes != null) 'notes': notes,
+        if (newCompletedStatus && (photos != null || photo != null))
+          'photos': changed.photos ?? [if (changed.photo != null) changed.photo!],
         if (manualProgress != null) 'progress': manualProgress.clamp(0.0, 1.0),
       });
+      var usedActivityRoute = true;
+      if (response.statusCode == 404 && response.body.contains('Route not found')) {
+        // Server not updated yet — fall back to the whole-phases update.
+        usedActivityRoute = false;
+        response = await ApiService.put('/projects/$projectId', {
+          'selectedPhases': phases.map((ph) => ph.toJson()).toList(),
+          'completedActivityKeys': completedKeys,
+          if (manualProgress != null) 'progress': manualProgress.clamp(0.0, 1.0),
+        });
+      }
       debugPrint(
         '[DEBUG] toggleActivityCompletion: PUT response status: ${response.statusCode}',
       );
@@ -1040,7 +1063,40 @@ class ProjectProvider extends ChangeNotifier {
             photos: photos,
           );
         }
-        if (response.statusCode == 200 && response.body.isNotEmpty) {
+        if (usedActivityRoute && response.statusCode == 200 && response.body.isNotEmpty) {
+          try {
+            final data = jsonDecode(response.body);
+            if (data is Map && data['activity'] is Map) {
+              final saved = ProjectActivity.fromJson(Map<String, dynamic>.from(data['activity'] as Map));
+              final i = _projects.indexWhere((p) => p.id == projectId);
+              if (i != -1) {
+                final cur = _projects[i];
+                final newPhases = (cur.selectedPhases ?? [])
+                    .map((ph) => ph.id == (data['phaseId'] ?? foundPhaseId)
+                        ? ph.copyWith(
+                            activities: ph.activities
+                                .map((a) => a.id == activityId ? saved : a)
+                                .toList(),
+                          )
+                        : ph)
+                    .toList();
+                final serverProgress = (data['progress'] as num?)?.toDouble();
+                final next = cur.copyWith(
+                  selectedPhases: newPhases,
+                  completedActivityKeys: (data['completedActivityKeys'] as List?)
+                      ?.map((e) => e.toString())
+                      .toList(),
+                  progress: serverProgress ?? cur.progress,
+                );
+                _projects[i] = next;
+                if (_selectedProject?.id == projectId) _selectedProject = next;
+                notifyListeners();
+              }
+            }
+          } catch (e) {
+            dev.log('[DEBUG] toggleActivityCompletion parse error: $e');
+          }
+        } else if (response.statusCode == 200 && response.body.isNotEmpty) {
           try {
             final data = jsonDecode(response.body);
             if (data['project'] != null) {
