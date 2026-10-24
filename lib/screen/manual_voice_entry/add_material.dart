@@ -1035,10 +1035,11 @@ class _AddMaterialScreenState extends State<AddMaterialScreen> {
       _projectError = _selectedProjectId == null
           ? 'Please select a Project.'
           : null;
-      _floorError = (_floors.isNotEmpty && _selectedFloor == null)
+      // Editing: older/imported entries may have no floor/phase — don't block the save.
+      _floorError = (!_isEditing && _floors.isNotEmpty && _selectedFloor == null)
           ? 'Please select a Floor / Zone.'
           : null;
-      _phaseError = _selectedPhase == null ? 'Please select a Phase.' : null;
+      _phaseError = (!_isEditing && _selectedPhase == null) ? 'Please select a Phase.' : null;
       _activityError = null; // Activity is optional (some phases have none).
       _unitError = _selectedUnit == null ? 'Please select a Unit.' : null;
       ok =
