@@ -147,10 +147,11 @@ class _FulfillmentPaymentScreenState extends State<FulfillmentPaymentScreen> {
         ? (_alreadyPaid > 0 ? PaymentStatus.partial : PaymentStatus.pending)
         : PaymentStatus.paid;
     if (_selectedStatus == PaymentStatus.paid) {
-      _amountCtrl.text = _outstanding.toStringAsFixed(0);
+      _amountCtrl.text = paymentAmountText(_outstanding);
     } else if (_selectedStatus == PaymentStatus.pending) {
       _amountCtrl.text = '0';
     }
+    _syncWithServer();
     _selectedMethod =
         args['paymentMethod']?.toString() ??
         args['paymentMode']?.toString() ??
@@ -172,6 +173,26 @@ class _FulfillmentPaymentScreenState extends State<FulfillmentPaymentScreen> {
     _phase = (txDetails?['phase'] ?? txDetails?['phaseName'])?.toString();
     _activity = (txDetails?['activity'] ?? txDetails?['activityName'])?.toString();
   }
+  /// The callers' bill / paid figures can be stale or computed on the phone
+  /// (e.g. a Materials bill with GST, which the server stores as quantity ×
+  /// rate only). The server rejects a paidAmount above ITS amount, so the
+  /// outstanding here is taken from the entry itself.
+  Future<void> _syncWithServer() async {
+    if (_entryId.isEmpty) return;
+    final tx = await ApiService.fetchTransactionById(_entryId);
+    if (tx == null || !mounted) return;
+    final bill = (tx['amount'] as num?)?.toDouble();
+    if (bill == null) return;
+    final paid = (tx['paidAmount'] as num?)?.toDouble() ?? 0.0;
+    setState(() {
+      _totalAmount = bill;
+      _alreadyPaid = paid;
+      _outstanding = (bill - paid).clamp(0.0, double.infinity);
+      if (_selectedStatus == PaymentStatus.paid && _outstanding > 0) {
+        _amountCtrl.text = paymentAmountText(_outstanding);
+      }
+    });
+  }
   @override
   void dispose() {
     _clientEmailCtrl.dispose();
@@ -187,7 +208,12 @@ class _FulfillmentPaymentScreenState extends State<FulfillmentPaymentScreen> {
     setState(() {
       _amountError = null;
     });
-    if (_selectedStatus != PaymentStatus.pending) {
+    // A leftover under one paisa (old float bills) shows "0": Fully Paid
+    // still clears it.
+    final subPaisaLeft = _selectedStatus == PaymentStatus.paid &&
+        _outstanding > 0 &&
+        moneyPaise(_outstanding) == 0;
+    if (_selectedStatus != PaymentStatus.pending && !subPaisaLeft) {
       final raw = _amountCtrl.text.trim();
       final amt = _parseAmount(raw);
       if (raw.isEmpty || amt == null || amt <= 0) {
@@ -196,7 +222,7 @@ class _FulfillmentPaymentScreenState extends State<FulfillmentPaymentScreen> {
         });
         return;
       }
-      if (_outstanding > 0 && amt > _outstanding) {
+      if (_outstanding > 0 && paymentExceeds(amt, _outstanding)) {
         setState(() {
           _amountError = 'Payment amount cannot exceed the outstanding amount.';
         });
@@ -208,6 +234,11 @@ class _FulfillmentPaymentScreenState extends State<FulfillmentPaymentScreen> {
         });
         return;
       }
+      // The exact remainder (to the paisa, or the whole-rupee figure shown
+      // for it) settles the entry: record it as Fully Paid.
+      if (paymentSettles(amt, _outstanding)) {
+        _selectedStatus = PaymentStatus.paid;
+      }
     }
     final amount = _selectedStatus == PaymentStatus.paid
         ? _outstanding
@@ -218,7 +249,12 @@ class _FulfillmentPaymentScreenState extends State<FulfillmentPaymentScreen> {
       _isSaving = true;
     });
     try {
-      final totalPaid = _alreadyPaid + amount;
+      // Paying in full sends the bill itself, so float sums (1000 + 2600.003)
+      // can't land a hair under it and leave the entry "Partial".
+      final totalPaid = _selectedStatus == PaymentStatus.paid &&
+              moneyPaise(_alreadyPaid + amount) == moneyPaise(_totalAmount)
+          ? _totalAmount
+          : _alreadyPaid + amount;
       final newStatusVal = _selectedStatus;
       final String newStatusStr = newStatusVal == PaymentStatus.paid
           ? 'Paid'
@@ -425,9 +461,9 @@ class _FulfillmentPaymentScreenState extends State<FulfillmentPaymentScreen> {
               _selectedStatus = v;
               _amountError = null;
               if (v == PaymentStatus.paid) {
-                _amountCtrl.text = _outstanding.toStringAsFixed(0);
+                _amountCtrl.text = paymentAmountText(_outstanding);
               } else if (v == PaymentStatus.partial) {
-                if (_amountCtrl.text == '0' || _amountCtrl.text == _outstanding.toStringAsFixed(0)) {
+                if (_amountCtrl.text == '0' || _amountCtrl.text == paymentAmountText(_outstanding)) {
                   _amountCtrl.clear();
                 }
               } else {
@@ -472,7 +508,7 @@ class _FulfillmentPaymentScreenState extends State<FulfillmentPaymentScreen> {
                     final amt = _parseAmount(val);
                     if (amt == null || amt == 0) {
                       _selectedStatus = PaymentStatus.pending;
-                    } else if (amt >= _outstanding) {
+                    } else if (amt >= _outstanding || paymentSettles(amt, _outstanding)) {
                       _selectedStatus = PaymentStatus.paid;
                     } else {
                       _selectedStatus = PaymentStatus.partial;

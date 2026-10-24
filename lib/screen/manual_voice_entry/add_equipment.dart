@@ -1183,21 +1183,24 @@ class _AddEquipmentScreenState extends State<AddEquipmentScreen> {
             "receipt": p['receiptDataUri'] ?? p['receipt'] ?? '',
           };
         }).toList();
+        settlePaymentHistory(payload["paymentHistory"] as List, _finalTotal());
       } else {
         payload["paymentHistory"] = [];
       }
     } else if (_isAddAndPay) {
       final paid = _parseDouble(_paymentAmountCtrl.text);
-      final totalPaid = _existingPaidAmount + paid;
-      final outstanding = (_finalTotal() - _existingPaidAmount).clamp(
+      final bill = _finalTotal();
+      final outstanding = (bill - _existingPaidAmount).clamp(
         0.0,
         double.infinity,
       );
-      if (paid > outstanding) {
+      if (paymentExceeds(paid, outstanding)) {
         _snack('Payment amount cannot exceed the outstanding amount.');
         setState(() => _isSaving = false);
         return;
       }
+      // The exact remainder pays the bill in full (sent as the bill itself).
+      final totalPaid = paymentSettles(paid, outstanding) ? bill : _existingPaidAmount + paid;
       String apiMode = _paymentMethod;
       if (apiMode == 'Bank Transfer') apiMode = 'Bank Transfer';
       payload["paidAmount"] = totalPaid;
@@ -1207,7 +1210,7 @@ class _AddEquipmentScreenState extends State<AddEquipmentScreen> {
         payload['requestEsign'] = true;
         payload['clientEmail'] = (_paymentResult?['clientEmail'] as String?) ?? '';
       }
-      payload["paymentStatus"] = totalPaid >= _finalTotal()
+      payload["paymentStatus"] = moneyPaise(totalPaid) >= moneyPaise(bill)
           ? "Paid"
           : totalPaid > 0
           ? "Partial"
@@ -1218,16 +1221,18 @@ class _AddEquipmentScreenState extends State<AddEquipmentScreen> {
       }
     } else if (_recordPaymentNow && _paymentResult != null) {
       final paid = (_paymentResult!['amount'] as double?) ?? 0.0;
-      final totalPaid = _existingPaidAmount + paid;
-      final outstanding = (_finalTotal() - _existingPaidAmount).clamp(
+      final bill = _finalTotal();
+      final outstanding = (bill - _existingPaidAmount).clamp(
         0.0,
         double.infinity,
       );
-      if (paid > outstanding) {
+      if (paymentExceeds(paid, outstanding)) {
         _snack('Payment amount cannot exceed the outstanding amount.');
         setState(() => _isSaving = false);
         return;
       }
+      // The exact remainder pays the bill in full (sent as the bill itself).
+      final totalPaid = paymentSettles(paid, outstanding) ? bill : _existingPaidAmount + paid;
       final method = (_paymentResult!['method'] as String?) ?? 'Cash';
       final payDate =
           (_paymentResult!['paymentDate'] as DateTime?) ?? DateTime.now();
@@ -1240,7 +1245,7 @@ class _AddEquipmentScreenState extends State<AddEquipmentScreen> {
         payload['requestEsign'] = true;
         payload['clientEmail'] = (_paymentResult!['clientEmail'] as String?) ?? '';
       }
-      payload["paymentStatus"] = totalPaid >= _finalTotal()
+      payload["paymentStatus"] = moneyPaise(totalPaid) >= moneyPaise(bill)
           ? "Paid"
           : totalPaid > 0
           ? "Partial"

@@ -978,6 +978,15 @@ class _AddMaterialScreenState extends State<AddMaterialScreen> {
     return _subtotal() * gstPct / 100;
   }
   double _finalTotal() => _subtotal() + _gstAmount();
+  /// What the server bills for this entry, and so the most that can be paid:
+  /// for Materials with a quantity and rate it stores quantity × rate WITHOUT
+  /// GST (Transaction pre-save hook + calculateAmount), and rejects any
+  /// paidAmount above that ("Paid amount cannot exceed total amount").
+  double _payableTotal() {
+    final qty = double.tryParse(_qtyCtrl.text) ?? 0;
+    final rate = double.tryParse(_rateCtrl.text) ?? 0;
+    return (qty > 0 && rate > 0) ? _subtotal() : _finalTotal();
+  }
   void _scrollToFirstError() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -1134,25 +1143,29 @@ class _AddMaterialScreenState extends State<AddMaterialScreen> {
             "receipt": p['receiptDataUri'] ?? p['receipt'] ?? '',
           };
         }).toList();
+        settlePaymentHistory(payload["paymentHistory"] as List, _payableTotal());
       } else {
         payload["paymentHistory"] = [];
       }
     } else if (_isAddAndPay) {
-      final totalPaid = _existingPaidAmount + _parseDouble(_paymentAmountCtrl.text);
-      final outstanding = (_finalTotal() - _existingPaidAmount).clamp(
+      final bill = _payableTotal();
+      final paying = _parseDouble(_paymentAmountCtrl.text);
+      final outstanding = (bill - _existingPaidAmount).clamp(
         0.0,
         double.infinity,
       );
-      if (_parseDouble(_paymentAmountCtrl.text) > outstanding) {
+      if (paymentExceeds(paying, outstanding)) {
         _snack('Payment amount cannot exceed the outstanding amount.');
         setState(() => _isSaving = false);
         return;
       }
+      // The exact remainder pays the bill in full (sent as the bill itself).
+      final totalPaid = paymentSettles(paying, outstanding) ? bill : _existingPaidAmount + paying;
       String apiMode = _paymentMethod;
       if (apiMode == 'Bank Transfer') apiMode = 'Bank Transfer';
       payload["paidAmount"] = totalPaid;
       payload["paymentMode"] = apiMode;
-      payload["paymentStatus"] = totalPaid >= _finalTotal()
+      payload["paymentStatus"] = moneyPaise(totalPaid) >= moneyPaise(bill)
           ? "Paid"
           : totalPaid > 0
           ? "Partial"
@@ -1163,16 +1176,18 @@ class _AddMaterialScreenState extends State<AddMaterialScreen> {
       }
     } else if (_recordPaymentNow && _paymentResult != null) {
       final paid = (_paymentResult!['amount'] as double?) ?? 0.0;
-      final totalPaid = _existingPaidAmount + paid;
-      final outstanding = (_finalTotal() - _existingPaidAmount).clamp(
+      final bill = _payableTotal();
+      final outstanding = (bill - _existingPaidAmount).clamp(
         0.0,
         double.infinity,
       );
-      if (paid > outstanding) {
+      if (paymentExceeds(paid, outstanding)) {
         _snack('Payment amount cannot exceed the outstanding amount.');
         setState(() => _isSaving = false);
         return;
       }
+      // The exact remainder pays the bill in full (sent as the bill itself).
+      final totalPaid = paymentSettles(paid, outstanding) ? bill : _existingPaidAmount + paid;
       final method = (_paymentResult!['method'] as String?) ?? 'Cash';
       final payDate =
           (_paymentResult!['paymentDate'] as DateTime?) ?? DateTime.now();
@@ -1185,7 +1200,7 @@ class _AddMaterialScreenState extends State<AddMaterialScreen> {
         payload['requestEsign'] = true;
         payload['clientEmail'] = (_paymentResult!['clientEmail'] as String?) ?? '';
       }
-      payload["paymentStatus"] = totalPaid >= _finalTotal()
+      payload["paymentStatus"] = moneyPaise(totalPaid) >= moneyPaise(bill)
           ? "Paid"
           : totalPaid > 0
           ? "Partial"
@@ -1528,7 +1543,7 @@ class _AddMaterialScreenState extends State<AddMaterialScreen> {
                                   ? 'Material'
                                   : _nameCtrl.text.trim(),
                               entryRef: '',
-                              totalAmount: _finalTotal(),
+                              totalAmount: _payableTotal(),
                               alreadyPaid: _existingPaidAmount,
                               vendorName: _supplierCtrl.text.trim(),
                               category: _categoryCtrl.text.trim().isEmpty
@@ -1584,7 +1599,7 @@ class _AddMaterialScreenState extends State<AddMaterialScreen> {
                       ? 'Material'
                       : _nameCtrl.text.trim(),
                   entryRef: '',
-                  totalAmount: _finalTotal(),
+                  totalAmount: _payableTotal(),
                   alreadyPaid: _calculateTotalPaidFromHistory(),
                   vendorName: _supplierCtrl.text.trim(),
                   category: _categoryCtrl.text.trim().isEmpty
@@ -1649,7 +1664,7 @@ class _AddMaterialScreenState extends State<AddMaterialScreen> {
               ? 'Material'
               : _nameCtrl.text.trim(),
           entryRef: '',
-          totalAmount: _finalTotal(),
+          totalAmount: _payableTotal(),
           alreadyPaid: _calculateTotalPaidFromHistory() - amount,
           vendorName: _supplierCtrl.text.trim(),
           category: _categoryCtrl.text.trim().isEmpty
@@ -1691,7 +1706,7 @@ class _AddMaterialScreenState extends State<AddMaterialScreen> {
               ? 'Material'
               : _nameCtrl.text.trim(),
           entryRef: '',
-          totalAmount: _finalTotal(),
+          totalAmount: _payableTotal(),
           alreadyPaid: _existingPaidAmount,
           vendorName: _supplierCtrl.text.trim(),
           category: _categoryCtrl.text.trim().isEmpty

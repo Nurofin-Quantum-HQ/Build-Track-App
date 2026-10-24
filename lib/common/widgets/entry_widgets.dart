@@ -369,11 +369,20 @@ class _UnitPickerSheetState extends State<_UnitPickerSheet> {
     _searchCtrl.dispose();
     super.dispose();
   }
+  /// The catalogue plus the current value when it is a custom unit, so a unit
+  /// added via "Custom" shows as the selected chip when the sheet reopens.
+  Map<String, List<String>> get _units {
+    final cur = widget.currentValue?.trim();
+    if (cur == null || cur.isEmpty) return widget.units;
+    final known = widget.units.values.any((l) => l.contains(cur));
+    return known ? widget.units : {'Custom': [cur], ...widget.units};
+  }
   Map<String, List<String>> get _filtered {
-    if (_query.isEmpty) return widget.units;
+    final all = _units;
+    if (_query.isEmpty) return all;
     final q = _query.toLowerCase();
     final result = <String, List<String>>{};
-    widget.units.forEach((cat, units) {
+    all.forEach((cat, units) {
       final matched = units.where((u) => u.toLowerCase().contains(q)).toList();
       if (matched.isNotEmpty) result[cat] = matched;
     });
@@ -1063,6 +1072,48 @@ class PaymentSummaryBanner extends StatelessWidget {
     );
   }
 }
+/// Money compared in whole paise, so float noise (3600.0030000000006,
+/// 1000 + 2600.003 …) never decides whether a payment "exceeds".
+int moneyPaise(num v) => (v * 100).round();
+
+/// True when [amount] pays off [outstanding]: equal to the paisa, or the
+/// whole-rupee figure the screens show for it (bills with GST / decimal rates
+/// end in paise — ₹2,600 is what you see for 2600.003 or 2599.6). Such a
+/// payment is recorded as exactly [outstanding] and the entry becomes Paid.
+bool paymentSettles(double amount, double outstanding) {
+  if (outstanding <= 0 || amount <= 0) return false;
+  if ((moneyPaise(amount) - moneyPaise(outstanding)).abs() <= 1) return true;
+  if (amount != amount.roundToDouble()) return false;
+  return amount == outstanding.roundToDouble() || amount == outstanding.ceilToDouble();
+}
+
+/// True when [amount] is more than [outstanding] — never for the exact
+/// remainder (see [paymentSettles]).
+bool paymentExceeds(double amount, double outstanding) =>
+    !paymentSettles(amount, outstanding) && moneyPaise(amount) > moneyPaise(outstanding);
+
+/// Payments that add up to [bill] to the paisa can still sum a hair under it
+/// (1000 + 2600.003 …), and the server then keeps the entry "Partial"
+/// (`paidAmount >= amount`). Tops the last payment up by that sub-paisa gap.
+void settlePaymentHistory(List<dynamic> history, double bill) {
+  if (history.isEmpty || bill <= 0) return;
+  double sum = 0;
+  for (final p in history) {
+    if (p is Map) sum += (p['amount'] as num?)?.toDouble() ?? 0;
+  }
+  final last = history.last;
+  if (sum < bill && moneyPaise(sum) == moneyPaise(bill) && last is Map) {
+    last['amount'] = ((last['amount'] as num?)?.toDouble() ?? 0) + (bill - sum);
+  }
+}
+
+/// Amount-field text for a sum: "3600" or "2600.50" (was rounded to whole
+/// rupees, so a bill ending in paise prefilled a figure above what was due).
+String paymentAmountText(double v) {
+  final p = moneyPaise(v);
+  return p % 100 == 0 ? (p ~/ 100).toString() : (p / 100).toStringAsFixed(2);
+}
+
 Future<Map<String, dynamic>?> showPaymentSheet(
   BuildContext context, {
   required String entryTitle,
@@ -1172,7 +1223,7 @@ Future<Map<String, dynamic>?> showPaymentSheet(
         if (selectedStatus == PaymentStatus.paid) {
           helperText = 'Full settlement — ${formatCurrency(outstanding)}';
           if (amountCtrl.text.isEmpty || amountCtrl.text == '0') {
-            amountCtrl.text = outstanding.toStringAsFixed(0);
+            amountCtrl.text = paymentAmountText(outstanding);
           }
         } else if (selectedStatus == PaymentStatus.pending) {
           helperText = 'No payment recorded';
@@ -1330,8 +1381,8 @@ Future<Map<String, dynamic>?> showPaymentSheet(
                                         selectedStatus = v;
                                         amountError = null;
                                         amountCtrl.text = outstanding > 0
-                                            ? outstanding.toStringAsFixed(0)
-                                            : totalAmount.toStringAsFixed(0);
+                                            ? paymentAmountText(outstanding)
+                                            : paymentAmountText(totalAmount);
                                       }),
                                     ),
                                     const SizedBox(width: 4),
@@ -1346,8 +1397,8 @@ Future<Map<String, dynamic>?> showPaymentSheet(
                                         selectedStatus = v;
                                         amountError = null;
                                         final tText = outstanding > 0
-                                            ? outstanding.toStringAsFixed(0)
-                                            : totalAmount.toStringAsFixed(0);
+                                            ? paymentAmountText(outstanding)
+                                            : paymentAmountText(totalAmount);
                                         if (amountCtrl.text == '0' ||
                                             amountCtrl.text == tText) {
                                           amountCtrl.clear();
@@ -1414,7 +1465,8 @@ Future<Map<String, dynamic>?> showPaymentSheet(
                                           selectedStatus =
                                               PaymentStatus.pending;
                                         } else if (outstanding > 0 &&
-                                            amt >= outstanding) {
+                                            (amt >= outstanding ||
+                                                paymentSettles(amt, outstanding))) {
                                           selectedStatus = PaymentStatus.paid;
                                         } else if (outstanding == 0 &&
                                             amt >= totalAmount) {
@@ -1768,7 +1820,12 @@ Future<Map<String, dynamic>?> showPaymentSheet(
                             BtButton(
                                 label: 'Confirm Payment & Update Inventory',
                                 onPressed: () {
-                                  if (selectedStatus != PaymentStatus.pending) {
+                                  // A leftover under one paisa (old float bills) shows "0":
+                                  // Fully Paid still clears it.
+                                  final subPaisaLeft = selectedStatus == PaymentStatus.paid &&
+                                      outstanding > 0 &&
+                                      moneyPaise(outstanding) == 0;
+                                  if (selectedStatus != PaymentStatus.pending && !subPaisaLeft) {
                                     final raw = amountCtrl.text.trim();
                                     final amt = parseAmount(raw);
                                     if (raw.isEmpty ||
@@ -1780,12 +1837,16 @@ Future<Map<String, dynamic>?> showPaymentSheet(
                                       );
                                       return;
                                     }
-                                    if (outstanding > 0 && amt > outstanding) {
+                                    if (outstanding > 0 && paymentExceeds(amt, outstanding)) {
                                       ss(
                                         () => amountError =
                                             'Payment amount cannot exceed the outstanding amount.',
                                       );
                                       return;
+                                    }
+                                    // The exact remainder settles the entry.
+                                    if (paymentSettles(amt, outstanding)) {
+                                      selectedStatus = PaymentStatus.paid;
                                     }
                                     if (outstanding <= 0) {
                                       ss(

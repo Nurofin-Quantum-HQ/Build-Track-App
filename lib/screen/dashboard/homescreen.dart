@@ -391,6 +391,18 @@ class _PoweredByFooter extends StatelessWidget {
   }
 }
 
+/// Money Out records. The server never accepts a negative `amount`
+/// (`validateTransactionAmounts` → "amount cannot be negative", and the
+/// Transaction schema has `min: 0`), so the old "Income with -amount" save
+/// was rejected with a 400 every time and money out never appeared. A Money
+/// Out is saved as a positive `Expense` tagged with this category: the
+/// server counts it in the project's cost (`spentAmount`) and keeps it out
+/// of `totalIncome`, so net cash flow = money in − cost is right everywhere.
+const String _kMoneyOutCategory = 'Money Out';
+
+bool _isMoneyOutRow(Map<String, dynamic> tx) =>
+    tx['type']?.toString() == 'Expense' && tx['category']?.toString() == _kMoneyOutCategory;
+
 /// Where a revenue entry's proof image lives: the uploaded photo
 /// (`attachments`) or, for a cash e-signature, `paymentReceipt`.
 String? _revenueProofUrl(Map<String, dynamic> tx) {
@@ -888,12 +900,32 @@ class _AdminDashboardState extends State<_AdminDashboard> {
     }
   }
 
+  /// Money in − money out (the Revenue History balance).
   double get _totalRevenueSum {
     return _revenueEntries.fold<double>(0.0, (sum, tx) {
       final amount = double.tryParse(tx['amount']?.toString() ?? '0') ?? 0.0;
       return sum + amount;
     });
   }
+
+  /// Money in only — the card's "Total revenue". Money out is already in the
+  /// cost (it is saved as an Expense), so it must not be taken off twice.
+  double get _moneyInSum {
+    return _revenueEntries.fold<double>(0.0, (sum, tx) {
+      final amount = double.tryParse(tx['amount']?.toString() ?? '0') ?? 0.0;
+      return amount > 0 ? sum + amount : sum;
+    });
+  }
+
+  static List<dynamic> _txList(String body) {
+    final decoded = json.decode(body);
+    if (decoded is List) return decoded;
+    if (decoded is Map) {
+      return (decoded['transactions'] ?? decoded['data'] ?? []) as List<dynamic>;
+    }
+    return [];
+  }
+
   Future<void> _loadRevenue(String projectId) async {
     if (!mounted) return;
     setState(() {
@@ -901,19 +933,25 @@ class _AdminDashboardState extends State<_AdminDashboard> {
       _revenueError = false;
     });
     try {
-      final response = await ApiService.get(
-        '/transactions?project=$projectId&type=Income',
-      );
-      if (response.statusCode == 200) {
-        final decoded = json.decode(response.body);
-        List<dynamic> entries = [];
-        if (decoded is List) {
-          entries = decoded;
-        } else if (decoded is Map) {
-          entries =
-              (decoded['transactions'] ?? decoded['data'] ?? [])
-                  as List<dynamic>;
-        }
+      // Money in (Income) + money out (Expense tagged "Money Out").
+      final responses = await Future.wait([
+        ApiService.get('/transactions?project=$projectId&type=Income'),
+        ApiService.get(
+          '/transactions?project=$projectId&type=Expense&category=${Uri.encodeQueryComponent(_kMoneyOutCategory)}',
+        ),
+      ]);
+      if (responses.every((r) => r.statusCode == 200)) {
+        final List<dynamic> entries = [
+          ..._txList(responses[0].body),
+          // Shown as outflows (negative), the way the history tiles,
+          // detail and edit sheets already read a money-out row.
+          for (final tx in _txList(responses[1].body))
+            if (tx is Map<String, dynamic> && _isMoneyOutRow(tx))
+              {
+                ...tx,
+                'amount': -((double.tryParse(tx['amount']?.toString() ?? '0') ?? 0.0).abs()),
+              },
+        ];
         entries.sort((a, b) {
           final dateA =
               DateTime.tryParse(a['date']?.toString() ?? '')?.toLocal() ?? DateTime.now();
@@ -1357,9 +1395,6 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                                     setModalState(() {
                                       isSaving = true;
                                     });
-                                    if (!isInflow) {
-                                      amount = -amount;
-                                    }
                                     try {
                                       String? base64Image;
                                       if (pickedImage != null) {
@@ -1370,7 +1405,10 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                                       }
                                       final payload = {
                                         'title': title,
-                                        'type': 'Income',
+                                        // Always a positive amount (the server rejects
+                                        // negatives); money out = a "Money Out" Expense.
+                                        'type': isInflow ? 'Income' : 'Expense',
+                                        'category': isInflow ? '' : _kMoneyOutCategory,
                                         'project': projectId,
                                         'amount': amount,
                                         'date': selectedDate.toIso8601String(),
@@ -1414,7 +1452,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                                             message: isEdit
                                                 ? 'Revenue updated successfully'
                                                 : 'Revenue recorded successfully',
-                                            label: '${amount < 0 ? 'Money out' : 'Money in'} · ${formatInr(amount.abs())}',
+                                            label: '${isInflow ? 'Money in' : 'Money out'} · ${formatInr(amount.abs())}',
                                           );
                                           if (!context.mounted) return;
                                           context.read<ProjectProvider>().load();
@@ -2186,7 +2224,10 @@ class _AdminDashboardState extends State<_AdminDashboard> {
     if (_isGlobalView) {
       for (var p in provider.projects) {
         gBudget += p.totalBudget;
-        gSpent += provider.totalSpentForProject(p.id);
+        // Only the selected project's entries are loaded, so the others'
+        // cost comes from the server's per-project total.
+        final local = provider.totalSpentForProject(p.id);
+        gSpent += local > p.spentAmount ? local : p.spentAmount;
         gRev += p.totalIncome;
         gProg += p.progress;
       }
@@ -2203,7 +2244,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
     final spent = _isGlobalView ? gSpent : (project != null ? provider.totalSpentForProject(project.id) : 0.0);
     final budget = _isGlobalView ? gBudget : (project?.totalBudget ?? 0.0);
     final remaining = _isGlobalView ? (gBudget - gSpent) : (project?.remainingBudget ?? 0.0);
-    final revenue = _isGlobalView ? gRev : (project != null ? _totalRevenueSum : 0.0);
+    final revenue = _isGlobalView ? gRev : (project != null ? _moneyInSum : 0.0);
     // Project revenue failed to load and nothing was loaded before: don't
     // show ₹0 / a fake loss.
     final revenueUnknown = !_isGlobalView && project != null && _revenueError && _revenueEntries.isEmpty;
