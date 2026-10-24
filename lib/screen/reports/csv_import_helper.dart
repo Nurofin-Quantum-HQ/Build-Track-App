@@ -364,7 +364,11 @@ class CsvImportHelper {
       } catch (_) {}
       final res = await ApiService.addTransactionsBulk(parsed.payloads);
       final results = res?['results'];
-      if (results is Map) {
+      if (res?['offline'] == true) {
+        // Queued on the device (no connection) — uploads on the next sync.
+        success = parsed.payloads.length;
+        errors.add('${parsed.payloads.length} entries saved offline — they will upload when you\'re back online.');
+      } else if (results is Map) {
         int n(dynamic v) => v is num ? v.toInt() : int.tryParse('$v') ?? 0;
         success = results.containsKey('successCount')
             ? n(results['successCount'])

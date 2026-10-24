@@ -3557,8 +3557,9 @@ class _ReportActions {
         route = '/add-material';
         break;
     }
-    Navigator.pushNamed(context, route, arguments: dupArgs).then((_) {
-      if (context.mounted) ReportFilterState.reloadEntries(context);
+    Navigator.pushNamed(context, route, arguments: dupArgs).then((saved) {
+      // Forms pop with true (saved) or 'deleted'; plain back needs no reload.
+      if (context.mounted && saved != null) ReportFilterState.reloadEntries(context);
     });
   }
 
@@ -3580,8 +3581,9 @@ class _ReportActions {
         route = '/add-material';
         break;
     }
-    Navigator.pushNamed(context, route, arguments: editArgs).then((_) {
-      if (context.mounted) ReportFilterState.reloadEntries(context);
+    Navigator.pushNamed(context, route, arguments: editArgs).then((saved) {
+      // Forms pop with true (saved) or 'deleted'; plain back needs no reload.
+      if (context.mounted && saved != null) ReportFilterState.reloadEntries(context);
     });
   }
 
