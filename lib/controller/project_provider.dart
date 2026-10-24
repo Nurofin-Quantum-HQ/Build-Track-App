@@ -30,6 +30,9 @@ class ProjectProvider extends ChangeNotifier {
   /// previous entries are kept (and the cache is not overwritten), so screens
   /// can show "couldn't refresh" instead of zeros.
   String _entriesError = '';
+  /// True when the last projects fetch failed and the list shown is cached.
+  bool _projectsStale = false;
+  bool get projectsStale => _projectsStale;
   String get entriesError => _entriesError;
   bool get entriesStale => _entriesError.isNotEmpty;
   List<ProjectModel> get projects => List.unmodifiable(_projects);
@@ -620,9 +623,15 @@ class ProjectProvider extends ChangeNotifier {
       if (!entriesFailed) await _persistEntries();
       _projectsLoaded = true;
       _error = '';
+      _projectsStale = false;
       notifyListeners();
     } catch (e, st) {
-      _error = 'Failed to load background network: $e';
+      // fetchProjects throws on failure now: the previous (cached) projects
+      // and entries are kept. Only a user with nothing to show gets the
+      // error card; otherwise the data is just flagged stale.
+      _projectsStale = true;
+      if (_projects.isEmpty) _error = 'Could not load projects: $e';
+      notifyListeners();
       dev.log(
         'ProjectProvider._fetchNetworkData error',
         error: e,
@@ -670,8 +679,10 @@ class ProjectProvider extends ChangeNotifier {
       }
       _projectsLoaded = true;
       _error = '';
+      _projectsStale = false;
     } catch (e) {
-      _error = 'Failed to fetch projects: $e';
+      _projectsStale = true;
+      if (_projects.isEmpty) _error = 'Could not load projects: $e';
       dev.log('fetchProjects error: $e');
     } finally {
       _setLoading(false);
@@ -1278,6 +1289,7 @@ class ProjectProvider extends ChangeNotifier {
     _projectsLoaded = false;
     _error = '';
     _entriesError = '';
+    _projectsStale = false;
     notifyListeners();
   }
 }
