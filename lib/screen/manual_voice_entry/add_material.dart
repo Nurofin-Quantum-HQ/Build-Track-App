@@ -156,16 +156,14 @@ class _AddMaterialScreenState extends State<AddMaterialScreen> {
         if (preProjectId != null &&
             preProjectId.isNotEmpty &&
             prePhase != null &&
-            prePhase.isNotEmpty &&
-            preActivity != null &&
-            preActivity.isNotEmpty) {
+            prePhase.isNotEmpty) { // activity is optional
           _selectedProjectId = preProjectId;
           // Projects without floors have no floor; phase/activity still apply.
           _selectedFloor = (preFloor != null && preFloor.isNotEmpty) ? preFloor : null;
           _selectedFloorId = _selectedFloor;
           _selectedPhase = prePhase;
           _selectedPhaseId = projectProvider.selectedPhaseId;
-          _selectedActivity = preActivity;
+          _selectedActivity = (preActivity != null && preActivity.isNotEmpty) ? preActivity : null;
           _selectedActivityId = projectProvider.selectedActivityId;
           debugPrint(
             '[AddMaterial] Context injected from ProjectProvider: '
@@ -180,15 +178,13 @@ class _AddMaterialScreenState extends State<AddMaterialScreen> {
           final routeActivity = args['activity']?.toString();
           if (routeProjectId.isNotEmpty &&
               routePhase != null &&
-              routePhase.isNotEmpty &&
-              routeActivity != null &&
-              routeActivity.isNotEmpty) {
+              routePhase.isNotEmpty) { // activity is optional
             _selectedProjectId = routeProjectId;
             _selectedFloor = (routeFloor != null && routeFloor.isNotEmpty) ? routeFloor : null;
             _selectedFloorId = _selectedFloor == null ? null : (args['floorId']?.toString() ?? routeFloor);
             _selectedPhase = routePhase;
             _selectedPhaseId = args['phaseId']?.toString();
-            _selectedActivity = routeActivity;
+            _selectedActivity = (routeActivity != null && routeActivity.isNotEmpty) ? routeActivity : null;
             _selectedActivityId = args['activityId']?.toString();
           } else {
             _selectedProjectId = routeProjectId;
@@ -1043,7 +1039,14 @@ class _AddMaterialScreenState extends State<AddMaterialScreen> {
           _activityError == null &&
           _unitError == null;
     });
-    if (!ok) _scrollToFirstError();
+    if (!ok) {
+      _scrollToFirstError();
+      // Say what's missing: some fields sit in the collapsed "Where" card, so a
+      // scroll alone looked like Save did nothing.
+      final first = [_projectError, _floorError, _phaseError, _activityError, _nameError, _qtyError, _unitError, _rateError]
+          .firstWhere((e) => e != null, orElse: () => null);
+      if (first != null) btToast(context, first, error: true);
+    }
     return ok;
   }
   Future<void> _save(BuildContext ctx) async {
