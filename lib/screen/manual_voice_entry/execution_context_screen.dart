@@ -108,9 +108,7 @@ class _ExecutionContextScreenState extends State<ExecutionContextScreen> {
       (!_projectHasFloors ||
           (_selectedFloor != null && _selectedFloor!.isNotEmpty)) &&
       _selectedPhase != null &&
-      _selectedPhase!.isNotEmpty &&
-      _selectedActivity != null &&
-      _selectedActivity!.isNotEmpty;
+      _selectedPhase!.isNotEmpty; // Activity is optional (some phases have none).
   String? _derivePhaseId(String? phaseName) {
     if (phaseName == null || phaseName.isEmpty || _selectedProjectId == null) {
       return null;
@@ -168,10 +166,6 @@ class _ExecutionContextScreenState extends State<ExecutionContextScreen> {
       }
       if (_selectedPhase == null || _selectedPhase!.isEmpty) {
         _phaseError = 'Please select a phase';
-        valid = false;
-      }
-      if (_selectedActivity == null || _selectedActivity!.isEmpty) {
-        _activityError = 'Please select an activity';
         valid = false;
       }
     });
@@ -513,6 +507,7 @@ class _ExecutionContextScreenState extends State<ExecutionContextScreen> {
       _PickRow(
         number: 4,
         label: 'Activity',
+        optional: true,
         value: activityValue,
         hint: activityHint,
         open: _open == 3,

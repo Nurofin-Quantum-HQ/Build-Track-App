@@ -1096,9 +1096,7 @@ class _AddEquipmentScreenState extends State<AddEquipmentScreen> {
           ? 'Please select a Floor / Zone.'
           : null;
       _phaseError = _selectedPhase == null ? 'Please select a Phase.' : null;
-      _activityError = _selectedActivity == null || _selectedActivity!.isEmpty
-          ? 'Please select an Activity.'
-          : null;
+      _activityError = null; // Activity is optional (some phases have none).
       _unitError = _selectedUnit == null ? 'Please select a Unit.' : null;
       ok =
           _nameError == null &&

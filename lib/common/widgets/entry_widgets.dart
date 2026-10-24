@@ -739,7 +739,7 @@ class ExecutionContextCard extends StatelessWidget {
               ),
               if (phaseError != null) EntryErrorText(phaseError!),
               const SizedBox(height: 18),
-              const EntryFieldLabel('Activity', required: true),
+              const EntryFieldLabel('Activity'),
               const SizedBox(height: 8),
               EntryDropdownField<String>(
                 value: activities.contains(selectedActivity)
