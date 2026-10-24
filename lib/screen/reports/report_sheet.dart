@@ -1,3 +1,4 @@
+import 'package:buildtrack_mobile/common/utils/date_parse.dart';
 import 'package:buildtrack_mobile/design/design.dart';
 import 'package:buildtrack_mobile/models/project_model.dart';
 import 'package:flutter/gestures.dart';
@@ -31,7 +32,17 @@ class ReportSheet extends StatefulWidget {
     this.firstRowNumber = 1,
     this.pinnedWidth = 132,
     this.tourWrap,
+    this.pinnedColumn,
+    this.onPinColumn,
   });
+
+  /// The column frozen on the left (chosen in Edit columns or by
+  /// long-pressing a header). Ignored when it isn't one of [columns]; then the
+  /// item column (Description / Material / …) is pinned, else the first one.
+  final String? pinnedColumn;
+
+  /// Long-pressing a scrolling header pins that column. Null: no long-press.
+  final ValueChanged<String>? onPinColumn;
 
   /// Lets the screen wrap the header row ('header') and the scroll hint
   /// ('footer') in guided-tour steps. Identity when null.
@@ -46,7 +57,7 @@ class ReportSheet extends StatefulWidget {
   /// 'Fully Paid', 'Partial' or 'Not Paid'.
   final String Function(EntryModel) statusOf;
 
-  /// 'date', 'project' or 'amount'.
+  /// 'date' (purchase date), 'paymentDate', 'project' or 'amount'.
   final String sortColumn;
   final bool sortAscending;
   final void Function(String sortColumn, bool ascending) onSort;
@@ -68,9 +79,55 @@ class ReportSheet extends StatefulWidget {
   /// Height of the hint + scroll track under the sheet.
   static const footerHeight = 28.0;
 
-  static const _itemColumns = {'Description', 'Material', 'Worker Type', 'Equipment'};
+  static const itemColumns = {'Description', 'Material', 'Worker Type', 'Equipment'};
   static const _actionColumns = ['Add More', 'Record Payment', 'Edit Entry'];
-  static const _sortKeys = {'Purchased Date': 'date', 'Project': 'project', 'Amount': 'amount'};
+  static const _sortKeys = {'Purchased Date': 'date', 'Payment Date': 'paymentDate', 'Project': 'project', 'Amount': 'amount'};
+
+  /// The column that is pinned for [columns] with the user's choice [pinned]:
+  /// that choice when it is shown, else the item column, else the first.
+  static String? pinnedOf(List<String> columns, String? pinned) {
+    if (pinned != null && columns.contains(pinned)) return pinned;
+    for (final c in columns) {
+      if (itemColumns.contains(c)) return c;
+    }
+    return columns.isEmpty ? null : columns.first;
+  }
+
+  /// [columns] in on-screen order: the pinned one first, the rest as saved.
+  /// Exports use this too, so a file has the same column order as the sheet.
+  static List<String> displayOrder(List<String> columns, String? pinned) {
+    final p = pinnedOf(columns, pinned);
+    if (p == null) return List.of(columns);
+    return [p, ...columns.where((c) => c != p)];
+  }
+
+  /// Date of the latest payment made on [e], or null when nothing is paid.
+  /// Taken from the payment history (the newest dated payment) and the
+  /// entry's own paymentDate, whichever is later — the old server only
+  /// refreshes paymentDate on some update paths.
+  static DateTime? paymentDateOf(EntryModel e) {
+    final cached = _paymentDateCache[e];
+    if (cached != null) return cached.$1;
+    final d = _latestPaymentDate(e);
+    _paymentDateCache[e] = (d,);
+    return d;
+  }
+
+  /// Entries are rebuilt on every reload, so caching per object is safe.
+  static final Expando<(DateTime?,)> _paymentDateCache = Expando();
+
+  static DateTime? _latestPaymentDate(EntryModel e) {
+    final hasPayment = e.paidAmount > 0 ||
+        e.paymentHistory.any((p) => (num.tryParse('${p['amount'] ?? ''}') ?? 0) > 0);
+    if (!hasPayment) return null;
+    DateTime? latest = e.paymentDate;
+    for (final p in e.paymentHistory) {
+      final d = parseFlexibleDate(p['date'] ?? p['paymentDate']);
+      if (d != null && (latest == null || d.isAfter(latest))) latest = d;
+    }
+    return latest;
+  }
+
   static const _numeric = {
     'Amount', 'Paid', 'Remaining', 'Rate', 'Rate/Day', 'Rent Rate', 'Qty', 'Days', 'Duration',
   };
@@ -78,9 +135,8 @@ class ReportSheet extends StatefulWidget {
   static double widthOf(String column) {
     switch (column) {
       case 'Purchased Date':
-        return 92;
       case 'Payment Date':
-        return 104;
+        return 116;
       case 'Project':
         return 132;
       case 'Type':
@@ -129,7 +185,7 @@ class ReportSheet extends StatefulWidget {
   static String labelOf(String column) {
     switch (column) {
       case 'Purchased Date':
-        return 'DATE';
+        return 'PURCHASE DATE';
       case 'Amount':
         return 'AMOUNT (INR)';
       case 'Paid':
@@ -220,13 +276,7 @@ class _ReportSheetState extends State<ReportSheet> {
     _syncing = false;
   }
 
-  String? get _pinned {
-    final cols = widget.columns;
-    for (final c in cols) {
-      if (ReportSheet._itemColumns.contains(c)) return c;
-    }
-    return cols.isEmpty ? null : cols.first;
-  }
+  String? get _pinned => ReportSheet.pinnedOf(widget.columns, widget.pinnedColumn);
 
   List<String> get _scrollColumns {
     final pinned = _pinned;
@@ -426,7 +476,8 @@ class _ReportSheetState extends State<ReportSheet> {
   }
 
   Widget _headerCell(String column, double width, _Styles s) {
-    return Container(
+    final pin = widget.onPinColumn;
+    final cell = Container(
       width: width,
       height: ReportSheet.headerHeight,
       padding: const EdgeInsets.symmetric(horizontal: 9),
@@ -434,11 +485,14 @@ class _ReportSheetState extends State<ReportSheet> {
       decoration: const BoxDecoration(border: Border(right: BorderSide(color: _line))),
       child: _headerLabel(column, s),
     );
+    if (pin == null) return cell;
+    // Long-press a heading to freeze that column on the left.
+    return GestureDetector(onLongPress: () => pin(column), child: cell);
   }
 
   Widget _pinnedCell(EntryModel e, String column, int i, _Styles s, BtTheme bt) {
     final selected = e.id == _selectedId;
-    final isItem = ReportSheet._itemColumns.contains(column);
+    final isItem = ReportSheet.itemColumns.contains(column);
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () => _tapRow(e),
@@ -460,7 +514,7 @@ class _ReportSheetState extends State<ReportSheet> {
           Expanded(
             child: isItem
                 ? Text(_text(e.description), maxLines: 1, overflow: TextOverflow.ellipsis, style: s.cell.copyWith(fontWeight: FontWeight.w600))
-                : _cell(column, e, s, bt),
+                : Align(alignment: Alignment.centerLeft, child: _cell(column, e, s, bt)),
           ),
         ]),
       ),
@@ -532,7 +586,8 @@ class _ReportSheetState extends State<ReportSheet> {
       case 'Purchased Date':
         return _plain(formatShortDate(e.date), s, numeric: true);
       case 'Payment Date':
-        return _plain(e.paymentDate == null ? '—' : formatShortDate(e.paymentDate), s, numeric: true);
+        final paid = ReportSheet.paymentDateOf(e);
+        return _plain(paid == null ? '—' : formatShortDate(paid), s, numeric: true);
       case 'Project':
         return _plain(_text(widget.projectNameOf(e)), s);
       case 'Type':

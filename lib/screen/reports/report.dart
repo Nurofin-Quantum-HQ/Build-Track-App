@@ -63,6 +63,46 @@ class ReportsScreen extends StatelessWidget {
   }
 }
 
+/// Order of two report entries for a sort key:
+///  * 'date' — purchase (entry) date, by calendar day, then by when the entry
+///    was made, so same-day rows stay in entry order;
+///  * 'paymentDate' — date of the latest payment; unpaid entries always last
+///    (in either direction), among themselves by purchase date;
+///  * 'amount', 'project' — ties broken by purchase date, newest first.
+/// Dates are compared as DateTime values (parsed with parseFlexibleDate in
+/// EntryModel.fromJson), never as strings.
+int compareReportEntries(EntryModel a, EntryModel b, String column, bool ascending, String Function(String) projectName) {
+  int dir(int c) => ascending ? c : -c;
+  int byPurchase(bool asc) {
+    final da = DateTime(a.date.year, a.date.month, a.date.day);
+    final db = DateTime(b.date.year, b.date.month, b.date.day);
+    var c = da.compareTo(db);
+    if (c == 0) c = a.createdAt.compareTo(b.createdAt);
+    if (c == 0) c = a.id.compareTo(b.id);
+    return asc ? c : -c;
+  }
+
+  switch (column) {
+    case 'paymentDate':
+      final pa = ReportSheet.paymentDateOf(a);
+      final pb = ReportSheet.paymentDateOf(b);
+      if (pa == null || pb == null) {
+        if (pa == null && pb == null) return byPurchase(ascending);
+        return pa == null ? 1 : -1;
+      }
+      final c = pa.compareTo(pb);
+      return c != 0 ? dir(c) : byPurchase(ascending);
+    case 'amount':
+      final c = a.amount.compareTo(b.amount);
+      return c != 0 ? dir(c) : byPurchase(false);
+    case 'project':
+      final c = projectName(a.projectId).toLowerCase().compareTo(projectName(b.projectId).toLowerCase());
+      return c != 0 ? dir(c) : byPurchase(false);
+    default:
+      return byPurchase(ascending);
+  }
+}
+
 class ReportFilterState {
   static String selectedProjectId = 'all';
   static String? selectedFloor;
@@ -141,6 +181,7 @@ class _ReportsViewState extends State<_ReportsView> {
   final _kHeaderExport = GlobalKey();
   final _kProject = GlobalKey();
   final _kPeriod = GlobalKey();
+  final _kWhere = GlobalKey();
   final _kTabs = GlobalKey();
   final _kSearch = GlobalKey();
   final _kItem = GlobalKey();
@@ -264,6 +305,7 @@ class _ReportsViewState extends State<_ReportsView> {
         _kProject,
         _kPeriod,
         ShowcaseKeys.reportFilters,
+        _kWhere,
         _kHeaderExport,
         _kAccount,
         _kTabs,
@@ -311,38 +353,120 @@ class _ReportsViewState extends State<_ReportsView> {
     );
   }
 
+  static const _columnTabs = ['All', 'Materials', 'Labour', 'Equipment'];
+
+  /// The user's pinned (frozen, left) column per tab; null = the default
+  /// (the item column: Description / Material / Worker Type / Equipment).
+  final Map<String, String?> _pinnedColumns = {};
+
+  /// Tabs whose columns were changed before the saved ones finished loading;
+  /// the late load must not overwrite them.
+  final Set<String> _editedColumnTabs = {};
+  bool _columnsLoaded = false;
+
+  static String _columnTab(String tab) => _columnTabs.contains(tab) ? tab : 'All';
+
+  /// A saved column list, minus names this tab doesn't have (older builds /
+  /// the web app) and duplicates. Null when nothing usable is left.
+  List<String>? _cleanColumns(String tab, dynamic raw) {
+    if (raw is! List) return null;
+    final allowed = _getAllColumnsForTab(tab).toSet();
+    final out = <String>[];
+    for (final v in raw) {
+      final c = v?.toString();
+      if (c != null && allowed.contains(c) && !out.contains(c)) out.add(c);
+    }
+    return out.isEmpty ? null : out;
+  }
+
+  String? _cleanPin(String tab, dynamic raw) {
+    final c = raw?.toString();
+    return c != null && _getAllColumnsForTab(tab).contains(c) ? c : null;
+  }
+
+  /// Saved columns (order + pinned column) per tab: this device first, then
+  /// the profile (so they follow the user to another phone).
   Future<void> _loadActiveColumns() async {
-    final prefs = await SharedPreferences.getInstance();
     final userId = UserSession.userId;
-    List<String>? all = prefs.getStringList('activeColumnsAll_$userId');
-    List<String>? materials = prefs.getStringList('activeColumnsMaterials_$userId');
-    List<String>? labour = prefs.getStringList('activeColumnsLabour_$userId');
-    List<String>? equipment = prefs.getStringList('activeColumnsEquipment_$userId');
-    
+    final cols = <String, List<String>?>{};
+    final pins = <String, String?>{};
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      for (final t in _columnTabs) {
+        cols[t] = _cleanColumns(t, prefs.getStringList('activeColumns${t}_$userId'));
+        pins[t] = _cleanPin(t, prefs.getString('reportPinnedColumn${t}_$userId'));
+      }
+    } catch (_) {}
+
     try {
       final res = await ApiService.get('/users/profile');
       if (res.statusCode == 200) {
-        final decoded = json.decode(res.body);
-        if (decoded != null && decoded['user'] != null && decoded['user']['preferences'] != null) {
-          final rc = decoded['user']['preferences']['reportColumns'];
-          if (rc != null) {
-            if (rc['All'] != null) all = List<String>.from(rc['All']);
-            if (rc['Materials'] != null) materials = List<String>.from(rc['Materials']);
-            if (rc['Labour'] != null) labour = List<String>.from(rc['Labour']);
-            if (rc['Equipment'] != null) equipment = List<String>.from(rc['Equipment']);
+        final saved = json.decode(res.body)?['user']?['preferences'];
+        if (saved is Map) {
+          final rc = saved['reportColumns'];
+          final rp = saved['reportPinnedColumns'];
+          for (final t in _columnTabs) {
+            if (rc is Map) cols[t] = _cleanColumns(t, rc[t]) ?? cols[t];
+            if (rp is Map && rp.containsKey(t)) pins[t] = _cleanPin(t, rp[t]);
           }
         }
       }
-    } catch(e) {}
-    
-    if (mounted) {
-      setState(() {
-        if (all != null) _activeColumnsAll = all;
-        if (materials != null) _activeColumnsMaterials = materials;
-        if (labour != null) _activeColumnsLabour = labour;
-        if (equipment != null) _activeColumnsEquipment = equipment;
-      });
+    } catch (_) {}
+
+    if (!mounted) return;
+    setState(() {
+      for (final t in _columnTabs) {
+        if (_editedColumnTabs.contains(t)) continue;
+        final c = cols[t];
+        if (c != null) _storeActiveColumns(t, c);
+        _pinnedColumns[t] = pins[t];
+      }
+    });
+    _columnsLoaded = true;
+    // Columns edited while loading were saved without the other tabs'
+    // saved lists; save again now that every tab is known.
+    if (_editedColumnTabs.isNotEmpty) _persistColumns();
+  }
+
+  void _storeActiveColumns(String tab, List<String> cols) {
+    switch (tab) {
+      case 'Materials':
+        _activeColumnsMaterials = cols;
+      case 'Labour':
+        _activeColumnsLabour = cols;
+      case 'Equipment':
+        _activeColumnsEquipment = cols;
+      default:
+        _activeColumnsAll = cols;
     }
+  }
+
+  /// Save every tab's columns + pinned column on this device and to the
+  /// profile. The live server merges `preferences` only one level deep, so
+  /// all four tabs are sent each time — sending just the edited tab (as
+  /// before) replaced `reportColumns` and wiped the other tabs' saved order.
+  Future<void> _persistColumns() async {
+    final userId = UserSession.userId;
+    final cols = {for (final t in _columnTabs) t: List<String>.from(_getActiveColumnsForTab(t))};
+    final pins = {for (final t in _columnTabs) t: _pinnedColumns[t]};
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      for (final t in _columnTabs) {
+        await prefs.setStringList('activeColumns${t}_$userId', cols[t]!);
+        final pin = pins[t];
+        if (pin == null) {
+          await prefs.remove('reportPinnedColumn${t}_$userId');
+        } else {
+          await prefs.setString('reportPinnedColumn${t}_$userId', pin);
+        }
+      }
+    } catch (_) {}
+    if (!_columnsLoaded) return; // the load finishing will send everything
+    try {
+      await ApiService.put('/users/profile', {
+        'preferences': {'reportColumns': cols, 'reportPinnedColumns': pins},
+      });
+    } catch (_) {}
   }
 
   @override
@@ -493,49 +617,50 @@ class _ReportsViewState extends State<_ReportsView> {
     }
   }
 
-  Future<void> _syncPreferences(String key, List<String> cols) async {
-    try {
-      final tabKey = key.replaceAll('activeColumns', '');
-      await ApiService.put('/users/profile', {
-        'preferences': {
-          'reportColumns': {
-            tabKey: cols,
-          }
-        }
-      });
-    } catch(e) {}
+  void _setActiveColumnsForTab(String tabName, List<String> cols, String? pinned) {
+    final tab = _columnTab(tabName);
+    _editedColumnTabs.add(tab);
+    setState(() {
+      _storeActiveColumns(tab, cols);
+      _pinnedColumns[tab] = pinned;
+    });
+    _persistColumns();
   }
 
-  Future<void> _setActiveColumnsForTab(String tabName, List<String> cols) async {
-    final prefs = await SharedPreferences.getInstance();
-    final userId = UserSession.userId;
-    
-    setState(() {
-      if (tabName == 'Materials') {
-        _activeColumnsMaterials = cols;
-        prefs.setStringList('activeColumnsMaterials_$userId', cols); _syncPreferences('activeColumnsMaterials', cols);
-      } else if (tabName == 'Labour') {
-        _activeColumnsLabour = cols;
-        prefs.setStringList('activeColumnsLabour_$userId', cols); _syncPreferences('activeColumnsLabour', cols);
-      } else if (tabName == 'Equipment') {
-        _activeColumnsEquipment = cols;
-        prefs.setStringList('activeColumnsEquipment_$userId', cols); _syncPreferences('activeColumnsEquipment', cols);
-      } else {
-        _activeColumnsAll = cols;
-        prefs.setStringList('activeColumnsAll_$userId', cols); _syncPreferences('activeColumnsAll', cols);
-      }
-    });
+  /// Long-press on a sheet heading: freeze that column on the left.
+  void _pinColumn(String tabName, String column) {
+    final tab = _columnTab(tabName);
+    final cols = List<String>.from(_getActiveColumnsForTab(tab));
+    if (!cols.contains(column)) cols.add(column);
+    _setActiveColumnsForTab(tab, cols, column);
+    btToast(context, '${_columnLabel(column)} is now pinned on the left');
   }
+
+  /// The tab's columns in on-screen order (pinned first) — the sheet and
+  /// both exports use this, so files match what the user sees.
+  List<String> _displayColumns(String tabName) {
+    final tab = _columnTab(tabName);
+    return ReportSheet.displayOrder(_getActiveColumnsForTab(tab), _pinnedColumns[tab]);
+  }
+
+  static String _columnLabel(String column) => column == 'Purchased Date' ? 'Purchase date' : _sentence(column);
 
   void _showCustomizeColumnsDialog(BuildContext context, String tabName) {
-    final List<String> allCols = _getAllColumnsForTab(tabName);
-    List<String> tempActive = List.from(_getActiveColumnsForTab(tabName));
+    final tab = _columnTab(tabName);
+    final List<String> allCols = _getAllColumnsForTab(tab);
+    List<String> tempActive = List.from(_getActiveColumnsForTab(tab));
     final inactive = allCols.where((c) => !tempActive.contains(c)).toList();
     List<String> tempAll = [...tempActive, ...inactive];
+    // The user's own pick; null = default (the item column).
+    String? tempPinned = _pinnedColumns[tab];
+    // Keep the shown list in the dragged order.
+    void syncActive() => tempActive = [for (final c in tempAll) if (tempActive.contains(c)) c];
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
+      // Dragging a row must not drag the sheet closed.
+      enableDrag: false,
       backgroundColor: Bt.card,
       barrierColor: Bt.scrim,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(Bt.rSheet))),
@@ -543,6 +668,7 @@ class _ReportsViewState extends State<_ReportsView> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             final maxListH = MediaQuery.of(context).size.height * 0.55;
+            final pinned = ReportSheet.pinnedOf(tempActive, tempPinned);
             return SafeArea(
               top: false,
               child: Column(
@@ -551,7 +677,7 @@ class _ReportsViewState extends State<_ReportsView> {
                 children: [
                   BtSheetHeader(
                     title: 'Edit columns',
-                    subtitle: '${tempActive.length} of ${tempAll.length} shown · drag ≡ to reorder',
+                    subtitle: '${tempActive.length} of ${tempAll.length} shown · drag ≡ to reorder · tap the pin to freeze a column on the left',
                   ),
                   ConstrainedBox(
                     constraints: BoxConstraints(maxHeight: maxListH),
@@ -570,23 +696,16 @@ class _ReportsViewState extends State<_ReportsView> {
                           itemCount: tempAll.length,
                           onReorder: (oldIndex, newIndex) {
                             setDialogState(() {
-                              if (newIndex > oldIndex) {
-                                newIndex -= 1;
-                              }
+                              if (newIndex > oldIndex) newIndex -= 1;
                               final item = tempAll.removeAt(oldIndex);
                               tempAll.insert(newIndex, item);
-                              final newTempActive = <String>[];
-                              for (final col in tempAll) {
-                                if (tempActive.contains(col)) {
-                                  newTempActive.add(col);
-                                }
-                              }
-                              tempActive = newTempActive;
+                              syncActive();
                             });
                           },
                           itemBuilder: (context, index) {
                             final col = tempAll[index];
                             final isChecked = tempActive.contains(col);
+                            final isPinned = col == pinned;
                             return Material(
                               key: ValueKey(col),
                               color: Bt.card,
@@ -595,12 +714,45 @@ class _ReportsViewState extends State<_ReportsView> {
                                 children: [
                                   if (index > 0) const Divider(height: 1, indent: 16, color: Bt.line),
                                   SizedBox(
-                                    height: 52,
+                                    height: 56,
                                     child: Row(
                                       children: [
                                         const SizedBox(width: 16),
                                         Expanded(
-                                          child: Text(col, style: BtText.body(context, color: isChecked ? Bt.ink : Bt.ink3)),
+                                          child: Column(
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(col, maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.body(context, color: isChecked ? Bt.ink : Bt.ink3)),
+                                              if (isPinned)
+                                                Text('Pinned · always first, stays put', maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.caption(context).copyWith(fontSize: 12)),
+                                            ],
+                                          ),
+                                        ),
+                                        Semantics(
+                                          button: true,
+                                          selected: isPinned,
+                                          label: isPinned ? '$col is pinned' : 'Pin $col on the left',
+                                          excludeSemantics: true,
+                                          child: InkResponse(
+                                            radius: 22,
+                                            onTap: () => setDialogState(() {
+                                              tempPinned = col;
+                                              if (!tempActive.contains(col)) {
+                                                tempActive.add(col);
+                                                syncActive();
+                                              }
+                                            }),
+                                            child: SizedBox(
+                                              width: 44,
+                                              height: 56,
+                                              child: Icon(
+                                                isPinned ? Icons.push_pin_rounded : Icons.push_pin_outlined,
+                                                size: 19,
+                                                color: isPinned ? context.bt.accentInk : Bt.placeholder,
+                                              ),
+                                            ),
+                                          ),
                                         ),
                                         BtSwitch(
                                           value: isChecked,
@@ -608,19 +760,13 @@ class _ReportsViewState extends State<_ReportsView> {
                                             setDialogState(() {
                                               if (val == true) {
                                                 tempActive.add(col);
-                                                final newTempActive = <String>[];
-                                                for (final c in tempAll) {
-                                                  if (tempActive.contains(c)) {
-                                                    newTempActive.add(c);
-                                                  }
-                                                }
-                                                tempActive = newTempActive;
+                                                syncActive();
+                                              } else if (tempActive.length > 1) {
+                                                tempActive.remove(col);
+                                                // A hidden column can't stay pinned.
+                                                if (tempPinned == col) tempPinned = null;
                                               } else {
-                                                if (tempActive.length > 1) {
-                                                  tempActive.remove(col);
-                                                } else {
-                                                  btToast(context, 'At least one column must be visible.', error: true);
-                                                }
+                                                btToast(context, 'At least one column must be visible.', error: true);
                                               }
                                             });
                                           },
@@ -629,7 +775,7 @@ class _ReportsViewState extends State<_ReportsView> {
                                           index: index,
                                           child: const SizedBox(
                                             width: 48,
-                                            height: 52,
+                                            height: 56,
                                             child: Icon(Icons.drag_handle_rounded, size: 22, color: Bt.ink3),
                                           ),
                                         ),
@@ -656,6 +802,7 @@ class _ReportsViewState extends State<_ReportsView> {
                               setDialogState(() {
                                 tempActive = List.from(allCols);
                                 tempAll = List.from(allCols);
+                                tempPinned = null;
                               });
                             },
                           ),
@@ -666,7 +813,7 @@ class _ReportsViewState extends State<_ReportsView> {
                           child: BtButton(
                             label: 'Save',
                             onPressed: () {
-                              _setActiveColumnsForTab(tabName, tempActive);
+                              _setActiveColumnsForTab(tab, List.of(tempActive), tempPinned);
                               Navigator.of(context).pop();
                             },
                           ),
@@ -1342,19 +1489,7 @@ class _ReportsViewState extends State<_ReportsView> {
 
     final quickCategoryTab = _quickTab();
     final filtered = _filterEntries(projectProvider, quickCategoryTab);
-    filtered.sort((a, b) {
-      int cmp = 0;
-      if (_sortColumn == 'date') {
-        cmp = a.date.compareTo(b.date);
-      } else if (_sortColumn == 'amount') {
-        cmp = a.amount.compareTo(b.amount);
-      } else if (_sortColumn == 'project') {
-        cmp = getProjectName(
-          a.projectId,
-        ).compareTo(getProjectName(b.projectId));
-      }
-      return _sortAscending ? cmp : -cmp;
-    });
+    filtered.sort((a, b) => compareReportEntries(a, b, _sortColumn, _sortAscending, getProjectName));
     double materialTotal = 0;
     double labourTotal = 0;
     double equipmentTotal = 0;
@@ -1390,7 +1525,10 @@ class _ReportsViewState extends State<_ReportsView> {
     final List<EntryModel> paginatedEntries = (totalCount > 0)
         ? filtered.sublist(startIndex, endIndex)
         : [];
-    final List<String> activeCols = _getActiveColumnsForTab(quickCategoryTab);
+    // Pinned column first, then the saved order — same for sheet and exports.
+    final List<String> activeCols = _displayColumns(quickCategoryTab);
+    final String? pinnedCol = activeCols.isEmpty ? null : activeCols.first;
+    void onPinColumn(String column) => _pinColumn(quickCategoryTab, column);
     final bt = context.bt;
     final entriesTitle = quickCategoryTab == 'All' || quickCategoryTab.isEmpty
         ? 'Entries'
@@ -1417,19 +1555,21 @@ class _ReportsViewState extends State<_ReportsView> {
             title: quickCategoryTab == 'All'
                 ? 'Report Logs'
                 : '$quickCategoryTab Report Logs',
+            // Read at call time: a column pinned in full screen counts too.
             onExportCsv: (rows) => _handleCsvExport(
               rows,
               getProjectName,
               quickCategoryTab,
-              activeColumns: activeCols,
+              activeColumns: _displayColumns(quickCategoryTab),
             ),
             onExportPdf: (rows) => _handlePdfExport(
               rows,
               getProjectName,
               quickCategoryTab,
-              activeColumns: activeCols,
+              activeColumns: _displayColumns(quickCategoryTab),
             ),
-            activeColumns: activeCols,
+            columnsOf: () => _displayColumns(quickCategoryTab),
+            onPinColumn: onPinColumn,
             sortColumn: _sortColumn,
             sortAscending: _sortAscending,
             onSort: onSheetSort,
@@ -1514,14 +1654,17 @@ class _ReportsViewState extends State<_ReportsView> {
             BtGroup(
               children: [
                 for (final o in const [
-                  ['date', false, 'Newest first'],
-                  ['date', true, 'Oldest first'],
-                  ['amount', false, 'Amount: high to low'],
-                  ['amount', true, 'Amount: low to high'],
-                  ['project', true, 'Project name'],
+                  ['date', false, 'Purchase date: newest first', null],
+                  ['date', true, 'Purchase date: oldest first', null],
+                  ['paymentDate', false, 'Payment date: newest first', 'Latest payment · unpaid entries last'],
+                  ['paymentDate', true, 'Payment date: oldest first', 'Latest payment · unpaid entries last'],
+                  ['amount', false, 'Amount: high to low', null],
+                  ['amount', true, 'Amount: low to high', null],
+                  ['project', true, 'Project name', null],
                 ])
                   BtRow(
                     title: o[2] as String,
+                    subtitle: o[3] as String?,
                     minHeight: 48,
                     trailing: (_sortColumn == o[0] && _sortAscending == o[1])
                         ? Icon(Icons.check_rounded, color: bt.accentInk, size: 20)
@@ -1584,17 +1727,16 @@ class _ReportsViewState extends State<_ReportsView> {
         ? '${_startDate == null ? '…' : formatShortDate(_startDate)} – ${_endDate == null ? '…' : formatShortDate(_endDate)}'
         : _sentence(_datePreset);
     final showSheet = _tableView && paginatedEntries.isNotEmpty;
-    final extraFilters = [
-      _selectedFloor,
-      _selectedPhaseId,
-      _selectedActivityName,
-      _selectedStatus == 'All' ? null : _selectedStatus,
-    ].where((v) => v != null).length;
+    // Floor / phase / activity show on their own chips, so the Filter chip
+    // counts only what is set inside the sheet alone (payment status).
+    final extraFilters = _selectedStatus == 'All' ? 0 : 1;
     final searchVisible = _searchOpen || _searchQuery.isNotEmpty;
+    final showWhere = _showWhereChips(projectProvider);
     final sortLabel = switch (_sortColumn) {
       'amount' => _sortAscending ? 'Amount · low' : 'Amount · high',
       'project' => _sortAscending ? 'Project · A–Z' : 'Project · Z–A',
-      _ => _sortAscending ? 'Date · oldest' : 'Date · newest',
+      'paymentDate' => _sortAscending ? 'Paid on · oldest' : 'Paid on · newest',
+      _ => _sortAscending ? 'Purchased · oldest' : 'Purchased · newest',
     };
     final topInset = MediaQuery.paddingOf(context).top;
     final glass = Colors.white.withValues(alpha: .09);
@@ -1708,7 +1850,7 @@ class _ReportsViewState extends State<_ReportsView> {
                 _tour(
                   ShowcaseKeys.reportFilters,
                   'More filters',
-                  'Narrow the report by floor, phase, activity and payment status (paid, partial, not paid). The number shows how many filters are on.',
+                  'Every filter in one place, including payment status (paid, partial, not paid). The number shows when a payment filter is on.',
                   BtChip(
                     label: extraFilters == 0 ? 'Filter' : 'Filter · $extraFilters',
                     onDark: true,
@@ -1721,6 +1863,16 @@ class _ReportsViewState extends State<_ReportsView> {
               ],
             ),
           ),
+          if (showWhere) ...[
+          const SizedBox(height: 8),
+          _tour(
+            _kWhere,
+            'Floor, phase, activity',
+            'Filter by floor, phase and activity in one tap. A chosen filter shows its value — tap × to clear it. Pick a project first.',
+            _buildWhereChips(context, projectProvider),
+            radius: Bt.rChip,
+          ),
+          ],
         ],
       ),
     );
@@ -1770,7 +1922,7 @@ class _ReportsViewState extends State<_ReportsView> {
                 _tour(
                   _kSort,
                   'Sort',
-                  'Order entries by date, project or amount, newest/highest or oldest/lowest first. The label shows the current order.',
+                  'Order entries by purchase date, payment date, project or amount, newest/highest or oldest/lowest first. The label shows the current order.',
                   _ToolChip(
                     icon: _sortAscending ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
                     label: sortLabel,
@@ -1830,7 +1982,9 @@ class _ReportsViewState extends State<_ReportsView> {
         builder: (context, viewport) {
           // The sheet takes whatever height is left under the header,
           // toolbar and summary so it is fully visible without scrolling.
-          final chromeAbove = topInset + 297 + (searchVisible ? 54 : 0);
+          // 297 = header + tabs + toolbar + summary; +44 = the floor / phase /
+          // activity chip row.
+          final chromeAbove = topInset + 297 + (showWhere ? 44 : 0) + (searchVisible ? 54 : 0);
           const chromeBelow = ReportSheet.footerHeight + 60;
           final sheetMax = (viewport.maxHeight - chromeAbove - chromeBelow).clamp(260.0, 900.0);
           return RefreshIndicator(
@@ -1898,10 +2052,12 @@ class _ReportsViewState extends State<_ReportsView> {
                           'One row per entry. Tap a row to see all its details and to add more, record a payment or edit it.',
                           ReportSheet(
                           tourWrap: (part, child) => part == 'header'
-                              ? _tour(_kSheetHeader, 'Sort by a column', 'Tap the DATE, PROJECT or AMOUNT heading to sort by it; tap it again to flip the order.', child, radius: 0)
-                              : _tour(_kSheetScroll, 'Scroll sideways', 'Swipe the sheet left and right to see every column — the first column stays pinned. This bar shows where you are.', child),
+                              ? _tour(_kSheetHeader, 'Sort by a column', 'Tap the PURCHASE DATE, PAYMENT DATE, PROJECT or AMOUNT heading to sort by it; tap it again to flip the order. Long-press any heading to pin that column on the left.', child, radius: 0)
+                              : _tour(_kSheetScroll, 'Scroll sideways', 'Swipe the sheet left and right to see every column — the pinned column stays put. This bar shows where you are.', child),
                           entries: paginatedEntries,
                           columns: activeCols,
+                          pinnedColumn: pinnedCol,
+                          onPinColumn: onPinColumn,
                           maxHeight: sheetMax,
                           firstRowNumber: startIndex + 1,
                           projectNameOf: (e) => getProjectName(e.projectId),
@@ -2162,6 +2318,123 @@ class _ReportsViewState extends State<_ReportsView> {
     );
   }
 
+  /// What the Floor / Phase / Activity filters offer for the selected
+  /// project (shared by the quick chips and the Filter sheet).
+  _WhereOptions _whereOptions(ProjectProvider projectProvider) {
+    final proj = _selectedProjectId == 'all'
+        ? null
+        : projectProvider.projects.where((p) => p.id == _selectedProjectId).firstOrNull;
+    final floors = proj?.floors ?? const <String>[];
+    final phases = proj?.selectedPhases ?? const <ProjectPhase>[];
+    final phase = phases.where((p) => p.id == _selectedPhaseId).firstOrNull;
+    final names = <String>{};
+    if (phase != null) {
+      names.addAll(phase.activities.map((a) => a.name));
+    } else if (proj != null) {
+      names.addAll(phases.expand((p) => p.activities).map((a) => a.name));
+    }
+    if (names.isEmpty && proj != null) {
+      // Project without a phase plan: offer the activities its entries use.
+      for (final e in projectProvider.entries) {
+        if (e.projectId.trim() != proj.id.trim()) continue;
+        if (phase != null && e.phaseId != phase.id && e.phase != phase.phaseName) continue;
+        final a = e.activity?.trim();
+        if (a != null && a.isNotEmpty) names.add(a);
+      }
+    }
+    names.removeWhere((n) => n.trim().isEmpty);
+    return _WhereOptions(project: proj, floors: floors, phases: phases, phase: phase, activities: names.toList());
+  }
+
+  Future<void> _pickFloor(BuildContext context, ProjectProvider projectProvider) async {
+    final o = _whereOptions(projectProvider);
+    final v = await _pickOption(context, 'Floor', [const MapEntry('Select Floor', 'All floors'), ...o.floors.map((f) => MapEntry(f, f))], _selectedFloor ?? 'Select Floor');
+    if (v != null && mounted) setState(() { _selectedFloor = v == 'Select Floor' ? null : v; _currentPage = 1; });
+  }
+
+  Future<void> _pickPhase(BuildContext context, ProjectProvider projectProvider) async {
+    final o = _whereOptions(projectProvider);
+    final v = await _pickOption(context, 'Phase', [const MapEntry('Select Phase', 'All phases'), ...o.phases.map((ph) => MapEntry(ph.id, ph.phaseName))], _selectedPhaseId ?? 'Select Phase');
+    if (v == null || !mounted) return;
+    final next = v == 'Select Phase' ? null : v;
+    if (next == _selectedPhaseId) return;
+    // A new phase has its own activities, so the activity choice is cleared.
+    setState(() { _selectedPhaseId = next; _selectedActivityName = null; _currentPage = 1; });
+  }
+
+  Future<void> _pickActivity(BuildContext context, ProjectProvider projectProvider) async {
+    final o = _whereOptions(projectProvider);
+    final v = await _pickOption(context, 'Activity', [const MapEntry('Select Activity', 'All activities'), ...o.activities.map((n) => MapEntry(n, n))], _selectedActivityName ?? 'Select Activity');
+    if (v != null && mounted) setState(() { _selectedActivityName = v == 'Select Activity' ? null : v; _currentPage = 1; });
+  }
+
+  /// Quick chip tapped while "All projects" is selected: pick a project
+  /// first, then go straight on to the picker that was tapped.
+  Future<void> _whereChipTap(BuildContext context, ProjectProvider projectProvider, Future<void> Function(BuildContext, ProjectProvider) picker) async {
+    if (_selectedProjectId == 'all') {
+      btToast(context, 'Pick a project to filter by phase or activity.');
+      await _pickProject(context, projectProvider);
+      if (!mounted || _selectedProjectId == 'all') return;
+    }
+    if (!context.mounted) return;
+    await picker(context, projectProvider);
+  }
+
+  /// Floor ▾ · Phase ▾ · Activity ▾ under the project / period chips: the
+  /// same filters as the Filter sheet (same state), one tap away, each
+  /// showing its value with an × to clear it.
+  /// The chip row is left out for a project with no floors, phases or
+  /// activities (and nothing picked) — it would only hold dead chips.
+  bool _showWhereChips(ProjectProvider projectProvider) {
+    final o = _whereOptions(projectProvider);
+    return o.project == null ||
+        o.floors.isNotEmpty ||
+        o.phases.isNotEmpty ||
+        o.activities.isNotEmpty ||
+        _selectedFloor != null ||
+        _selectedPhaseId != null ||
+        _selectedActivityName != null;
+  }
+
+  Widget _buildWhereChips(BuildContext context, ProjectProvider projectProvider) {
+    final o = _whereOptions(projectProvider);
+    final hasProject = o.project != null;
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      clipBehavior: Clip.none,
+      child: Row(
+        children: [
+          if (o.floors.isNotEmpty) ...[
+            _WhereChip(
+              label: 'Floor',
+              value: _selectedFloor,
+              onTap: () => _pickFloor(context, projectProvider),
+              onClear: () => setState(() { _selectedFloor = null; _currentPage = 1; }),
+            ),
+            const SizedBox(width: 8),
+          ],
+          _WhereChip(
+            label: 'Phase',
+            value: o.phase?.phaseName ?? (_selectedPhaseId == null ? null : 'Phase'),
+            enabled: !hasProject || o.phases.isNotEmpty,
+            dim: !hasProject,
+            onTap: () => _whereChipTap(context, projectProvider, _pickPhase),
+            onClear: () => setState(() { _selectedPhaseId = null; _selectedActivityName = null; _currentPage = 1; }),
+          ),
+          const SizedBox(width: 8),
+          _WhereChip(
+            label: 'Activity',
+            value: _selectedActivityName,
+            enabled: !hasProject || o.activities.isNotEmpty || _selectedActivityName != null,
+            dim: !hasProject,
+            onTap: () => _whereChipTap(context, projectProvider, _pickActivity),
+            onClear: () => setState(() { _selectedActivityName = null; _currentPage = 1; }),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _openFilterSheet(BuildContext context, ProjectProvider projectProvider) {
     showBtSheet(
       context,
@@ -2169,17 +2442,12 @@ class _ReportsViewState extends State<_ReportsView> {
       builder: (sheetCtx) => StatefulBuilder(
         builder: (sheetCtx, setSheet) {
           void refresh() => setSheet(() {});
-          final proj = projectProvider.projects.where((p) => p.id == _selectedProjectId).firstOrNull;
-          final floors = proj?.floors ?? [];
-          final phases = proj?.selectedPhases ?? [];
-          final selectedPhase = phases.where((p) => p.id == _selectedPhaseId).firstOrNull;
-          final List<ProjectActivity> activities = [];
-          if (_selectedPhaseId != null) {
-            activities.addAll(selectedPhase?.activities ?? []);
-          } else if (proj != null) {
-            activities.addAll(phases.expand((p) => p.activities));
-          }
-          final activityNames = activities.map((a) => a.name).toSet().toList();
+          final o = _whereOptions(projectProvider);
+          final proj = o.project;
+          final floors = o.floors;
+          final phases = o.phases;
+          final selectedPhase = o.phase;
+          final activityNames = o.activities;
           final count = _filterEntries(projectProvider, _quickTab()).length;
           final hasProject = _selectedProjectId != 'all';
 
@@ -2239,18 +2507,9 @@ class _ReportsViewState extends State<_ReportsView> {
                   whereRow('Project', hasProject ? (proj?.name ?? 'Project') : 'All projects', true, () async {
                     await _pickProject(sheetCtx, projectProvider);
                   }),
-                  whereRow('Floor', _selectedFloor ?? 'All', hasProject && floors.isNotEmpty, () async {
-                    final v = await _pickOption(sheetCtx, 'Floor', [const MapEntry('Select Floor', 'All floors'), ...floors.map((f) => MapEntry(f, f))], _selectedFloor ?? 'Select Floor');
-                    if (v != null) setState(() { _selectedFloor = v == 'Select Floor' ? null : v; _currentPage = 1; });
-                  }),
-                  whereRow('Phase', selectedPhase?.phaseName ?? 'All', hasProject && phases.isNotEmpty, () async {
-                    final v = await _pickOption(sheetCtx, 'Phase', [const MapEntry('Select Phase', 'All phases'), ...phases.map((ph) => MapEntry(ph.id, ph.phaseName))], _selectedPhaseId ?? 'Select Phase');
-                    if (v != null) setState(() { _selectedPhaseId = v == 'Select Phase' ? null : v; _selectedActivityName = null; _currentPage = 1; });
-                  }),
-                  whereRow('Activity', _selectedActivityName ?? 'All', hasProject && activityNames.isNotEmpty, () async {
-                    final v = await _pickOption(sheetCtx, 'Activity', [const MapEntry('Select Activity', 'All activities'), ...activityNames.map((n) => MapEntry(n, n))], _selectedActivityName ?? 'Select Activity');
-                    if (v != null) setState(() { _selectedActivityName = v == 'Select Activity' ? null : v; _currentPage = 1; });
-                  }),
+                  whereRow('Floor', _selectedFloor ?? 'All', hasProject && floors.isNotEmpty, () => _pickFloor(sheetCtx, projectProvider)),
+                  whereRow('Phase', selectedPhase?.phaseName ?? 'All', hasProject && phases.isNotEmpty, () => _pickPhase(sheetCtx, projectProvider)),
+                  whereRow('Activity', _selectedActivityName ?? 'All', hasProject && (activityNames.isNotEmpty || _selectedActivityName != null), () => _pickActivity(sheetCtx, projectProvider)),
                 ],
               ),
               if (!hasProject)
@@ -2273,7 +2532,15 @@ class _ReportsViewState extends State<_ReportsView> {
   List<Widget> _buildEntryGroups(BuildContext context, List<EntryModel> entries, String Function(String) getProjectName) {
     final groups = <String, List<EntryModel>>{};
     for (final e in entries) {
-      final key = _sortColumn == 'date' ? formatDayGroup(e.date) : '';
+      final String key;
+      if (_sortColumn == 'date') {
+        key = formatDayGroup(e.date);
+      } else if (_sortColumn == 'paymentDate') {
+        final paid = ReportSheet.paymentDateOf(e);
+        key = paid == null ? 'Not paid yet' : 'Paid · ${formatDayGroup(paid)}';
+      } else {
+        key = '';
+      }
       groups.putIfAbsent(key, () => []).add(e);
     }
     final out = <Widget>[];
@@ -2878,6 +3145,70 @@ class _ReportsViewState extends State<_ReportsView> {
 
 /// Noir "Ask AI about your costs" card (Reports board).
 /// Cost card in the "By type" grid (V2 version of the original app's cards).
+class _WhereOptions {
+  const _WhereOptions({required this.project, required this.floors, required this.phases, required this.phase, required this.activities});
+  final ProjectModel? project;
+  final List<String> floors;
+  final List<ProjectPhase> phases;
+  final ProjectPhase? phase;
+  final List<String> activities;
+}
+
+/// Quick filter chip on the noir header: "Phase ▾" when off; the chosen value
+/// with an × (clears it) when on. [dim] = needs a project first.
+class _WhereChip extends StatelessWidget {
+  const _WhereChip({required this.label, required this.value, required this.onTap, required this.onClear, this.enabled = true, this.dim = false});
+  final String label;
+  final String? value;
+  final VoidCallback onTap;
+  final VoidCallback onClear;
+  final bool enabled;
+  final bool dim;
+
+  @override
+  Widget build(BuildContext context) {
+    final on = value != null;
+    final fg = on ? Bt.noir : Bt.bone.withValues(alpha: (dim || !enabled) ? .5 : 1);
+    final text = on && value!.length > 20 ? '${value!.substring(0, 19).trimRight()}…' : (value ?? label);
+    return Semantics(
+      button: true,
+      label: on ? '$label: $value' : '$label filter',
+      child: BtPressable(
+        onTap: enabled ? onTap : null,
+        scale: .95,
+        child: AnimatedContainer(
+          duration: Bt.fast,
+          curve: Bt.ease,
+          constraints: const BoxConstraints(minHeight: 36),
+          padding: EdgeInsets.only(left: 13, right: on ? 4 : 9),
+          decoration: BoxDecoration(
+            color: on ? Bt.bone : Colors.white.withValues(alpha: .08),
+            borderRadius: BorderRadius.circular(Bt.rChip),
+            border: on ? null : Border.all(color: Colors.white.withValues(alpha: .12)),
+          ),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            ExcludeSemantics(child: Text(text, style: BtText.subhead(context, weight: FontWeight.w500, color: fg))),
+            if (on)
+              Semantics(
+                button: true,
+                label: 'Clear $label',
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: onClear,
+                  child: SizedBox(width: 30, height: 36, child: Icon(Icons.close_rounded, size: 16, color: fg)),
+                ),
+              )
+            else ...[
+              const SizedBox(width: 2),
+              Icon(Icons.expand_more_rounded, size: 18, color: fg),
+            ],
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
 class _CostCard extends StatelessWidget {
   const _CostCard({
     required this.title,
@@ -3271,7 +3602,8 @@ class _FullScreenLogsViewer extends StatefulWidget {
     required this.title,
     required this.onExportCsv,
     required this.onExportPdf,
-    required this.activeColumns,
+    required this.columnsOf,
+    required this.onPinColumn,
     required this.sortColumn,
     required this.sortAscending,
     required this.onSort,
@@ -3287,7 +3619,9 @@ class _FullScreenLogsViewer extends StatefulWidget {
   final String title;
   final void Function(List<EntryModel> rows) onExportCsv;
   final void Function(List<EntryModel> rows) onExportPdf;
-  final List<String> activeColumns;
+  /// The tab's columns in on-screen order (pinned first), read on each build.
+  final List<String> Function() columnsOf;
+  final void Function(String column) onPinColumn;
   final String sortColumn;
   final bool sortAscending;
   final void Function(String column, bool ascending) onSort;
@@ -3314,17 +3648,7 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
 
   List<EntryModel> _sorted(List<EntryModel> source) {
     final list = List<EntryModel>.from(source);
-    list.sort((a, b) {
-      int cmp = 0;
-      if (_sortColumn == 'date') {
-        cmp = a.date.compareTo(b.date);
-      } else if (_sortColumn == 'amount') {
-        cmp = a.amount.compareTo(b.amount);
-      } else if (_sortColumn == 'project') {
-        cmp = widget.getProjectName(a.projectId).compareTo(widget.getProjectName(b.projectId));
-      }
-      return _sortAscending ? cmp : -cmp;
-    });
+    list.sort((a, b) => compareReportEntries(a, b, _sortColumn, _sortAscending, widget.getProjectName));
     return list;
   }
 
@@ -3362,6 +3686,7 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
 
   Widget _content(double width) {
     final rotated = _quarterTurns != 0;
+    final columns = widget.columnsOf();
     final wide = width > 600;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -3431,7 +3756,12 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
                     ? const BtCard(child: BtEmpty(icon: Icons.search_off_outlined, title: 'No transaction logs match filters.'))
                     : ReportSheet(
                         entries: _rows,
-                        columns: widget.activeColumns,
+                        columns: columns,
+                        pinnedColumn: columns.isEmpty ? null : columns.first,
+                        onPinColumn: (column) {
+                          widget.onPinColumn(column);
+                          setState(() {});
+                        },
                         maxHeight: c.maxHeight - ReportSheet.footerHeight,
                         pinnedWidth: wide ? 158 : 132,
                         projectNameOf: (e) => widget.getProjectName(e.projectId),

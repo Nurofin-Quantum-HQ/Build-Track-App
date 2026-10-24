@@ -1,4 +1,5 @@
 import 'package:buildtrack_mobile/models/project_model.dart';
+import 'package:buildtrack_mobile/screen/reports/report_sheet.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -66,6 +67,11 @@ class ReportExportHelper {
     final formattedRemaining = buffer.toString().split('').reversed.join('');
     return 'Rs. $formattedRemaining,$lastThree.$decimal';
   }
+  static String _payDate(EntryModel e) {
+    final d = ReportSheet.paymentDateOf(e);
+    return d == null ? '' : _formatYmd(d);
+  }
+
   static List<String> getExportHeaders({
     required String quickCategoryTab,
     List<String>? activeColumns,
@@ -175,9 +181,9 @@ class ReportExportHelper {
         amount: entry.amount,
         paidAmount: entry.paidAmount,
       );
-      final payDateStr = entry.paymentDate != null
-          ? _formatYmd(entry.paymentDate!)
-          : '';
+      // Latest payment's date (same as the sheet's Payment Date column).
+      final paidOn = ReportSheet.paymentDateOf(entry);
+      final payDateStr = paidOn != null ? _formatYmd(paidOn) : '';
           
       final List<String> rowValues = [];
       
@@ -190,7 +196,7 @@ class ReportExportHelper {
         }
         for (final col in activeColumns) {
           if (col == 'Created At') {
-            rowValues.add(entry.createdAt != null ? _formatDateTime(entry.createdAt!) : '');
+            rowValues.add(_formatDateTime(entry.createdAt));
           } else if (col == 'Action') {
             rowValues.add('unchanged');
           } else if (col == 'Purchased Date') {
@@ -403,6 +409,8 @@ class ReportExportHelper {
         } else if (col == 'Type' || col == 'Unit' || col == 'Status') {
           cellAlignmentsMap[i] = pw.Alignment.center;
         } else if (col == 'Amount' ||
+            col == 'Paid' ||
+            col == 'Remaining' ||
             col == 'Rate' ||
             col == 'Rate/Day' ||
             col == 'Rent Rate' ||
@@ -419,7 +427,7 @@ class ReportExportHelper {
             rowValues.add(_formatYmd(e.date));
           } else if (col == 'Payment Date') {
             rowValues.add(
-              e.paymentDate != null ? _formatYmd(e.paymentDate!) : '',
+              _payDate(e),
             );
           } else if (col == 'Project') {
             rowValues.add(getProjectName(e.projectId));
@@ -508,7 +516,7 @@ class ReportExportHelper {
             paidAmount: e.paidAmount,
           ),
           _formatIndianCurrency(e.amount),
-          e.paymentDate != null ? _formatYmd(e.paymentDate!) : '',
+          _payDate(e),
         ];
       }).toList();
     } else if (quickCategoryTab == 'Labour') {
@@ -549,7 +557,7 @@ class ReportExportHelper {
             paidAmount: e.paidAmount,
           ),
           _formatIndianCurrency(e.amount),
-          e.paymentDate != null ? _formatYmd(e.paymentDate!) : '',
+          _payDate(e),
         ];
       }).toList();
     } else if (quickCategoryTab == 'Equipment') {
@@ -590,7 +598,7 @@ class ReportExportHelper {
             paidAmount: e.paidAmount,
           ),
           _formatIndianCurrency(e.amount),
-          e.paymentDate != null ? _formatYmd(e.paymentDate!) : '',
+          _payDate(e),
         ];
       }).toList();
     } else {
@@ -641,7 +649,7 @@ class ReportExportHelper {
             paidAmount: e.paidAmount,
           ),
           _formatIndianCurrency(e.amount),
-          e.paymentDate != null ? _formatYmd(e.paymentDate!) : '',
+          _payDate(e),
         ];
       }).toList();
     }
