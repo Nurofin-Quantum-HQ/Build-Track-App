@@ -89,7 +89,9 @@ class ApiService {
 
   static String _newClientRequestId() {
     final random = Random();
-    return 'm-${DateTime.now().microsecondsSinceEpoch}-${random.nextInt(1 << 32).toRadixString(16)}';
+    // Two 24-bit parts: `1 << 32` is 0 on web (JS 32-bit shifts) and nextInt(0) throws.
+    String part() => random.nextInt(0xFFFFFF).toRadixString(16).padLeft(6, '0');
+    return 'm-${DateTime.now().microsecondsSinceEpoch}-${part()}${part()}';
   }
 
   static Future<List<Map<String, dynamic>>> _readQueue(SharedPreferences prefs) async {
