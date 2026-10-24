@@ -3339,7 +3339,11 @@ class _TeamApprovalHistoryWidgetState
   }
   Future<void> _load() async {
     try {
-      final data = await ApiService.fetchApprovalsHistory();
+      // Filter on the server before its 20-row limit (was: last 20 overall, then by project).
+      final pid = widget.projectId?.trim() ?? '';
+      final data = await ApiService.fetchApprovalsHistory(
+        projectId: RegExp(r'^[a-f0-9]{24}$').hasMatch(pid) ? pid : null,
+      );
       final List<dynamic> all = (data?['transactions'] as List?) ?? [];
       final filtered =
           all.where((t) {

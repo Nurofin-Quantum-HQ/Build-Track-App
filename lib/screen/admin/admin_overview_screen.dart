@@ -67,7 +67,7 @@ class _AdminOverviewScreenState extends State<AdminOverviewScreen>
       _txError = null;
     });
     try {
-      final response = await ApiService.get('/transactions');
+      final response = await ApiService.get('/transactions?expand=createdBy');
       if (response.statusCode == 200) {
         final decoded = json.decode(response.body);
         final List raw = decoded is List
