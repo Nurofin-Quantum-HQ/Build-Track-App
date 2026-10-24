@@ -188,8 +188,15 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
     }
   }
 
-  void _showEntryOptions(BuildContext context, String type) {
-    Navigator.pushNamed(context, '/add-entry');
+  /// A specific type (Mason's "Add Material Entry") opens the same flow as
+  /// the + sheet's choice (`/execution-context` with that type); anything
+  /// else opens the Add Entry page.
+  Future<void> _showEntryOptions(BuildContext context, String type) async {
+    if (type == 'material' || type == 'labour' || type == 'equipment') {
+      await Navigator.pushNamed(context, '/execution-context', arguments: {'type': type});
+      return;
+    }
+    await Navigator.pushNamed(context, '/add-entry');
   }
 
   /// Top row of every role's hero: company caption + greeting, then
@@ -432,7 +439,7 @@ Future<bool> _approveTx(BuildContext context, String id) async {
   if (ok) {
     btToast(context, 'Transaction approved');
   } else {
-    btToast(context, 'Failed to approve', error: true);
+    btToast(context, "Couldn't approve — check your connection and try again.", error: true);
   }
   return ok;
 }
@@ -443,6 +450,8 @@ Future<bool> _rejectTx(BuildContext context, String id) async {
   if (!context.mounted) return ok;
   if (ok) {
     btToast(context, 'Transaction rejected');
+  } else {
+    btToast(context, "Couldn't reject — check your connection and try again.", error: true);
   }
   return ok;
 }
@@ -479,7 +488,10 @@ class _ApprovalsSummaryCard extends StatelessWidget {
         const SizedBox(width: 14),
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('$count ${count == 1 ? 'entry needs' : 'entries need'} your approval', style: BtText.headline(context)),
+            Text(
+              updates > 0 ? '$count ${count == 1 ? 'item needs' : 'items need'} your approval' : '$count ${count == 1 ? 'entry needs' : 'entries need'} your approval',
+              style: BtText.headline(context),
+            ),
             if (sub.isNotEmpty) ...[
               const SizedBox(height: 2),
               Text(sub.join(' · '), style: BtText.num(BtText.subhead(context))),
@@ -495,7 +507,7 @@ class _ApprovalsSummaryCard extends StatelessWidget {
 /// Pending approvals on Home for anyone who can approve: count + amount,
 /// the top two entries with Approve / Reject…, and "See all" → Approvals.
 class _HomeApprovals extends StatefulWidget {
-  const _HomeApprovals();
+  const _HomeApprovals({super.key});
   @override
   State<_HomeApprovals> createState() => _HomeApprovalsState();
 }
@@ -505,6 +517,10 @@ class _HomeApprovalsState extends State<_HomeApprovals> {
   int _updates = 0;
   bool _loaded = false;
 
+  /// The last load failed (network / server error) — show Retry instead of
+  /// hiding the card as if nothing were waiting.
+  bool _failed = false;
+
   @override
   void initState() {
     super.initState();
@@ -512,12 +528,21 @@ class _HomeApprovalsState extends State<_HomeApprovals> {
   }
 
   Future<void> _load() async {
-    final data = await ApiService.fetchPendingApprovals();
+    Map<String, dynamic>? data;
+    try {
+      data = await ApiService.fetchPendingApprovals();
+    } catch (_) {
+      data = null;
+    }
     if (!mounted) return;
     setState(() {
-      _txs = (data?['transactions'] as List?) ?? [];
-      _updates = (data?['projectUpdates'] as List?)?.length ?? 0;
       _loaded = true;
+      _failed = data == null;
+      // Keep what was shown before when a refresh fails.
+      if (data != null) {
+        _txs = (data['transactions'] as List?) ?? [];
+        _updates = (data['projectUpdates'] as List?)?.length ?? 0;
+      }
     });
   }
 
@@ -545,6 +570,12 @@ class _HomeApprovalsState extends State<_HomeApprovals> {
       return const Padding(padding: EdgeInsets.only(bottom: 16), child: BtSkeleton(height: 76, radius: Bt.rCard));
     }
     final total = _txs.length + _updates;
+    if (_failed && total == 0) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 16),
+        child: BtErrorCard(message: "Couldn't load pending approvals", onRetry: _load),
+      );
+    }
     if (total == 0) return const SizedBox.shrink();
     final top = _txs.take(2).toList();
     return Padding(
@@ -794,7 +825,7 @@ class _TaskCard extends StatelessWidget {
 
 class _AdminDashboard extends StatefulWidget {
   const _AdminDashboard({required this.onEntryTap, required this.top});
-  final void Function(BuildContext, String) onEntryTap;
+  final Future<void> Function(BuildContext, String) onEntryTap;
   final Widget top;
   @override
   State<_AdminDashboard> createState() => _AdminDashboardState();
@@ -804,6 +835,23 @@ class _AdminDashboardState extends State<_AdminDashboard> {
   bool _isGlobalView = true;
   bool _loadingRevenue = false;
   String? _lastProjectId;
+
+  /// Revenue for the selected project failed to load — the card says so
+  /// (with Retry) instead of showing ₹0.
+  bool _revenueError = false;
+  final _approvalsKey = GlobalKey<_HomeApprovalsState>();
+
+  /// Pull-to-refresh: projects + entries (totals), this project's revenue and
+  /// the pending-approvals card.
+  Future<void> _refresh() async {
+    final provider = context.read<ProjectProvider>();
+    final projectId = _isGlobalView ? null : provider.selectedProject?.id;
+    await Future.wait<void>([
+      provider.load().catchError((_) {}),
+      if (projectId != null) _loadRevenue(projectId),
+      if (_approvalsKey.currentState != null) _approvalsKey.currentState!._load(),
+    ]);
+  }
 
   /// Bumped when proof images arrive, so an open Revenue History sheet redraws.
   final ValueNotifier<int> _revenueProofs = ValueNotifier<int>(0);
@@ -847,8 +895,10 @@ class _AdminDashboardState extends State<_AdminDashboard> {
     });
   }
   Future<void> _loadRevenue(String projectId) async {
+    if (!mounted) return;
     setState(() {
       _loadingRevenue = true;
+      _revenueError = false;
     });
     try {
       final response = await ApiService.get(
@@ -879,16 +929,18 @@ class _AdminDashboardState extends State<_AdminDashboard> {
           _hydrateRevenueProofs(entries, projectId);
         }
       } else {
-        if (mounted) {
+        if (mounted && projectId == _lastProjectId) {
           setState(() {
             _loadingRevenue = false;
+            _revenueError = true;
           });
         }
       }
     } catch (e) {
-      if (mounted) {
+      if (mounted && projectId == _lastProjectId) {
         setState(() {
           _loadingRevenue = false;
+          _revenueError = true;
         });
       }
     }
@@ -1416,6 +1468,22 @@ class _AdminDashboardState extends State<_AdminDashboard> {
   Widget _buildRevenueHistory(BuildContext context) {
     if (_loadingRevenue) {
       return const BtSkeleton(height: 16, width: 110, radius: 6);
+    }
+    if (_revenueError) {
+      final id = _lastProjectId;
+      return Semantics(
+        button: true,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: id == null ? null : () => _loadRevenue(id),
+          child: Text(
+            "Couldn't load · Retry",
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: BtText.caption(context, color: Bt.red, weight: FontWeight.w600),
+          ),
+        ),
+      );
     }
     final project = Provider.of<ProjectProvider>(
       context,
@@ -2136,6 +2204,9 @@ class _AdminDashboardState extends State<_AdminDashboard> {
     final budget = _isGlobalView ? gBudget : (project?.totalBudget ?? 0.0);
     final remaining = _isGlobalView ? (gBudget - gSpent) : (project?.remainingBudget ?? 0.0);
     final revenue = _isGlobalView ? gRev : (project != null ? _totalRevenueSum : 0.0);
+    // Project revenue failed to load and nothing was loaded before: don't
+    // show ₹0 / a fake loss.
+    final revenueUnknown = !_isGlobalView && project != null && _revenueError && _revenueEntries.isEmpty;
     final netCash = revenue - spent;
     final isLoss = netCash < 0;
     final progress = _isGlobalView ? gProg : (project?.progress ?? 0.0);
@@ -2212,13 +2283,6 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                 ),
               ),
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: BtGlassTile(
-                label: 'Upcoming · planned',
-                value: Text(budget > 0 ? formatInr(remaining < 0 ? 0 : remaining, compact: true) : '—', maxLines: 1, overflow: TextOverflow.ellipsis),
-              ),
-            ),
           ]),
         ),
       ],
@@ -2272,7 +2336,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
           tooltipPadding: const EdgeInsets.all(16),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('Total revenue', style: BtText.caption(context)),
-            Text(formatInr(revenue, compact: true), maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.num(BtText.headline(context).copyWith(color: Bt.green))),
+            Text(revenueUnknown ? '—' : formatInr(revenue, compact: true), maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.num(BtText.headline(context).copyWith(color: Bt.green))),
           ]),
         ),
         const SizedBox(height: 8),
@@ -2285,7 +2349,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
           tooltipPadding: const EdgeInsets.all(16),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(isLoss ? 'Net cash flow · loss' : 'Net cash flow · profit', maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.caption(context)),
-            Text(formatInr(netCash, compact: true), maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.num(BtText.headline(context).copyWith(color: isLoss ? Bt.red : Bt.green))),
+            Text(revenueUnknown ? '—' : formatInr(netCash, compact: true), maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.num(BtText.headline(context).copyWith(color: revenueUnknown ? Bt.ink2 : (isLoss ? Bt.red : Bt.green)))),
           ]),
         ),
         if (project != null) ...[
@@ -2297,8 +2361,9 @@ class _AdminDashboardState extends State<_AdminDashboard> {
 
     return BtHeroScroll(
       hero: hero,
+      onRefresh: _refresh,
       children: [
-        if (RoleManager.canApproveUpdates) const _HomeApprovals(),
+        if (RoleManager.canApproveUpdates) _HomeApprovals(key: _approvalsKey),
         BtReveal(index: 1, child: _buildSpeakUpdate(context)),
         const SizedBox(height: 12),
         BtReveal(
@@ -2520,9 +2585,11 @@ class _SupervisorDashboard extends StatefulWidget {
 class _SupervisorDashboardState extends State<_SupervisorDashboard> {
   List<dynamic> _pendingTransactions = [];
   List<dynamic> _historyTransactions = [];
+  int _pendingUpdates = 0;
   List<TaskModel> _tasks = [];
   bool _isLoading = true;
   String? _error;
+  bool _tasksError = false;
   String _activeTab = 'pending';
   @override
   void initState() {
@@ -2534,22 +2601,30 @@ class _SupervisorDashboardState extends State<_SupervisorDashboard> {
       _isLoading = true;
       _error = null;
     });
-    final results = await Future.wait([
-      ApiService.fetchPendingApprovals(),
-      ApiService.fetchApprovalsHistory(),
-      TaskService.getDailyTasks(),
+    // Each call fails on its own (getDailyTasks throws on errors; before, one
+    // failure left the whole Home stuck on skeletons).
+    final results = await Future.wait<Object?>([
+      ApiService.fetchPendingApprovals().catchError((_) => null),
+      ApiService.fetchApprovalsHistory().catchError((_) => null),
+      TaskService.getDailyTasks().then<List<TaskModel>?>((t) => t).catchError((_) => null),
     ]);
     if (!mounted) return;
     final pendingData = results[0] as Map<String, dynamic>?;
     final historyData = results[1] as Map<String, dynamic>?;
-    final tasksData = results[2] as List<TaskModel>;
+    final tasksData = results[2] as List<TaskModel>?;
     setState(() {
-      _pendingTransactions = (pendingData?['transactions'] as List?) ?? [];
-      _historyTransactions = (historyData?['transactions'] as List?) ?? [];
-      _tasks = tasksData;
+      if (pendingData != null) {
+        _pendingTransactions = (pendingData['transactions'] as List?) ?? [];
+        _pendingUpdates = (pendingData['projectUpdates'] as List?)?.length ?? 0;
+      }
+      if (historyData != null) _historyTransactions = (historyData['transactions'] as List?) ?? [];
+      if (tasksData != null) _tasks = tasksData;
+      _tasksError = tasksData == null;
       _isLoading = false;
-      if (pendingData == null && historyData == null) {
-        _error = 'Failed to load data';
+      // Pending approvals are the point of this Home — a failed load is an
+      // error (with Retry), not "No pending approvals".
+      if (pendingData == null) {
+        _error = "Couldn't load approvals. Check your connection.";
       }
     });
   }
@@ -2652,7 +2727,16 @@ class _SupervisorDashboardState extends State<_SupervisorDashboard> {
           index: 1,
           child: Row(children: [
             if (RoleManager.canAssignTasks) ...[
-              Expanded(child: BtButton(label: 'Assign Task', icon: Icons.assignment_turned_in_outlined, onPressed: () => Navigator.pushNamed(context, '/assign-task'))),
+              Expanded(
+                child: BtButton(
+                  label: 'Assign Task',
+                  icon: Icons.assignment_turned_in_outlined,
+                  // Back from Assign Task → refresh "Tasks assigned".
+                  onPressed: () => Navigator.pushNamed(context, '/assign-task').then((_) {
+                    if (mounted) _loadAll();
+                  }),
+                ),
+              ),
               const SizedBox(width: 10),
               Semantics(
                 button: true,
@@ -2688,7 +2772,9 @@ class _SupervisorDashboardState extends State<_SupervisorDashboard> {
           title: 'Tasks assigned',
           action: _tasks.isEmpty ? null : '${_tasks.where((t) => t.status != 'Completed').length} open',
         ),
-        if (_tasks.isEmpty)
+        if (!_isLoading && _tasksError && _tasks.isEmpty)
+          BtErrorCard(message: "Couldn't load tasks", onRetry: _loadAll)
+        else if (_tasks.isEmpty)
           const BtCard(child: BtEmpty(icon: Icons.task_alt, title: 'No tasks currently active.'))
         else
           BtGroup(children: [
@@ -2740,10 +2826,11 @@ class _SupervisorDashboardState extends State<_SupervisorDashboard> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             BtSectionHeader(title: 'Pending approvals', action: 'See all', onAction: _openInbox),
-            if (pendingCount == 0)
+            if (pendingCount == 0 && _pendingUpdates == 0)
               const BtCard(child: BtEmpty(icon: Icons.check_circle_outline, title: 'No pending approvals', message: 'Pull down to refresh'))
             else ...[
-              _ApprovalsSummaryCard(count: pendingCount, amount: pendingSum, onTap: _openInbox),
+              // Project updates are approved on the Approvals screen (See all).
+              _ApprovalsSummaryCard(count: pendingCount + _pendingUpdates, amount: pendingSum, updates: _pendingUpdates, onTap: _openInbox),
               for (var i = 0; i < _pendingTransactions.length; i++)
                 Padding(
                   padding: const EdgeInsets.only(top: 10),
@@ -2933,7 +3020,7 @@ class _BigAction extends StatelessWidget {
 
 class _MasonDashboard extends StatefulWidget {
   const _MasonDashboard({required this.onEntryTap, required this.top});
-  final void Function(BuildContext, String) onEntryTap;
+  final Future<void> Function(BuildContext, String) onEntryTap;
   final Widget top;
   @override
   State<_MasonDashboard> createState() => _MasonDashboardState();
@@ -2942,12 +3029,28 @@ class _MasonDashboardState extends State<_MasonDashboard> {
   late Future<List<dynamic>> _recentEntriesFuture;
   List<TaskModel> _tasks = [];
   bool _isLoadingTasks = true;
+  bool _tasksError = false;
+  final _approvalsKey = GlobalKey<_HomeApprovalsState>();
   @override
   void initState() {
     super.initState();
     final projectId = context.read<ProjectProvider>().selectedProject?.id;
     _recentEntriesFuture = _fetchOwnRecentEntries(projectId);
     _loadTasks();
+  }
+
+  /// Pull-to-refresh (and after adding an entry): tasks, own recent entries
+  /// and the approvals card — same idea as the Supervisor Home's reload.
+  Future<void> _refresh() async {
+    if (!mounted) return;
+    final projectId = context.read<ProjectProvider>().selectedProject?.id;
+    final entries = _fetchOwnRecentEntries(projectId);
+    setState(() => _recentEntriesFuture = entries);
+    await Future.wait<void>([
+      _loadTasks(),
+      entries.then<void>((_) {}, onError: (_) {}),
+      if (_approvalsKey.currentState != null) _approvalsKey.currentState!._load(),
+    ]);
   }
 
   /// The mason's OWN recent entries. `fetchMyRecentEntries` reads
@@ -2961,7 +3064,7 @@ class _MasonDashboardState extends State<_MasonDashboard> {
     String idOf(dynamic v) => v is Map ? (v['_id'] ?? v['id'] ?? '').toString() : (v ?? '').toString();
     try {
       final response = await ApiService.get('/transactions/my?limit=50');
-      if (response.statusCode != 200) return [];
+      if (response.statusCode != 200) throw Exception('HTTP ${response.statusCode}');
       final decoded = json.decode(response.body);
       final List<dynamic> raw = decoded is List ? decoded : ((decoded['transactions'] ?? decoded['data'] ?? []) as List<dynamic>);
       final own = raw.where((e) {
@@ -2976,8 +3079,9 @@ class _MasonDashboardState extends State<_MasonDashboard> {
         ..sort((a, b) => (b['date'] ?? b['createdAt'] ?? '').toString().compareTo((a['date'] ?? a['createdAt'] ?? '').toString()));
       return own;
     } catch (e) {
+      // Surface as an error (FutureBuilder shows Retry), not "No entries yet".
       debugPrint('Mason recent entries error: $e');
-      return [];
+      rethrow;
     }
   }
   Future<void> _loadTasks() async {
@@ -2987,11 +3091,15 @@ class _MasonDashboardState extends State<_MasonDashboard> {
         setState(() {
           _tasks = tasks;
           _isLoadingTasks = false;
+          _tasksError = false;
         });
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _isLoadingTasks = false);
+        setState(() {
+          _isLoadingTasks = false;
+          _tasksError = true;
+        });
       }
     }
   }
@@ -3031,6 +3139,7 @@ class _MasonDashboardState extends State<_MasonDashboard> {
     );
     return BtHeroScroll(
       hero: hero,
+      onRefresh: _refresh,
       children: [
         if (canDailyUpdate || canMaterialEntry) ...[
         BtReveal(
@@ -3044,7 +3153,9 @@ class _MasonDashboardState extends State<_MasonDashboard> {
                   icon: Icons.add_task_rounded,
                   title: 'Add Daily Update',
                   subtitle: 'Work, photos, notes',
-                  onTap: () => Navigator.pushNamed(context, '/update-progress'),
+                  onTap: () => Navigator.pushNamed(context, '/update-progress').then((_) {
+                    if (mounted) _refresh();
+                  }),
                 ),
               ),
               if (canDailyUpdate && canMaterialEntry) const SizedBox(width: 12),
@@ -3054,7 +3165,10 @@ class _MasonDashboardState extends State<_MasonDashboard> {
                   icon: Icons.inventory_2_outlined,
                   title: 'Add Material Entry',
                   subtitle: 'Cement, steel, bricks…',
-                  onTap: () => widget.onEntryTap(context, 'material'),
+                  // Same flow as the + sheet's "Material" choice.
+                  onTap: () => widget.onEntryTap(context, 'material').then((_) {
+                    if (mounted) _refresh();
+                  }),
                 ),
               ),
             ]),
@@ -3062,10 +3176,12 @@ class _MasonDashboardState extends State<_MasonDashboard> {
         ),
         const SizedBox(height: 24),
         ],
-        if (RoleManager.canApproveUpdates) const _HomeApprovals(),
+        if (RoleManager.canApproveUpdates) _HomeApprovals(key: _approvalsKey),
         BtSectionHeader(title: 'Tasks assigned', action: _isLoadingTasks || _tasks.isEmpty ? null : '$openTasks open'),
         if (_isLoadingTasks)
           const BtSkeletonList(count: 2)
+        else if (_tasksError && _tasks.isEmpty)
+          BtErrorCard(message: "Couldn't load tasks", onRetry: _loadTasks)
         else if (_tasks.isEmpty)
           const BtCard(child: BtEmpty(icon: Icons.task_alt, title: 'No tasks currently active.'))
         else
@@ -3096,7 +3212,7 @@ class _MasonDashboardState extends State<_MasonDashboard> {
               return const BtSkeletonList(count: 3);
             }
             if (snapshot.hasError) {
-              return const BtErrorCard(message: 'Failed to load recent entries.');
+              return BtErrorCard(message: "Couldn't load recent entries.", onRetry: _refresh);
             }
             final entries = snapshot.data ?? [];
             if (entries.isEmpty) {

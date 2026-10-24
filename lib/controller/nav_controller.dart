@@ -27,7 +27,9 @@ class NavController extends ChangeNotifier {
   bool isRouteEnabled(String route) {
     if (route == '/home') return true;
     if (route == '/projects') return RoleManager.canViewProjects;
-    if (route == '/add-entry') return RoleManager.canAddEntries;
+    // Entries = daily updates/labour (canAddEntries) or material/equipment
+    // (manage_expenses → canAddTransactions).
+    if (route == '/add-entry') return RoleManager.canAddEntries || RoleManager.canAddTransactions;
     if (route == '/inventory') return RoleManager.canManageInventory;
     if (route == '/reports') return RoleManager.canViewReports;
     // Insights uses the same permission as the project insights entry point.
@@ -46,7 +48,7 @@ class NavController extends ChangeNotifier {
   List<String> get routes {
     final items = <String>['/home'];
     if (RoleManager.canViewProjects) items.add('/projects');
-    if (RoleManager.canAddEntries) items.add('/add-entry');
+    if (RoleManager.canAddEntries || RoleManager.canAddTransactions) items.add('/add-entry');
     if (RoleManager.canViewReports && RoleManager.canViewProjectBudget) items.add('/insights');
     if (RoleManager.canViewReports) items.add('/reports');
     return items;

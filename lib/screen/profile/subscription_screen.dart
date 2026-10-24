@@ -316,12 +316,15 @@ class _SubscriptionScreenContentState
                 style: TextButton.styleFrom(foregroundColor: Bt.ink2, minimumSize: const Size(44, 44)),
                 child: Text('Restore Purchases', style: BtText.subhead(context, weight: FontWeight.w500)),
               ),
-              const Text('·', style: TextStyle(color: Bt.placeholder)),
-              TextButton(
-                onPressed: () => _showCancelDialog(context, sub),
-                style: TextButton.styleFrom(foregroundColor: Bt.red, minimumSize: const Size(44, 44)),
-                child: Text('Cancel Plan…', style: BtText.subhead(context, weight: FontWeight.w500, color: Bt.red)),
-              ),
+              // Nothing to cancel on Free.
+              if (sub.isPaid) ...[
+                const Text('·', style: TextStyle(color: Bt.placeholder)),
+                TextButton(
+                  onPressed: () => _showCancelDialog(context, sub),
+                  style: TextButton.styleFrom(foregroundColor: Bt.red, minimumSize: const Size(44, 44)),
+                  child: Text('Cancel Plan…', style: BtText.subhead(context, weight: FontWeight.w500, color: Bt.red)),
+                ),
+              ],
             ],
           ),
           Text(
@@ -361,7 +364,11 @@ class _SubscriptionScreenContentState
     if (sub.currentPlan == plan.plan) return;
     final params = await sub.purchase(plan.productId!);
     if (!context.mounted) return;
-    if (params == null) return;
+    if (params == null) {
+      // Before: nothing happened when the payment couldn't be started.
+      btToast(context, sub.error.isNotEmpty ? sub.error : "Couldn't start the payment. Please try again.", error: true);
+      return;
+    }
     final result = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
@@ -371,7 +378,15 @@ class _SubscriptionScreenContentState
     if (!context.mounted) return;
     if (result == true) {
       _showSuccessDialog(context, plan);
-    } else {}
+    } else {
+      // Failed, cancelled or Back from the payment page: say so (no charge
+      // is assumed; the plan is unchanged).
+      btToast(
+        context,
+        result == false ? "Payment didn't go through. You haven't been upgraded." : 'Payment cancelled. Your plan is unchanged.',
+        error: result == false,
+      );
+    }
   }
 
   Future<void> _onRestore(

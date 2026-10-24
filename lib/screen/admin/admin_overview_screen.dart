@@ -41,19 +41,22 @@ class _AdminOverviewScreenState extends State<AdminOverviewScreen>
         final List raw = decoded is List
             ? decoded
             : (decoded['users'] ?? decoded['data'] ?? []) as List;
+        if (!mounted) return;
         setState(() {
           _users = raw.map((u) => Map<String, dynamic>.from(u as Map)).toList();
           _loadingUsers = false;
         });
       } else {
+        if (!mounted) return;
         setState(() {
           _usersError = 'Failed to load users (${response.statusCode})';
           _loadingUsers = false;
         });
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
-        _usersError = 'Network error: $e';
+        _usersError = "Couldn't load users — check your connection.";
         _loadingUsers = false;
       });
     }
@@ -70,6 +73,7 @@ class _AdminOverviewScreenState extends State<AdminOverviewScreen>
         final List raw = decoded is List
             ? decoded
             : (decoded['transactions'] ?? decoded['data'] ?? []) as List;
+        if (!mounted) return;
         setState(() {
           _transactions = raw
               .map((t) => Map<String, dynamic>.from(t as Map))
@@ -77,14 +81,16 @@ class _AdminOverviewScreenState extends State<AdminOverviewScreen>
           _loadingTx = false;
         });
       } else {
+        if (!mounted) return;
         setState(() {
           _txError = 'Failed to load entries (${response.statusCode})';
           _loadingTx = false;
         });
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
-        _txError = 'Network error: $e';
+        _txError = "Couldn't load entries — check your connection.";
         _loadingTx = false;
       });
     }

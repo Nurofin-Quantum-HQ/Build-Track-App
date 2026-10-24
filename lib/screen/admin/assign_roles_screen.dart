@@ -132,6 +132,11 @@ class _AssignRolesScreenState extends State<AssignRolesScreen> {
   bool _isEditMode = false;
   String? _editingUserId;
   final Set<String> _selectedProjectIds = {};
+
+  /// Edit mode: the user's permission list as loaded. Keys this screen has no
+  /// switch for (e.g. reject_updates, mark_paid, manage_users…) are sent back
+  /// unchanged — before, saving an edit silently deleted them.
+  List<String> _originalPermissions = const [];
   List<Map<String, String>> _projects = [];
   bool _isLoadingProjects = true;
   String? _projectsError;
@@ -180,7 +185,8 @@ class _AssignRolesScreenState extends State<AssignRolesScreen> {
       _selectedRole = _customRoleValue;
       _customRoleCtrl.text = role;
     }
-    final perms = (userData['permissions'] as List?)?.cast<String>() ?? [];
+    final perms = ((userData['permissions'] as List?) ?? const []).map((p) => p.toString()).toList();
+    _originalPermissions = perms;
     for (final key in _permissions.keys) {
       _permissions[key] = perms.contains(key);
     }
@@ -189,7 +195,10 @@ class _AssignRolesScreenState extends State<AssignRolesScreen> {
     _selectedOverseesRoles
       ..clear()
       ..addAll(overseesRoles);
-    final projectIds = (userData['projectIds'] as List?)?.cast<String>() ?? [];
+    final projectIds = ((userData['projectIds'] as List?) ?? const [])
+        .map((p) => p is Map ? (p['_id'] ?? p['id'] ?? '').toString() : p.toString())
+        .where((id) => id.isNotEmpty)
+        .toList();
     _selectedProjectIds
       ..clear()
       ..addAll(projectIds);
@@ -358,9 +367,14 @@ class _AssignRolesScreenState extends State<AssignRolesScreen> {
           'name': name,
           'email': email,
           'role': roleToSend,
-          'permissions': selectedPermissions,
-          if (_selectedProjectIds.isNotEmpty)
-            'projectIds': _selectedProjectIds.toList(),
+          // Known keys from the switches + every key the screen doesn't show.
+          'permissions': {
+            ..._originalPermissions.where((k) => !_permissions.containsKey(k)),
+            ...selectedPermissions,
+          }.toList(),
+          // Always sent: an empty list clears project access (the server
+          // only updates projectIds when the field is an array).
+          'projectIds': _selectedProjectIds.toList(),
           'overseesRoles': _selectedOverseesRoles.toList(),
           if (pass.isNotEmpty) 'password': pass,
         };

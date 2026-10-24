@@ -21,6 +21,7 @@ import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:buildtrack_mobile/common/utils/image_pick_helper.dart';
 import 'package:showcaseview/showcaseview.dart';
 import 'package:buildtrack_mobile/controller/showcase_keys.dart';
+import 'package:buildtrack_mobile/screen/profile/change_password_sheet.dart';
 class ProfileUserData {
   const ProfileUserData({
     required this.name,
@@ -616,7 +617,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         leading: const BtTile(icon: Icons.lock_outline, size: 34),
         title: 'Change Password',
         showChevron: true,
-        onTap: () => Navigator.pushNamed(context, '/forgot-password'),
+        onTap: () => showChangePasswordSheet(context),
       ),
     ]);
   }

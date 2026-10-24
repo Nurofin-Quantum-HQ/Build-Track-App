@@ -60,10 +60,32 @@ class AppTopBar extends StatelessWidget {
 class AppBottomNav extends StatelessWidget {
   AppBottomNav({super.key});
 
+  /// The route this dock is drawn on. A screen with the dock opened with
+  /// `pushNamed` (`/add-entry`, `/inventory`, …) never called `markCurrent`,
+  /// so the previous tab stayed highlighted — and, being "active", untappable.
+  /// The highlight now follows the dock's own route; the controller is synced
+  /// after the frame (never notifyListeners during build), and only by the
+  /// dock on the top-most route so docks on routes underneath can't fight
+  /// over it. Unnamed routes keep the controller's tab.
+  static String? _ownRoute(BuildContext context) {
+    final name = ModalRoute.of(context)?.settings.name;
+    if (name == null || name == '/' || !name.startsWith('/')) return null;
+    return name;
+  }
+
   @override
   Widget build(BuildContext context) {
     final nav = context.watch<NavController>();
     final bottom = MediaQuery.paddingOf(context).bottom;
+    final own = _ownRoute(context);
+    final isTop = ModalRoute.of(context)?.isCurrent ?? false;
+    if (own != null && isTop && nav.currentRoute != own) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!context.mounted) return;
+        if ((ModalRoute.of(context)?.isCurrent ?? false) && nav.currentRoute != own) nav.markCurrent(own);
+      });
+    }
+    final shown = own ?? nav.currentRoute;
     return Padding(
       padding: EdgeInsets.fromLTRB(14, 6, 14, bottom > 0 ? bottom : 14),
       child: Container(
@@ -78,13 +100,13 @@ class AppBottomNav extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            _tab(context, nav, '/home', Icons.home_outlined, Icons.home_rounded, 'Home'),
+            _tab(context, nav, shown, own, '/home', Icons.home_outlined, Icons.home_rounded, 'Home'),
             if (nav.isRouteEnabled('/projects'))
               Expanded(
                 child: Showcase(
                   key: ShowcaseKeys.projects,
                   description: 'Click here to view your projects and create new ones.',
-                  child: _tab(context, nav, '/projects', Icons.apartment_outlined, Icons.apartment_rounded, 'Projects', expanded: false),
+                  child: _tab(context, nav, shown, own, '/projects', Icons.apartment_outlined, Icons.apartment_rounded, 'Projects', expanded: false),
                 ),
               ),
             if (nav.isRouteEnabled('/add-entry'))
@@ -96,13 +118,13 @@ class AppBottomNav extends StatelessWidget {
                 ),
               ),
             if (nav.isRouteEnabled('/insights'))
-              _tab(context, nav, '/insights', Icons.insights_outlined, Icons.insights_rounded, 'Insights'),
+              _tab(context, nav, shown, own, '/insights', Icons.insights_outlined, Icons.insights_rounded, 'Insights'),
             if (nav.isRouteEnabled('/reports'))
               Expanded(
                 child: Showcase(
                   key: ShowcaseKeys.reports,
                   description: 'View detailed project reports and bulk CSV imports here.',
-                  child: _tab(context, nav, '/reports', Icons.bar_chart_outlined, Icons.bar_chart_rounded, 'Reports', expanded: false),
+                  child: _tab(context, nav, shown, own, '/reports', Icons.bar_chart_outlined, Icons.bar_chart_rounded, 'Reports', expanded: false),
                 ),
               ),
           ],
@@ -111,13 +133,16 @@ class AppBottomNav extends StatelessWidget {
     );
   }
 
-  Widget _tab(BuildContext context, NavController nav, String route, IconData icon, IconData activeIcon, String label, {bool expanded = true}) {
-    final isActive = nav.currentRoute == route;
+  Widget _tab(BuildContext context, NavController nav, String shown, String? own, String route, IconData icon, IconData activeIcon, String label, {bool expanded = true}) {
+    final isActive = shown == route;
     final accent = context.bt.accent;
+    // Disabled only when this dock sits on that tab's own screen; from any
+    // other screen every tab stays tappable.
+    final onItsScreen = own == route;
     final item = BtPressable(
       semanticLabel: label,
       scale: .9,
-      onTap: isActive ? null : () => nav.setRoute(route, context),
+      onTap: onItsScreen ? null : () => nav.setRoute(route, context),
       child: SizedBox(
         height: 56,
         child: Column(

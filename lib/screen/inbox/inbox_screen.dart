@@ -4,7 +4,9 @@ import 'package:buildtrack_mobile/controller/nav_controller.dart';
 import 'package:buildtrack_mobile/controller/role_manager.dart';
 import 'package:buildtrack_mobile/controller/user_session.dart';
 import 'package:buildtrack_mobile/design/design.dart';
+import 'package:buildtrack_mobile/models/task_model.dart';
 import 'package:buildtrack_mobile/services/api_service.dart';
+import 'package:buildtrack_mobile/services/task_service.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -223,8 +225,15 @@ class ApprovalsPane extends StatefulWidget {
 class _ApprovalsPaneState extends State<ApprovalsPane> {
   bool _isLoading = true;
   List<dynamic> _transactions = [];
-  // ignore: unused_field
+
+  /// Pending daily / project updates (GET /approvals/pending → projectUpdates),
+  /// approved with PUT /project-updates/:id/approve|reject.
   List<dynamic> _projectUpdates = [];
+
+  /// The last load failed. With nothing on screen this shows an error + Retry
+  /// (not "You're all caught up").
+  bool _failed = false;
+  bool _loadedOnce = false;
   final Set<String> _busy = {};
 
   /// Approved items that are animating out (tick + slide) until the refresh lands.
@@ -238,18 +247,35 @@ class _ApprovalsPaneState extends State<ApprovalsPane> {
 
   Future<void> _fetchPendingApprovals() async {
     setState(() => _isLoading = true);
-    final data = await ApiService.fetchPendingApprovals();
-    if (data != null && mounted) {
-      setState(() {
-        _transactions = data['transactions'] ?? [];
-        _projectUpdates = data['projectUpdates'] ?? [];
-      });
-      widget.onCount?.call(_transactions.length);
-      widget.onTotal?.call(_transactions.fold<num>(0, (a, t) => a + _num(t['amount'])));
-      final ids = _transactions.map((t) => (t['_id'] ?? t['id']).toString()).toSet();
-      _leaving.removeWhere((id) => !ids.contains(id));
+    Map<String, dynamic>? data;
+    try {
+      data = await ApiService.fetchPendingApprovals();
+    } catch (_) {
+      data = null;
     }
-    if (mounted) setState(() => _isLoading = false);
+    if (!mounted) return;
+    final hadData = _loadedOnce;
+    setState(() {
+      _isLoading = false;
+      _failed = data == null;
+      if (data != null) {
+        _loadedOnce = true;
+        _transactions = (data['transactions'] as List?) ?? [];
+        _projectUpdates = (data['projectUpdates'] as List?) ?? [];
+      }
+    });
+    if (data == null) {
+      // A refresh that fails keeps the list on screen; tell the user.
+      if (hadData) btToast(context, "Couldn't refresh approvals — check your connection.", error: true);
+      return;
+    }
+    widget.onCount?.call(_transactions.length + _projectUpdates.length);
+    widget.onTotal?.call(_transactions.fold<num>(0, (a, t) => a + _num(t['amount'])));
+    final ids = {
+      ..._transactions.map((t) => (t['_id'] ?? t['id']).toString()),
+      ..._projectUpdates.map((u) => (u['_id'] ?? u['id']).toString()),
+    };
+    _leaving.removeWhere((id) => !ids.contains(id));
   }
 
   Future<void> _handleApproveTx(String id) async {
@@ -263,6 +289,8 @@ class _ApprovalsPaneState extends State<ApprovalsPane> {
     if (success) {
       btToast(context, 'Transaction approved');
       _fetchPendingApprovals();
+    } else {
+      btToast(context, "Couldn't approve — check your connection and try again.", error: true);
     }
   }
 
@@ -277,15 +305,78 @@ class _ApprovalsPaneState extends State<ApprovalsPane> {
     if (success) {
       btToast(context, 'Transaction rejected');
       _fetchPendingApprovals();
+    } else {
+      btToast(context, "Couldn't reject — check your connection and try again.", error: true);
     }
+  }
+
+  // PUT /project-updates/:id/approve needs `approve_updates`; reject takes
+  // approve_updates or reject_updates (Admins always) — see backend
+  // projectUpdateRoutes.js. `approve_payments` alone is not enough here.
+  static bool get _canApproveProjectUpdates => RoleManager.isAdmin || UserSession.hasPermission('approve_updates');
+  static bool get _canRejectProjectUpdates => _canApproveProjectUpdates || UserSession.hasPermission('reject_updates');
+
+  Future<void> _handleApproveUpdate(String id) async {
+    setState(() => _busy.add(id));
+    final success = await ApiService.approveProjectUpdate(id);
+    if (!mounted) return;
+    setState(() {
+      _busy.remove(id);
+      if (success) _leaving.add(id);
+    });
+    if (success) {
+      btToast(context, 'Update approved');
+      _fetchPendingApprovals();
+    } else {
+      btToast(context, "Couldn't approve the update — try again.", error: true);
+    }
+  }
+
+  Future<void> _handleRejectUpdate(dynamic u) async {
+    final id = (u['_id'] ?? u['id']).toString();
+    final by = u['createdBy'];
+    final who = by is Map ? (by['name'] ?? '').toString() : '';
+    final ok = await _rejectSheet('Reject this update?', [
+      TextSpan(text: _updateTitle(u)),
+      TextSpan(text: who.isNotEmpty ? ' from $who.' : '.'),
+      const TextSpan(text: '\nThe person who sent it will see it as rejected.'),
+    ]);
+    if (!ok || !mounted) return;
+    setState(() => _busy.add(id));
+    final success = await ApiService.rejectProjectUpdate(id, 'Rejected by supervisor/admin');
+    if (!mounted) return;
+    setState(() => _busy.remove(id));
+    if (success) {
+      btToast(context, 'Update rejected');
+      _fetchPendingApprovals();
+    } else {
+      btToast(context, "Couldn't reject the update — try again.", error: true);
+    }
+  }
+
+  static String _updateTitle(dynamic u) {
+    final stage = (u['stage'] ?? '').toString();
+    final project = u['project'] is Map ? (u['project']['projectName'] ?? '').toString() : '';
+    final t = [if (stage.isNotEmpty) stage, if (project.isNotEmpty) project].join(' · ');
+    return t.isEmpty ? 'Project update' : t;
   }
 
   static num _num(dynamic v) => v is num ? v : num.tryParse('$v') ?? 0;
 
-  /// Reject confirmation as a bottom sheet (Reject-Sheet board). Returns true to reject.
-  Future<bool> _confirmReject(dynamic tx) async {
+  /// Reject confirmation for an entry. Returns true to reject.
+  Future<bool> _confirmReject(dynamic tx) {
     final by = tx['createdBy'];
     final who = by is Map ? (by['name'] ?? '') : '';
+    return _rejectSheet('Reject this entry?', [
+      TextSpan(text: '${tx['title'] ?? 'Transaction'} · '),
+      TextSpan(text: formatInr(_num(tx['amount'])), style: BtText.num(BtText.body(context, weight: FontWeight.w600))),
+      TextSpan(text: who.toString().isNotEmpty ? ' from $who.' : '.'),
+      const TextSpan(text: '\nThe person who logged it will see it as rejected.'),
+    ]);
+  }
+
+  /// Reject confirmation as a bottom sheet (Reject-Sheet board). Returns true to reject.
+  Future<bool> _rejectSheet(String heading, List<InlineSpan> detail) async {
     final r = await showModalBottomSheet<bool>(
       context: context,
       backgroundColor: Bt.card,
@@ -315,15 +406,10 @@ class _ApprovalsPaneState extends State<ApprovalsPane> {
               ),
             ),
             const SizedBox(height: 16),
-            Text('Reject this entry?', textAlign: TextAlign.center, style: BtText.d2(ctx)),
+            Text(heading, textAlign: TextAlign.center, style: BtText.d2(ctx)),
             const SizedBox(height: 8),
             Text.rich(
-              TextSpan(children: [
-                TextSpan(text: '${tx['title'] ?? 'Transaction'} · '),
-                TextSpan(text: formatInr(_num(tx['amount'])), style: BtText.num(BtText.body(ctx, weight: FontWeight.w600))),
-                TextSpan(text: who.toString().isNotEmpty ? ' from $who.' : '.'),
-                const TextSpan(text: '\nThe person who logged it will see it as rejected.'),
-              ]),
+              TextSpan(children: detail),
               textAlign: TextAlign.center,
               style: BtText.body(ctx, color: Bt.ink2),
             ),
@@ -351,8 +437,16 @@ class _ApprovalsPaneState extends State<ApprovalsPane> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading && _transactions.isEmpty) {
+    if (_isLoading && !_loadedOnce) {
       return const Padding(padding: EdgeInsets.fromLTRB(16, 22, 16, 16), child: BtSkeletonList(count: 4));
+    }
+    if (_failed && !_loadedOnce) {
+      return RefreshIndicator(
+        onRefresh: _fetchPendingApprovals,
+        child: ListView(padding: const EdgeInsets.fromLTRB(16, 22, 16, 16), children: [
+          BtErrorCard(message: "Couldn't load approvals. Check your connection.", onRetry: _fetchPendingApprovals),
+        ]),
+      );
     }
     final total = _transactions.fold<num>(0, (a, t) => a + _num(t['amount']));
     return RefreshIndicator(
@@ -360,9 +454,22 @@ class _ApprovalsPaneState extends State<ApprovalsPane> {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 20, 16, 66),
         children: [
-          if (_transactions.isEmpty)
-            const BtEmpty(icon: Icons.task_alt_rounded, title: "You're all caught up", message: 'No pending approvals at this time.')
-          else ...[
+          if (_transactions.isEmpty && _projectUpdates.isEmpty)
+            const BtEmpty(icon: Icons.task_alt_rounded, title: "You're all caught up", message: 'No pending approvals at this time.'),
+          if (_projectUpdates.isNotEmpty) ...[
+            BtSectionHeader(title: 'Project updates · ${_projectUpdates.length}', caption: true),
+            for (var i = 0; i < _projectUpdates.length; i++)
+              BtReveal(
+                key: ValueKey('u-${(_projectUpdates[i]['_id'] ?? _projectUpdates[i]['id'])}'),
+                index: i < 8 ? i : 8,
+                child: _updateRow(_projectUpdates[i]),
+              ),
+            if (_transactions.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              BtSectionHeader(title: 'Entries · ${_transactions.length}', caption: true),
+            ],
+          ],
+          if (_transactions.isNotEmpty) ...[
             Padding(
               padding: const EdgeInsets.fromLTRB(4, 0, 4, 4),
               child: Text('${formatInr(total)} waiting across ${_transactions.length} ${_transactions.length == 1 ? 'entry' : 'entries'}', textAlign: TextAlign.center, style: BtText.num(BtText.caption(context, color: Bt.ink2))),
@@ -383,6 +490,88 @@ class _ApprovalsPaneState extends State<ApprovalsPane> {
     );
   }
 
+  /// A pending project / daily update: stage, project, who, work done,
+  /// remarks, photo count; Approve / Reject… (confirm) like entries.
+  Widget _updateRow(dynamic u) {
+    final id = (u['_id'] ?? u['id']).toString();
+    final by = u['createdBy'];
+    final who = by is Map ? (by['name'] ?? 'Unknown') : 'Unknown';
+    final role = by is Map ? (by['role'] ?? 'Worker') : 'Worker';
+    final project = u['project'] is Map ? (u['project']['projectName'] ?? 'Unknown') : 'Unknown';
+    final stage = (u['stage'] ?? '').toString();
+    final workDone = u['workDone'];
+    final remarks = (u['remarks'] ?? '').toString().trim();
+    final media = u['media'] is List ? (u['media'] as List).length : 0;
+    DateTime? created;
+    try {
+      created = DateTime.parse((u['createdAt'] ?? '').toString()).toLocal();
+    } catch (_) {}
+    final meta = [
+      if (workDone is num) '${workDone % 1 == 0 ? workDone.toInt() : workDone}% done',
+      if (media > 0) '$media photo${media == 1 ? '' : 's'}',
+      if (created != null) '${formatDayGroup(created)}, ${formatTime(created)}',
+    ].join(' · ');
+    final busy = _busy.contains(id);
+    final leaving = _leaving.contains(id);
+    final canApprove = _canApproveProjectUpdates;
+    final canReject = _canRejectProjectUpdates;
+    final body = Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        BtTile(icon: Icons.add_task_rounded, bg: context.bt.accentSoft, fg: context.bt.accentInk, size: 40),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(stage.isNotEmpty ? 'Update · $stage' : 'Project update', maxLines: 2, overflow: TextOverflow.ellipsis, style: BtText.body(context, weight: FontWeight.w600)),
+            const SizedBox(height: 2),
+            Text('$who ($role) · $project', maxLines: 2, overflow: TextOverflow.ellipsis, style: BtText.caption(context, color: Bt.ink2)),
+            if (meta.isNotEmpty) ...[
+              const SizedBox(height: 2),
+              Text(meta, style: BtText.num(BtText.caption(context))),
+            ],
+          ]),
+        ),
+      ]),
+      if (remarks.isNotEmpty) ...[
+        const SizedBox(height: 10),
+        Text(remarks, maxLines: 3, overflow: TextOverflow.ellipsis, style: BtText.subhead(context, color: Bt.ink)),
+      ],
+      if (canApprove || canReject) ...[
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 42,
+          child: busy
+              ? const Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)))
+              : Row(children: [
+                  if (canReject)
+                    Expanded(
+                      child: _ActionButton(
+                        label: 'Reject…',
+                        icon: Icons.close_rounded,
+                        fg: Bt.red,
+                        bg: Bt.card,
+                        border: Bt.inputBorder,
+                        onTap: leaving ? null : () => _handleRejectUpdate(u),
+                      ),
+                    ),
+                  if (canReject && canApprove) const SizedBox(width: 8),
+                  if (canApprove)
+                    Expanded(
+                      child: _ActionButton(
+                        label: 'Approve',
+                        semantic: 'Approve update',
+                        icon: Icons.check_rounded,
+                        fg: Colors.white,
+                        bg: Bt.green,
+                        onTap: leaving ? null : () => _handleApproveUpdate(id),
+                      ),
+                    ),
+                ]),
+        ),
+      ],
+    ]);
+    return _animatedCard(id, body);
+  }
+
   Widget _row(dynamic tx) {
     final id = (tx['_id'] ?? tx['id']).toString();
     final by = tx['createdBy'];
@@ -391,10 +580,8 @@ class _ApprovalsPaneState extends State<ApprovalsPane> {
     final project = tx['project'] is Map ? (tx['project']['projectName'] ?? 'Unknown') : 'Unknown';
     final busy = _busy.contains(id);
     final leaving = _leaving.contains(id);
-    final reduce = Bt.reduceMotion(context);
-    final card = BtCard(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
-      child: Stack(children: [
+    return _animatedCard(
+      id,
         Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
             BtTypeTile(type: '${tx['category'] ?? ''} ${tx['type'] ?? ''} ${tx['title'] ?? ''}'),
@@ -439,6 +626,17 @@ class _ApprovalsPaneState extends State<ApprovalsPane> {
                   ]),
           ),
         ]),
+    );
+  }
+
+  /// Card + "Approved" overlay + slide-out while [id] is leaving.
+  Widget _animatedCard(String id, Widget content) {
+    final leaving = _leaving.contains(id);
+    final reduce = Bt.reduceMotion(context);
+    final card = BtCard(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+      child: Stack(children: [
+        content,
         // Approved: green wash + tick draws in while the card slides away.
         Positioned.fill(
           child: IgnorePointer(
@@ -604,33 +802,89 @@ class _ActivityPaneState extends State<ActivityPane> {
   }
 
   Future<void> _markAllRead() async {
-    await ApiService.markAllNotificationsAsRead();
+    bool ok;
+    try {
+      ok = await ApiService.markAllNotificationsAsRead();
+    } catch (_) {
+      ok = false;
+    }
+    if (!mounted) return;
+    if (!ok) btToast(context, "Couldn't mark notifications as read — try again.", error: true);
     _fetchNotifications();
   }
 
   Future<void> _clearAll() async {
-    await ApiService.clearAllNotifications();
+    bool ok;
+    try {
+      ok = await ApiService.clearAllNotifications();
+    } catch (_) {
+      ok = false;
+    }
+    if (!mounted) return;
+    if (!ok) btToast(context, "Couldn't clear notifications — try again.", error: true);
     _fetchNotifications();
   }
 
+  /// Where a (non-transaction) notification opens — only screens this user may
+  /// open (same gates as the dock / RoleManager). Task notifications are
+  /// handled in [_openTask]. Before: a Mason's task opened `/` (Login, over a
+  /// live session) and inventory / assign-task opened without any check.
   String? _targetRoute(dynamic n) {
-    final isWorker = UserSession.isMason;
+    final nav = context.read<NavController>();
     switch (n['relatedModel']) {
       case 'Transaction':
-        return '/logs';
+        return nav.isRouteEnabled('/logs') ? '/logs' : null;
       case 'Inventory':
-        if (isWorker) return '/add-material';
-        return '/inventory';
-      case 'Task':
-        if (isWorker) return '/';
-        return '/assign-task';
+        if (nav.isRouteEnabled('/inventory')) return '/inventory';
+        if (RoleManager.canAddTransactions) return '/add-material';
+        return null;
       case 'Project':
-        return '/projects';
+        return nav.isRouteEnabled('/projects') ? '/projects' : null;
       case 'Payment':
-        return '/subscription';
+        return RoleManager.isAdmin ? '/subscription' : null;
       default:
         return null;
     }
+  }
+
+  /// Task notification ("New Task Assigned" / "Task Completed"). There's no
+  /// GET /tasks/:id, so the task is looked up in GET /tasks/daily (tasks
+  /// assigned to or created by me). My open task → the daily-update screen
+  /// with that task (same arguments Home's task cards pass); anything else →
+  /// Home, where "Tasks assigned" lists it.
+  Future<void> _openTask(String? notificationId, String taskId) async {
+    if (_opening != null) return;
+    setState(() => _opening = notificationId ?? taskId);
+    TaskModel? task;
+    var failed = false;
+    try {
+      final tasks = await TaskService.getDailyTasks();
+      for (final t in tasks) {
+        if (t.id == taskId) {
+          task = t;
+          break;
+        }
+      }
+    } catch (_) {
+      failed = true;
+    }
+    if (!mounted) return;
+    setState(() => _opening = null);
+    if (failed) {
+      btToast(context, "Couldn't open this task — check your connection.", error: true);
+      return;
+    }
+    if (task == null) {
+      btToast(context, 'This task is no longer available.', error: true);
+      return;
+    }
+    final me = UserSession.userId;
+    final assignee = (task.assignedTo?['_id'] ?? task.assignedTo?['id'])?.toString();
+    if (me.isNotEmpty && assignee == me && task.status != 'Completed') {
+      Navigator.pushNamed(context, '/update-progress', arguments: {'task': task});
+      return;
+    }
+    context.read<NavController>().setRoute('/home', context);
   }
 
   /// Notification currently being opened (its entry is being fetched).
@@ -646,6 +900,14 @@ class _ActivityPaneState extends State<ActivityPane> {
     final relatedId = n['relatedId']?.toString() ?? '';
     if (n['relatedModel'] == 'Transaction' && relatedId.isNotEmpty) {
       _openTransaction(id, relatedId);
+      return;
+    }
+    if (n['relatedModel'] == 'Task') {
+      if (relatedId.isNotEmpty) {
+        _openTask(id, relatedId);
+      } else {
+        context.read<NavController>().setRoute('/home', context);
+      }
       return;
     }
     final route = _targetRoute(n);
