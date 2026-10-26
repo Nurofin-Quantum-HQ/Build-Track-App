@@ -1,3 +1,6 @@
+import 'dart:math' as math;
+
+import 'package:buildtrack_mobile/common/utils/entry_names.dart';
 import 'package:buildtrack_mobile/common/widgets/entry_widgets.dart' show PaymentStatus;
 import 'package:buildtrack_mobile/controller/project_provider.dart';
 import 'package:buildtrack_mobile/design/design.dart';
@@ -118,10 +121,21 @@ class _InsSpendByTypeViewState extends State<InsSpendByTypeView> {
 
   void _setCat(CostCategory c) => setState(() => _cat = _lastCat = c);
 
-  void _open(SpendGroup g, String scope) => Navigator.push(
-    context,
-    MaterialPageRoute(builder: (_) => _GroupEntriesPage(group: g, category: _cat, scope: scope, period: _period.label)),
-  );
+  /// Material parents with several children open the child list; a parent
+  /// with one child (and every other group) opens the detail page directly.
+  void _open(SpendGroup g, String scope) {
+    final cat = _cat, period = _period.label;
+    if (g.children.length > 1) {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => _ChildrenPage(parent: g, category: cat, period: period)));
+      return;
+    }
+    final target = g.children.length == 1 ? g.children.first : g;
+    final sc = g.children.length == 1 ? g.name : scope;
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => _GroupEntriesPage(group: target, category: cat, scope: sc, period: period)),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -159,7 +173,7 @@ class _InsSpendByTypeViewState extends State<InsSpendByTypeView> {
     };
     final nameHint = switch (_cat) {
       CostCategory.labour => 'Painters, masons, tile work… as entered in "Labour type"',
-      CostCategory.material => 'Each material, with total quantity where the unit is the same',
+      CostCategory.material => 'Grouped by kind — tap one to see each material inside it',
       CostCategory.equipment => 'Each machine or equipment item',
     };
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -396,7 +410,7 @@ class _GroupsCardState extends State<_GroupsCard> {
   Widget build(BuildContext context) {
     final groups = widget.groups;
     final shown = _all || groups.length <= _collapsed + 2 ? groups : groups.take(_collapsed).toList();
-    final top = groups.isEmpty ? 1.0 : groups.first.amount;
+    final top = groups.isEmpty ? 1.0 : groups.map((g) => g.amount).reduce(math.max);
     return InsCard(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 6),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -445,6 +459,7 @@ class _GroupRow extends StatelessWidget {
     final g = group;
     final meta = <String>[
       '${(g.share * 100).toStringAsFixed(g.share < .01 && g.share > 0 ? 1 : 0)}% of total',
+      if (g.children.length > 1) '${g.children.length} types',
       '${g.count} ${g.count == 1 ? 'entry' : 'entries'}',
       if (showQty && g.quantity != null) '${_qty(g.quantity!)} ${g.unit}',
       if (showQty && g.avgRate != null) 'avg ${inrCompact(g.avgRate!)}/${g.unit}',
@@ -487,7 +502,135 @@ class _GroupRow extends StatelessWidget {
   }
 }
 
-// ── Entries of one group ────────────────────────────────────────────────────
+// ── Pages: shared chrome ───────────────────────────────────────────────────
+
+PreferredSizeWidget _insAppBar(String title, String subtitle) => AppBar(
+  toolbarHeight: 64,
+  backgroundColor: Colors.white,
+  surfaceTintColor: Colors.white,
+  scrolledUnderElevation: 0,
+  elevation: 0,
+  shape: const Border(bottom: BorderSide(color: Ins.border)),
+  foregroundColor: Ins.ink,
+  titleSpacing: 0,
+  title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    Text(title, style: Ins.t(17, w: FontWeight.w600), overflow: TextOverflow.ellipsis),
+    Text(subtitle, style: Ins.t(12.5, c: Ins.ink3), overflow: TextOverflow.ellipsis),
+  ]),
+);
+
+/// ₹ with paise only for small fractional rates (₹7.50/kg), else whole rupees.
+String _rate(double r) => r < 100 && r != r.roundToDouble() ? '₹${r.toStringAsFixed(2)}' : inrFull(r);
+
+/// Total, paid / to pay, entries, quantity + average rate of one group.
+class _GroupHeaderCard extends StatelessWidget {
+  const _GroupHeaderCard({required this.group, required this.category});
+  final SpendGroup group;
+  final CostCategory category;
+
+  @override
+  Widget build(BuildContext context) {
+    final g = group;
+    final color = Ins.cat(category);
+    final paidPct = g.amount > 0 ? (g.paid / g.amount * 100).round() : 0;
+    final mixedUnits = g.quantity == null && g.lines.any((l) => l.quantity > 0);
+    final units = mixedUnits
+        ? (g.lines.map((l) => l.unit.trim()).where((u) => u.isNotEmpty).toSet().toList()..sort()).join(', ')
+        : '';
+    return InsCard(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('TOTAL SPENT', style: Ins.overline()),
+        const SizedBox(height: 6),
+        Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+          Expanded(child: Text(inrFull(g.amount), style: Ins.num(26))),
+          Text('${(g.share * 100).toStringAsFixed(g.share < .01 && g.share > 0 ? 1 : 0)}% of ${category.label.toLowerCase()}',
+              style: Ins.t(13, c: Ins.ink3)),
+        ]),
+        const SizedBox(height: 12),
+        _PaidBar(paid: g.paid, pending: g.pending, color: color),
+        const SizedBox(height: 12),
+        Row(children: [
+          Expanded(child: _Stat(label: 'Paid', value: inrCompact(g.paid), sub: g.amount > 0 ? '$paidPct%' : null, swatch: color)),
+          Expanded(
+            child: _Stat(
+              label: 'To pay',
+              value: inrCompact(g.pending),
+              sub: g.amount > 0 ? '${100 - paidPct}%' : null,
+              swatch: color.withValues(alpha: .32),
+            ),
+          ),
+        ]),
+        const SizedBox(height: 12),
+        Container(height: 1, color: Ins.border),
+        const SizedBox(height: 12),
+        Row(children: [
+          Expanded(child: _Fact(label: 'Entries', value: '${g.count}')),
+          Expanded(child: _Fact(label: 'Total quantity', value: g.quantity != null ? '${_qty(g.quantity!)} ${g.unit}' : '—')),
+          Expanded(child: _Fact(label: 'Average rate', value: g.avgRate != null ? '${_rate(g.avgRate!)}/${g.unit}' : '—')),
+        ]),
+        if (mixedUnits) ...[
+          const SizedBox(height: 8),
+          Text('Entries use different units${units.isEmpty ? '' : ' ($units)'}, so quantity isn\'t added up.',
+              style: Ins.t(12.5, c: Ins.ink3)),
+        ],
+      ]),
+    );
+  }
+}
+
+class _Fact extends StatelessWidget {
+  const _Fact({required this.label, required this.value, this.color = Ins.ink});
+  final String label, value;
+  final Color color;
+  @override
+  Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    Text(label, style: Ins.t(11.5, c: Ins.ink3), maxLines: 1, overflow: TextOverflow.ellipsis),
+    const SizedBox(height: 2),
+    FittedBox(
+      fit: BoxFit.scaleDown,
+      alignment: Alignment.centerLeft,
+      child: Text(value, style: Ins.num(14, c: color), maxLines: 1),
+    ),
+  ]);
+}
+
+// ── Children of a material parent (Sand → M-Sand, P-Sand, …) ───────────────
+
+class _ChildrenPage extends StatelessWidget {
+  const _ChildrenPage({required this.parent, required this.category, required this.period});
+  final SpendGroup parent;
+  final CostCategory category;
+  final String period;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Ins.bg,
+      appBar: _insAppBar(parent.name, '${category.label} · $period'),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(Ins.gutter, 16, Ins.gutter, 32),
+        children: [
+          _GroupHeaderCard(group: parent, category: category),
+          const SizedBox(height: 12),
+          _GroupsCard(
+            title: 'Inside ${parent.name}',
+            description: 'Tap one to see its entries',
+            groups: parent.children,
+            color: Ins.cat(category),
+            showQty: true,
+            emptyText: '',
+            onTap: (c) => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => _GroupEntriesPage(group: c, category: category, scope: parent.name, period: period)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Detail of one group: header + entries (like Reports) ────────────────────
 
 class _GroupEntriesPage extends StatelessWidget {
   const _GroupEntriesPage({required this.group, required this.category, required this.scope, required this.period});
@@ -499,54 +642,22 @@ class _GroupEntriesPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final g = group;
-    final color = Ins.cat(category);
+    // Show each entry's own name when the group merges different names
+    // (e.g. Sand → "Sand", "Fine sand", or a worker's several labour types).
+    final showName = g.lines.map((l) => entryNameKey(l.name)).toSet().length > 1;
     return Scaffold(
       backgroundColor: Ins.bg,
-      appBar: AppBar(
-        toolbarHeight: 64,
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
-        scrolledUnderElevation: 0,
-        elevation: 0,
-        shape: const Border(bottom: BorderSide(color: Ins.border)),
-        foregroundColor: Ins.ink,
-        titleSpacing: 0,
-        title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(g.name, style: Ins.t(17, w: FontWeight.w600), overflow: TextOverflow.ellipsis),
-          Text('${category.label} · $scope · $period', style: Ins.t(12.5, c: Ins.ink3), overflow: TextOverflow.ellipsis),
-        ]),
-      ),
+      appBar: _insAppBar(g.name, '${category.label} · $scope · $period'),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(Ins.gutter, 16, Ins.gutter, 32),
         children: [
-          InsCard(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                Expanded(child: Text(inrFull(g.amount), style: Ins.num(26))),
-                Text('${(g.share * 100).round()}% of ${category.label.toLowerCase()}', style: Ins.t(13, c: Ins.ink3)),
-              ]),
-              const SizedBox(height: 12),
-              _PaidBar(paid: g.paid, pending: g.pending, color: color),
-              const SizedBox(height: 10),
-              Row(children: [
-                Expanded(child: _Stat(label: 'Paid', value: inrCompact(g.paid), swatch: color)),
-                Expanded(child: _Stat(label: 'To pay', value: inrCompact(g.pending), swatch: color.withValues(alpha: .32))),
-                Expanded(
-                  child: _Stat(
-                    label: g.quantity != null ? 'Quantity' : 'Entries',
-                    value: g.quantity != null ? '${_qty(g.quantity!)} ${g.unit}' : '${g.count}',
-                    swatch: Colors.transparent,
-                  ),
-                ),
-              ]),
-            ]),
-          ),
+          _GroupHeaderCard(group: g, category: category),
           const SizedBox(height: 12),
           InsCard(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 6),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              InsCardHeader(title: '${g.count} ${g.count == 1 ? 'entry' : 'entries'}', description: 'Newest first · tap to open'),
-              for (final l in g.lines) _EntryRow(line: l),
+              InsCardHeader(title: '${g.count} ${g.count == 1 ? 'entry' : 'entries'}', description: 'Newest first · tap an entry to open it'),
+              for (final l in g.lines) _EntryRow(line: l, showName: showName),
             ]),
           ),
         ],
@@ -555,50 +666,82 @@ class _GroupEntriesPage extends StatelessWidget {
   }
 }
 
+/// One entry, Reports columns stacked for a phone: date + amount + status,
+/// floor/phase/activity, supplier or worker, then Qty · Rate · Paid · Remaining.
 class _EntryRow extends StatelessWidget {
-  const _EntryRow({required this.line});
+  const _EntryRow({required this.line, required this.showName});
   final SpendLine line;
+  final bool showName;
 
   @override
   Widget build(BuildContext context) {
     final l = line;
-    final who = l.category == CostCategory.labour
-        ? (l.worker.isNotEmpty ? l.worker : l.contractor)
-        : '${l.raw['supplier'] ?? ''}'.trim();
-    final sub = <String>[
-      if (l.date != null) dateShort.format(l.date!),
-      if (l.category == CostCategory.labour && l.name.isNotEmpty) l.name,
-      if (who.isNotEmpty) who,
-      if (l.quantity > 0) '${_qty(l.quantity)} ${l.unit}'.trim(),
-    ];
+    final party = l.party;
+    final partyLabel = l.category == CostCategory.labour ? 'Worker' : 'Supplier';
+    final title = [
+      l.date != null ? dateShort.format(l.date!) : 'No date',
+      if (showName && l.name.isNotEmpty) entryNameDisplay(l.name),
+    ].join(' · ');
+    final place = l.place;
+    final rate = l.rate;
     final status = l.paid >= l.amount - 0.5
         ? (fg: Ins.good, bg: Ins.goodSoft, label: 'Paid')
         : l.paid > 0
         ? (fg: Ins.warn, bg: Ins.warnSoft, label: 'Partial')
         : (fg: Ins.ink3, bg: Ins.muted, label: 'To pay');
-    return InkWell(
-      onTap: l.id.isEmpty ? null : () => Navigator.pushNamed(context, '/entry-detail', arguments: _entryDetailArgs(l)),
-      child: Container(
-        constraints: const BoxConstraints(minHeight: 60),
-        decoration: const BoxDecoration(border: Border(top: BorderSide(color: Ins.border))),
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        child: Row(children: [
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(sub.isEmpty ? 'Entry' : sub.first, style: Ins.t(14, w: FontWeight.w500)),
-              if (sub.length > 1) Text(sub.skip(1).join(' · '), style: Ins.t(12, c: Ins.ink3), overflow: TextOverflow.ellipsis),
-              if (!l.approved) Text('Awaiting approval', style: Ins.t(12, c: Ins.warn)),
+    return Semantics(
+      button: l.id.isNotEmpty,
+      label: '$title, ${inrFull(l.amount)}, ${status.label}'
+          '${place.isNotEmpty ? ', $place' : ''}${party.isNotEmpty ? ', $partyLabel $party' : ''}'
+          ', paid ${inrFull(l.paid)}, remaining ${inrFull(l.pending)}',
+      child: InkWell(
+        onTap: l.id.isEmpty ? null : () => Navigator.pushNamed(context, '/entry-detail', arguments: _entryDetailArgs(l)),
+        child: Container(
+          decoration: const BoxDecoration(border: Border(top: BorderSide(color: Ins.border))),
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: ExcludeSemantics(
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Expanded(
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text(title, style: Ins.t(14, w: FontWeight.w600), maxLines: 2, overflow: TextOverflow.ellipsis),
+                        const SizedBox(height: 2),
+                        Text(place.isEmpty ? 'No floor / phase' : place,
+                            style: Ins.t(12.5, c: Ins.ink3), maxLines: 2, overflow: TextOverflow.ellipsis),
+                        if (party.isNotEmpty)
+                          Text('$partyLabel: $party', style: Ins.t(12.5, c: Ins.ink2), maxLines: 1, overflow: TextOverflow.ellipsis),
+                      ]),
+                    ),
+                    const SizedBox(width: 8),
+                    Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                      Text(inrFull(l.amount), style: Ins.num(15)),
+                      const SizedBox(height: 4),
+                      InsBadge(label: status.label, fg: status.fg, bg: status.bg),
+                    ]),
+                  ]),
+                  const SizedBox(height: 10),
+                  Row(children: [
+                    Expanded(child: _Fact(label: 'Qty', value: l.quantity > 0 ? '${_qty(l.quantity)} ${l.unit}'.trim() : '—')),
+                    Expanded(child: _Fact(label: 'Rate', value: rate != null ? _rate(rate) : '—')),
+                    Expanded(child: _Fact(label: 'Paid', value: inrFull(l.paid))),
+                    Expanded(child: _Fact(label: 'Remaining', value: inrFull(l.pending), color: l.pending > 0.5 ? Ins.warn : Ins.ink)),
+                  ]),
+                  if (!l.approved) ...[
+                    const SizedBox(height: 6),
+                    Text('Awaiting approval', style: Ins.t(12, c: Ins.warn)),
+                  ],
+                ]),
+              ),
+              const SizedBox(width: 4),
+              const Padding(
+                padding: EdgeInsets.only(top: 2),
+                child: Icon(Icons.chevron_right_rounded, size: 20, color: Ins.ink3),
+              ),
             ]),
           ),
-          const SizedBox(width: 8),
-          Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-            Text(inrFull(l.amount), style: Ins.num(14)),
-            const SizedBox(height: 4),
-            InsBadge(label: status.label, fg: status.fg, bg: status.bg),
-          ]),
-          const SizedBox(width: 4),
-          const Icon(Icons.chevron_right_rounded, size: 20, color: Ins.ink3),
-        ]),
+        ),
       ),
     );
   }

@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:buildtrack_mobile/common/utils/date_parse.dart';
+import 'package:buildtrack_mobile/common/utils/entry_names.dart';
 // Typed view of GET /api/projects/:id/insights (project insights screen).
 // Mirrors core/backend/services/projectInsights.js.
 
@@ -318,6 +319,24 @@ class SpendLine {
 
   double get pending => math.max(0, amount - paid);
 
+  /// Rate per unit: the entry's own rate, else amount ÷ quantity.
+  double? get rate {
+    final r = _d(raw['rate'] ?? raw['ratePerUnit']);
+    if (r > 0) return r;
+    return quantity > 0 ? amount / quantity : null;
+  }
+
+  /// "Floor · Phase · Activity" as entered (empty parts left out).
+  String get place => [raw['floor'], raw['phase'], raw['activity']]
+      .map(_s)
+      .where((s) => s.isNotEmpty && s != 'null')
+      .join(' · ');
+
+  /// Supplier for materials / equipment; worker, else contractor, for labour.
+  String get party => category == CostCategory.labour
+      ? (worker.isNotEmpty ? worker : contractor)
+      : _s(raw['supplier'] is Map ? (raw['supplier'] as Map)['name'] : raw['supplier']);
+
   static String _s(dynamic v) => v == null ? '' : '$v'.trim();
 
   /// Null for entries the breakdown ignores (income, rejected, no amount).
@@ -369,11 +388,16 @@ class SpendLine {
   }
 }
 
-/// A group of entries sharing a (normalised) name.
+/// A group of entries sharing a name key (see entry_names.dart). Material
+/// groups in [SpendCategoryBreakdown.byName] are parents (Sand, Cement, …)
+/// whose [children] are the simple names (M-Sand, P-Sand, …).
 class SpendGroup {
   final String name;
   final List<SpendLine> lines;
   final double amount, paid, share;
+
+  /// Material parents only: child groups, largest first. Empty otherwise.
+  final List<SpendGroup> children;
 
   /// Total quantity + unit, only when every entry uses the same unit.
   final double? quantity;
@@ -385,6 +409,7 @@ class SpendGroup {
     required this.amount,
     required this.paid,
     required this.share,
+    this.children = const [],
     this.quantity,
     this.unit,
   });
@@ -399,7 +424,8 @@ class SpendCategoryBreakdown {
   final double total, paid;
   final int count, awaitingApproval;
 
-  /// By item name (labour type / material / equipment), largest first.
+  /// By item name (labour type / equipment), largest first. Materials: by
+  /// parent (Sand, Cement, …), each with its [SpendGroup.children].
   final List<SpendGroup> byName;
 
   /// Labour only: by worker, else contractor / team.
@@ -422,48 +448,67 @@ class SpendBreakdown {
   final Map<CostCategory, SpendCategoryBreakdown> byCategory;
   const SpendBreakdown(this.byCategory);
 
-  static String _key(String s) => s.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+  /// One group from [ls] (sorted newest first in place).
+  static SpendGroup _make(String name, List<SpendLine> ls, double total, {List<SpendGroup> children = const []}) {
+    var amount = 0.0, paid = 0.0, qty = 0.0;
+    final units = <String>{};
+    for (final l in ls) {
+      amount += l.amount;
+      paid += l.paid;
+      qty += l.quantity;
+      units.add(l.unit.trim().toLowerCase());
+    }
+    final oneUnit = units.length == 1 && units.first.isNotEmpty && qty > 0;
+    ls.sort((a, b) => (b.date ?? DateTime(0)).compareTo(a.date ?? DateTime(0)));
+    return SpendGroup(
+      name: name,
+      lines: ls,
+      amount: amount,
+      paid: paid,
+      share: total > 0 ? amount / total : 0,
+      children: children,
+      quantity: oneUnit ? qty : null,
+      unit: oneUnit ? ls.first.unit.trim() : null,
+    );
+  }
 
+  /// Groups by [entryNameKey] of [nameOf]; display = most common spelling.
   static List<SpendGroup> _group(List<SpendLine> lines, String Function(SpendLine) nameOf, double total, String fallback) {
     final buckets = <String, List<SpendLine>>{};
-    final spellings = <String, Map<String, int>>{};
     for (final l in lines) {
-      final raw = nameOf(l).trim().replaceAll(RegExp(r'\s+'), ' ');
-      final k = raw.isEmpty ? '' : _key(raw);
-      (buckets[k] ??= []).add(l);
-      if (raw.isNotEmpty) {
-        final m = spellings[k] ??= {};
-        m[raw] = (m[raw] ?? 0) + 1;
-      }
+      (buckets[entryNameKey(nameOf(l))] ??= []).add(l);
+    }
+    final out = [
+      for (final ls in buckets.values) _make(mostCommonSpelling(ls.map(nameOf)) ?? fallback, ls, total),
+    ];
+    out.sort((a, b) => b.amount.compareTo(a.amount));
+    return out;
+  }
+
+  /// Materials: parent → child per [classifyMaterial]. Miscellaneous children
+  /// keep the entry's own (most common) spelling.
+  static List<SpendGroup> _groupMaterials(List<SpendLine> lines, double total) {
+    final parents = <String, Map<String, List<SpendLine>>>{};
+    final childNames = <String, String?>{};
+    for (final l in lines) {
+      final p = classifyMaterial(l.name);
+      ((parents[p.parent] ??= {})[p.childKey] ??= []).add(l);
+      childNames[p.childKey] = p.child;
     }
     final out = <SpendGroup>[];
-    buckets.forEach((k, ls) {
-      var name = fallback;
-      final sp = spellings[k];
-      if (sp != null && sp.isNotEmpty) {
-        name = sp.entries.reduce((a, b) => b.value > a.value ? b : a).key;
-      }
-      var amount = 0.0, paid = 0.0, qty = 0.0;
-      final units = <String>{};
-      for (final l in ls) {
-        amount += l.amount;
-        paid += l.paid;
-        qty += l.quantity;
-        units.add(l.unit.toLowerCase());
-      }
-      final oneUnit = units.length == 1 && units.first.isNotEmpty && qty > 0;
-      ls.sort((a, b) => (b.date ?? DateTime(0)).compareTo(a.date ?? DateTime(0)));
-      out.add(SpendGroup(
-        name: name,
-        lines: ls,
-        amount: amount,
-        paid: paid,
-        share: total > 0 ? amount / total : 0,
-        quantity: oneUnit ? qty : null,
-        unit: oneUnit ? ls.first.unit : null,
-      ));
+    parents.forEach((parent, kids) {
+      final children = [
+        for (final e in kids.entries)
+          _make(childNames[e.key] ?? mostCommonSpelling(e.value.map((l) => l.name)) ?? 'Unnamed', e.value, total),
+      ]..sort((a, b) => b.amount.compareTo(a.amount));
+      out.add(_make(parent, [for (final c in children) ...c.lines], total, children: children));
     });
-    out.sort((a, b) => b.amount.compareTo(a.amount));
+    // Miscellaneous last, the rest largest first.
+    out.sort((a, b) {
+      final am = a.name == miscellaneousParent, bm = b.name == miscellaneousParent;
+      if (am != bm) return am ? 1 : -1;
+      return b.amount.compareTo(a.amount);
+    });
     return out;
   }
 
@@ -497,7 +542,7 @@ class SpendBreakdown {
             paid: paid,
             count: ls.length,
             awaitingApproval: awaiting,
-            byName: _group(ls, (l) => l.name, total, 'Unnamed'),
+            byName: c == CostCategory.material ? _groupMaterials(ls, total) : _group(ls, (l) => l.name, total, 'Unnamed'),
             byPerson: c == CostCategory.labour
                 ? _group(ls, (l) => l.worker.isNotEmpty ? l.worker : l.contractor, total, 'Not recorded')
                 : const [],
