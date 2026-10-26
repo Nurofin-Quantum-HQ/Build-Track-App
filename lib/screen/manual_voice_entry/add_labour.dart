@@ -6,6 +6,7 @@ import 'package:buildtrack_mobile/common/widgets/entry_widgets.dart';
 import 'package:buildtrack_mobile/common/widgets/upload_box.dart';
 import 'package:buildtrack_mobile/common/utils/image_pick_helper.dart';
 import 'package:buildtrack_mobile/controller/project_provider.dart';
+import 'package:buildtrack_mobile/common/utils/entry_names.dart';
 import 'package:buildtrack_mobile/controller/user_session.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -50,6 +51,9 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
   PickedAttachment? _attachment;
   DateTime _selectedDate = DateTime.now();
   List<dynamic> _recentEntries = [];
+
+  /// Labour types used before on this project / in the company (autofill).
+  List<Map<String, dynamic>> _suggestions = [];
   bool _isAddAndPay = false;
   bool _recordPaymentNow = false;
   Map<String, dynamic>? _paymentResult;
@@ -1045,11 +1049,26 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
     }
     return ok;
   }
+  /// The user typed or picked a name (edits keep an untouched name as is).
+  bool _nameTouched = false;
+
+  /// Name to save: an existing suggestion with the same [entryNameKey]
+  /// ("msand" → "M-Sand") so spelling variants stop being created, else the
+  /// typed name with spaces collapsed. An edit whose name wasn't touched
+  /// keeps it as it was.
+  String _nameToSave() {
+    final typed = _nameCtrl.text;
+    if (_isEditing && !_nameTouched) return typed.trim();
+    return canonicalEntryName(typed, [for (final s in _suggestions) (s['title'] ?? s['name'] ?? '').toString()]);
+  }
+
   Future<void> _save(BuildContext ctx) async {
     if (!_validate()) return;
     setState(() => _isSaving = true);
+    final name = _nameToSave();
+    if (_nameCtrl.text != name) _nameCtrl.text = name;
     final payload = {
-      "title": _nameCtrl.text.trim(),
+      "title": name,
       "type": "Wages",
       "category": _categoryCtrl.text.trim(),
       "quantity": double.tryParse(_qtyCtrl.text) ?? 0,
@@ -1716,17 +1735,22 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
     if (_selectedProjectId == null) {
       setState(() {
         _recentEntries = [];
+        _suggestions = [];
       });
       return;
     }
-    final recentTxs = await ApiService.fetchRecentTransactions(
+    final recentFuture = ApiService.fetchRecentTransactions(
       projectId: _selectedProjectId!,
       type: 'Wages',
       userId: UserSession.userId,
     );
+    final suggestionFuture = ApiService.fetchSuggestions(projectId: _selectedProjectId!, type: 'Wages');
+    final recentTxs = await recentFuture;
+    final suggestions = await suggestionFuture;
     if (mounted) {
       setState(() {
         _recentEntries = recentTxs.take(5).toList();
+        _suggestions = suggestions;
       });
     }
   }
@@ -1930,9 +1954,15 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
                 child: AutocompleteNameField(
                   controller: _nameCtrl,
                   hint: 'e.g. Mason, Carpenter, Steel Fixer',
-                  suggestions: const [],
-                  onChanged: (_) => setState(() => _nameError = null),
-                  onSuggestionSelected: _prefillFromRecent,
+                  suggestions: _suggestions,
+                  onChanged: (_) => setState(() {
+                    _nameError = null;
+                    _nameTouched = true;
+                  }),
+                  onSuggestionSelected: (tx) {
+                    _nameTouched = true;
+                    _prefillFromRecent(tx);
+                  },
                   errorText: _nameError,
                 ),
               ),

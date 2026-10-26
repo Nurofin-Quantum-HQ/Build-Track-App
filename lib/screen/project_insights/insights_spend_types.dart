@@ -1,9 +1,11 @@
+import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:buildtrack_mobile/common/utils/entry_names.dart';
 import 'package:buildtrack_mobile/common/widgets/entry_widgets.dart' show PaymentStatus;
 import 'package:buildtrack_mobile/controller/project_provider.dart';
 import 'package:buildtrack_mobile/controller/role_manager.dart';
+import 'package:buildtrack_mobile/controller/user_session.dart';
 import 'package:buildtrack_mobile/design/design.dart';
 import 'package:buildtrack_mobile/models/project_insights.dart';
 import 'package:buildtrack_mobile/screen/project_insights/insights_theme.dart';
@@ -11,6 +13,7 @@ import 'package:buildtrack_mobile/screen/project_insights/tidy_names_sheet.dart'
 import 'package:buildtrack_mobile/services/api_service.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// "By type" tab of project insights: where the money went inside each cost
 /// category — per labour type (and worker / contractor), per material, per
@@ -62,6 +65,11 @@ class _InsSpendByTypeViewState extends State<InsSpendByTypeView> {
   CostCategory _cat = _lastCat;
   _Period _period = _lastPeriod;
 
+  /// "Move to group" overrides (material nameKey → parent), per user.
+  Map<String, String> _groups = const {};
+  bool _groupsFromServer = false;
+  bool _groupsEdited = false;
+
   @override
   void initState() {
     super.initState();
@@ -76,6 +84,7 @@ class _InsSpendByTypeViewState extends State<InsSpendByTypeView> {
 
   Future<void> _load() async {
     setState(() => _loading = true);
+    _loadGroups();
     List<SpendLine>? lines;
     var offline = false;
     String? error;
@@ -113,7 +122,201 @@ class _InsSpendByTypeViewState extends State<InsSpendByTypeView> {
   /// Runs only when the data or the period changes — never in build.
   void _recompute() {
     final lines = _lines;
-    _bd = lines == null ? null : SpendBreakdown.compute(lines, projectId: widget.projectId, from: _period.from);
+    _bd = lines == null
+        ? null
+        : SpendBreakdown.compute(lines, projectId: widget.projectId, from: _period.from, materialGroups: _groups);
+  }
+
+  // ── Move to group (display only; never changes entries) ──────────────────
+
+  /// Phone cache first (instant), then the profile copy (source of truth).
+  Future<void> _loadGroups() async {
+    final uid = UserSession.userId;
+    final cached = await _MaterialGroups.readCache(uid);
+    if (cached != null && mounted && !_groupsEdited && !_groupsFromServer) {
+      setState(() {
+        _groups = cached;
+        _recompute();
+      });
+    }
+    final server = await _MaterialGroups.fetch();
+    if (server == null || !mounted) return;
+    _groupsFromServer = true;
+    if (_groupsEdited) return;
+    await _MaterialGroups.writeCache(uid, server);
+    if (!mounted || _groupsEdited) return;
+    setState(() {
+      _groups = server;
+      _recompute();
+    });
+  }
+
+  /// Applies [next] right away, caches it on the phone and saves the whole
+  /// map to the profile (the server merges preferences one level deep).
+  Future<void> _setGroups(Map<String, String> next, String done) async {
+    setState(() {
+      _groups = Map.unmodifiable(next);
+      _groupsEdited = true;
+      _recompute();
+    });
+    await _MaterialGroups.writeCache(UserSession.userId, next);
+    final synced = await _MaterialGroups.save(next);
+    if (!mounted) return;
+    btToast(context, synced ? done : '$done — saved on this phone only (couldn\'t reach the server)', error: !synced);
+  }
+
+  /// Distinct name keys of the entries in [g].
+  static Set<String> _keysOf(SpendGroup g) => {for (final l in g.lines) entryNameKey(l.name)}..remove('');
+
+  /// The material parent [g] is shown under (or [g] itself when it is one).
+  String? _parentOf(SpendGroup g) {
+    for (final p in _bd?.byCategory[CostCategory.material]?.byName ?? const <SpendGroup>[]) {
+      if (identical(p, g) || p.children.any((c) => identical(c, g))) return p.name;
+    }
+    return null;
+  }
+
+  /// Long-press menu of a material row (top-level or child): Move to group…,
+  /// Back to automatic, Rename (admin). On a change from a pushed page, go
+  /// back to the tab, whose groups are already recomputed.
+  _RenameCallback _materialMenu() {
+    final viewRoute = ModalRoute.of(context);
+    void backToTab() {
+      if (viewRoute != null && mounted) Navigator.of(context).popUntil((r) => r == viewRoute);
+    }
+
+    return (pageCtx, g) async {
+      final keys = _keysOf(g);
+      final moved = keys.any(_groups.containsKey);
+      final canRename = RoleManager.isAdmin && !_offline && g.children.length <= 1;
+      final action = await showModalBottomSheet<String>(
+        context: pageCtx,
+        backgroundColor: Colors.white,
+        showDragHandle: true,
+        builder: (sheetCtx) => SafeArea(
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(Ins.gutter, 0, Ins.gutter, 8),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(g.name, style: Ins.t(17, w: FontWeight.w600), overflow: TextOverflow.ellipsis),
+                Text('Material · ${g.count} ${g.count == 1 ? 'entry' : 'entries'}', style: Ins.t(12.5, c: Ins.ink3)),
+              ]),
+            ),
+            if (keys.isNotEmpty)
+              ListTile(
+                leading: const Icon(Icons.drive_file_move_outline),
+                title: Text('Move to group…', style: Ins.t(15, w: FontWeight.w600)),
+                subtitle: Text('Only changes how Insights groups it for you — entries stay the same', style: Ins.t(12.5, c: Ins.ink3)),
+                onTap: () => Navigator.pop(sheetCtx, 'move'),
+              ),
+            if (moved)
+              ListTile(
+                leading: const Icon(Icons.undo_rounded),
+                title: Text('Back to automatic', style: Ins.t(15, w: FontWeight.w600)),
+                subtitle: Text('Group it by the built-in rules again', style: Ins.t(12.5, c: Ins.ink3)),
+                onTap: () => Navigator.pop(sheetCtx, 'auto'),
+              ),
+            if (canRename)
+              ListTile(
+                leading: const Icon(Icons.edit_outlined),
+                title: Text('Rename', style: Ins.t(15, w: FontWeight.w600)),
+                subtitle: Text('Changes the name on its entries', style: Ins.t(12.5, c: Ins.ink3)),
+                onTap: () => Navigator.pop(sheetCtx, 'rename'),
+              ),
+            const SizedBox(height: 8),
+          ]),
+        ),
+      );
+      if (action == null || !mounted || !pageCtx.mounted) return;
+      switch (action) {
+        case 'rename':
+          if (await _renameSpendGroup(pageCtx, g, _RenameField.name) && mounted) {
+            backToTab();
+            _load();
+          }
+        case 'move':
+          if (await _moveToGroup(pageCtx, g, keys)) backToTab();
+        case 'auto':
+          final next = Map<String, String>.of(_groups)..removeWhere((k, _) => keys.contains(k));
+          await _setGroups(next, '"${g.name}" is grouped automatically again');
+          backToTab();
+      }
+    };
+  }
+
+  /// Pick a parent (present + rule parents) or type a new one; stores an
+  /// override for every name key in [g]. True when something changed.
+  Future<bool> _moveToGroup(BuildContext ctx, SpendGroup g, Set<String> keys) async {
+    // Don't overwrite profile overrides we haven't seen yet.
+    if (!_groupsFromServer) await _loadGroups();
+    if (!mounted || !ctx.mounted) return false;
+    final current = _parentOf(g);
+    final options = <String>[];
+    final seen = <String>{if (current != null) entryNameKey(current)};
+    for (final n in [
+      for (final p in _bd?.byCategory[CostCategory.material]?.byName ?? const <SpendGroup>[]) p.name,
+      ..._groups.values,
+      ...materialRuleParents,
+    ]) {
+      final d = entryNameDisplay(n);
+      if (d.isNotEmpty && seen.add(entryNameKey(d))) options.add(d);
+    }
+    const newGroup = '\u0000new';
+    final picked = await showModalBottomSheet<String>(
+      context: ctx,
+      backgroundColor: Colors.white,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (sheetCtx) => ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(sheetCtx).size.height * .75),
+        child: SafeArea(
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(Ins.gutter, 0, Ins.gutter, 8),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('Move "${g.name}" to', style: Ins.t(17, w: FontWeight.w600), overflow: TextOverflow.ellipsis),
+                Text(current == null ? 'Pick a group' : 'Now in $current', style: Ins.t(12.5, c: Ins.ink3)),
+              ]),
+            ),
+            Flexible(
+              child: ListView(shrinkWrap: true, children: [
+                ListTile(
+                  leading: const Icon(Icons.add_rounded, color: Ins.primary),
+                  title: Text('New group…', style: Ins.t(15, w: FontWeight.w600, c: Ins.primary)),
+                  onTap: () => Navigator.pop(sheetCtx, newGroup),
+                ),
+                for (final o in options)
+                  ListTile(
+                    leading: const Icon(Icons.folder_outlined),
+                    title: Text(o, style: Ins.t(15)),
+                    onTap: () => Navigator.pop(sheetCtx, o),
+                  ),
+              ]),
+            ),
+          ]),
+        ),
+      ),
+    );
+    if (picked == null || !mounted || !ctx.mounted) return false;
+    var target = picked;
+    if (picked == newGroup) {
+      final typed = await _askGroupName(ctx);
+      if (typed == null || !mounted) return false;
+      target = options.firstWhere((o) => entryNameKey(o) == entryNameKey(typed), orElse: () => typed);
+    }
+    // Keys whose automatic parent already is the target need no override.
+    final next = Map<String, String>.of(_groups);
+    final names = {for (final l in g.lines) entryNameKey(l.name): l.name}..remove('');
+    for (final k in keys) {
+      final auto = classifyMaterial(names[k] ?? k).parent;
+      if (entryNameKey(auto) == entryNameKey(target)) {
+        next.remove(k);
+      } else {
+        next[k] = target;
+      }
+    }
+    await _setGroups(next, 'Moved "${g.name}" to $target — entries unchanged');
+    return true;
   }
 
   void _setPeriod(_Period p) => setState(() {
@@ -130,10 +333,13 @@ class _InsSpendByTypeViewState extends State<InsSpendByTypeView> {
     final field = scope == 'Worker / contractor' ? _RenameField.party : _RenameField.name;
     final rename = _renameFrom(field);
     final restore = _reloadAfter(_restoreSpendGroup);
+    final menu = cat == CostCategory.material ? _materialMenu() : null;
     if (g.children.length > 1) {
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => _ChildrenPage(parent: g, category: cat, period: period, onRename: rename, onRestore: restore)),
+        MaterialPageRoute(
+          builder: (_) => _ChildrenPage(parent: g, category: cat, period: period, onRename: rename, onRestore: restore, onMenu: menu),
+        ),
       );
       return;
     }
@@ -142,7 +348,15 @@ class _InsSpendByTypeViewState extends State<InsSpendByTypeView> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => _GroupEntriesPage(group: target, category: cat, scope: sc, period: period, onRename: rename, onRestore: restore),
+        builder: (_) => _GroupEntriesPage(
+          group: target,
+          category: cat,
+          scope: sc,
+          period: period,
+          onRename: rename,
+          onRestore: restore,
+          onMenu: menu,
+        ),
       ),
     );
   }
@@ -171,7 +385,7 @@ class _InsSpendByTypeViewState extends State<InsSpendByTypeView> {
       context,
       MaterialPageRoute(
         fullscreenDialog: true,
-        builder: (_) => TidyNamesPage(projectLines: lines, projectName: widget.projectName),
+        builder: (_) => TidyNamesPage(projectLines: lines, projectName: widget.projectName, materialGroups: _groups),
       ),
     );
     if (changed == true && mounted) {
@@ -220,7 +434,7 @@ class _InsSpendByTypeViewState extends State<InsSpendByTypeView> {
     };
     final nameHint = switch (_cat) {
       CostCategory.labour => 'Painters, masons, tile work… as entered in "Labour type"',
-      CostCategory.material => 'Grouped by kind — tap one to see each material inside it',
+      CostCategory.material => 'Grouped by kind — tap to see inside, long-press to move to another group',
       CostCategory.equipment => 'Each machine or equipment item',
     };
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -270,7 +484,7 @@ class _InsSpendByTypeViewState extends State<InsSpendByTypeView> {
         showQty: _cat != CostCategory.labour,
         emptyText: 'No ${_cat.label.toLowerCase()} entries ${_period == _Period.all ? 'yet' : 'in this period'}.',
         onTap: (g) => _open(g, nameTitle.replaceFirst('By ', '')),
-        onLongPress: (g) => _renameHere(g, _RenameField.name),
+        onLongPress: (g) => _cat == CostCategory.material ? _materialMenu()(context, g) : _renameHere(g, _RenameField.name),
       ),
       if (_cat == CostCategory.labour && c.count > 0) ...[
         const SizedBox(height: 12),
@@ -664,11 +878,14 @@ class _Fact extends StatelessWidget {
 // ── Children of a material parent (Sand → M-Sand, P-Sand, …) ───────────────
 
 class _ChildrenPage extends StatelessWidget {
-  const _ChildrenPage({required this.parent, required this.category, required this.period, this.onRename, this.onRestore});
+  const _ChildrenPage({required this.parent, required this.category, required this.period, this.onRename, this.onRestore, this.onMenu});
   final SpendGroup parent;
   final CostCategory category;
   final String period;
   final _RenameCallback? onRename, onRestore;
+
+  /// Long-press menu (Move to group… / Back to automatic / Rename).
+  final _RenameCallback? onMenu;
 
   @override
   Widget build(BuildContext context) {
@@ -682,16 +899,30 @@ class _ChildrenPage extends StatelessWidget {
           const SizedBox(height: 12),
           _GroupsCard(
             title: 'Inside ${parent.name}',
-            description: 'Tap one to see its entries',
+            description: onMenu != null ? 'Tap one to see its entries · long-press to move it' : 'Tap one to see its entries',
             groups: parent.children,
             color: Ins.cat(category),
             showQty: true,
             emptyText: '',
             onTap: (c) => Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => _GroupEntriesPage(group: c, category: category, scope: parent.name, period: period, onRename: onRename, onRestore: onRestore)),
+              MaterialPageRoute(
+                builder: (_) => _GroupEntriesPage(
+                  group: c,
+                  category: category,
+                  scope: parent.name,
+                  period: period,
+                  onRename: onRename,
+                  onRestore: onRestore,
+                  onMenu: onMenu,
+                ),
+              ),
             ),
-            onLongPress: onRename == null ? null : (c) => onRename!(context, c),
+            onLongPress: onMenu != null
+                ? (c) => onMenu!(context, c)
+                : onRename == null
+                ? null
+                : (c) => onRename!(context, c),
           ),
         ],
       ),
@@ -702,7 +933,15 @@ class _ChildrenPage extends StatelessWidget {
 // ── Detail of one group: header + entries (like Reports) ────────────────────
 
 class _GroupEntriesPage extends StatelessWidget {
-  const _GroupEntriesPage({required this.group, required this.category, required this.scope, required this.period, this.onRename, this.onRestore});
+  const _GroupEntriesPage({
+    required this.group,
+    required this.category,
+    required this.scope,
+    required this.period,
+    this.onRename,
+    this.onRestore,
+    this.onMenu,
+  });
   final SpendGroup group;
   final CostCategory category;
   final String scope;
@@ -711,6 +950,9 @@ class _GroupEntriesPage extends StatelessWidget {
 
   /// "Undo rename": puts back the original names of renamed entries.
   final _RenameCallback? onRestore;
+
+  /// Materials: Move to group… / Back to automatic / Rename.
+  final _RenameCallback? onMenu;
 
   @override
   Widget build(BuildContext context) {
@@ -727,6 +969,12 @@ class _GroupEntriesPage extends StatelessWidget {
             tooltip: 'Undo rename',
             icon: const Icon(Icons.history_rounded),
             onPressed: () => onRestore!(context, g),
+          ),
+        if (onMenu != null)
+          IconButton(
+            tooltip: 'Move to group',
+            icon: const Icon(Icons.drive_file_move_outline),
+            onPressed: () => onMenu!(context, g),
           ),
         if (onRename != null && RoleManager.isAdmin)
           IconButton(
@@ -1048,4 +1296,101 @@ Future<String?> _askNewName(BuildContext context, String current, int count, _Re
       },
     ),
   ).whenComplete(ctrl.dispose);
+}
+
+/// "New group…" name (trimmed, spaces collapsed, ≤ 40 characters).
+Future<String?> _askGroupName(BuildContext context) {
+  final ctrl = TextEditingController();
+  String? error;
+  return showDialog<String>(
+    context: context,
+    builder: (ctx) => StatefulBuilder(
+      builder: (ctx, setState) {
+        void submit() {
+          final v = entryNameDisplay(ctrl.text);
+          if (entryNameKey(v).isEmpty) return setState(() => error = 'Enter a group name');
+          if (v.length > 40) return setState(() => error = 'Keep it under 40 characters');
+          Navigator.pop(ctx, v);
+        }
+        return AlertDialog(
+          backgroundColor: Colors.white,
+          title: Text('New group', style: Ins.t(18, w: FontWeight.w700)),
+          content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Only you see this grouping. Entries keep their names.', style: Ins.t(14, c: Ins.ink3)),
+            const SizedBox(height: 12),
+            TextField(
+              controller: ctrl,
+              autofocus: true,
+              textCapitalization: TextCapitalization.words,
+              onSubmitted: (_) => submit(),
+              decoration: InputDecoration(labelText: 'Group name', hintText: 'e.g. Glass', errorText: error, border: const OutlineInputBorder()),
+            ),
+          ]),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            FilledButton(onPressed: submit, child: const Text('Move')),
+          ],
+        );
+      },
+    ),
+  ).whenComplete(ctrl.dispose);
+}
+
+// ── Move-to-group store: profile preferences + phone cache ─────────────────
+//
+// GET /users/profile → user.preferences.materialGroups; PUT /users/profile
+// {preferences: {materialGroups: {...whole map...}}}. The live server merges
+// preferences one level deep, so the whole map is always sent.
+
+abstract final class _MaterialGroups {
+  static String _prefKey(String uid) => 'materialGroups_$uid';
+
+  static Map<String, String> _clean(dynamic v) => {
+    if (v is Map)
+      for (final e in v.entries)
+        if (entryNameKey('${e.key}').isNotEmpty && e.value is String && (e.value as String).trim().isNotEmpty)
+          entryNameKey('${e.key}'): entryNameDisplay(e.value as String),
+  };
+
+  static Future<Map<String, String>?> readCache(String uid) async {
+    if (uid.isEmpty) return null;
+    try {
+      final raw = (await SharedPreferences.getInstance()).getString(_prefKey(uid));
+      return raw == null ? null : _clean(jsonDecode(raw));
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<void> writeCache(String uid, Map<String, String> map) async {
+    if (uid.isEmpty) return;
+    try {
+      await (await SharedPreferences.getInstance()).setString(_prefKey(uid), jsonEncode(map));
+    } catch (_) {}
+  }
+
+  /// Null when the profile couldn't be read (keep what we have).
+  static Future<Map<String, String>?> fetch() async {
+    try {
+      final res = await ApiService.get('/users/profile', timeout: const Duration(seconds: 20));
+      if (res.statusCode != 200) return null;
+      final body = jsonDecode(res.body);
+      final user = body is Map ? body['user'] : null;
+      final prefs = user is Map ? user['preferences'] : null;
+      return _clean(prefs is Map ? prefs['materialGroups'] : null);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<bool> save(Map<String, String> map) async {
+    try {
+      final res = await ApiService.put('/users/profile', {
+        'preferences': {'materialGroups': map},
+      });
+      return res.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
 }

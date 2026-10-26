@@ -107,10 +107,13 @@ String _title(SpendLine l) {
   return t == null ? l.name : '$t';
 }
 
-/// For each kind: target = (materials) the rule's simple child name when one
-/// matches, else the most common spelling among entries with the same
-/// [entryNameKey]. Proposed only where target != current title.
-List<TidyProposal> computeTidyProposals(Iterable<SpendLine> lines) {
+/// For each kind: target = (materials) the rule's fixed simple child name
+/// (M-Sand, Cement, …) when one matches, else the most common spelling among
+/// entries with the same [entryNameKey]. Keep-own-name children (UPVC door,
+/// Teak wood, …) and items the user moved to a group ([materialGroups]) only
+/// get their spelling unified — never collapsed into one name. Proposed only
+/// where target != current title.
+List<TidyProposal> computeTidyProposals(Iterable<SpendLine> lines, {Map<String, String>? materialGroups}) {
   final out = <TidyProposal>[];
   for (final kind in const [CostCategory.labour, CostCategory.material, CostCategory.equipment]) {
     final ofKind = [
@@ -126,7 +129,7 @@ List<TidyProposal> computeTidyProposals(Iterable<SpendLine> lines) {
     final moves = <String, Map<String, List<SpendLine>>>{};
     for (final l in ofKind) {
       final current = _title(l);
-      final target = (kind == CostCategory.material ? classifyMaterial(current).child : null) ?? common[entryNameKey(current)];
+      final target = (kind == CostCategory.material ? classifyMaterial(current, overrides: materialGroups).child : null) ?? common[entryNameKey(current)];
       if (target == null || target == current) continue;
       ((moves[target] ??= {})[current] ??= []).add(l);
     }
@@ -151,7 +154,10 @@ List<TidyProposal> computeTidyProposals(Iterable<SpendLine> lines) {
 
 /// Full-screen "Tidy names" page. Pops with true when something was renamed.
 class TidyNamesPage extends StatefulWidget {
-  const TidyNamesPage({super.key, required this.projectLines, this.projectName});
+  const TidyNamesPage({super.key, required this.projectLines, this.projectName, this.materialGroups});
+
+  /// The user's "Move to group" overrides — those items keep their own names.
+  final Map<String, String>? materialGroups;
 
   /// The current project's entries (already parsed by the By type tab).
   final List<SpendLine> projectLines;
@@ -176,7 +182,7 @@ class _TidyNamesPageState extends State<TidyNamesPage> {
   }
 
   void _setProposals(List<SpendLine> lines) {
-    _proposals = computeTidyProposals(lines);
+    _proposals = computeTidyProposals(lines, materialGroups: widget.materialGroups);
     _ticked
       ..clear()
       ..addAll(_proposals);

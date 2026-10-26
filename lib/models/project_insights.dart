@@ -491,13 +491,14 @@ class SpendBreakdown {
     return out;
   }
 
-  /// Materials: parent → child per [classifyMaterial]. Miscellaneous children
-  /// keep the entry's own (most common) spelling.
-  static List<SpendGroup> _groupMaterials(List<SpendLine> lines, double total) {
+  /// Materials: parent → child per [classifyMaterial] (with the user's
+  /// "Move to group" [overrides]). Keep-own-name children (Miscellaneous,
+  /// Doors & Windows, Wood, …) show the entries' most common spelling.
+  static List<SpendGroup> _groupMaterials(List<SpendLine> lines, double total, Map<String, String>? overrides) {
     final parents = <String, Map<String, List<SpendLine>>>{};
     final childNames = <String, String?>{};
     for (final l in lines) {
-      final p = classifyMaterial(l.name);
+      final p = classifyMaterial(l.name, overrides: overrides);
       ((parents[p.parent] ??= {})[p.childKey] ??= []).add(l);
       childNames[p.childKey] = p.child;
     }
@@ -518,8 +519,15 @@ class SpendBreakdown {
     return out;
   }
 
-  /// [from] inclusive, [to] exclusive; null = open-ended.
-  static SpendBreakdown compute(Iterable<SpendLine> all, {String? projectId, DateTime? from, DateTime? to}) {
+  /// [from] inclusive, [to] exclusive; null = open-ended. [materialGroups]:
+  /// the user's "Move to group" overrides (nameKey → parent), display only.
+  static SpendBreakdown compute(
+    Iterable<SpendLine> all, {
+    String? projectId,
+    DateTime? from,
+    DateTime? to,
+    Map<String, String>? materialGroups,
+  }) {
     final per = {for (final c in CostCategory.values) c: <SpendLine>[]};
     for (final l in all) {
       if (projectId != null && l.projectId.isNotEmpty && l.projectId != projectId) continue;
@@ -548,7 +556,7 @@ class SpendBreakdown {
             paid: paid,
             count: ls.length,
             awaitingApproval: awaiting,
-            byName: c == CostCategory.material ? _groupMaterials(ls, total) : _group(ls, (l) => l.name, total, 'Unnamed'),
+            byName: c == CostCategory.material ? _groupMaterials(ls, total, materialGroups) : _group(ls, (l) => l.name, total, 'Unnamed'),
             byPerson: c == CostCategory.labour
                 ? _group(ls, (l) => l.worker.isNotEmpty ? l.worker : l.contractor, total, 'Not recorded')
                 : const [],

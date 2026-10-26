@@ -6,6 +6,7 @@ import 'package:buildtrack_mobile/common/widgets/entry_widgets.dart';
 import 'package:buildtrack_mobile/common/widgets/upload_box.dart';
 import 'package:buildtrack_mobile/common/utils/image_pick_helper.dart';
 import 'package:buildtrack_mobile/common/utils/currency_formatter.dart';
+import 'package:buildtrack_mobile/common/utils/entry_names.dart';
 import 'package:buildtrack_mobile/controller/user_session.dart';
 import 'package:buildtrack_mobile/services/api_service.dart';
 import 'package:flutter/material.dart';
@@ -1060,11 +1061,26 @@ class _AddMaterialScreenState extends State<AddMaterialScreen> {
     }
     return ok;
   }
+  /// The user typed or picked a name (edits keep an untouched name as is).
+  bool _nameTouched = false;
+
+  /// Name to save: an existing suggestion with the same [entryNameKey]
+  /// ("msand" → "M-Sand") so spelling variants stop being created, else the
+  /// typed name with spaces collapsed. An edit whose name wasn't touched
+  /// keeps it as it was.
+  String _nameToSave() {
+    final typed = _nameCtrl.text;
+    if (_isEditing && !_nameTouched) return typed.trim();
+    return canonicalEntryName(typed, [for (final s in _suggestions) (s['title'] ?? s['name'] ?? '').toString()]);
+  }
+
   Future<void> _save(BuildContext ctx) async {
     if (!_validate()) return;
     setState(() => _isSaving = true);
+    final name = _nameToSave();
+    if (_nameCtrl.text != name) _nameCtrl.text = name;
     final payload = {
-      "title": _nameCtrl.text.trim(),
+      "title": name,
       "type": "Materials",
       "subType": "Purchase",
       "category": _categoryCtrl.text.trim(),
@@ -1439,7 +1455,7 @@ class _AddMaterialScreenState extends State<AddMaterialScreen> {
     if (_selectedProjectId == null) {
       setState(() {
         _recentEntries = [];
-        _suggestions = [];
+        _suggestions = withStandardMaterialNames(const []);
       });
       return;
     }
@@ -1452,14 +1468,13 @@ class _AddMaterialScreenState extends State<AddMaterialScreen> {
     final suggestionFuture = ApiService.fetchSuggestions(
       projectId: _selectedProjectId!,
       type: 'Materials',
-      userId: UserSession.userId,
     );
     final recentTxs = await recentFuture;
     final suggestions = await suggestionFuture;
     if (mounted) {
       setState(() {
         _recentEntries = recentTxs.take(5).toList();
-        _suggestions = suggestions;
+        _suggestions = withStandardMaterialNames(suggestions);
         _isLoadingRecent = false;
       });
     }
@@ -1976,8 +1991,20 @@ class _AddMaterialScreenState extends State<AddMaterialScreen> {
                   controller: _nameCtrl,
                   hint: 'e.g. Ready-Mix Concrete M30',
                   suggestions: _suggestions,
-                  onChanged: (_) => setState(() => _nameError = null),
-                  onSuggestionSelected: _prefillFromRecent,
+                  onChanged: (_) => setState(() {
+                    _nameError = null;
+                    _nameTouched = true;
+                  }),
+                  // A common name (M-Sand, Cement…) has no past entry to
+                  // prefill from — just take the name.
+                  onSuggestionSelected: (tx) {
+                    _nameTouched = true;
+                    if (tx[r'$standard'] == true) {
+                      setState(() => _nameError = null);
+                    } else {
+                      _prefillFromRecent(tx);
+                    }
+                  },
                   errorText: _nameError,
                 ),
               ),

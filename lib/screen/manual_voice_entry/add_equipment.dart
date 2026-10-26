@@ -8,6 +8,7 @@ import 'package:buildtrack_mobile/common/utils/image_pick_helper.dart';
 import 'package:buildtrack_mobile/common/utils/currency_formatter.dart';
 import 'package:buildtrack_mobile/controller/project_provider.dart';
 import 'package:buildtrack_mobile/controller/role_manager.dart';
+import 'package:buildtrack_mobile/common/utils/entry_names.dart';
 import 'package:buildtrack_mobile/controller/user_session.dart';
 import 'package:buildtrack_mobile/models/construction_models.dart';
 import 'package:buildtrack_mobile/models/project_model.dart';
@@ -1118,13 +1119,28 @@ class _AddEquipmentScreenState extends State<AddEquipmentScreen> {
     }
     return ok;
   }
+  /// The user typed or picked a name (edits keep an untouched name as is).
+  bool _nameTouched = false;
+
+  /// Name to save: an existing suggestion with the same [entryNameKey]
+  /// ("msand" → "M-Sand") so spelling variants stop being created, else the
+  /// typed name with spaces collapsed. An edit whose name wasn't touched
+  /// keeps it as it was.
+  String _nameToSave() {
+    final typed = _nameCtrl.text;
+    if (_isEditing && !_nameTouched) return typed.trim();
+    return canonicalEntryName(typed, [for (final s in _suggestions) (s['title'] ?? s['name'] ?? '').toString()]);
+  }
+
   Future<void> _save(BuildContext ctx) async {
     if (!_validate()) return;
     setState(() => _isSaving = true);
+    final name = _nameToSave();
+    if (_nameCtrl.text != name) _nameCtrl.text = name;
     final payload = <String, dynamic>{
-      "title": _nameCtrl.text.trim(),
+      "title": name,
       "type": "Expense",
-      "category": _nameCtrl.text.trim(),
+      "category": name,
       "quantity": double.tryParse(_qtyCtrl.text) ?? 0,
       "rate": double.tryParse(_rateCtrl.text) ?? 0,
       "unit": _selectedUnit == null
@@ -1338,7 +1354,6 @@ class _AddEquipmentScreenState extends State<AddEquipmentScreen> {
     final suggestionFuture = ApiService.fetchSuggestions(
       projectId: _selectedProjectId!,
       type: 'Expense',
-      userId: UserSession.userId,
     );
     final recentTxs = await recentFuture;
     final suggestions = await suggestionFuture;
@@ -2005,8 +2020,14 @@ class _AddEquipmentScreenState extends State<AddEquipmentScreen> {
                   controller: _nameCtrl,
                   hint: 'e.g. JCB Excavator 3DX, Hydra Crane 14T',
                   suggestions: _suggestions,
-                  onChanged: (_) => setState(() => _nameError = null),
-                  onSuggestionSelected: _prefillFromRecent,
+                  onChanged: (_) => setState(() {
+                    _nameError = null;
+                    _nameTouched = true;
+                  }),
+                  onSuggestionSelected: (tx) {
+                    _nameTouched = true;
+                    _prefillFromRecent(tx);
+                  },
                   errorText: _nameError,
                 ),
               ),

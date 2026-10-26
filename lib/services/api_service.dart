@@ -9,6 +9,7 @@ import 'package:flutter/foundation.dart';
 import 'dart:math';
 import 'package:buildtrack_mobile/services/auth_service.dart';
 import 'package:buildtrack_mobile/controller/user_session.dart';
+import 'package:buildtrack_mobile/common/utils/entry_names.dart';
 
 class ApiService {
   static Future<bool> backupCsv() async {
@@ -949,110 +950,96 @@ class ApiService {
       return [];
     }
   }
+  /// Name suggestions for an entry form: every name used on [projectId]
+  /// (first), then elsewhere in the company, for transaction [type].
+  ///
+  /// Whole company, not just this user: GET /transactions (live server,
+  /// b7de495) never requires `createdBy` — it already limits results to the
+  /// projects the caller may see (an admin's own projects; a team member's
+  /// accessible projects), so the filter is dropped for everyone.
+  ///
+  /// Spelling variants ("M sand", "M-Sand", "msand") are one suggestion
+  /// (same [entryNameKey]) shown with the most common spelling.
   static Future<List<Map<String, dynamic>>> fetchSuggestions({
     required String projectId,
     required String type,
-    String? userId,
   }) async {
+    Future<List<dynamic>> load(String url) async {
+      try {
+        final r = await get(url);
+        if (r.statusCode != 200) return const [];
+        final d = json.decode(r.body);
+        if (d is List) return d;
+        if (d is Map) {
+          final list = (d['transactions'] ?? d['data'] ?? []) as List<dynamic>;
+          return list.where((tx) => tx is Map && tx['type'] == type).toList();
+        }
+      } catch (_) {}
+      return const [];
+    }
+
     try {
-      List<dynamic> projectTxs = [];
-      try {
-        String projectUrl =
-            '/transactions?limit=10000&project=$projectId&type=$type';
-        if (userId != null && userId.isNotEmpty) {
-          projectUrl += '&createdBy=$userId';
-        }
-        final r = await get(projectUrl);
-        if (r.statusCode == 200) {
-          final d = json.decode(r.body);
-          if (d is List) {
-            projectTxs = d;
-          } else if (d is Map) {
-            final list = (d['transactions'] ?? d['data'] ?? []) as List<dynamic>;
-            projectTxs = list.where((tx) => tx['type'] == type).toList();
-          }
-        }
-      } catch (_) {}
-      List<dynamic> globalTxs = [];
-      try {
-        String globalUrl = '/transactions?limit=10000&type=$type';
-        if (userId != null && userId.isNotEmpty) {
-          globalUrl += '&createdBy=$userId';
-        }
-        final r = await get(globalUrl);
-        if (r.statusCode == 200) {
-          final d = json.decode(r.body);
-          if (d is List) {
-            globalTxs = d;
-          } else if (d is Map) {
-            globalTxs = (d['transactions'] ?? d['data'] ?? []) as List<dynamic>;
-          }
-        }
-      } catch (_) {}
-      final Map<String, Map<String, dynamic>> byTitle = {};
+      final type_ = Uri.encodeQueryComponent(type);
+      final results = await Future.wait([
+        load('/transactions?limit=10000&project=$projectId&type=$type_'),
+        load('/transactions?limit=10000&type=$type_'),
+      ]);
+      final projectTxs = results[0], globalTxs = results[1];
+      final Map<String, Map<String, dynamic>> byKey = {};
       final Map<String, int> frequency = {};
       final Map<String, bool> isCurrentProject = {};
-      for (final rawTx in projectTxs) {
-        final tx = rawTx as Map<String, dynamic>;
+      final Map<String, List<String>> spellings = {};
+      final projectIds = <String>{};
+      void add(Map<String, dynamic> tx, bool inProject) {
         final title = (tx['title'] ?? tx['name'] ?? '').toString().trim();
-        if (title.isEmpty) continue;
-        final key = title.toLowerCase();
+        final key = entryNameKey(title);
+        if (key.isEmpty) return;
+        (spellings[key] ??= []).add(title);
         frequency[key] = (frequency[key] ?? 0) + 1;
-        isCurrentProject[key] = true;
-        if (!byTitle.containsKey(key)) {
-          byTitle[key] = Map<String, dynamic>.from(tx);
-        } else {
-          final existingDate = byTitle[key]!['date']?.toString() ?? '';
-          final newDate = tx['date']?.toString() ?? '';
-          if (newDate.compareTo(existingDate) > 0) {
-            byTitle[key] = Map<String, dynamic>.from(tx);
-          }
-        }
+        if (inProject) isCurrentProject[key] = true;
+        isCurrentProject[key] ??= false;
+        final existing = byKey[key];
+        // Prefill from the newest entry, preferring this project's.
+        final exInProject = existing?[r'$fromProject'] == true;
+        final newer = (tx['date']?.toString() ?? '').compareTo(existing?['date']?.toString() ?? '') > 0;
+        final preferNew = existing == null || (inProject && !exInProject) || (inProject == exInProject && newer);
+        if (preferNew) byKey[key] = Map<String, dynamic>.from(tx)..[r'$fromProject'] = inProject;
       }
-      for (final rawTx in globalTxs) {
-        final tx = rawTx as Map<String, dynamic>;
-        final title = (tx['title'] ?? tx['name'] ?? '').toString().trim();
-        if (title.isEmpty) continue;
-        final key = title.toLowerCase();
-        if (!byTitle.containsKey(key)) {
-          byTitle[key] = Map<String, dynamic>.from(tx);
-          frequency[key] = 1;
-          isCurrentProject[key] = false;
-        } else if (isCurrentProject[key] != true) {
-          final existingDate = byTitle[key]!['date']?.toString() ?? '';
-          final newDate = tx['date']?.toString() ?? '';
-          if (newDate.compareTo(existingDate) > 0) {
-            byTitle[key] = Map<String, dynamic>.from(tx);
-          }
-          frequency[key] = (frequency[key] ?? 0) + 1;
-        }
+
+      for (final raw in projectTxs) {
+        if (raw is! Map) continue;
+        final tx = Map<String, dynamic>.from(raw);
+        final id = (tx['_id'] ?? tx['id'] ?? '').toString();
+        if (id.isNotEmpty) projectIds.add(id);
+        add(tx, true);
       }
-      final entries = byTitle.entries.toList()
+      for (final raw in globalTxs) {
+        if (raw is! Map) continue;
+        final tx = Map<String, dynamic>.from(raw);
+        final id = (tx['_id'] ?? tx['id'] ?? '').toString();
+        if (id.isNotEmpty && projectIds.contains(id)) continue; // already counted
+        add(tx, false);
+      }
+      final entries = byKey.entries.toList()
         ..sort((a, b) {
-          final aKey = a.key;
-          final bKey = b.key;
-          final aProj = isCurrentProject[aKey] == true ? 1 : 0;
-          final bProj = isCurrentProject[bKey] == true ? 1 : 0;
+          final aProj = isCurrentProject[a.key] == true ? 1 : 0;
+          final bProj = isCurrentProject[b.key] == true ? 1 : 0;
           if (aProj != bProj) return bProj - aProj;
-          final aDate = a.value['date']?.toString() ?? '';
-          final bDate = b.value['date']?.toString() ?? '';
-          final dateCmp = bDate.compareTo(aDate);
+          final dateCmp = (b.value['date']?.toString() ?? '').compareTo(a.value['date']?.toString() ?? '');
           if (dateCmp != 0) return dateCmp;
-          final aFreq = frequency[aKey] ?? 0;
-          final bFreq = frequency[bKey] ?? 0;
-          return bFreq - aFreq;
+          return (frequency[b.key] ?? 0) - (frequency[a.key] ?? 0);
         });
       final result = <Map<String, dynamic>>[];
       for (final e in entries.take(50)) {
         final record = Map<String, dynamic>.from(e.value)
-          ..['\$freq'] = frequency[e.key] ?? 1
-          ..['\$isCurrentProject'] = isCurrentProject[e.key] ?? false;
+          ..remove(r'$fromProject')
+          ..['title'] = mostCommonSpelling(spellings[e.key] ?? const []) ?? e.value['title']
+          ..[r'$freq'] = frequency[e.key] ?? 1
+          ..[r'$isCurrentProject'] = isCurrentProject[e.key] ?? false;
         result.add(record);
       }
       if (kDebugMode) {
-        debugPrint(
-          'fetchSuggestions [$type]: ${result.length} unique suggestions',
-        );
+        debugPrint('fetchSuggestions [$type]: ${result.length} unique suggestions');
       }
       return result;
     } catch (e, stack) {

@@ -1,3 +1,4 @@
+import 'package:buildtrack_mobile/common/utils/entry_names.dart';
 import 'package:buildtrack_mobile/design/design.dart';
 import 'package:flutter/material.dart';
 class AutocompleteNameField extends StatefulWidget {
@@ -85,6 +86,10 @@ class _AutocompleteNameFieldState extends State<AutocompleteNameField> {
       }
     }
   }
+  static String _titleOf(Map<String, dynamic> s) => (s['title'] ?? s['name'] ?? '').toString().trim();
+
+  /// Matches on [entryNameKey] so "msand" finds "M-Sand" / "M sand":
+  /// key starts-with first, then key contains, then plain text matching.
   void _computeFiltered(String query) {
     final q = query.trim().toLowerCase();
     if (q.isEmpty) {
@@ -95,28 +100,29 @@ class _AutocompleteNameFieldState extends State<AutocompleteNameField> {
       debugPrint('[AutocompleteNameField] query empty — suggestions hidden');
       return;
     }
+    final qk = entryNameKey(q);
     final startsWith = <Map<String, dynamic>>[];
     final contains = <Map<String, dynamic>>[];
+    final textMatch = <Map<String, dynamic>>[];
     for (final s in widget.suggestions) {
-      final title = (s['title'] ?? s['name'] ?? '')
-          .toString()
-          .trim()
-          .toLowerCase();
-      if (title.startsWith(q)) {
+      final title = _titleOf(s).toLowerCase();
+      final tk = entryNameKey(title);
+      if (qk.isNotEmpty && tk.startsWith(qk)) {
         startsWith.add(s);
-      } else if (title.contains(q)) {
+      } else if (qk.isNotEmpty && tk.contains(qk)) {
         contains.add(s);
+      } else if (title.startsWith(q) || title.contains(q)) {
+        textMatch.add(s);
       }
-      if (startsWith.length + contains.length >= _maxSuggestions) break;
     }
     setState(() {
-      _filtered = [...startsWith, ...contains].take(_maxSuggestions).toList();
+      _filtered = [...startsWith, ...contains, ...textMatch].take(_maxSuggestions).toList();
       _showSuggestions = _focusNode.hasFocus;
     });
     debugPrint(
       '[AutocompleteNameField] query="$q" '
       '→ ${_filtered.length} matches '
-      '(${startsWith.length} starts-with, ${contains.length} contains)',
+      '(${startsWith.length} starts-with, ${contains.length} contains, ${textMatch.length} text)',
     );
   }
   void _onSelectSuggestion(Map<String, dynamic> tx) {
@@ -135,10 +141,13 @@ class _AutocompleteNameFieldState extends State<AutocompleteNameField> {
   Widget build(BuildContext context) {
     final query = widget.controller.text.trim();
     final items = List<Map<String, dynamic>>.from(_filtered);
+    // Same key = same thing ("msand" = "M-Sand"): no "Add new" row, and
+    // the screens save the existing spelling.
+    final queryKey = entryNameKey(query);
     final hasExactMatch = items.any(
-      (s) =>
-          (s['title'] ?? '').toString().trim().toLowerCase() ==
-          query.toLowerCase(),
+      (s) => queryKey.isNotEmpty
+          ? entryNameKey(_titleOf(s)) == queryKey
+          : _titleOf(s).toLowerCase() == query.toLowerCase(),
     );
     final showAddNew = !hasExactMatch && query.isNotEmpty;
     final totalRows = items.length + (showAddNew ? 1 : 0);
@@ -323,11 +332,13 @@ class _SuggestionDropdown extends StatelessWidget {
                   final dateLabel = _relativeDate(tx['date']?.toString());
                   final isCurrentProject =
                       tx['\$isCurrentProject'] as bool? ?? false;
+                  final isStandard = tx['\$standard'] == true;
                   return _SuggestionRow(
                     title: title,
                     unit: unit,
                     rateLabel: rateLabel,
                     dateLabel: dateLabel,
+                    note: isStandard ? 'Common name' : null,
                     isCurrentProject: isCurrentProject,
                     onTap: () => onSelect(tx),
                   );
@@ -348,11 +359,13 @@ class _SuggestionRow extends StatelessWidget {
     required this.dateLabel,
     required this.isCurrentProject,
     required this.onTap,
+    this.note,
   });
   final String title;
   final String unit;
   final String rateLabel;
   final String dateLabel;
+  final String? note;
   final bool isCurrentProject;
   final VoidCallback onTap;
   @override
@@ -382,6 +395,10 @@ class _SuggestionRow extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: BtText.body(context, weight: FontWeight.w600),
                     ),
+                    if (note != null) ...[
+                      const SizedBox(height: 1),
+                      Text(note!, style: BtText.caption(context)),
+                    ],
                     if (rateLabel.isNotEmpty || dateLabel.isNotEmpty) ...[
                       const SizedBox(height: 1),
                       Row(
