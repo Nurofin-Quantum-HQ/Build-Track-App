@@ -985,11 +985,9 @@ class _AddMaterialScreenState extends State<AddMaterialScreen> {
   /// for Materials with a quantity and rate it stores quantity × rate WITHOUT
   /// GST (Transaction pre-save hook + calculateAmount), and rejects any
   /// paidAmount above that ("Paid amount cannot exceed total amount").
-  double _payableTotal() {
-    final qty = double.tryParse(_qtyCtrl.text) ?? 0;
-    final rate = double.tryParse(_rateCtrl.text) ?? 0;
-    return (qty > 0 && rate > 0) ? _subtotal() : _finalTotal();
-  }
+  // The bill the server stores. The current backend (deployed 24 Oct) keeps GST
+  // on materials, so it's the full total incl. GST (rounded like the payload).
+  double _payableTotal() => (_finalTotal() * 100).round() / 100;
   void _scrollToFirstError() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
