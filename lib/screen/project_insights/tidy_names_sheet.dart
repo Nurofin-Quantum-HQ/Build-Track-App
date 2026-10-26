@@ -1,6 +1,5 @@
 import 'dart:convert';
 
-import 'package:buildtrack_mobile/common/utils/entry_names.dart';
 import 'package:buildtrack_mobile/design/design.dart';
 import 'package:buildtrack_mobile/models/project_insights.dart';
 import 'package:buildtrack_mobile/screen/project_insights/insights_theme.dart';
@@ -90,74 +89,16 @@ void showEntryNamesBusy(BuildContext context, String text) {
   );
 }
 
-// ── Proposals (same rules as the backend cleanup script) ───────────────────
-
-/// Entries of one kind spelled [from] that should be called [to].
-class TidyProposal {
-  final CostCategory kind;
-  final String from, to;
-  final List<SpendLine> lines;
-  TidyProposal(this.kind, this.from, this.to, this.lines);
-  double get amount => lines.fold(0.0, (s, l) => s + l.amount);
-}
-
-/// The entry's title as stored (the rename compares against this).
-String _title(SpendLine l) {
-  final t = l.raw['title'];
-  return t == null ? l.name : '$t';
-}
-
-/// For each kind: target = (materials) the rule's fixed simple child name
-/// (M-Sand, Cement, …) when one matches, else the most common spelling among
-/// entries with the same [entryNameKey]. Keep-own-name children (UPVC door,
-/// Teak wood, …) and items the user moved to a group ([materialGroups]) only
-/// get their spelling unified — never collapsed into one name. Proposed only
-/// where target != current title.
-List<TidyProposal> computeTidyProposals(Iterable<SpendLine> lines, {Map<String, String>? materialGroups}) {
-  final out = <TidyProposal>[];
-  for (final kind in const [CostCategory.labour, CostCategory.material, CostCategory.equipment]) {
-    final ofKind = [
-      for (final l in lines)
-        if (l.category == kind && l.id.isNotEmpty && entryNameKey(_title(l)).isNotEmpty) l,
-    ];
-    final byKey = <String, List<SpendLine>>{};
-    for (final l in ofKind) {
-      (byKey[entryNameKey(_title(l))] ??= []).add(l);
-    }
-    final common = {for (final e in byKey.entries) e.key: mostCommonSpelling(e.value.map(_title))};
-    // (from, to) → lines
-    final moves = <String, Map<String, List<SpendLine>>>{};
-    for (final l in ofKind) {
-      final current = _title(l);
-      final target = (kind == CostCategory.material ? classifyMaterial(current, overrides: materialGroups).child : null) ?? common[entryNameKey(current)];
-      if (target == null || target == current) continue;
-      ((moves[target] ??= {})[current] ??= []).add(l);
-    }
-    for (final t in moves.entries) {
-      for (final f in t.value.entries) {
-        out.add(TidyProposal(kind, f.key, t.key, f.value));
-      }
-    }
-  }
-  for (final kind in CostCategory.values) {
-    // Largest first inside each kind; kinds keep their order.
-    final idx = out.indexWhere((p) => p.kind == kind);
-    if (idx < 0) continue;
-    final end = out.lastIndexWhere((p) => p.kind == kind) + 1;
-    final part = out.sublist(idx, end)..sort((a, b) => b.amount.compareTo(a.amount));
-    out.replaceRange(idx, end, part);
-  }
-  return out;
-}
+// Proposals: computeTidyProposals / TidyProposal in models/project_insights.dart
+// (spelling unification only — never rule names).
 
 // ── Page ────────────────────────────────────────────────────────────────────
 
-/// Full-screen "Tidy names" page. Pops with true when something was renamed.
+/// Full-screen "Tidy spellings" page (admin): makes every saved name with the
+/// same match key use its most common spelling. Pops with true when something
+/// was renamed.
 class TidyNamesPage extends StatefulWidget {
-  const TidyNamesPage({super.key, required this.projectLines, this.projectName, this.materialGroups});
-
-  /// The user's "Move to group" overrides — those items keep their own names.
-  final Map<String, String>? materialGroups;
+  const TidyNamesPage({super.key, required this.projectLines, this.projectName});
 
   /// The current project's entries (already parsed by the By type tab).
   final List<SpendLine> projectLines;
@@ -182,7 +123,7 @@ class _TidyNamesPageState extends State<TidyNamesPage> {
   }
 
   void _setProposals(List<SpendLine> lines) {
-    _proposals = computeTidyProposals(lines, materialGroups: widget.materialGroups);
+    _proposals = computeTidyProposals(lines);
     _ticked
       ..clear()
       ..addAll(_proposals);
@@ -269,7 +210,7 @@ class _TidyNamesPageState extends State<TidyNamesPage> {
         foregroundColor: Ins.ink,
         titleSpacing: 0,
         title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('Tidy names', style: Ins.t(17, w: FontWeight.w600)),
+          Text('Tidy spellings', style: Ins.t(17, w: FontWeight.w600)),
           Text(_allProjects ? 'All projects' : (widget.projectName ?? 'This project'),
               style: Ins.t(12.5, c: Ins.ink3), overflow: TextOverflow.ellipsis),
         ]),
@@ -293,7 +234,8 @@ class _TidyNamesPageState extends State<TidyNamesPage> {
             const SizedBox(width: 6),
             Expanded(
               child: Text(
-                'Only names change — amounts, payments and dates stay the same. '
+                'Makes the same name use one spelling (spaces, dashes, capitals) — the most used one. '
+                'Different names are never merged. Amounts, payments and dates stay the same. '
                 'Each entry keeps its old name, so you can undo from the entry list ("Undo rename").',
                 style: Ins.t(12.5, c: Ins.ink3),
               ),
@@ -321,7 +263,7 @@ class _TidyNamesPageState extends State<TidyNamesPage> {
                 const SizedBox(height: 8),
                 const Icon(Icons.check_circle_outline_rounded, size: 36, color: Ins.good),
                 const SizedBox(height: 8),
-                Text('Names are already tidy', style: Ins.t(16, w: FontWeight.w600)),
+                Text('Spellings are already tidy', style: Ins.t(16, w: FontWeight.w600)),
                 const SizedBox(height: 4),
                 Text('Nothing to rename here.', style: Ins.t(13, c: Ins.ink3)),
                 const SizedBox(height: 8),
@@ -348,7 +290,7 @@ class _TidyNamesPageState extends State<TidyNamesPage> {
                 child: FilledButton(
                   style: FilledButton.styleFrom(backgroundColor: Ins.primary, minimumSize: const Size.fromHeight(Ins.tap + 4)),
                   onPressed: count == 0 ? null : _apply,
-                  child: Text(count == 0 ? 'Nothing selected' : 'Apply $count ${count == 1 ? 'rename' : 'renames'}'),
+                  child: Text(count == 0 ? 'Nothing selected' : 'Fix $count ${count == 1 ? 'entry' : 'entries'}'),
                 ),
               ),
             ),

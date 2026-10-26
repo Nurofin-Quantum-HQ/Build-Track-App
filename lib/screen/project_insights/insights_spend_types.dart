@@ -9,6 +9,7 @@ import 'package:buildtrack_mobile/controller/user_session.dart';
 import 'package:buildtrack_mobile/design/design.dart';
 import 'package:buildtrack_mobile/models/project_insights.dart';
 import 'package:buildtrack_mobile/screen/project_insights/insights_theme.dart';
+import 'package:buildtrack_mobile/screen/project_insights/suggest_groups_sheet.dart';
 import 'package:buildtrack_mobile/screen/project_insights/tidy_names_sheet.dart';
 import 'package:buildtrack_mobile/services/api_service.dart';
 import 'package:flutter/material.dart';
@@ -65,8 +66,9 @@ class _InsSpendByTypeViewState extends State<InsSpendByTypeView> {
   CostCategory _cat = _lastCat;
   _Period _period = _lastPeriod;
 
-  /// "Move to group" overrides (material nameKey → parent), per user.
-  Map<String, String> _groups = const {};
+  /// The user's own groups per category (nameKey → group name), from "Move
+  /// to group" / "Suggest groups". Display only; never changes entries.
+  Map<CostCategory, Map<String, String>> _groups = const {};
   bool _groupsFromServer = false;
   bool _groupsEdited = false;
 
@@ -124,7 +126,7 @@ class _InsSpendByTypeViewState extends State<InsSpendByTypeView> {
     final lines = _lines;
     _bd = lines == null
         ? null
-        : SpendBreakdown.compute(lines, projectId: widget.projectId, from: _period.from, materialGroups: _groups);
+        : SpendBreakdown.compute(lines, projectId: widget.projectId, from: _period.from, groups: _groups);
   }
 
   // ── Move to group (display only; never changes entries) ──────────────────
@@ -132,18 +134,18 @@ class _InsSpendByTypeViewState extends State<InsSpendByTypeView> {
   /// Phone cache first (instant), then the profile copy (source of truth).
   Future<void> _loadGroups() async {
     final uid = UserSession.userId;
-    final cached = await _MaterialGroups.readCache(uid);
+    final cached = await _UserGroups.readCache(uid);
     if (cached != null && mounted && !_groupsEdited && !_groupsFromServer) {
       setState(() {
         _groups = cached;
         _recompute();
       });
     }
-    final server = await _MaterialGroups.fetch();
+    final server = await _UserGroups.fetch();
     if (server == null || !mounted) return;
     _groupsFromServer = true;
     if (_groupsEdited) return;
-    await _MaterialGroups.writeCache(uid, server);
+    await _UserGroups.writeCache(uid, server);
     if (!mounted || _groupsEdited) return;
     setState(() {
       _groups = server;
@@ -151,35 +153,46 @@ class _InsSpendByTypeViewState extends State<InsSpendByTypeView> {
     });
   }
 
-  /// Applies [next] right away, caches it on the phone and saves the whole
-  /// map to the profile (the server merges preferences one level deep).
-  Future<void> _setGroups(Map<String, String> next, String done) async {
+  /// Applies [next] for [cat] right away, caches it on the phone and saves
+  /// the whole map to the profile (the server merges preferences one level
+  /// deep, so each category's map is replaced as a whole).
+  Future<void> _setGroups(CostCategory cat, Map<String, String> next, String done) =>
+      _saveGroups({..._groups, cat: Map.unmodifiable(next)}, [cat], done);
+
+  /// Removes every group in every category ("Clear my groups").
+  Future<void> _clearGroups() => _saveGroups(const {}, CostCategory.values, 'Groups cleared — every item shows on its own');
+
+  Future<void> _saveGroups(Map<CostCategory, Map<String, String>> all, List<CostCategory> changed, String done) async {
     setState(() {
-      _groups = Map.unmodifiable(next);
+      _groups = Map.unmodifiable(all);
       _groupsEdited = true;
       _recompute();
     });
-    await _MaterialGroups.writeCache(UserSession.userId, next);
-    final synced = await _MaterialGroups.save(next);
+    await _UserGroups.writeCache(UserSession.userId, all);
+    final synced = await _UserGroups.save({for (final c in changed) c: all[c] ?? const {}});
     if (!mounted) return;
     btToast(context, synced ? done : '$done — saved on this phone only (couldn\'t reach the server)', error: !synced);
   }
 
+  int get _groupedCount => _groups.values.fold(0, (s, m) => s + m.length);
+
   /// Distinct name keys of the entries in [g].
   static Set<String> _keysOf(SpendGroup g) => {for (final l in g.lines) entryNameKey(l.name)}..remove('');
 
-  /// The material parent [g] is shown under (or [g] itself when it is one).
-  String? _parentOf(SpendGroup g) {
-    for (final p in _bd?.byCategory[CostCategory.material]?.byName ?? const <SpendGroup>[]) {
+  /// The user group [g] is shown under (or [g] itself when it is one).
+  String? _parentOf(CostCategory cat, SpendGroup g) {
+    for (final p in _bd?.byCategory[cat]?.byName ?? const <SpendGroup>[]) {
+      if (p.children.isEmpty) continue;
       if (identical(p, g) || p.children.any((c) => identical(c, g))) return p.name;
     }
     return null;
   }
 
-  /// Long-press menu of a material row (top-level or child): Move to group…,
-  /// Back to automatic, Rename (admin). On a change from a pushed page, go
-  /// back to the tab, whose groups are already recomputed.
-  _RenameCallback _materialMenu() {
+  /// Long-press menu of an item / group row (top-level or child) in "By
+  /// material / labour type / equipment": Move to group…, Remove from group,
+  /// Rename (admin). On a change from a pushed page, go back to the tab,
+  /// whose groups are already recomputed.
+  _RenameCallback _itemMenu(CostCategory cat) {
     final viewRoute = ModalRoute.of(context);
     void backToTab() {
       if (viewRoute != null && mounted) Navigator.of(context).popUntil((r) => r == viewRoute);
@@ -187,8 +200,11 @@ class _InsSpendByTypeViewState extends State<InsSpendByTypeView> {
 
     return (pageCtx, g) async {
       final keys = _keysOf(g);
-      final moved = keys.any(_groups.containsKey);
+      final mine = _groups[cat] ?? const <String, String>{};
+      final moved = keys.any(mine.containsKey);
+      final isGroup = g.children.isNotEmpty;
       final canRename = RoleManager.isAdmin && !_offline && g.children.length <= 1;
+      final renameTarget = g.children.length == 1 ? g.children.first : g;
       final action = await showModalBottomSheet<String>(
         context: pageCtx,
         backgroundColor: Colors.white,
@@ -199,7 +215,7 @@ class _InsSpendByTypeViewState extends State<InsSpendByTypeView> {
               padding: const EdgeInsets.fromLTRB(Ins.gutter, 0, Ins.gutter, 8),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(g.name, style: Ins.t(17, w: FontWeight.w600), overflow: TextOverflow.ellipsis),
-                Text('Material · ${g.count} ${g.count == 1 ? 'entry' : 'entries'}', style: Ins.t(12.5, c: Ins.ink3)),
+                Text('${isGroup ? 'Your group' : cat.label} · ${g.count} ${g.count == 1 ? 'entry' : 'entries'}', style: Ins.t(12.5, c: Ins.ink3)),
               ]),
             ),
             if (keys.isNotEmpty)
@@ -212,8 +228,9 @@ class _InsSpendByTypeViewState extends State<InsSpendByTypeView> {
             if (moved)
               ListTile(
                 leading: const Icon(Icons.undo_rounded),
-                title: Text('Back to automatic', style: Ins.t(15, w: FontWeight.w600)),
-                subtitle: Text('Group it by the built-in rules again', style: Ins.t(12.5, c: Ins.ink3)),
+                title: Text(isGroup ? 'Ungroup' : 'Remove from group', style: Ins.t(15, w: FontWeight.w600)),
+                subtitle: Text(isGroup ? 'Show its ${g.children.length} items on their own again' : 'Show it on its own again',
+                    style: Ins.t(12.5, c: Ins.ink3)),
                 onTap: () => Navigator.pop(sheetCtx, 'auto'),
               ),
             if (canRename)
@@ -230,33 +247,35 @@ class _InsSpendByTypeViewState extends State<InsSpendByTypeView> {
       if (action == null || !mounted || !pageCtx.mounted) return;
       switch (action) {
         case 'rename':
-          if (await _renameSpendGroup(pageCtx, g, _RenameField.name) && mounted) {
+          if (await _renameSpendGroup(pageCtx, renameTarget, _RenameField.name) && mounted) {
             backToTab();
             _load();
           }
         case 'move':
-          if (await _moveToGroup(pageCtx, g, keys)) backToTab();
+          if (await _moveToGroup(pageCtx, cat, g, keys)) backToTab();
         case 'auto':
-          final next = Map<String, String>.of(_groups)..removeWhere((k, _) => keys.contains(k));
-          await _setGroups(next, '"${g.name}" is grouped automatically again');
+          final next = Map<String, String>.of(mine)..removeWhere((k, _) => keys.contains(k));
+          await _setGroups(cat, next, isGroup ? 'Ungrouped "${g.name}" — entries unchanged' : '"${g.name}" shows on its own again');
           backToTab();
       }
     };
   }
 
-  /// Pick a parent (present + rule parents) or type a new one; stores an
-  /// override for every name key in [g]. True when something changed.
-  Future<bool> _moveToGroup(BuildContext ctx, SpendGroup g, Set<String> keys) async {
+  /// Pick a group (the user's groups, plus common material kinds) or type a
+  /// new one; stores an override for every name key in [g]. True when
+  /// something changed.
+  Future<bool> _moveToGroup(BuildContext ctx, CostCategory cat, SpendGroup g, Set<String> keys) async {
     // Don't overwrite profile overrides we haven't seen yet.
     if (!_groupsFromServer) await _loadGroups();
     if (!mounted || !ctx.mounted) return false;
-    final current = _parentOf(g);
+    final current = _parentOf(cat, g);
     final options = <String>[];
     final seen = <String>{if (current != null) entryNameKey(current)};
     for (final n in [
-      for (final p in _bd?.byCategory[CostCategory.material]?.byName ?? const <SpendGroup>[]) p.name,
-      ..._groups.values,
-      ...materialRuleParents,
+      for (final p in _bd?.byCategory[cat]?.byName ?? const <SpendGroup>[])
+        if (p.children.isNotEmpty) p.name,
+      ...?_groups[cat]?.values,
+      if (cat == CostCategory.material) ...materialRuleParents.where((p) => p != miscellaneousParent),
     ]) {
       final d = entryNameDisplay(n);
       if (d.isNotEmpty && seen.add(entryNameKey(d))) options.add(d);
@@ -304,18 +323,8 @@ class _InsSpendByTypeViewState extends State<InsSpendByTypeView> {
       if (typed == null || !mounted) return false;
       target = options.firstWhere((o) => entryNameKey(o) == entryNameKey(typed), orElse: () => typed);
     }
-    // Keys whose automatic parent already is the target need no override.
-    final next = Map<String, String>.of(_groups);
-    final names = {for (final l in g.lines) entryNameKey(l.name): l.name}..remove('');
-    for (final k in keys) {
-      final auto = classifyMaterial(names[k] ?? k).parent;
-      if (entryNameKey(auto) == entryNameKey(target)) {
-        next.remove(k);
-      } else {
-        next[k] = target;
-      }
-    }
-    await _setGroups(next, 'Moved "${g.name}" to $target — entries unchanged');
+    final next = {...?_groups[cat], for (final k in keys) k: target};
+    await _setGroups(cat, next, 'Moved "${g.name}" to $target — entries unchanged');
     return true;
   }
 
@@ -326,14 +335,14 @@ class _InsSpendByTypeViewState extends State<InsSpendByTypeView> {
 
   void _setCat(CostCategory c) => setState(() => _cat = _lastCat = c);
 
-  /// Material parents with several children open the child list; a parent
-  /// with one child (and every other group) opens the detail page directly.
+  /// A user group with several items opens the item list; a group with one
+  /// item (and every plain item) opens the detail page directly.
   void _open(SpendGroup g, String scope) {
     final cat = _cat, period = _period.label;
     final field = scope == 'Worker / contractor' ? _RenameField.party : _RenameField.name;
     final rename = _renameFrom(field);
     final restore = _reloadAfter(_restoreSpendGroup);
-    final menu = cat == CostCategory.material ? _materialMenu() : null;
+    final menu = field == _RenameField.name ? _itemMenu(cat) : null;
     if (g.children.length > 1) {
       Navigator.push(
         context,
@@ -377,7 +386,7 @@ class _InsSpendByTypeViewState extends State<InsSpendByTypeView> {
     };
   }
 
-  /// Admin "Tidy names": preview + apply spelling fixes for this project
+  /// Admin "Tidy spellings": preview + apply spelling fixes for this project
   /// (or all projects); reload when anything was renamed.
   Future<void> _openTidy() async {
     final lines = _lines ?? const <SpendLine>[];
@@ -385,12 +394,109 @@ class _InsSpendByTypeViewState extends State<InsSpendByTypeView> {
       context,
       MaterialPageRoute(
         fullscreenDialog: true,
-        builder: (_) => TidyNamesPage(projectLines: lines, projectName: widget.projectName, materialGroups: _groups),
+        builder: (_) => TidyNamesPage(projectLines: lines, projectName: widget.projectName),
       ),
     );
     if (changed == true && mounted) {
       context.read<ProjectProvider>().load();
       _load();
+    }
+  }
+
+  /// "Suggest groups": rule-based proposals for ungrouped materials; the
+  /// ticked ones are added to the user's material groups.
+  Future<void> _openSuggest() async {
+    if (!_groupsFromServer) await _loadGroups();
+    if (!mounted) return;
+    final mine = _groups[CostCategory.material] ?? const <String, String>{};
+    final lines = [
+      for (final l in _lines ?? const <SpendLine>[])
+        if (l.projectId.isEmpty || l.projectId == widget.projectId) l,
+    ];
+    final picked = await Navigator.push<Map<String, String>>(
+      context,
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => SuggestGroupsPage(lines: lines, groups: mine, projectName: widget.projectName),
+      ),
+    );
+    if (picked == null || picked.isEmpty || !mounted) return;
+    _setCat(CostCategory.material);
+    final n = picked.length;
+    await _setGroups(CostCategory.material, {...mine, ...picked}, 'Grouped $n ${n == 1 ? 'item' : 'items'} — entries unchanged');
+  }
+
+  Future<void> _confirmClearGroups() async {
+    final n = _groupedCount;
+    final yes = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        title: Text('Clear my groups', style: Ins.t(18, w: FontWeight.w700)),
+        content: Text('Show all $n grouped ${n == 1 ? 'item' : 'items'} on their own again? Entries and names stay the same.',
+            style: Ins.t(14, c: Ins.ink3)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Clear')),
+        ],
+      ),
+    );
+    if (yes == true && mounted) await _clearGroups();
+  }
+
+  /// "Organise" sheet (chip at the right of the period chips): Suggest groups
+  /// (everyone), Tidy spellings (admin, online), Clear my groups.
+  Future<void> _openOrganise() async {
+    final n = _groupedCount;
+    final canTidy = RoleManager.isAdmin;
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.white,
+      showDragHandle: true,
+      builder: (sheetCtx) => SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(Ins.gutter, 0, Ins.gutter, 8),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Organise', style: Ins.t(17, w: FontWeight.w600)),
+              Text('Items show as entered. Grouping is up to you.', style: Ins.t(12.5, c: Ins.ink3)),
+            ]),
+          ),
+          ListTile(
+            leading: const Icon(Icons.auto_awesome_outlined, color: Ins.ink),
+            title: Text('Suggest groups', style: Ins.t(15, w: FontWeight.w600)),
+            subtitle: Text('Materials into Sand, Cement, Doors & Windows… — you pick', style: Ins.t(12.5, c: Ins.ink3)),
+            onTap: () => Navigator.pop(sheetCtx, 'suggest'),
+          ),
+          if (canTidy)
+            ListTile(
+              enabled: !_offline,
+              leading: Icon(Icons.spellcheck_rounded, color: _offline ? Ins.ink3 : Ins.ink),
+              title: Text('Tidy spellings', style: Ins.t(15, w: FontWeight.w600, c: _offline ? Ins.ink3 : Ins.ink)),
+              subtitle: Text(_offline ? 'Needs a connection' : 'Fix spaces/capitals on saved names — needs the latest server',
+                  style: Ins.t(12.5, c: Ins.ink3)),
+              onTap: () => Navigator.pop(sheetCtx, 'tidy'),
+            ),
+          ListTile(
+            enabled: n > 0,
+            leading: Icon(Icons.layers_clear_outlined, color: n > 0 ? Ins.bad : Ins.ink3),
+            title: Text('Clear my groups', style: Ins.t(15, w: FontWeight.w600, c: n > 0 ? Ins.bad : Ins.ink3)),
+            subtitle: Text(n > 0 ? '$n ${n == 1 ? 'item is' : 'items are'} in your groups — show all on their own' : 'You have no groups yet',
+                style: Ins.t(12.5, c: Ins.ink3)),
+            onTap: () => Navigator.pop(sheetCtx, 'clear'),
+          ),
+          const SizedBox(height: 8),
+        ]),
+      ),
+    );
+    if (!mounted) return;
+    switch (action) {
+      case 'suggest':
+        await _openSuggest();
+      case 'tidy':
+        await _openTidy();
+      case 'clear':
+        await _confirmClearGroups();
     }
   }
 
@@ -433,38 +539,36 @@ class _InsSpendByTypeViewState extends State<InsSpendByTypeView> {
       CostCategory.equipment => 'By equipment',
     };
     final nameHint = switch (_cat) {
-      CostCategory.labour => 'Painters, masons, tile work… as entered in "Labour type"',
-      CostCategory.material => 'Grouped by kind — tap to see inside, long-press to move to another group',
-      CostCategory.equipment => 'Each machine or equipment item',
+      CostCategory.labour => 'Painters, masons, tile work… as entered — long-press to group',
+      CostCategory.material => 'Each material as entered — long-press to put it in a group',
+      CostCategory.equipment => 'Each machine or equipment item — long-press to group',
     };
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      if (RoleManager.isAdmin && !_offline) ...[
-        Align(
-          alignment: Alignment.centerRight,
-          child: TextButton.icon(
-            style: TextButton.styleFrom(foregroundColor: Ins.ink2, minimumSize: const Size(0, 40)),
-            onPressed: _openTidy,
-            icon: const Icon(Icons.auto_fix_high_rounded, size: 18),
-            label: Text('Tidy names', style: Ins.t(13.5, w: FontWeight.w600, c: Ins.ink2)),
-          ),
-        ),
-        const SizedBox(height: 4),
-      ],
       _CatSegment(value: _cat, onChanged: _setCat, totals: {for (final k in CostCategory.values) k: bd.byCategory[k]!.total}),
       const SizedBox(height: 10),
-      SizedBox(
-        height: 38,
-        child: ListView.separated(
-          scrollDirection: Axis.horizontal,
-          clipBehavior: Clip.none,
-          itemCount: _Period.values.length,
-          separatorBuilder: (_, _) => const SizedBox(width: 8),
-          itemBuilder: (_, i) {
-            final p = _Period.values[i];
-            return BtChip(label: p.label, selected: p == _period, onTap: () => _setPeriod(p));
-          },
+      Row(children: [
+        Expanded(
+          child: SizedBox(
+            height: 38,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              clipBehavior: Clip.hardEdge,
+              itemCount: _Period.values.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 8),
+              itemBuilder: (_, i) {
+                final p = _Period.values[i];
+                return BtChip(label: p.label, selected: p == _period, onTap: () => _setPeriod(p));
+              },
+            ),
+          ),
         ),
-      ),
+        const SizedBox(width: 8),
+        Semantics(
+          button: true,
+          label: 'Organise: suggest groups${RoleManager.isAdmin ? ', tidy spellings' : ''}, clear my groups',
+          child: ExcludeSemantics(child: BtChip(label: 'Organise', icon: Icons.tune_rounded, onTap: _openOrganise)),
+        ),
+      ]),
       if (_offline) ...[
         const SizedBox(height: 10),
         Row(children: [
@@ -484,7 +588,7 @@ class _InsSpendByTypeViewState extends State<InsSpendByTypeView> {
         showQty: _cat != CostCategory.labour,
         emptyText: 'No ${_cat.label.toLowerCase()} entries ${_period == _Period.all ? 'yet' : 'in this period'}.',
         onTap: (g) => _open(g, nameTitle.replaceFirst('By ', '')),
-        onLongPress: (g) => _cat == CostCategory.material ? _materialMenu()(context, g) : _renameHere(g, _RenameField.name),
+        onLongPress: (g) => _itemMenu(_cat)(context, g),
       ),
       if (_cat == CostCategory.labour && c.count > 0) ...[
         const SizedBox(height: 12),
@@ -875,7 +979,7 @@ class _Fact extends StatelessWidget {
   ]);
 }
 
-// ── Children of a material parent (Sand → M-Sand, P-Sand, …) ───────────────
+// ── Items inside one of the user's groups (Sand → M-Sand, P Sand, …) ───────
 
 class _ChildrenPage extends StatelessWidget {
   const _ChildrenPage({required this.parent, required this.category, required this.period, this.onRename, this.onRestore, this.onMenu});
@@ -884,7 +988,7 @@ class _ChildrenPage extends StatelessWidget {
   final String period;
   final _RenameCallback? onRename, onRestore;
 
-  /// Long-press menu (Move to group… / Back to automatic / Rename).
+  /// Long-press menu (Move to group… / Remove from group / Rename).
   final _RenameCallback? onMenu;
 
   @override
@@ -951,7 +1055,7 @@ class _GroupEntriesPage extends StatelessWidget {
   /// "Undo rename": puts back the original names of renamed entries.
   final _RenameCallback? onRestore;
 
-  /// Materials: Move to group… / Back to automatic / Rename.
+  /// Move to group… / Remove from group / Rename.
   final _RenameCallback? onMenu;
 
   @override
@@ -1336,14 +1440,17 @@ Future<String?> _askGroupName(BuildContext context) {
   ).whenComplete(ctrl.dispose);
 }
 
-// ── Move-to-group store: profile preferences + phone cache ─────────────────
+// ── User groups store: profile preferences + phone cache ───────────────────
 //
-// GET /users/profile → user.preferences.materialGroups; PUT /users/profile
-// {preferences: {materialGroups: {...whole map...}}}. The live server merges
-// preferences one level deep, so the whole map is always sent.
+// GET /users/profile → user.preferences.{material,labour,equipment}Groups;
+// PUT /users/profile {preferences: {materialGroups: {...whole map...}}}. The
+// server merges preferences one level deep, so each changed category's whole
+// map is sent (other categories are untouched). Phone cache per category:
+// SharedPreferences `<cat>Groups_<userId>` (materialGroups_<uid> as before).
 
-abstract final class _MaterialGroups {
-  static String _prefKey(String uid) => 'materialGroups_$uid';
+abstract final class _UserGroups {
+  static String _field(CostCategory c) => '${c.key}Groups';
+  static String _prefKey(CostCategory c, String uid) => '${_field(c)}_$uid';
 
   static Map<String, String> _clean(dynamic v) => {
     if (v is Map)
@@ -1352,41 +1459,53 @@ abstract final class _MaterialGroups {
           entryNameKey('${e.key}'): entryNameDisplay(e.value as String),
   };
 
-  static Future<Map<String, String>?> readCache(String uid) async {
+  /// Null when nothing is cached for any category.
+  static Future<Map<CostCategory, Map<String, String>>?> readCache(String uid) async {
     if (uid.isEmpty) return null;
     try {
-      final raw = (await SharedPreferences.getInstance()).getString(_prefKey(uid));
-      return raw == null ? null : _clean(jsonDecode(raw));
+      final prefs = await SharedPreferences.getInstance();
+      final out = <CostCategory, Map<String, String>>{};
+      for (final c in CostCategory.values) {
+        final raw = prefs.getString(_prefKey(c, uid));
+        if (raw != null) out[c] = _clean(jsonDecode(raw));
+      }
+      return out.isEmpty ? null : out;
     } catch (_) {
       return null;
     }
   }
 
-  static Future<void> writeCache(String uid, Map<String, String> map) async {
+  static Future<void> writeCache(String uid, Map<CostCategory, Map<String, String>> all) async {
     if (uid.isEmpty) return;
     try {
-      await (await SharedPreferences.getInstance()).setString(_prefKey(uid), jsonEncode(map));
+      final prefs = await SharedPreferences.getInstance();
+      for (final c in CostCategory.values) {
+        await prefs.setString(_prefKey(c, uid), jsonEncode(all[c] ?? const <String, String>{}));
+      }
     } catch (_) {}
   }
 
   /// Null when the profile couldn't be read (keep what we have).
-  static Future<Map<String, String>?> fetch() async {
+  static Future<Map<CostCategory, Map<String, String>>?> fetch() async {
     try {
       final res = await ApiService.get('/users/profile', timeout: const Duration(seconds: 20));
       if (res.statusCode != 200) return null;
       final body = jsonDecode(res.body);
       final user = body is Map ? body['user'] : null;
       final prefs = user is Map ? user['preferences'] : null;
-      return _clean(prefs is Map ? prefs['materialGroups'] : null);
+      return {
+        for (final c in CostCategory.values) c: _clean(prefs is Map ? prefs[_field(c)] : null),
+      };
     } catch (_) {
       return null;
     }
   }
 
-  static Future<bool> save(Map<String, String> map) async {
+  /// Saves the whole map of each category in [changed], in one call.
+  static Future<bool> save(Map<CostCategory, Map<String, String>> changed) async {
     try {
       final res = await ApiService.put('/users/profile', {
-        'preferences': {'materialGroups': map},
+        'preferences': {for (final e in changed.entries) _field(e.key): e.value},
       });
       return res.statusCode == 200;
     } catch (_) {

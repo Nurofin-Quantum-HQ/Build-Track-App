@@ -394,15 +394,15 @@ class SpendLine {
   }
 }
 
-/// A group of entries sharing a name key (see entry_names.dart). Material
-/// groups in [SpendCategoryBreakdown.byName] are parents (Sand, Cement, …)
-/// whose [children] are the simple names (M-Sand, P-Sand, …).
+/// A group of entries sharing a name key (see entry_names.dart), or — when
+/// the user moved items into a group ("Move to group" / "Suggest groups") —
+/// that group, whose [children] are the items (each by its own name).
 class SpendGroup {
   final String name;
   final List<SpendLine> lines;
   final double amount, paid, share;
 
-  /// Material parents only: child groups, largest first. Empty otherwise.
+  /// User groups only: the items inside, largest first. Empty otherwise.
   final List<SpendGroup> children;
 
   /// Total quantity + unit, only when every entry uses the same unit.
@@ -430,8 +430,8 @@ class SpendCategoryBreakdown {
   final double total, paid;
   final int count, awaitingApproval;
 
-  /// By item name (labour type / equipment), largest first. Materials: by
-  /// parent (Sand, Cement, …), each with its [SpendGroup.children].
+  /// By item name (spelling variants merged by key), largest first. Items the
+  /// user put in a group appear under that group's row ([SpendGroup.children]).
   final List<SpendGroup> byName;
 
   /// Labour only: by worker, else contractor / team.
@@ -491,42 +491,50 @@ class SpendBreakdown {
     return out;
   }
 
-  /// Materials: parent → child per [classifyMaterial] (with the user's
-  /// "Move to group" [overrides]). Keep-own-name children (Miscellaneous,
-  /// Doors & Windows, Wood, …) show the entries' most common spelling.
-  static List<SpendGroup> _groupMaterials(List<SpendLine> lines, double total, Map<String, String>? overrides) {
-    final parents = <String, Map<String, List<SpendLine>>>{};
-    final childNames = <String, String?>{};
-    for (final l in lines) {
-      final p = classifyMaterial(l.name, overrides: overrides);
-      ((parents[p.parent] ??= {})[p.childKey] ??= []).add(l);
-      childNames[p.childKey] = p.child;
+  /// Items by their own names (key-merged, see [_group]). Items with a user
+  /// group in [groups] (nameKey → group name) sit under that group's row as
+  /// children; an ungrouped item spelled like a group (key) joins it too, so
+  /// "Sand" never shows twice. No automatic rule parents — the user's data
+  /// as entered, grouped only where the user chose to.
+  static List<SpendGroup> _groupNames(List<SpendLine> lines, double total, Map<String, String>? groups) {
+    final items = _group(lines, (l) => l.name, total, 'Unnamed');
+    if (groups == null || groups.isEmpty) return items;
+    final parents = <String, ({String name, List<SpendGroup> kids})>{};
+    final loose = <SpendGroup>[];
+    for (final it in items) {
+      final k = entryNameKey(it.lines.first.name);
+      final g = k.isEmpty ? null : groups[k];
+      if (g != null && entryNameKey(g).isNotEmpty) {
+        (parents[entryNameKey(g)] ??= (name: entryNameDisplay(g), kids: [])).kids.add(it);
+      } else {
+        loose.add(it);
+      }
     }
     final out = <SpendGroup>[];
-    parents.forEach((parent, kids) {
-      final children = [
-        for (final e in kids.entries)
-          _make(childNames[e.key] ?? mostCommonSpelling(e.value.map((l) => l.name)) ?? 'Unnamed', e.value, total),
-      ]..sort((a, b) => b.amount.compareTo(a.amount));
-      out.add(_make(parent, [for (final c in children) ...c.lines], total, children: children));
-    });
-    // Miscellaneous last, the rest largest first.
-    out.sort((a, b) {
-      final am = a.name == miscellaneousParent, bm = b.name == miscellaneousParent;
-      if (am != bm) return am ? 1 : -1;
-      return b.amount.compareTo(a.amount);
-    });
+    for (final it in loose) {
+      final p = parents[entryNameKey(it.name)];
+      if (p != null) {
+        p.kids.add(it);
+      } else {
+        out.add(it);
+      }
+    }
+    for (final p in parents.values) {
+      final kids = p.kids..sort((a, b) => b.amount.compareTo(a.amount));
+      out.add(_make(p.name, [for (final c in kids) ...c.lines], total, children: kids));
+    }
+    out.sort((a, b) => b.amount.compareTo(a.amount));
     return out;
   }
 
-  /// [from] inclusive, [to] exclusive; null = open-ended. [materialGroups]:
-  /// the user's "Move to group" overrides (nameKey → parent), display only.
+  /// [from] inclusive, [to] exclusive; null = open-ended. [groups]: the
+  /// user's own groups per category (nameKey → group name), display only.
   static SpendBreakdown compute(
     Iterable<SpendLine> all, {
     String? projectId,
     DateTime? from,
     DateTime? to,
-    Map<String, String>? materialGroups,
+    Map<CostCategory, Map<String, String>>? groups,
   }) {
     final per = {for (final c in CostCategory.values) c: <SpendLine>[]};
     for (final l in all) {
@@ -556,7 +564,7 @@ class SpendBreakdown {
             paid: paid,
             count: ls.length,
             awaitingApproval: awaiting,
-            byName: c == CostCategory.material ? _groupMaterials(ls, total, materialGroups) : _group(ls, (l) => l.name, total, 'Unnamed'),
+            byName: _groupNames(ls, total, groups?[c]),
             byPerson: c == CostCategory.labour
                 ? _group(ls, (l) => l.worker.isNotEmpty ? l.worker : l.contractor, total, 'Not recorded')
                 : const [],
@@ -564,4 +572,96 @@ class SpendBreakdown {
         }(),
     });
   }
+}
+
+
+// ═════════════════════════════════════════════════════════════════════════════
+// SUGGEST GROUPS + TIDY SPELLINGS — pure proposals (no Flutter), shown as a
+// preview the user ticks. See NAME-RULES.md.
+// ═════════════════════════════════════════════════════════════════════════════
+
+/// One material item (all spellings of one [entryNameKey]) and the group the
+/// rules suggest for it.
+class GroupSuggestion {
+  final String key, name, group;
+  final List<SpendLine> lines;
+  const GroupSuggestion({required this.key, required this.name, required this.group, required this.lines});
+  double get amount => lines.fold(0.0, (s, l) => s + l.amount);
+  int get count => lines.length;
+}
+
+/// Rule-based group proposals for the material items in [lines] that are not
+/// in one of the user's [groups] yet (nameKey → group). Nothing for items the
+/// rules call Miscellaneous, items already named like their suggested group,
+/// or items named like one of the user's groups (they already sit in it).
+/// Ordered by rule group, largest item first inside a group.
+List<GroupSuggestion> computeGroupSuggestions(Iterable<SpendLine> lines, Map<String, String> groups) {
+  final byKey = <String, List<SpendLine>>{};
+  for (final l in lines) {
+    if (l.category != CostCategory.material) continue;
+    final k = entryNameKey(l.name);
+    if (k.isEmpty || groups.containsKey(k)) continue;
+    (byKey[k] ??= []).add(l);
+  }
+  final groupKeys = {for (final g in groups.values) entryNameKey(g)};
+  final out = <GroupSuggestion>[];
+  byKey.forEach((k, ls) {
+    if (groupKeys.contains(k)) return;
+    final name = mostCommonSpelling(ls.map((l) => l.name)) ?? k;
+    final rule = materialRuleFor(name);
+    if (rule == null || entryNameKey(rule.parent) == k) return;
+    out.add(GroupSuggestion(key: k, name: name, group: rule.parent, lines: ls));
+  });
+  final order = materialRuleParents;
+  out.sort((a, b) {
+    final c = order.indexOf(a.group).compareTo(order.indexOf(b.group));
+    return c != 0 ? c : b.amount.compareTo(a.amount);
+  });
+  return out;
+}
+
+/// Entries of one kind spelled [from] that should be spelled [to].
+class TidyProposal {
+  final CostCategory kind;
+  final String from, to;
+  final List<SpendLine> lines;
+  TidyProposal(this.kind, this.from, this.to, this.lines);
+  double get amount => lines.fold(0.0, (s, l) => s + l.amount);
+}
+
+/// The entry's title as stored (the rename compares against this).
+String tidyTitleOf(SpendLine l) {
+  final t = l.raw['title'];
+  return t == null ? l.name : '$t';
+}
+
+/// Spelling unification only: for each kind, every entry gets the most common
+/// spelling among entries with the same [entryNameKey] ("M sand", "m-sand" →
+/// "M-Sand" when that is the most used). Never a rule name, never merges
+/// different names. Proposed only where the target differs from the title.
+/// Largest first inside each kind; kinds in labour, material, equipment order.
+List<TidyProposal> computeTidyProposals(Iterable<SpendLine> lines) {
+  final out = <TidyProposal>[];
+  for (final kind in const [CostCategory.labour, CostCategory.material, CostCategory.equipment]) {
+    final byKey = <String, List<SpendLine>>{};
+    for (final l in lines) {
+      if (l.category != kind || l.id.isEmpty) continue;
+      final k = entryNameKey(tidyTitleOf(l));
+      if (k.isNotEmpty) (byKey[k] ??= []).add(l);
+    }
+    final part = <TidyProposal>[];
+    for (final ls in byKey.values) {
+      final target = mostCommonSpelling(ls.map(tidyTitleOf));
+      if (target == null) continue;
+      final moves = <String, List<SpendLine>>{};
+      for (final l in ls) {
+        final current = tidyTitleOf(l);
+        if (current != target) (moves[current] ??= []).add(l);
+      }
+      moves.forEach((from, fl) => part.add(TidyProposal(kind, from, target, fl)));
+    }
+    part.sort((a, b) => b.amount.compareTo(a.amount));
+    out.addAll(part);
+  }
+  return out;
 }

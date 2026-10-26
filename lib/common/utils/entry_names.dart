@@ -2,12 +2,12 @@
 // cleanup script. Pure Dart (no Flutter) so it can be unit-tested and reused.
 //
 // 1. Match key: lowercase, keep only a–z and 0–9. "M sand", "M-Sand",
-//    "Msand", "M.Sand" → "msand".
-// 2. Materials get a parent (Sand, Cement, Doors & Windows, …, Miscellaneous)
-//    and a child: a fixed simple name (M-Sand, Cement) or the item's own name
-//    (UPVC door); first matching rule wins (order matters). The user's "Move
-//    to group" overrides win over the rules (display only).
-// 3. Labour / equipment: no parents, group by key only.
+//    "Msand", "M.Sand" → "msand". Insights groups by this key only by
+//    default (display = most common spelling) — the user's data as entered.
+// 2. Material rules (Sand, Cement, Doors & Windows, …) are SUGGESTIONS only:
+//    "Suggest groups" proposes them and the user ticks what to apply (stored
+//    as the same per-user overrides as "Move to group"). First match wins.
+// 3. Tidy spellings unifies spelling per key; it never applies rule names.
 
 final RegExp _nonAlnum = RegExp(r'[^a-z0-9]');
 final RegExp _spaces = RegExp(r'\s+');
@@ -95,8 +95,9 @@ const List<String> standardMaterialNames = [
 /// name, or null = use the most common original spelling among its entries.
 typedef MaterialPlace = ({String parent, String? child, String childKey});
 
-/// [overrides] (nameKey → parent) are the user's "Move to group" choices;
-/// display only. An override wins over the rules and keeps the item's own name.
+/// Rule placement (kept in sync with the backend cleanup script). Insights no
+/// longer applies it automatically — see [materialRuleFor] for suggestions.
+/// [overrides] (nameKey → parent) win over the rules and keep the own name.
 MaterialPlace classifyMaterial(String name, {Map<String, String>? overrides}) {
   final k = entryNameKey(name);
   final own = 'n:$k';
