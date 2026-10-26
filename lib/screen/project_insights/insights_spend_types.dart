@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:buildtrack_mobile/common/utils/entry_names.dart';
 import 'package:buildtrack_mobile/common/widgets/entry_widgets.dart' show PaymentStatus;
 import 'package:buildtrack_mobile/controller/project_provider.dart';
+import 'package:buildtrack_mobile/controller/role_manager.dart';
 import 'package:buildtrack_mobile/design/design.dart';
 import 'package:buildtrack_mobile/models/project_insights.dart';
 import 'package:buildtrack_mobile/screen/project_insights/insights_theme.dart';
@@ -125,16 +126,34 @@ class _InsSpendByTypeViewState extends State<InsSpendByTypeView> {
   /// with one child (and every other group) opens the detail page directly.
   void _open(SpendGroup g, String scope) {
     final cat = _cat, period = _period.label;
+    final field = scope == 'Worker / contractor' ? _RenameField.party : _RenameField.name;
+    final rename = _renameFrom(field);
     if (g.children.length > 1) {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => _ChildrenPage(parent: g, category: cat, period: period)));
+      Navigator.push(context, MaterialPageRoute(builder: (_) => _ChildrenPage(parent: g, category: cat, period: period, onRename: rename)));
       return;
     }
     final target = g.children.length == 1 ? g.children.first : g;
     final sc = g.children.length == 1 ? g.name : scope;
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => _GroupEntriesPage(group: target, category: cat, scope: sc, period: period)),
+      MaterialPageRoute(builder: (_) => _GroupEntriesPage(group: target, category: cat, scope: sc, period: period, onRename: rename)),
     );
+  }
+
+  /// Rename from any page opened from this tab: on success, go back to the
+  /// tab and reload so the groups reflect the new name.
+  _RenameCallback _renameFrom(_RenameField field) {
+    final viewRoute = ModalRoute.of(context);
+    return (pageCtx, g) async {
+      final ok = await _renameSpendGroup(pageCtx, g, field);
+      if (!ok || !mounted) return;
+      if (viewRoute != null) Navigator.of(context).popUntil((r) => r == viewRoute);
+      _load();
+    };
+  }
+
+  Future<void> _renameHere(SpendGroup g, _RenameField field) async {
+    if (await _renameSpendGroup(context, g, field) && mounted) _load();
   }
 
   @override
@@ -211,6 +230,7 @@ class _InsSpendByTypeViewState extends State<InsSpendByTypeView> {
         showQty: _cat != CostCategory.labour,
         emptyText: 'No ${_cat.label.toLowerCase()} entries ${_period == _Period.all ? 'yet' : 'in this period'}.',
         onTap: (g) => _open(g, nameTitle.replaceFirst('By ', '')),
+        onLongPress: (g) => _renameHere(g, _RenameField.name),
       ),
       if (_cat == CostCategory.labour && c.count > 0) ...[
         const SizedBox(height: 12),
@@ -222,6 +242,7 @@ class _InsSpendByTypeViewState extends State<InsSpendByTypeView> {
           showQty: false,
           emptyText: '',
           onTap: (g) => _open(g, 'Worker / contractor'),
+          onLongPress: (g) => _renameHere(g, _RenameField.party),
         ),
       ],
     ]);
@@ -391,12 +412,14 @@ class _GroupsCard extends StatefulWidget {
     required this.showQty,
     required this.emptyText,
     required this.onTap,
+    this.onLongPress,
   });
   final String title, description, emptyText;
   final List<SpendGroup> groups;
   final Color color;
   final bool showQty;
   final ValueChanged<SpendGroup> onTap;
+  final ValueChanged<SpendGroup>? onLongPress;
 
   @override
   State<_GroupsCard> createState() => _GroupsCardState();
@@ -429,7 +452,8 @@ class _GroupsCardState extends State<_GroupsCard> {
             child: Text(widget.emptyText, style: Ins.t(14, c: Ins.ink3)),
           ),
         for (var i = 0; i < shown.length; i++)
-          _GroupRow(rank: i + 1, group: shown[i], color: widget.color, fraction: shown[i].amount / top, showQty: widget.showQty, onTap: () => widget.onTap(shown[i])),
+          _GroupRow(rank: i + 1, group: shown[i], color: widget.color, fraction: shown[i].amount / top, showQty: widget.showQty, onTap: () => widget.onTap(shown[i]),
+              onLongPress: widget.onLongPress == null ? null : () => widget.onLongPress!(shown[i])),
         if (shown.length < groups.length)
           InkWell(
             onTap: () => setState(() => _all = true),
@@ -446,13 +470,14 @@ class _GroupsCardState extends State<_GroupsCard> {
 }
 
 class _GroupRow extends StatelessWidget {
-  const _GroupRow({required this.rank, required this.group, required this.color, required this.fraction, required this.showQty, required this.onTap});
+  const _GroupRow({required this.rank, required this.group, required this.color, required this.fraction, required this.showQty, required this.onTap, this.onLongPress});
   final int rank;
   final SpendGroup group;
   final Color color;
   final double fraction;
   final bool showQty;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -469,6 +494,7 @@ class _GroupRow extends StatelessWidget {
       label: '${g.name}, ${inrFull(g.amount)}, ${meta.join(', ')}, ${inrFull(g.pending)} to pay',
       child: InkWell(
         onTap: onTap,
+        onLongPress: onLongPress,
         child: Container(
           constraints: const BoxConstraints(minHeight: 64),
           decoration: const BoxDecoration(border: Border(top: BorderSide(color: Ins.border))),
@@ -504,7 +530,8 @@ class _GroupRow extends StatelessWidget {
 
 // ── Pages: shared chrome ───────────────────────────────────────────────────
 
-PreferredSizeWidget _insAppBar(String title, String subtitle) => AppBar(
+PreferredSizeWidget _insAppBar(String title, String subtitle, {List<Widget>? actions}) => AppBar(
+  actions: actions,
   toolbarHeight: 64,
   backgroundColor: Colors.white,
   surfaceTintColor: Colors.white,
@@ -597,10 +624,11 @@ class _Fact extends StatelessWidget {
 // ── Children of a material parent (Sand → M-Sand, P-Sand, …) ───────────────
 
 class _ChildrenPage extends StatelessWidget {
-  const _ChildrenPage({required this.parent, required this.category, required this.period});
+  const _ChildrenPage({required this.parent, required this.category, required this.period, this.onRename});
   final SpendGroup parent;
   final CostCategory category;
   final String period;
+  final _RenameCallback? onRename;
 
   @override
   Widget build(BuildContext context) {
@@ -621,8 +649,9 @@ class _ChildrenPage extends StatelessWidget {
             emptyText: '',
             onTap: (c) => Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => _GroupEntriesPage(group: c, category: category, scope: parent.name, period: period)),
+              MaterialPageRoute(builder: (_) => _GroupEntriesPage(group: c, category: category, scope: parent.name, period: period, onRename: onRename)),
             ),
+            onLongPress: onRename == null ? null : (c) => onRename!(context, c),
           ),
         ],
       ),
@@ -633,11 +662,12 @@ class _ChildrenPage extends StatelessWidget {
 // ── Detail of one group: header + entries (like Reports) ────────────────────
 
 class _GroupEntriesPage extends StatelessWidget {
-  const _GroupEntriesPage({required this.group, required this.category, required this.scope, required this.period});
+  const _GroupEntriesPage({required this.group, required this.category, required this.scope, required this.period, this.onRename});
   final SpendGroup group;
   final CostCategory category;
   final String scope;
   final String period;
+  final _RenameCallback? onRename;
 
   @override
   Widget build(BuildContext context) {
@@ -647,7 +677,14 @@ class _GroupEntriesPage extends StatelessWidget {
     final showName = g.lines.map((l) => entryNameKey(l.name)).toSet().length > 1;
     return Scaffold(
       backgroundColor: Ins.bg,
-      appBar: _insAppBar(g.name, '${category.label} · $scope · $period'),
+      appBar: _insAppBar(g.name, '${category.label} · $scope · $period', actions: [
+        if (onRename != null && RoleManager.isAdmin)
+          IconButton(
+            tooltip: 'Rename',
+            icon: const Icon(Icons.edit_outlined),
+            onPressed: () => onRename!(context, g),
+          ),
+      ]),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(Ins.gutter, 16, Ins.gutter, 32),
         children: [
@@ -802,4 +839,133 @@ Map<String, dynamic> _entryDetailArgs(SpendLine l) {
     'activity': tx['activity']?.toString(),
     'paymentReceipt': tx['paymentReceipt']?.toString(),
   };
+}
+
+
+// ── Rename a group (fix a name on every entry in it) ────────────────────────
+
+enum _RenameField { name, party }
+
+typedef _RenameCallback = Future<void> Function(BuildContext pageContext, SpendGroup group);
+
+/// Renames every entry in [g]: the entry's name (labour type / material /
+/// equipment) or, for "By worker / contractor", the contractor / team field.
+/// One PUT per entry — the server moves inventory stock to the new name too.
+/// Admin only (other roles can't change approved entries on the server).
+Future<bool> _renameSpendGroup(BuildContext context, SpendGroup g, _RenameField field) async {
+  if (!RoleManager.isAdmin) {
+    btToast(context, 'Only an admin can rename entries.', error: true);
+    return false;
+  }
+  if (g.children.length > 1) {
+    btToast(context, '${g.name} holds ${g.children.length} items — open it and rename each one.', error: true);
+    return false;
+  }
+  final lines = (g.children.length == 1 ? g.children.first.lines : g.lines).where((l) => l.id.isNotEmpty).toList();
+  // Worker names picked from the team list live on the person, not the entry.
+  final editable = <SpendLine, Map<String, dynamic>>{};
+  var teamWorkers = 0;
+  for (final l in lines) {
+    if (field == _RenameField.name) {
+      editable[l] = {};
+    } else if (l.worker.isNotEmpty && l.worker != l.contractor) {
+      teamWorkers++;
+    } else {
+      final raw = l.raw;
+      final key = (raw['category'] ?? '').toString().trim().isNotEmpty && l.category == CostCategory.labour
+          ? 'category'
+          : (raw['contractor'] ?? '').toString().trim().isNotEmpty
+              ? 'contractor'
+              : 'supplier';
+      editable[l] = {'_field': key};
+    }
+  }
+  if (editable.isEmpty) {
+    btToast(context, '"${g.name}" is a team member — change the name in Team Overview.', error: true);
+    return false;
+  }
+  final newName = await _askNewName(context, g.name, editable.length, field);
+  if (newName == null || !context.mounted) return false;
+
+  final progress = ValueNotifier<int>(0);
+  showDialog<void>(
+    context: context,
+    barrierDismissible: false,
+    builder: (_) => PopScope(
+      canPop: false,
+      child: AlertDialog(
+        content: ValueListenableBuilder<int>(
+          valueListenable: progress,
+          builder: (_, done, _) => Row(children: [
+            const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5)),
+            const SizedBox(width: 16),
+            Expanded(child: Text('Renaming $done of ${editable.length}…', style: Ins.t(15))),
+          ]),
+        ),
+      ),
+    ),
+  );
+  var ok = 0, failed = 0;
+  for (final e in editable.entries) {
+    final body = field == _RenameField.name
+        ? <String, dynamic>{'title': newName}
+        : <String, dynamic>{e.value['_field'] as String: newName};
+    try {
+      final res = await ApiService.put('/transactions/${e.key.id}', body);
+      (res.statusCode == 200 || res.statusCode == 204) ? ok++ : failed++;
+    } catch (_) {
+      failed++;
+    }
+    progress.value = ok + failed;
+  }
+  if (context.mounted) Navigator.of(context, rootNavigator: true).pop();
+  progress.dispose();
+  if (!context.mounted) return ok > 0;
+  final skipped = teamWorkers > 0 ? ' · $teamWorkers team-member entries left as they are' : '';
+  if (failed == 0) {
+    btToast(context, 'Renamed $ok ${ok == 1 ? 'entry' : 'entries'} to "$newName"$skipped');
+  } else {
+    btToast(context, 'Renamed $ok, $failed failed — try again for the rest$skipped', error: true);
+  }
+  if (ok > 0) context.read<ProjectProvider>().load();
+  return ok > 0;
+}
+
+Future<String?> _askNewName(BuildContext context, String current, int count, _RenameField field) {
+  final ctrl = TextEditingController(text: current);
+  ctrl.selection = TextSelection(baseOffset: 0, extentOffset: current.length);
+  String? error;
+  return showDialog<String>(
+    context: context,
+    builder: (ctx) => StatefulBuilder(
+      builder: (ctx, setState) {
+        void submit() {
+          final v = ctrl.text.replaceAll(RegExp(r'\s+'), ' ').trim();
+          if (v.isEmpty) return setState(() => error = 'Enter a name');
+          if (v == current) return setState(() => error = 'That is the current name');
+          Navigator.pop(ctx, v);
+        }
+        return AlertDialog(
+          backgroundColor: Colors.white,
+          title: Text(field == _RenameField.party ? 'Rename worker / contractor' : 'Rename', style: Ins.t(18, w: FontWeight.w700)),
+          content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Changes "$current" on $count ${count == 1 ? 'entry' : 'entries'}. Entries with the new name are grouped together.',
+                style: Ins.t(14, c: Ins.ink3)),
+            const SizedBox(height: 12),
+            TextField(
+              controller: ctrl,
+              autofocus: true,
+              textCapitalization: TextCapitalization.words,
+              onSubmitted: (_) => submit(),
+              decoration: InputDecoration(labelText: 'New name', errorText: error, border: const OutlineInputBorder()),
+            ),
+          ]),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            FilledButton(onPressed: submit, child: const Text('Rename')),
+          ],
+        );
+      },
+    ),
+  ).whenComplete(ctrl.dispose);
 }
