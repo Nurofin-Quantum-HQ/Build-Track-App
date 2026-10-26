@@ -301,6 +301,10 @@ class SpendLine {
   final bool approved;
   final Map<String, dynamic> raw;
 
+  /// The entry's name before an admin renamed it (server `originalTitle`),
+  /// or '' when it was never renamed.
+  final String originalName;
+
   const SpendLine({
     required this.id,
     required this.projectId,
@@ -315,6 +319,7 @@ class SpendLine {
     required this.date,
     required this.approved,
     required this.raw,
+    this.originalName = '',
   });
 
   double get pending => math.max(0, amount - paid);
@@ -384,6 +389,7 @@ class SpendLine {
       date: _dt(j['date']) ?? _dt(j['createdAt']),
       approved: approval == 'approved',
       raw: j,
+      originalName: _s(j['originalTitle']),
     );
   }
 }

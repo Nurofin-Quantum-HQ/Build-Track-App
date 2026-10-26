@@ -7,6 +7,7 @@ import 'package:buildtrack_mobile/controller/role_manager.dart';
 import 'package:buildtrack_mobile/design/design.dart';
 import 'package:buildtrack_mobile/models/project_insights.dart';
 import 'package:buildtrack_mobile/screen/project_insights/insights_theme.dart';
+import 'package:buildtrack_mobile/screen/project_insights/tidy_names_sheet.dart';
 import 'package:buildtrack_mobile/services/api_service.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -128,28 +129,55 @@ class _InsSpendByTypeViewState extends State<InsSpendByTypeView> {
     final cat = _cat, period = _period.label;
     final field = scope == 'Worker / contractor' ? _RenameField.party : _RenameField.name;
     final rename = _renameFrom(field);
+    final restore = _reloadAfter(_restoreSpendGroup);
     if (g.children.length > 1) {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => _ChildrenPage(parent: g, category: cat, period: period, onRename: rename)));
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => _ChildrenPage(parent: g, category: cat, period: period, onRename: rename, onRestore: restore)),
+      );
       return;
     }
     final target = g.children.length == 1 ? g.children.first : g;
     final sc = g.children.length == 1 ? g.name : scope;
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => _GroupEntriesPage(group: target, category: cat, scope: sc, period: period, onRename: rename)),
+      MaterialPageRoute(
+        builder: (_) => _GroupEntriesPage(group: target, category: cat, scope: sc, period: period, onRename: rename, onRestore: restore),
+      ),
     );
   }
 
   /// Rename from any page opened from this tab: on success, go back to the
   /// tab and reload so the groups reflect the new name.
-  _RenameCallback _renameFrom(_RenameField field) {
+  _RenameCallback _renameFrom(_RenameField field) => _reloadAfter((c, g) => _renameSpendGroup(c, g, field));
+
+  /// Wraps a rename / undo action for a page opened from this tab: on
+  /// success, pop back to the tab and reload.
+  _RenameCallback _reloadAfter(Future<bool> Function(BuildContext, SpendGroup) action) {
     final viewRoute = ModalRoute.of(context);
     return (pageCtx, g) async {
-      final ok = await _renameSpendGroup(pageCtx, g, field);
+      final ok = await action(pageCtx, g);
       if (!ok || !mounted) return;
       if (viewRoute != null) Navigator.of(context).popUntil((r) => r == viewRoute);
       _load();
     };
+  }
+
+  /// Admin "Tidy names": preview + apply spelling fixes for this project
+  /// (or all projects); reload when anything was renamed.
+  Future<void> _openTidy() async {
+    final lines = _lines ?? const <SpendLine>[];
+    final changed = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => TidyNamesPage(projectLines: lines, projectName: widget.projectName),
+      ),
+    );
+    if (changed == true && mounted) {
+      context.read<ProjectProvider>().load();
+      _load();
+    }
   }
 
   Future<void> _renameHere(SpendGroup g, _RenameField field) async {
@@ -196,6 +224,18 @@ class _InsSpendByTypeViewState extends State<InsSpendByTypeView> {
       CostCategory.equipment => 'Each machine or equipment item',
     };
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      if (RoleManager.isAdmin && !_offline) ...[
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton.icon(
+            style: TextButton.styleFrom(foregroundColor: Ins.ink2, minimumSize: const Size(0, 40)),
+            onPressed: _openTidy,
+            icon: const Icon(Icons.auto_fix_high_rounded, size: 18),
+            label: Text('Tidy names', style: Ins.t(13.5, w: FontWeight.w600, c: Ins.ink2)),
+          ),
+        ),
+        const SizedBox(height: 4),
+      ],
       _CatSegment(value: _cat, onChanged: _setCat, totals: {for (final k in CostCategory.values) k: bd.byCategory[k]!.total}),
       const SizedBox(height: 10),
       SizedBox(
@@ -624,11 +664,11 @@ class _Fact extends StatelessWidget {
 // ── Children of a material parent (Sand → M-Sand, P-Sand, …) ───────────────
 
 class _ChildrenPage extends StatelessWidget {
-  const _ChildrenPage({required this.parent, required this.category, required this.period, this.onRename});
+  const _ChildrenPage({required this.parent, required this.category, required this.period, this.onRename, this.onRestore});
   final SpendGroup parent;
   final CostCategory category;
   final String period;
-  final _RenameCallback? onRename;
+  final _RenameCallback? onRename, onRestore;
 
   @override
   Widget build(BuildContext context) {
@@ -649,7 +689,7 @@ class _ChildrenPage extends StatelessWidget {
             emptyText: '',
             onTap: (c) => Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => _GroupEntriesPage(group: c, category: category, scope: parent.name, period: period, onRename: onRename)),
+              MaterialPageRoute(builder: (_) => _GroupEntriesPage(group: c, category: category, scope: parent.name, period: period, onRename: onRename, onRestore: onRestore)),
             ),
             onLongPress: onRename == null ? null : (c) => onRename!(context, c),
           ),
@@ -662,12 +702,15 @@ class _ChildrenPage extends StatelessWidget {
 // ── Detail of one group: header + entries (like Reports) ────────────────────
 
 class _GroupEntriesPage extends StatelessWidget {
-  const _GroupEntriesPage({required this.group, required this.category, required this.scope, required this.period, this.onRename});
+  const _GroupEntriesPage({required this.group, required this.category, required this.scope, required this.period, this.onRename, this.onRestore});
   final SpendGroup group;
   final CostCategory category;
   final String scope;
   final String period;
   final _RenameCallback? onRename;
+
+  /// "Undo rename": puts back the original names of renamed entries.
+  final _RenameCallback? onRestore;
 
   @override
   Widget build(BuildContext context) {
@@ -675,9 +718,16 @@ class _GroupEntriesPage extends StatelessWidget {
     // Show each entry's own name when the group merges different names
     // (e.g. Sand → "Sand", "Fine sand", or a worker's several labour types).
     final showName = g.lines.map((l) => entryNameKey(l.name)).toSet().length > 1;
+    final renamed = g.lines.any((l) => l.originalName.isNotEmpty);
     return Scaffold(
       backgroundColor: Ins.bg,
       appBar: _insAppBar(g.name, '${category.label} · $scope · $period', actions: [
+        if (onRestore != null && renamed && RoleManager.isAdmin)
+          IconButton(
+            tooltip: 'Undo rename',
+            icon: const Icon(Icons.history_rounded),
+            onPressed: () => onRestore!(context, g),
+          ),
         if (onRename != null && RoleManager.isAdmin)
           IconButton(
             tooltip: 'Rename',
@@ -721,6 +771,9 @@ class _EntryRow extends StatelessWidget {
     ].join(' · ');
     final place = l.place;
     final rate = l.rate;
+    final wasName = l.originalName.isNotEmpty && entryNameKey(l.originalName) != entryNameKey(l.name)
+        ? entryNameDisplay(l.originalName)
+        : null;
     final status = l.paid >= l.amount - 0.5
         ? (fg: Ins.good, bg: Ins.goodSoft, label: 'Paid')
         : l.paid > 0
@@ -728,7 +781,7 @@ class _EntryRow extends StatelessWidget {
         : (fg: Ins.ink3, bg: Ins.muted, label: 'To pay');
     return Semantics(
       button: l.id.isNotEmpty,
-      label: '$title, ${inrFull(l.amount)}, ${status.label}'
+      label: '$title${wasName != null ? ', was $wasName' : ''}, ${inrFull(l.amount)}, ${status.label}'
           '${place.isNotEmpty ? ', $place' : ''}${party.isNotEmpty ? ', $partyLabel $party' : ''}'
           ', paid ${inrFull(l.paid)}, remaining ${inrFull(l.pending)}',
       child: InkWell(
@@ -744,6 +797,8 @@ class _EntryRow extends StatelessWidget {
                     Expanded(
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                         Text(title, style: Ins.t(14, w: FontWeight.w600), maxLines: 2, overflow: TextOverflow.ellipsis),
+                        if (wasName != null)
+                          Text('Was: $wasName', style: Ins.t(12, c: Ins.ink3), maxLines: 1, overflow: TextOverflow.ellipsis),
                         const SizedBox(height: 2),
                         Text(place.isEmpty ? 'No floor / phase' : place,
                             style: Ins.t(12.5, c: Ins.ink3), maxLines: 2, overflow: TextOverflow.ellipsis),
@@ -850,8 +905,9 @@ typedef _RenameCallback = Future<void> Function(BuildContext pageContext, SpendG
 
 /// Renames every entry in [g]: the entry's name (labour type / material /
 /// equipment) or, for "By worker / contractor", the contractor / team field.
-/// One PUT per entry — the server moves inventory stock to the new name too.
-/// Admin only (other roles can't change approved entries on the server).
+/// One POST /transactions/rename per field — it changes only the name, never
+/// amounts / payments / dates, and title renames keep the old name so they
+/// can be undone. Admin only.
 Future<bool> _renameSpendGroup(BuildContext context, SpendGroup g, _RenameField field) async {
   if (!RoleManager.isAdmin) {
     btToast(context, 'Only an admin can rename entries.', error: true);
@@ -862,12 +918,13 @@ Future<bool> _renameSpendGroup(BuildContext context, SpendGroup g, _RenameField 
     return false;
   }
   final lines = (g.children.length == 1 ? g.children.first.lines : g.lines).where((l) => l.id.isNotEmpty).toList();
-  // Worker names picked from the team list live on the person, not the entry.
-  final editable = <SpendLine, Map<String, dynamic>>{};
+  // Server field → entry ids. Worker names picked from the team list live on
+  // the person, not the entry, so those entries are skipped.
+  final byField = <String, List<String>>{};
   var teamWorkers = 0;
   for (final l in lines) {
     if (field == _RenameField.name) {
-      editable[l] = {};
+      (byField['title'] ??= []).add(l.id);
     } else if (l.worker.isNotEmpty && l.worker != l.contractor) {
       teamWorkers++;
     } else {
@@ -877,58 +934,81 @@ Future<bool> _renameSpendGroup(BuildContext context, SpendGroup g, _RenameField 
           : (raw['contractor'] ?? '').toString().trim().isNotEmpty
               ? 'contractor'
               : 'supplier';
-      editable[l] = {'_field': key};
+      (byField[key] ??= []).add(l.id);
     }
   }
-  if (editable.isEmpty) {
+  final total = byField.values.fold(0, (s, ids) => s + ids.length);
+  if (total == 0) {
     btToast(context, '"${g.name}" is a team member — change the name in Team Overview.', error: true);
     return false;
   }
-  final newName = await _askNewName(context, g.name, editable.length, field);
+  final newName = await _askNewName(context, g.name, total, field);
   if (newName == null || !context.mounted) return false;
 
-  final progress = ValueNotifier<int>(0);
-  showDialog<void>(
-    context: context,
-    barrierDismissible: false,
-    builder: (_) => PopScope(
-      canPop: false,
-      child: AlertDialog(
-        content: ValueListenableBuilder<int>(
-          valueListenable: progress,
-          builder: (_, done, _) => Row(children: [
-            const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5)),
-            const SizedBox(width: 16),
-            Expanded(child: Text('Renaming $done of ${editable.length}…', style: Ins.t(15))),
-          ]),
-        ),
-      ),
-    ),
-  );
-  var ok = 0, failed = 0;
-  for (final e in editable.entries) {
-    final body = field == _RenameField.name
-        ? <String, dynamic>{'title': newName}
-        : <String, dynamic>{e.value['_field'] as String: newName};
-    try {
-      final res = await ApiService.put('/transactions/${e.key.id}', body);
-      (res.statusCode == 200 || res.statusCode == 204) ? ok++ : failed++;
-    } catch (_) {
-      failed++;
+  showEntryNamesBusy(context, 'Renaming $total ${total == 1 ? 'entry' : 'entries'}…');
+  var ok = 0, failed = 0, serverSkipped = 0;
+  String? error;
+  for (final e in byField.entries) {
+    final r = await renameEntriesOnServer(ids: e.value, field: e.key, to: newName);
+    if (r.ok) {
+      ok += r.done;
+      serverSkipped += r.skipped.length;
+    } else {
+      failed += e.value.length;
+      error ??= r.error;
     }
-    progress.value = ok + failed;
   }
   if (context.mounted) Navigator.of(context, rootNavigator: true).pop();
-  progress.dispose();
   if (!context.mounted) return ok > 0;
-  final skipped = teamWorkers > 0 ? ' · $teamWorkers team-member entries left as they are' : '';
-  if (failed == 0) {
+  final skipped = [
+    if (teamWorkers > 0) '$teamWorkers team-member entries left as they are',
+    if (serverSkipped > 0) '$serverSkipped skipped',
+  ].map((s) => ' · $s').join();
+  if (error == null) {
     btToast(context, 'Renamed $ok ${ok == 1 ? 'entry' : 'entries'} to "$newName"$skipped');
+  } else if (ok == 0) {
+    btToast(context, error, error: true);
   } else {
-    btToast(context, 'Renamed $ok, $failed failed — try again for the rest$skipped', error: true);
+    btToast(context, 'Renamed $ok, $failed not renamed: $error$skipped', error: true);
   }
   if (ok > 0) context.read<ProjectProvider>().load();
   return ok > 0;
+}
+
+/// "Undo rename" on a detail page: puts back the original names of the
+/// renamed entries in [g]. Admin only.
+Future<bool> _restoreSpendGroup(BuildContext context, SpendGroup g) async {
+  if (!RoleManager.isAdmin) {
+    btToast(context, 'Only an admin can undo a rename.', error: true);
+    return false;
+  }
+  final ids = [for (final l in g.lines) if (l.id.isNotEmpty && l.originalName.isNotEmpty) l.id];
+  if (ids.isEmpty) return false;
+  final n = ids.length;
+  final yes = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      backgroundColor: Colors.white,
+      title: Text('Undo rename', style: Ins.t(18, w: FontWeight.w700)),
+      content: Text('Put back the original names on $n ${n == 1 ? 'entry' : 'entries'}?', style: Ins.t(14, c: Ins.ink3)),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+        FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Put back')),
+      ],
+    ),
+  );
+  if (yes != true || !context.mounted) return false;
+  showEntryNamesBusy(context, 'Putting back $n ${n == 1 ? 'name' : 'names'}…');
+  final r = await restoreEntryNamesOnServer(ids);
+  if (context.mounted) Navigator.of(context, rootNavigator: true).pop();
+  if (!context.mounted) return r.ok && r.done > 0;
+  if (!r.ok) {
+    btToast(context, r.error!, error: true);
+    return false;
+  }
+  btToast(context, 'Put back the original name on ${r.done} ${r.done == 1 ? 'entry' : 'entries'}');
+  if (r.done > 0) context.read<ProjectProvider>().load();
+  return r.done > 0;
 }
 
 Future<String?> _askNewName(BuildContext context, String current, int count, _RenameField field) {
