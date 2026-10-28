@@ -200,7 +200,6 @@ class _SubscriptionScreenContentState
   }
 
   SubscriptionPlan? _picked;
-  bool _autoRenew = false;
 
   @override
   Widget build(BuildContext context) {
@@ -309,47 +308,6 @@ class _SubscriptionScreenContentState
             ]),
           ),
           const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: Bt.card,
-              borderRadius: BorderRadius.circular(Bt.rCard),
-              border: Border.all(color: Bt.line),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  _autoRenew ? Icons.autorenew_rounded : Icons.flash_on_rounded,
-                  color: _autoRenew ? bt.accent : Bt.ink2,
-                  size: 22,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _autoRenew ? 'Monthly AutoPay (Recurring)' : 'One-Time Payment (30 days)',
-                        style: BtText.subhead(context, weight: FontWeight.w600),
-                      ),
-                      Text(
-                        _autoRenew
-                            ? 'Auto-renews monthly · Cancel anytime'
-                            : 'Pay once via UPI QR, Cards, or Netbanking',
-                        style: BtText.caption(context),
-                      ),
-                    ],
-                  ),
-                ),
-                Switch.adaptive(
-                  value: _autoRenew,
-                  activeColor: bt.accent,
-                  onChanged: (val) => setState(() => _autoRenew = val),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -401,7 +359,7 @@ class _SubscriptionScreenContentState
   ) async {
     if (plan.productId == null) return;
     if (sub.currentPlan == plan.plan) return;
-    final params = await sub.purchase(plan.productId!, isRecurring: _autoRenew);
+    final params = await sub.purchase(plan.productId!);
     if (!context.mounted) return;
     if (params == null) return;
     final result = await Navigator.push<bool>(
