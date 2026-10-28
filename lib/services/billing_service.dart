@@ -20,13 +20,13 @@ const Map<String, String> kPlanNames = {
   kEnterpriseMonthlyId: 'enterprise',
 };
 class BillingService {
-  static Future<Map<String, dynamic>?> initiatePayment(String productId) async {
+  static Future<Map<String, dynamic>?> initiatePayment(String productId, {bool isRecurring = false}) async {
     try {
       final planName = kPlanNames[productId];
       if (planName == null) return null;
       final response = await ApiService.post('/subscriptions/initiate', {
         'plan': planName,
-        'isRecurring': true,
+        'isRecurring': isRecurring,
       });
       if (response.statusCode == 200) {
         final data = json.decode(response.body) as Map<String, dynamic>;

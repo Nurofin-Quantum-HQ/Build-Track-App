@@ -158,13 +158,13 @@ class SubscriptionProvider extends ChangeNotifier {
     }
   }
 
-  Future<Map<String, dynamic>?> purchase(String productId) async {
+  Future<Map<String, dynamic>?> purchase(String productId, {bool isRecurring = false}) async {
     if (_isPurchasing) return null;
     _isPurchasing = true;
     _error = '';
     notifyListeners();
     try {
-      final params = await BillingService.initiatePayment(productId);
+      final params = await BillingService.initiatePayment(productId, isRecurring: isRecurring);
       if (params == null) {
         _error = 'Could not initiate payment. Please try again.';
         return null;
