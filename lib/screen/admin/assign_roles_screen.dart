@@ -84,6 +84,12 @@ class _AssignRolesScreenState extends State<AssignRolesScreen> {
     },
     {'section': 'Visibility'},
     {
+      'type': 'toggle',
+      'label': 'View finances',
+      'desc': 'See money in, money out, loans and revenue in Reports',
+      'key': RoleManager.viewFinancesKey,
+    },
+    {
       'type': 'table',
       'label': 'Reports & Analytics',
       'desc': 'Access to charts, cost summaries and analytics',
@@ -115,6 +121,8 @@ class _AssignRolesScreenState extends State<AssignRolesScreen> {
     // Off by default for every preset (Supervisor / Mason / custom); an Admin
     // turns it on per person. Read by RoleManager.canViewProjectBudget.
     RoleManager.viewProjectBudgetKey: false,
+    // Off by default for every preset; an Admin turns it on per person.
+    RoleManager.viewFinancesKey: false,
     'delete_entry': false,
     'manage_expenses': false,
     'manage_equipment_master': false,

@@ -280,6 +280,21 @@ class ApiService {
     syncOfflineEntries();
     return response;
   }
+  static Future<http.Response> patch(
+    String endpoint,
+    Map<String, dynamic> body,
+  ) async {
+    final headers = await _getHeaders();
+    final url = '$baseUrl$endpoint';
+    debugPrint('API Request [PATCH]: $url');
+    final response = await http
+        .patch(Uri.parse(url), headers: headers, body: jsonEncode(body))
+        .timeout(const Duration(seconds: 90));
+    debugPrint('Status: ${response.statusCode}');
+    _checkUnauthorized(response);
+    return response;
+  }
+
   static Future<http.Response> delete(String endpoint, {Map<String, dynamic>? body}) async {
     final headers = await _getHeaders();
     final url = '$baseUrl$endpoint';
