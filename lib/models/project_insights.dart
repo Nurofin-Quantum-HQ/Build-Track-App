@@ -491,6 +491,14 @@ class SpendBreakdown {
     return out;
   }
 
+  /// The same grouping the lists use (spelling variants merged by key,
+  /// largest first), for splitting one group's [lines] by [nameOf] — e.g. a
+  /// labour type by worker — in drill-down charts. [lines] is not modified.
+  static List<SpendGroup> splitLines(Iterable<SpendLine> lines, String Function(SpendLine) nameOf, String fallback) {
+    final ls = lines.toList();
+    return _group(ls, nameOf, ls.fold(0.0, (s, l) => s + l.amount), fallback);
+  }
+
   /// Items by their own names (key-merged, see [_group]). Items with a user
   /// group in [groups] (nameKey → group name) sit under that group's row as
   /// children; an ungrouped item spelled like a group (key) joins it too, so

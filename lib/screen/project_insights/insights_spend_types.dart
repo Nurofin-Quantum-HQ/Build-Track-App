@@ -8,6 +8,7 @@ import 'package:buildtrack_mobile/controller/role_manager.dart';
 import 'package:buildtrack_mobile/controller/user_session.dart';
 import 'package:buildtrack_mobile/design/design.dart';
 import 'package:buildtrack_mobile/models/project_insights.dart';
+import 'package:buildtrack_mobile/screen/project_insights/insights_charts.dart';
 import 'package:buildtrack_mobile/screen/project_insights/insights_theme.dart';
 import 'package:buildtrack_mobile/screen/project_insights/suggest_groups_sheet.dart';
 import 'package:buildtrack_mobile/screen/project_insights/tidy_names_sheet.dart';
@@ -580,6 +581,22 @@ class _InsSpendByTypeViewState extends State<InsSpendByTypeView> {
       const SizedBox(height: 12),
       _SummaryCard(data: c, color: color, period: _period.label),
       const SizedBox(height: 12),
+      // Top items, from the very same groups the list below shows.
+      if (c.byName.isNotEmpty) ...[
+        InsTopGroupsChart(
+          key: ValueKey('top-${_cat.name}-${_period.name}'),
+          title: switch (_cat) {
+            CostCategory.labour => 'Top labour types',
+            CostCategory.material => 'Top materials',
+            CostCategory.equipment => 'Top equipment',
+          },
+          description: '${_period.label} · tap a bar to open it',
+          groups: c.byName,
+          color: color,
+          onTap: (g) => _open(g, nameTitle.replaceFirst('By ', '')),
+        ),
+        const SizedBox(height: 12),
+      ],
       _GroupsCard(
         title: nameTitle,
         description: nameHint,
@@ -1001,6 +1018,27 @@ class _ChildrenPage extends StatelessWidget {
         children: [
           _GroupHeaderCard(group: parent, category: category),
           const SizedBox(height: 12),
+          InsTopGroupsChart(
+            title: 'Split of ${parent.name}',
+            description: 'What is inside this group · tap a bar to see its entries',
+            groups: parent.children,
+            color: Ins.cat(category),
+            onTap: (c) => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => _GroupEntriesPage(
+                  group: c,
+                  category: category,
+                  scope: parent.name,
+                  period: period,
+                  onRename: onRename,
+                  onRestore: onRestore,
+                  onMenu: onMenu,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
           _GroupsCard(
             title: 'Inside ${parent.name}',
             description: onMenu != null ? 'Tap one to see its entries · long-press to move it' : 'Tap one to see its entries',
@@ -1032,6 +1070,40 @@ class _ChildrenPage extends StatelessWidget {
       ),
     );
   }
+}
+
+// ── Drill-down chart: one group's entries split by its children ────────────
+
+/// Labour type → workers; worker → labour types; material / equipment →
+/// suppliers. Same grouping as the lists (spelling variants merged). Empty
+/// when nothing was recorded to split by.
+List<Widget> _splitChart(SpendGroup g, CostCategory category, String scope) {
+  final byPerson = category == CostCategory.labour && scope == 'Worker / contractor';
+  final String title, description, fallback;
+  final String Function(SpendLine) nameOf;
+  if (byPerson) {
+    title = 'Labour types for ${g.name}';
+    description = 'Spend by type of work';
+    fallback = 'Unnamed';
+    nameOf = (l) => l.name;
+  } else if (category == CostCategory.labour) {
+    title = 'Workers in ${g.name}';
+    description = 'Spend by worker / contractor';
+    fallback = 'Not recorded';
+    nameOf = (l) => l.party;
+  } else {
+    title = 'Suppliers for ${g.name}';
+    description = 'Spend by supplier';
+    fallback = 'No supplier';
+    nameOf = (l) => l.party;
+  }
+  final parts = SpendBreakdown.splitLines(g.lines, nameOf, fallback);
+  // One bucket that is just "not recorded" says nothing — leave it out.
+  if (parts.isEmpty || (parts.length == 1 && parts.first.name == fallback)) return const [];
+  return [
+    InsTopGroupsChart(key: ValueKey('split-${g.name}'), title: title, description: description, groups: parts, color: Ins.cat(category)),
+    const SizedBox(height: 12),
+  ];
 }
 
 // ── Detail of one group: header + entries (like Reports) ────────────────────
@@ -1092,6 +1164,7 @@ class _GroupEntriesPage extends StatelessWidget {
         children: [
           _GroupHeaderCard(group: g, category: category),
           const SizedBox(height: 12),
+          ..._splitChart(g, category, scope),
           InsCard(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 6),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
