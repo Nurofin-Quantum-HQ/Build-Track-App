@@ -1,26 +1,11 @@
 import 'dart:math' as math;
 
 import 'package:buildtrack_mobile/models/project_insights.dart';
+import 'package:buildtrack_mobile/screen/project_insights/insights_charts.dart';
 import 'package:buildtrack_mobile/screen/project_insights/insights_theme.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-
-double _niceStep(double raw) {
-  if (raw <= 0) return 1;
-  final exp = math.pow(10, (math.log(raw) / math.ln10).floor()).toDouble();
-  final f = raw / exp;
-  final nice = f <= 1
-      ? 1
-      : f <= 2
-      ? 2
-      : f <= 2.5
-      ? 2.5
-      : f <= 5
-      ? 5
-      : 10;
-  return nice * exp;
-}
 
 String _monYY(DateTime d) => "${DateFormat('MMM').format(d)} '${(d.year % 100).toString().padLeft(2, '0')}";
 
@@ -72,7 +57,7 @@ class InsSpendCurveCard extends StatelessWidget {
     final maxY =
         [...planned, ...actual, ...fc, FlSpot(0, data.budgetTotal / 1e5)].map((s) => s.y).fold<double>(1, math.max) *
         1.1;
-    final step = _niceStep(maxY / 4);
+    final step = insNiceStep(maxY / 4);
     final behind = last != null && planned.isNotEmpty
         ? () {
             final pv = planned.lastWhere((s) => s.x <= last.x, orElse: () => planned.first).y;
@@ -250,136 +235,6 @@ class InsSpendCurveCard extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-// ═════════════════════════════════════════════════════════════════════════════
-// MONTHLY BURN
-// ═════════════════════════════════════════════════════════════════════════════
-
-class InsMonthlyCard extends StatelessWidget {
-  const InsMonthlyCard({super.key, required this.data, this.height = 200});
-  final ProjectInsights data;
-  final double height;
-
-  @override
-  Widget build(BuildContext context) {
-    final months = data.monthly;
-    if (months.isEmpty) {
-      return InsCard(
-        child: Text('No approved spend yet.', style: Ins.t(14, c: Ins.ink3)),
-      );
-    }
-    final maxY = months.map((m) => m.spend.total / 1e5).fold<double>(1, math.max) * 1.15;
-    final step = _niceStep(maxY / 4);
-    final avg = months.length >= 3
-        ? months.sublist(months.length - 3).fold<double>(0, (s, m) => s + m.spend.total) / 3
-        : null;
-    return InsCard(
-      padding: const EdgeInsets.fromLTRB(16, 16, 12, 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          InsCardHeader(
-            title: 'Monthly spend',
-            description: avg == null ? 'Approved spend by month' : 'Last 3 months average ${inrCompact(avg)} / month',
-          ),
-          Wrap(
-            spacing: 14,
-            children: [for (final c in CostCategory.values) InsSwatch(color: Ins.cat(c), label: c.label)],
-          ),
-          const SizedBox(height: 14),
-          SizedBox(
-            height: height,
-            child: BarChart(
-              BarChartData(
-                maxY: maxY,
-                alignment: BarChartAlignment.spaceAround,
-                gridData: FlGridData(
-                  drawVerticalLine: false,
-                  horizontalInterval: step,
-                  getDrawingHorizontalLine: (_) => const FlLine(color: Ins.border, strokeWidth: 1),
-                ),
-                borderData: FlBorderData(show: false),
-                titlesData: FlTitlesData(
-                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  leftTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      reservedSize: 46,
-                      interval: step,
-                      getTitlesWidget: (v, m) => v == m.max
-                          ? const SizedBox.shrink()
-                          : Text(inrCompact(v * 1e5), style: Ins.t(11, c: Ins.ink3)),
-                    ),
-                  ),
-                  bottomTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      reservedSize: 24,
-                      getTitlesWidget: (v, m) {
-                        final i = v.toInt();
-                        if (i < 0 || i >= months.length) return const SizedBox.shrink();
-                        return SideTitleWidget(
-                          axisSide: m.axisSide,
-                          child: Text(DateFormat('MMM').format(months[i].month), style: Ins.t(11, c: Ins.ink3)),
-                        );
-                      },
-                    ),
-                  ),
-                ),
-                barTouchData: BarTouchData(
-                  touchTooltipData: BarTouchTooltipData(
-                    getTooltipColor: (_) => Ins.ink,
-                    tooltipRoundedRadius: 8,
-                    fitInsideHorizontally: true,
-                    fitInsideVertically: true,
-                    getTooltipItem: (g, _, _, _) {
-                      final m = months[g.x];
-                      return BarTooltipItem(
-                        '${_monYY(m.month)} · ${inrCompact(m.spend.total)}\n',
-                        Ins.t(12.5, c: Colors.white, w: FontWeight.w600),
-                        children: [
-                          for (final c in CostCategory.values)
-                            TextSpan(
-                              text: '${c.label} ${inrCompact(m.spend.of(c))}${c == CostCategory.equipment ? '' : '\n'}',
-                              style: Ins.t(11.5, c: const Color(0xFFCBD5E1)),
-                            ),
-                        ],
-                      );
-                    },
-                  ),
-                ),
-                barGroups: [
-                  for (var i = 0; i < months.length; i++)
-                    BarChartGroupData(x: i, barRods: [_rod(months[i].spend, maxY)]),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  BarChartRodData _rod(Buckets b, double maxY) {
-    final gap = maxY * 0.006; // ≈2px surface gap between stacked segments
-    final items = <BarChartRodStackItem>[];
-    double y = 0;
-    for (final c in CostCategory.values) {
-      final v = b.of(c) / 1e5;
-      if (v <= 0) continue;
-      items.add(BarChartRodStackItem(y, y + v, Ins.cat(c)));
-      y += v + gap;
-    }
-    return BarChartRodData(
-      toY: y,
-      width: 16,
-      rodStackItems: items,
-      color: Colors.transparent,
-      borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
     );
   }
 }

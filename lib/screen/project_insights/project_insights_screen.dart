@@ -1,4 +1,5 @@
 import 'package:buildtrack_mobile/models/project_insights.dart';
+import 'package:buildtrack_mobile/screen/project_insights/insights_charts.dart';
 import 'package:buildtrack_mobile/screen/project_insights/insights_money.dart';
 import 'package:buildtrack_mobile/screen/project_insights/insights_overview.dart';
 import 'package:buildtrack_mobile/screen/project_insights/insights_phases.dart';
@@ -185,7 +186,7 @@ class _ProjectInsightsScreenState extends State<ProjectInsightsScreen> {
       // Money
       [
         InsSpendCurveCard(data: d),
-        InsMonthlyCard(data: d),
+        InsMonthlyStackedCard(data: d),
         InsMixCard(data: d),
         InsCashCard(data: d),
         InsSuppliersCard(suppliers: d.suppliers),
