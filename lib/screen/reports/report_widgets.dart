@@ -455,6 +455,7 @@ class ProjectSelector extends StatelessWidget {
     final realProjects = projectProvider.projects;
     showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: btSheetStyleDefault(context),
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),

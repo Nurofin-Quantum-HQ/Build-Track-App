@@ -194,6 +194,8 @@ class MyApp extends StatelessWidget {
       title: 'BuildTrack',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.build(themeProvider.btTheme),
+      // Motion setting (Profile -> Motion) is read by every animation helper.
+      builder: (context, child) => BtMotionScope(notifier: BtMotion.instance, child: child ?? const SizedBox.shrink()),
       initialRoute: isLoggedIn ? '/home' : '/',
       onGenerateInitialRoutes: (initialRouteName) {
         debugPrint('Navigation Started');

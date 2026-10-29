@@ -1245,7 +1245,8 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
     final savedTotal = _totalCost();
     await showBtSuccess(
       context,
-      kind: BtSuccessKind.check,
+      // Hard hat for a new labour entry; an edit is a plain check.
+      kind: _isEditing ? BtSuccessKind.check : BtSuccessKind.labour,
       label: _isEditing
           ? 'Entry updated'
           : RoleManager.isAdmin
@@ -1571,6 +1572,7 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
   void _showRecentEntriesSheet() {
     showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: btSheetStyleDefault(context),
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       barrierColor: Bt.scrim,

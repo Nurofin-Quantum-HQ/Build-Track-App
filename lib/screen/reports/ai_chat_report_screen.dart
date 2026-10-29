@@ -463,6 +463,7 @@ class _ResultsStateState extends State<_ResultsState> {
     List<String> tempAll = List.from(widget.result.columns);
     showModalBottomSheet(
       context: context,
+      sheetAnimationStyle: btSheetStyleDefault(context),
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: Bt.card,

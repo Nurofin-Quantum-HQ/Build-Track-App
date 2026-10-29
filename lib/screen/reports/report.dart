@@ -657,6 +657,7 @@ class _ReportsViewState extends State<_ReportsView> {
     void syncActive() => tempActive = [for (final c in tempAll) if (tempActive.contains(c)) c];
     showModalBottomSheet(
       context: context,
+      sheetAnimationStyle: btSheetStyleDefault(context),
       isScrollControlled: true,
       useSafeArea: true,
       // Dragging a row must not drag the sheet closed.

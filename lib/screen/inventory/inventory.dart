@@ -463,6 +463,7 @@ class _InventoryScreenContentState extends State<_InventoryScreenContent> {
     final idMap = <String, String?>{for (final p in projects) p.name: p.id};
     showModalBottomSheet<void>(
       context: ctx,
+      sheetAnimationStyle: btSheetStyleDefault(ctx),
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (sheetCtx) => _ProjectSelectorSheet(
@@ -1806,6 +1807,7 @@ class _FiltersRow extends StatelessWidget {
               onTap: () {
                 showModalBottomSheet<void>(
                   context: context,
+                  sheetAnimationStyle: btSheetStyleDefault(context),
                   isScrollControlled: true,
                   backgroundColor: Colors.transparent,
                   builder: (ctx) => _DateRangeSheet(

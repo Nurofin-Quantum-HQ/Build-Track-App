@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'bt_components.dart';
+import 'bt_motion.dart';
+import 'bt_success_scenes.dart';
 import 'bt_text.dart';
 import 'bt_theme.dart';
 
@@ -82,14 +84,15 @@ class _HeroGlow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final a = context.bt.accent;
-    final reduce = Bt.reduceMotion(context);
+    final level = BtMotion.of(context);
+    final full = level == BtMotionLevel.full;
     return IgnorePointer(
       child: RepaintBoundary(
         child: TweenAnimationBuilder<double>(
-          tween: Tween(begin: reduce ? 1 : 0, end: 1),
-          duration: const Duration(milliseconds: 1600),
+          tween: Tween(begin: level == BtMotionLevel.off ? 1 : 0, end: 1),
+          duration: full ? const Duration(milliseconds: 1600) : (level == BtMotionLevel.off ? Duration.zero : const Duration(milliseconds: 400)),
           curve: Bt.ease,
-          builder: (_, t, child) => Opacity(opacity: t, child: Transform.scale(scale: .85 + .15 * t, child: child)),
+          builder: (_, t, child) => Opacity(opacity: t, child: full ? Transform.scale(scale: .85 + .15 * t, child: child) : child),
           child: Container(
             width: 320,
             height: 320,
@@ -214,8 +217,15 @@ class _BtRevealState extends State<BtReveal> with SingleTickerProviderStateMixin
     super.didChangeDependencies();
     if (_started) return;
     _started = true;
-    if (Bt.reduceMotion(context)) {
+    final level = BtMotion.of(context);
+    if (level == BtMotionLevel.off) {
       _c.value = 1;
+      return;
+    }
+    if (level == BtMotionLevel.reduced) {
+      // fade only: no stagger, no rise
+      _c.duration = BtMotion.fadeReduced;
+      _c.forward();
       return;
     }
     final delay = Duration(milliseconds: 60 * widget.index.clamp(0, 10));
@@ -236,6 +246,7 @@ class _BtRevealState extends State<BtReveal> with SingleTickerProviderStateMixin
 
   @override
   Widget build(BuildContext context) {
+    final rise = BtMotion.isFull(context) ? widget.distance : 0.0;
     return AnimatedBuilder(
       animation: _t,
       child: widget.child,
@@ -243,7 +254,7 @@ class _BtRevealState extends State<BtReveal> with SingleTickerProviderStateMixin
         // Keep the same widget structure for the whole animation (and after),
         // so stateful children (text fields, controllers) are never remounted.
         final v = _t.value.clamp(0.0, 1.0);
-        return Opacity(opacity: v, child: Transform.translate(offset: Offset(0, widget.distance * (1 - v)), child: child));
+        return Opacity(opacity: v, child: Transform.translate(offset: Offset(0, rise * (1 - v)), child: child));
       },
     );
   }
@@ -542,7 +553,10 @@ class _BtBrickLoaderState extends State<BtBrickLoader> with SingleTickerProvider
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (Bt.reduceMotion(context)) {
+    // Full: bricks lay in and out. Reduced: the finished wall breathes (a
+    // fade, so a loading screen still reads as busy). Off: a still wall.
+    if (BtMotion.isOff(context)) {
+      _c.stop();
       _c.value = .5;
     } else if (!_c.isAnimating) {
       _c.repeat();
@@ -564,6 +578,8 @@ class _BtBrickLoaderState extends State<BtBrickLoader> with SingleTickerProvider
   @override
   Widget build(BuildContext context) {
     final color = context.bt.accent;
+    final fullMotion = BtMotion.isFull(context);
+    final off = BtMotion.isOff(context);
     final loader = RepaintBoundary(
       child: SizedBox(
         width: 40 * widget.scale,
@@ -575,7 +591,10 @@ class _BtBrickLoaderState extends State<BtBrickLoader> with SingleTickerProvider
               Builder(builder: (_) {
                 final local = (_c.value - i * .055).clamp(0.0, 1.0);
                 double o, dy;
-                if (local < .18) {
+                if (!fullMotion) {
+                  o = off ? 1 : .45 + .55 * (.5 - .5 * math.cos(_c.value * 2 * math.pi));
+                  dy = 0;
+                } else if (local < .18) {
                   final t = Bt.ease.transform(local / .18);
                   o = t;
                   dy = -22 * (1 - t);
@@ -620,19 +639,31 @@ class BtPageLoader extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────── success moments
 
 enum BtSuccessKind {
-  /// Cement bags drop and stack (material / labour / equipment / daily update saved).
+  /// Cement bags drop and stack (new material entry saved).
   bags,
 
   /// Notes slide into a wallet (payment recorded, money in).
   money,
 
+  /// Hard hat drops onto a tick (new labour entry saved).
+  labour,
+
+  /// Tower crane lowers a steel bundle onto a slab, then a tick (new equipment entry saved).
+  equipment,
+
+  /// Floors stack up into a building, then a tick (daily progress / task done).
+  progress,
+
   /// Check draws in a ring (anything else: approved, sent, signed).
   check,
 }
 
-/// Full-screen noir celebration. Auto-closes after [autoClose] (or on tap of
-/// the button) and then returns — so callers can `await` it and continue
-/// their existing flow (pop, refresh) unchanged.
+/// Full-screen noir celebration. Auto-closes after [autoClose] (or when the
+/// user taps anywhere / the button) and then returns — so callers can `await`
+/// it and continue their existing flow (pop, refresh) unchanged.
+///
+/// Honours the Motion setting: Full plays the scene for [kind]; Reduced and
+/// Off show a static tick with a quick fade and close sooner.
 Future<void> showBtSuccess(
   BuildContext context, {
   required BtSuccessKind kind,
@@ -640,17 +671,28 @@ Future<void> showBtSuccess(
   String? message,
   String? label,
   String doneLabel = 'Done',
-  Duration autoClose = const Duration(milliseconds: 2600),
+  Duration? autoClose,
 }) {
+  final level = BtMotion.peek(context);
+  final full = level == BtMotionLevel.full;
+  final close = autoClose ?? (full ? Duration(milliseconds: math.max(2600, _sceneMs(kind) + 800)) : const Duration(milliseconds: 1400));
   return Navigator.of(context, rootNavigator: true).push(PageRouteBuilder<void>(
     opaque: false,
     barrierDismissible: false,
-    transitionDuration: const Duration(milliseconds: 380),
-    reverseTransitionDuration: const Duration(milliseconds: 260),
-    pageBuilder: (ctx, _, _) => _BtSuccessPage(kind: kind, title: title, message: message, label: label, doneLabel: doneLabel, autoClose: autoClose),
+    transitionDuration: Duration(milliseconds: full ? 380 : (level == BtMotionLevel.reduced ? 160 : 100)),
+    reverseTransitionDuration: Duration(milliseconds: full ? 260 : (level == BtMotionLevel.reduced ? 140 : 100)),
+    pageBuilder: (ctx, _, _) => _BtSuccessPage(kind: kind, title: title, message: message, label: label, doneLabel: doneLabel, autoClose: close),
     transitionsBuilder: (_, a, _, child) => FadeTransition(opacity: CurvedAnimation(parent: a, curve: Curves.easeOut), child: child),
   ));
 }
+
+/// Length of each scene's animation.
+int _sceneMs(BtSuccessKind k) => switch (k) {
+      BtSuccessKind.labour => 1800,
+      BtSuccessKind.equipment => 2200,
+      BtSuccessKind.progress => 2000,
+      _ => 1900,
+    };
 
 class _BtSuccessPage extends StatefulWidget {
   const _BtSuccessPage({required this.kind, required this.title, this.message, this.label, required this.doneLabel, required this.autoClose});
@@ -665,7 +707,7 @@ class _BtSuccessPage extends StatefulWidget {
 }
 
 class _BtSuccessPageState extends State<_BtSuccessPage> with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 1900));
+  late final AnimationController _c = AnimationController(vsync: this, duration: Duration(milliseconds: _sceneMs(widget.kind)));
   bool _closed = false;
 
   @override
@@ -679,7 +721,7 @@ class _BtSuccessPageState extends State<_BtSuccessPage> with SingleTickerProvide
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (Bt.reduceMotion(context)) {
-      _c.value = 1;
+      _c.value = 1; // static tick, no scene
     } else if (_c.value == 0) {
       _c.forward();
     }
@@ -702,9 +744,14 @@ class _BtSuccessPageState extends State<_BtSuccessPage> with SingleTickerProvide
   @override
   Widget build(BuildContext context) {
     final bt = context.bt;
+    final full = BtMotion.isFull(context);
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
-      child: Material(
+      // Tap anywhere to skip (the Done button still works on its own).
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: _close,
+        child: Material(
         color: Bt.noir,
         child: Stack(children: [
           const Positioned.fill(child: RepaintBoundary(child: CustomPaint(painter: _BlueprintGrid()))),
@@ -720,11 +767,16 @@ class _BtSuccessPageState extends State<_BtSuccessPage> with SingleTickerProvide
                     width: 280,
                     child: AnimatedBuilder(
                       animation: _c,
-                      builder: (_, _) => switch (widget.kind) {
-                        BtSuccessKind.bags => _bags(bt),
-                        BtSuccessKind.money => _money(bt),
-                        BtSuccessKind.check => _check(bt),
-                      },
+                      builder: (_, _) => !full
+                          ? _staticCheck()
+                          : switch (widget.kind) {
+                              BtSuccessKind.bags => _bags(bt),
+                              BtSuccessKind.money => _money(bt),
+                              BtSuccessKind.labour => _scene(BtHatPainter(_c.value, bt.accent)),
+                              BtSuccessKind.equipment => _scene(BtCranePainter(_c.value, bt.accent)),
+                              BtSuccessKind.progress => _scene(BtFloorsPainter(_c.value, bt.accent)),
+                              BtSuccessKind.check => _check(bt),
+                            },
                     ),
                   ),
                 ),
@@ -733,7 +785,7 @@ class _BtSuccessPageState extends State<_BtSuccessPage> with SingleTickerProvide
                   animation: _c,
                   builder: (_, child) {
                     final t = _iv(.45, .85);
-                    return Opacity(opacity: t, child: Transform.translate(offset: Offset(0, 16 * (1 - t)), child: child));
+                    return Opacity(opacity: t, child: Transform.translate(offset: Offset(0, (full ? 16 : 0) * (1 - t)), child: child));
                   },
                   child: Column(children: [
                     if (widget.label != null) Text(widget.label!.toUpperCase(), style: BtText.mono(context, color: bt.accent)),
@@ -751,9 +803,15 @@ class _BtSuccessPageState extends State<_BtSuccessPage> with SingleTickerProvide
             ),
           ),
         ]),
+        ),
       ),
     );
   }
+
+  Widget _scene(CustomPainter painter) => CustomPaint(size: kBtSceneSize, painter: painter);
+
+  // Reduced / Off: the tick, already drawn (the route fade is its only motion).
+  Widget _staticCheck() => const Center(child: SizedBox(width: 120, height: 120, child: _CheckBadge(progress: 1, size: 120)));
 
   // Six bags drop and stack; a check pops on top.
   Widget _bags(BtTheme bt) {
@@ -767,7 +825,7 @@ class _BtSuccessPageState extends State<_BtSuccessPage> with SingleTickerProvide
       for (var i = 0; i < slots.length; i++)
         Builder(builder: (_) {
           final start = .05 + i * .085;
-          final t = _iv(start, start + .32, const _DropCurve());
+          final t = _iv(start, start + .32, const BtDropCurve());
           return Positioned(
             left: slots[i][0],
             bottom: 1 + slots[i][1] + 240 * (1 - t),
@@ -837,17 +895,6 @@ class _BtSuccessPageState extends State<_BtSuccessPage> with SingleTickerProvide
         child: SizedBox(width: 120, height: 120, child: _CheckBadge(progress: _iv(.3, .6), size: 120)),
       ),
     );
-  }
-}
-
-class _DropCurve extends Curve {
-  const _DropCurve();
-  @override
-  double transformInternal(double t) {
-    // fall, small bounce, settle
-    if (t < .55) return Curves.easeIn.transform(t / .55) * 1.04;
-    if (t < .75) return 1.04 - .06 * Curves.easeOut.transform((t - .55) / .2);
-    return .98 + .02 * Curves.easeOut.transform((t - .75) / .25);
   }
 }
 

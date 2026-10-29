@@ -382,7 +382,7 @@ class _ApprovalsPaneState extends State<ApprovalsPane> {
       backgroundColor: Bt.card,
       barrierColor: Bt.scrim,
       useSafeArea: true,
-      sheetAnimationStyle: const AnimationStyle(duration: Duration(milliseconds: 460), curve: Bt.ease, reverseDuration: Duration(milliseconds: 240)),
+      sheetAnimationStyle: btSheetStyle(context, ms: 460, reverseMs: 240),
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(Bt.rSheet))),
       builder: (ctx) => SafeArea(
         top: false,

@@ -154,6 +154,7 @@ class CsvTemplate {
     if (!context.mounted) return null;
     final result = await showModalBottomSheet<({List<String> order, Set<String> hidden})>(
       context: context,
+      sheetAnimationStyle: btSheetStyleDefault(context),
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       barrierColor: Bt.scrim,

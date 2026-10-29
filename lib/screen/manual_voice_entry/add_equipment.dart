@@ -1319,7 +1319,8 @@ class _AddEquipmentScreenState extends State<AddEquipmentScreen> {
     final savedTotal = _finalTotal();
     await showBtSuccess(
       context,
-      kind: BtSuccessKind.check,
+      // Crane for a new equipment entry; an edit is a plain check.
+      kind: _isEditing ? BtSuccessKind.check : BtSuccessKind.equipment,
       label: _isEditing
           ? 'Entry updated'
           : RoleManager.isAdmin
@@ -1368,6 +1369,7 @@ class _AddEquipmentScreenState extends State<AddEquipmentScreen> {
   void _showRecentEntriesSheet() {
     showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: btSheetStyleDefault(context),
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       barrierColor: Bt.scrim,

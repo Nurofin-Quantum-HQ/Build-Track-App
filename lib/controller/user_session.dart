@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:buildtrack_mobile/common/themes/app_colors.dart';
 import 'package:buildtrack_mobile/services/api_service.dart';
+import 'package:buildtrack_mobile/design/bt_motion.dart';
 enum UserRole { admin, supervisor, mason }
 class UserSession extends ChangeNotifier {
   static final UserSession _instance = UserSession._();
@@ -211,6 +212,7 @@ class UserSession extends ChangeNotifier {
     final newUserId = (user['id'] ?? user['_id'])?.toString() ?? '';
     final sameUser = newUserId.isNotEmpty && newUserId == _userId;
     _userId = newUserId;
+    await BtMotion.instance.loadFor(newUserId); // per-user Motion setting
     final rawRoleStr = user['role']?.toString() ?? '';
     
     // Sync themePreference from backend
@@ -337,6 +339,7 @@ class UserSession extends ChangeNotifier {
       }
       final data = json.decode(raw) as Map<String, dynamic>;
       _userId = data['id']?.toString() ?? '';
+      await BtMotion.instance.loadFor(_userId);
       _profilePhoto = data['profilePhoto']?.toString();
       _companyName = data['companyName']?.toString() ?? '';
       _companyFontStyle = data['companyFontStyle']?.toString() ?? 'Inter';
@@ -421,6 +424,11 @@ class UserSession extends ChangeNotifier {
       for (final key in allKeys)
         if (key.startsWith('app_tour_prompted_') && prefs.getBool(key) == true) key,
     ];
+    // Motion setting is per user and local-only: keep it for their next login.
+    final motionPrefs = <String, String>{
+      for (final key in allKeys)
+        if (BtMotion.isPrefsKey(key) && prefs.getString(key) != null) key: prefs.getString(key)!,
+    };
     // Unsynced offline entries belong to the user who made them (each item
     // carries its userId) — keep them so they sync on that user's next login.
     final offlineQueue = prefs.getString('offline_post_queue');
@@ -430,6 +438,10 @@ class UserSession extends ChangeNotifier {
     for (final key in tourPrompted) {
       await prefs.setBool(key, true);
     }
+    for (final e in motionPrefs.entries) {
+      await prefs.setString(e.key, e.value);
+    }
+    BtMotion.instance.reset();
     if (offlineQueue != null && offlineQueue != '[]') {
       await prefs.setString('offline_post_queue', offlineQueue);
     }

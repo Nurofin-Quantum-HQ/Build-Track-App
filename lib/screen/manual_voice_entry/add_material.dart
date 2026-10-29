@@ -1294,6 +1294,7 @@ class _AddMaterialScreenState extends State<AddMaterialScreen> {
   void _showRecentEntriesSheet() {
     showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: btSheetStyleDefault(context),
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       barrierColor: Bt.scrim,

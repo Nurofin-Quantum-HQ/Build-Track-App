@@ -207,6 +207,7 @@ class _InsSpendByTypeViewState extends State<InsSpendByTypeView> {
       final renameTarget = g.children.length == 1 ? g.children.first : g;
       final action = await showModalBottomSheet<String>(
         context: pageCtx,
+        sheetAnimationStyle: btSheetStyleDefault(pageCtx),
         backgroundColor: Colors.white,
         showDragHandle: true,
         builder: (sheetCtx) => SafeArea(
@@ -283,6 +284,7 @@ class _InsSpendByTypeViewState extends State<InsSpendByTypeView> {
     const newGroup = '\u0000new';
     final picked = await showModalBottomSheet<String>(
       context: ctx,
+      sheetAnimationStyle: btSheetStyleDefault(ctx),
       backgroundColor: Colors.white,
       showDragHandle: true,
       isScrollControlled: true,
@@ -451,6 +453,7 @@ class _InsSpendByTypeViewState extends State<InsSpendByTypeView> {
     final canTidy = RoleManager.isAdmin;
     final action = await showModalBottomSheet<String>(
       context: context,
+      sheetAnimationStyle: btSheetStyleDefault(context),
       backgroundColor: Colors.white,
       showDragHandle: true,
       builder: (sheetCtx) => SafeArea(

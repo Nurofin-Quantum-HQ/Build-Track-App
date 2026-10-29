@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:buildtrack_mobile/common/themes/app_colors.dart';
 import 'package:buildtrack_mobile/common/themes/app_theme.dart';
 import 'package:buildtrack_mobile/common/widgets/subscription_card.dart';
@@ -14,6 +13,7 @@ import 'package:buildtrack_mobile/services/auth_service.dart';
 import 'package:provider/provider.dart';
 import 'package:buildtrack_mobile/controller/theme_provider.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:buildtrack_mobile/design/design.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
@@ -607,6 +607,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         showChevron: true,
         onTap: () => _showAppearance(context),
       ),
+      const _MotionRow(),
       BtRow(
         leading: const BtTile(icon: Icons.notifications_outlined, size: 34),
         title: 'Notifications',
@@ -732,6 +733,56 @@ class _ErrorBanner extends StatelessWidget {
 }
 
 
+
+/// Settings row: Motion  Full / Reduced / Off (saved per user on this device).
+class _MotionRow extends StatelessWidget {
+  const _MotionRow();
+
+  static const _hints = {
+    BtMotionLevel.full: 'Everything animates, including the save celebrations.',
+    BtMotionLevel.reduced: 'Gentle fades only. No sliding, counting or looping.',
+    BtMotionLevel.off: 'Nothing moves. Changes appear instantly.',
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: BtMotion.instance,
+      builder: (context, _) {
+        final level = BtMotion.instance.level;
+        final osLimited = BtMotion.osLimited(context);
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              const BtTile(icon: Icons.animation_rounded, size: 34),
+              const SizedBox(width: 12),
+              Expanded(child: Text('Motion', style: BtText.body(context, weight: FontWeight.w500))),
+            ]),
+            const SizedBox(height: 12),
+            BtSegmented<BtMotionLevel>(
+              value: level,
+              onChanged: (v) {
+                HapticFeedback.selectionClick();
+                BtMotion.instance.set(v);
+              },
+              segments: const {
+                BtMotionLevel.full: 'Full',
+                BtMotionLevel.reduced: 'Reduced',
+                BtMotionLevel.off: 'Off',
+              },
+            ),
+            const SizedBox(height: 8),
+            Text(
+              osLimited ? 'Your phone\'s Reduce Motion setting is on, so the app stays at Reduced.' : _hints[level]!,
+              style: BtText.caption(context, color: Bt.ink3),
+            ),
+          ]),
+        );
+      },
+    );
+  }
+}
 
 class _ThemePicker extends StatelessWidget {
   const _ThemePicker();

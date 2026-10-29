@@ -339,6 +339,7 @@ class UnitSelectorField extends StatelessWidget {
   void _showUnitSheet(BuildContext context) {
     showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: btSheetStyleDefault(context),
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => _UnitPickerSheet(
@@ -1211,6 +1212,7 @@ Future<Map<String, dynamic>?> showPaymentSheet(
   ];
   return showModalBottomSheet<Map<String, dynamic>>(
     context: context,
+    sheetAnimationStyle: btSheetStyleDefault(context),
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     barrierColor: Bt.scrim,

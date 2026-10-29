@@ -13,7 +13,7 @@ Future<void> showLogSheet(BuildContext context) {
     useSafeArea: true,
     backgroundColor: Bt.card,
     barrierColor: Bt.scrim,
-    sheetAnimationStyle: const AnimationStyle(duration: Duration(milliseconds: 520), curve: Bt.ease, reverseDuration: Duration(milliseconds: 260)),
+    sheetAnimationStyle: btSheetStyle(context),
     shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(Bt.rSheet))),
     builder: (ctx) => SafeArea(top: false, child: _LogSheet(parentContext: context)),
   );

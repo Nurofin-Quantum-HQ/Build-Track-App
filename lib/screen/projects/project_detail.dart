@@ -886,6 +886,7 @@ class _TrackerActivityRowState extends State<_TrackerActivityRow> {
     );
     showModalBottomSheet(
       context: context,
+      sheetAnimationStyle: btSheetStyleDefault(context),
       isScrollControlled: true,
       backgroundColor: Bt.ground,
       barrierColor: Bt.scrim,
@@ -1370,6 +1371,7 @@ class _TrackerActivityRowState extends State<_TrackerActivityRow> {
   void _showActivityDetails(BuildContext context) {
     showModalBottomSheet(
       context: context,
+      sheetAnimationStyle: btSheetStyleDefault(context),
       isScrollControlled: true,
       backgroundColor: Bt.ground,
       barrierColor: Bt.scrim,

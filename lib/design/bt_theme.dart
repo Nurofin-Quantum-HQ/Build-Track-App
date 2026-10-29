@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'bt_motion.dart';
 
 /// Neutral tokens — "Blueprint Noir" (Design V2). Identical in every theme;
 /// only the accent changes with the user's App Theme colour.
@@ -73,9 +74,11 @@ class Bt {
   static const medium = Duration(milliseconds: 450);
   static const slow = Duration(milliseconds: 800);
 
-  /// True when the OS asks for reduced motion — every looping/entrance
-  /// animation checks this and renders its final state instead.
-  static bool reduceMotion(BuildContext context) => MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+  /// True when motion is limited (user chose Reduced/Off in Profile -> Motion,
+  /// or the OS asks for reduced motion). Every looping / entrance / count-up
+  /// animation checks this and renders its final state instead. Use
+  /// [BtMotion.of] when Reduced (fades) and Off (instant) must differ.
+  static bool reduceMotion(BuildContext context) => BtMotion.of(context) != BtMotionLevel.full;
 }
 
 /// The colours offered in Appearance. `custom` = the colour picker
