@@ -13,10 +13,9 @@ import 'package:intl/intl.dart';
 // ═════════════════════════════════════════════════════════════════════════════
 
 /// One place for chart motion: bars grow in over ~700ms with the app's expo-out
-/// curve, and not at all when the system asks for reduced motion. Wire a
-/// settings toggle here (and only here) when one exists.
+/// curve, and not at all unless the Motion setting is Full.
 Duration insChartDuration(BuildContext context) =>
-    MediaQuery.maybeDisableAnimationsOf(context) == true ? Duration.zero : const Duration(milliseconds: 700);
+    Bt.reduceMotion(context) ? Duration.zero : const Duration(milliseconds: 700);
 
 const Curve insChartCurve = Bt.ease;
 
