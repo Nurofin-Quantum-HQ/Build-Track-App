@@ -7,6 +7,9 @@ import 'package:buildtrack_mobile/common/widgets/common_widgets.dart';
 import 'package:buildtrack_mobile/controller/project_provider.dart';
 import 'package:buildtrack_mobile/controller/entry_permissions.dart';
 import 'package:buildtrack_mobile/controller/report_provider.dart';
+import 'package:buildtrack_mobile/controller/role_manager.dart';
+import 'package:buildtrack_mobile/screen/reports/report_ledger_data.dart';
+import 'package:buildtrack_mobile/screen/reports/report_ledger_view.dart';
 import 'package:buildtrack_mobile/models/project_model.dart';
 import 'package:buildtrack_mobile/screen/reports/report_export_helper.dart';
 import 'package:buildtrack_mobile/screen/reports/csv_import_helper.dart';
@@ -200,6 +203,13 @@ class _ReportsViewState extends State<_ReportsView> {
   final _kByTypeToggle = GlobalKey();
   final _kCsvRevert = GlobalKey();
   final ScrollController _scrollController = ScrollController();
+
+  /// Spending (the entries report, null) or a money view for people allowed
+  /// to see finances (View finances / Admin).
+  LedgerDirection? _ledgerView;
+  /// The server refused the ledger (403): hide the Money segments.
+  bool _financeHidden = false;
+  final GlobalKey<LedgerPanelState> _ledgerKey = GlobalKey<LedgerPanelState>();
 
   bool _linked = false;
   String _selectedProjectId = ReportFilterState.selectedProjectId;
@@ -1531,6 +1541,8 @@ class _ReportsViewState extends State<_ReportsView> {
     final String? pinnedCol = activeCols.isEmpty ? null : activeCols.first;
     void onPinColumn(String column) => _pinColumn(quickCategoryTab, column);
     final bt = context.bt;
+    final canFinance = RoleManager.canViewFinances && !_financeHidden;
+    final ledgerOn = canFinance && _ledgerView != null;
     final entriesTitle = quickCategoryTab == 'All' || quickCategoryTab.isEmpty
         ? 'Entries'
         : '$quickCategoryTab entries';
@@ -1757,7 +1769,13 @@ class _ReportsViewState extends State<_ReportsView> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      '$totalCount ${totalCount == 1 ? 'ENTRY' : 'ENTRIES'} · ${periodChip.toUpperCase()}',
+                      ledgerOn
+                          ? '${switch (_ledgerView!) {
+                              LedgerDirection.inbound => 'MONEY IN',
+                              LedgerDirection.outbound => 'MONEY OUT',
+                              LedgerDirection.all => 'MONEY IN AND OUT',
+                            }} · ${periodChip.toUpperCase()}'
+                          : '$totalCount ${totalCount == 1 ? 'ENTRY' : 'ENTRIES'} · ${periodChip.toUpperCase()}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: BtText.num(BtText.mono(context, color: Bt.onNoir2)),
@@ -1792,7 +1810,7 @@ class _ReportsViewState extends State<_ReportsView> {
                   color: Bt.bone,
                   size: 20,
                   background: glass,
-                  onTap: openExport,
+                  onTap: ledgerOn ? () => _ledgerKey.currentState?.openExport() : openExport,
                 ),
                 radius: 22,
               ),
@@ -1847,8 +1865,8 @@ class _ReportsViewState extends State<_ReportsView> {
                   ),
                   radius: Bt.rChip,
                 ),
-                const SizedBox(width: 8),
-                _tour(
+                if (!ledgerOn) const SizedBox(width: 8),
+                if (!ledgerOn) _tour(
                   ShowcaseKeys.reportFilters,
                   'More filters',
                   'Every filter in one place, including payment status (paid, partial, not paid). The number shows when a payment filter is on.',
@@ -1864,7 +1882,7 @@ class _ReportsViewState extends State<_ReportsView> {
               ],
             ),
           ),
-          if (showWhere) ...[
+          if (showWhere && !ledgerOn) ...[
           const SizedBox(height: 8),
           _tour(
             _kWhere,
@@ -1985,14 +2003,16 @@ class _ReportsViewState extends State<_ReportsView> {
           // toolbar and summary so it is fully visible without scrolling.
           // 297 = header + tabs + toolbar + summary; +44 = the floor / phase /
           // activity chip row.
-          final chromeAbove = topInset + 297 + (showWhere ? 44 : 0) + (searchVisible ? 54 : 0);
+          final chromeAbove = topInset + 297 + (showWhere ? 44 : 0) + (searchVisible ? 54 : 0) + (canFinance ? 56 : 0);
           const chromeBelow = ReportSheet.footerHeight + 60;
           final sheetMax = (viewport.maxHeight - chromeAbove - chromeBelow).clamp(260.0, 900.0);
           return RefreshIndicator(
             color: Bt.noir,
             backgroundColor: bt.accent,
             edgeOffset: topInset,
-            onRefresh: () => ReportFilterState.reloadEntries(context),
+            onRefresh: () => ledgerOn
+                ? (_ledgerKey.currentState?.refresh() ?? Future.value())
+                : ReportFilterState.reloadEntries(context),
             child: ListView(
               controller: _scrollController,
               physics: const AlwaysScrollableScrollPhysics(parent: ClampingScrollPhysics()),
@@ -2005,6 +2025,44 @@ class _ReportsViewState extends State<_ReportsView> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      if (canFinance) ...[
+                        BtSegmented<int>(
+                          segments: const {0: 'Spending', 1: 'Money in', 2: 'Money out', 3: 'All'},
+                          value: switch (_ledgerView) {
+                            null => 0,
+                            LedgerDirection.inbound => 1,
+                            LedgerDirection.outbound => 2,
+                            LedgerDirection.all => 3,
+                          },
+                          onChanged: (v) => setState(() {
+                            _ledgerView = switch (v) {
+                              1 => LedgerDirection.inbound,
+                              2 => LedgerDirection.outbound,
+                              3 => LedgerDirection.all,
+                              _ => null,
+                            };
+                          }),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+                      if (ledgerOn)
+                        LedgerPanel(
+                          key: _ledgerKey,
+                          direction: _ledgerView!,
+                          projectId: _selectedProjectId,
+                          projectLabel: projectName,
+                          periodLabel: periodChip,
+                          from: _startDate,
+                          to: _endDate,
+                          onForbidden: () => WidgetsBinding.instance.addPostFrameCallback((_) {
+                            if (!mounted) return;
+                            setState(() {
+                              _financeHidden = true;
+                              _ledgerView = null;
+                            });
+                          }),
+                        )
+                      else ...[
                       _tour(
                         _kTabs,
                         'Entry types',
@@ -2146,6 +2204,7 @@ class _ReportsViewState extends State<_ReportsView> {
                       ),
                       const SizedBox(height: 28),
                       _buildCsvImportCard(),
+                      ],
                     ],
                   ),
                 ),

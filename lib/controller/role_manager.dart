@@ -113,6 +113,11 @@ class RoleManager {
   static const viewProjectBudgetKey = 'view_project_budget';
   static bool get canViewProjectBudget =>
       isAdmin || UserSession.hasPermission(viewProjectBudgetKey);
+  /// Money in / money out / loans in Reports (GET /reports/ledger). Admins
+  /// always; others only when granted "View finances" in Assign Role.
+  static const viewFinancesKey = 'view_finances';
+  static bool get canViewFinances =>
+      isAdmin || UserSession.hasPermission(viewFinancesKey);
   static bool get canViewReports =>
       isAdmin || UserSession.hasPermission('view_reports');
   static bool get canManageExpenses =>
