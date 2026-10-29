@@ -145,7 +145,7 @@ class LedgerPanelState extends State<LedgerPanel> {
         LedgerGroupBy.category => r.category,
         LedgerGroupBy.project => r.projectId,
         LedgerGroupBy.month => r.date == null ? '' : DateFormat('yyyy-MM').format(r.date!),
-        LedgerGroupBy.payee => r.payee,
+        LedgerGroupBy.payee => r.payee.isEmpty ? 'Unspecified' : r.payee,
         LedgerGroupBy.none => '',
       };
 
@@ -166,10 +166,13 @@ class LedgerPanelState extends State<LedgerPanel> {
     for (final r in data.rows) {
       byKey.putIfAbsent(_keyOf(r), () => []).add(r);
     }
-    final server = {for (final g in data.groups) g.key: g};
+    // Server payee keys are ids ("s:<supplier>", "w:<workerId>"); rows only carry
+    // the name, so payee groups are matched by their label.
+    String gk(LedgerGroup g) => _groupBy == LedgerGroupBy.payee ? g.label : g.key;
+    final server = {for (final g in data.groups) gk(g): g};
     final order = <String>[
       for (final g in data.groups)
-        if (byKey.containsKey(g.key)) g.key,
+        if (byKey.containsKey(gk(g))) gk(g),
       for (final k in byKey.keys)
         if (!server.containsKey(k)) k,
     ];
