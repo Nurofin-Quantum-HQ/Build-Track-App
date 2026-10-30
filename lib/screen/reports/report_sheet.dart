@@ -1,6 +1,7 @@
 import 'package:buildtrack_mobile/common/utils/date_parse.dart';
 import 'package:buildtrack_mobile/design/design.dart';
 import 'package:buildtrack_mobile/models/project_model.dart';
+import 'package:buildtrack_mobile/screen/reports/report_ledger_data.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
@@ -14,6 +15,9 @@ const _zebra = Color(0xFFFAFAFA);
 /// (and full screen). The item column (with row numbers) stays pinned on the
 /// left and the header row stays on top; everything else scrolls sideways,
 /// and up/down inside the sheet once the rows outgrow [maxHeight].
+///
+/// [ReportSheet.money] is the same sheet for people who can see finances: one
+/// row per money movement (spending entries plus client payments, loans…).
 class ReportSheet extends StatefulWidget {
   const ReportSheet({
     super.key,
@@ -34,7 +38,44 @@ class ReportSheet extends StatefulWidget {
     this.tourWrap,
     this.pinnedColumn,
     this.onPinColumn,
-  });
+  }) : moneyRows = null, onMoneyRowTap = null;
+
+  /// The finance table: [rows] are every money movement, spending entries
+  /// included (those keep Paid / Remaining and the row actions). Columns are
+  /// fixed ([moneyColumns]); the Description column is pinned.
+  const ReportSheet.money({
+    super.key,
+    required List<MoneyRow> rows,
+    required this.statusOf,
+    required this.sortColumn,
+    required this.sortAscending,
+    required this.onSort,
+    required this.onMoneyRowTap,
+    required this.onAddMore,
+    required this.onRecordPayment,
+    required this.onEdit,
+    this.maxHeight = 420,
+    this.firstRowNumber = 1,
+    this.pinnedWidth = 132,
+    this.tourWrap,
+  })  : moneyRows = rows,
+        entries = const [],
+        columns = moneyColumns,
+        projectNameOf = _noProjectName,
+        pinnedColumn = 'Description',
+        onPinColumn = null,
+        onRowTap = _ignoreRowTap;
+
+  static String _noProjectName(EntryModel e) => '';
+  static void _ignoreRowTap(EntryModel e) {}
+
+  /// Finance table columns, in the user-facing order (Description is pinned,
+  /// so it shows first on screen).
+  static const moneyColumns = ['Description', 'Date', 'Project', 'Type', 'In', 'Out', 'Balance', 'Paid / Remaining', 'Status'];
+
+  /// Rows of the finance table; null for the plain entries sheet.
+  final List<MoneyRow>? moneyRows;
+  final void Function(MoneyRow)? onMoneyRowTap;
 
   /// The column frozen on the left (chosen in Edit columns or by
   /// long-pressing a header). Ignored when it isn't one of [columns]; then the
@@ -82,6 +123,7 @@ class ReportSheet extends StatefulWidget {
   static const itemColumns = {'Description', 'Material', 'Worker Type', 'Equipment'};
   static const _actionColumns = ['Add More', 'Record Payment', 'Edit Entry'];
   static const _sortKeys = {'Purchased Date': 'date', 'Payment Date': 'paymentDate', 'Project': 'project', 'Amount': 'amount'};
+  static const _moneySortKeys = {'Date': 'date', 'Description': 'title', 'Project': 'project', 'Type': 'type', 'In': 'in', 'Out': 'out'};
 
   /// The column that is pinned for [columns] with the user's choice [pinned]:
   /// that choice when it is shown, else the item column, else the first.
@@ -129,7 +171,18 @@ class ReportSheet extends StatefulWidget {
   }
 
   static const _numeric = {
-    'Amount', 'Paid', 'Remaining', 'Rate', 'Rate/Day', 'Rent Rate', 'Qty', 'Days', 'Duration',
+    'Amount', 'Paid', 'Remaining', 'Rate', 'Rate/Day', 'Rent Rate', 'Qty', 'Days', 'Duration', 'In', 'Out', 'Balance',
+  };
+
+  static const _moneyWidths = {
+    'Date': 104.0,
+    'Project': 132.0,
+    'Type': 138.0,
+    'In': 112.0,
+    'Out': 112.0,
+    'Balance': 124.0,
+    'Paid / Remaining': 184.0,
+    'Status': 104.0,
   };
 
   static double widthOf(String column) {
@@ -192,6 +245,11 @@ class ReportSheet extends StatefulWidget {
         return 'PAID (INR)';
       case 'Remaining':
         return 'REMAINING (INR)';
+      case 'In':
+      case 'Out':
+      case 'Balance':
+      case 'Paid / Remaining':
+        return '${column.toUpperCase()} (INR)';
       default:
         return column.toUpperCase();
     }
@@ -199,6 +257,15 @@ class ReportSheet extends StatefulWidget {
 
   @override
   State<ReportSheet> createState() => _ReportSheetState();
+}
+
+/// One sheet row: a plain entry, or a finance-table row ([money], with its
+/// spending [entry] when it is one).
+class _SheetRow {
+  const _SheetRow(this.id, this.entry, this.money);
+  final String id;
+  final EntryModel? entry;
+  final MoneyRow? money;
 }
 
 /// Text styles resolved once per build (not per cell).
@@ -247,8 +314,9 @@ class _ReportSheetState extends State<ReportSheet> {
     // Different rows (page, search, sort) go back to the top; different
     // columns (tab, Edit columns) go back to the left. Plain rebuilds keep
     // the reader where they were.
-    final rowsChanged = old.entries.length != widget.entries.length ||
-        Iterable.generate(widget.entries.length).any((i) => old.entries[i].id != widget.entries[i].id);
+    final oldIds = _idsOf(old);
+    final newIds = _idsOf(widget);
+    final rowsChanged = oldIds.length != newIds.length || Iterable.generate(newIds.length).any((i) => oldIds[i] != newIds[i]);
     final colsChanged = old.columns.join('|') != widget.columns.join('|');
     if (!rowsChanged && !colsChanged) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -276,6 +344,16 @@ class _ReportSheetState extends State<ReportSheet> {
     _syncing = false;
   }
 
+  static List<String> _idsOf(ReportSheet w) => w.moneyRows != null ? [for (final m in w.moneyRows!) m.id] : [for (final e in w.entries) e.id];
+
+  bool get _isMoney => widget.moneyRows != null;
+
+  List<_SheetRow> get _rows => _isMoney
+      ? [for (final m in widget.moneyRows!) _SheetRow(m.id, m.entry, m)]
+      : [for (final e in widget.entries) _SheetRow(e.id, e, null)];
+
+  double _widthOf(String column) => (_isMoney ? ReportSheet._moneyWidths[column] : null) ?? ReportSheet.widthOf(column);
+
   String? get _pinned => ReportSheet.pinnedOf(widget.columns, widget.pinnedColumn);
 
   List<String> get _scrollColumns {
@@ -283,20 +361,24 @@ class _ReportSheetState extends State<ReportSheet> {
     return [...widget.columns.where((c) => c != pinned), ...ReportSheet._actionColumns];
   }
 
-  void _tapRow(EntryModel e) {
-    if (_selectedId != e.id) setState(() => _selectedId = e.id);
-    widget.onRowTap(e);
+  void _tapRow(_SheetRow r) {
+    if (_selectedId != r.id) setState(() => _selectedId = r.id);
+    if (r.money != null) {
+      widget.onMoneyRowTap?.call(r.money!);
+    } else {
+      widget.onRowTap(r.entry!);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final bt = context.bt;
     final s = _Styles(context, bt);
-    final rows = widget.entries;
+    final rows = _rows;
     final pinned = _pinned;
     final pinW = widget.pinnedWidth;
     final scrollCols = _scrollColumns;
-    final scrollWidth = scrollCols.fold<double>(0, (w, c) => w + ReportSheet.widthOf(c));
+    final scrollWidth = scrollCols.fold<double>(0, (w, c) => w + _widthOf(c));
     final maxBody = (widget.maxHeight - ReportSheet.headerHeight).clamp(ReportSheet.rowHeight, double.infinity);
     final bodyHeight = (rows.length * ReportSheet.rowHeight).clamp(ReportSheet.rowHeight, maxBody).toDouble();
     final innerScroll = rows.length * ReportSheet.rowHeight > bodyHeight + .5;
@@ -332,7 +414,7 @@ class _ReportSheetState extends State<ReportSheet> {
                           child: Container(
                             height: ReportSheet.headerHeight,
                             decoration: const BoxDecoration(color: _headBg, border: Border(bottom: BorderSide(color: _line2))),
-                            child: Row(children: [for (final c in scrollCols) _headerCell(c, ReportSheet.widthOf(c), s)]),
+                            child: Row(children: [for (final c in scrollCols) _headerCell(c, _widthOf(c), s)]),
                           ),
                         )),
                         Expanded(
@@ -445,7 +527,7 @@ class _ReportSheetState extends State<ReportSheet> {
   }
 
   Widget _headerLabel(String column, _Styles s) {
-    final sortKey = ReportSheet._sortKeys[column];
+    final sortKey = (_isMoney ? ReportSheet._moneySortKeys : ReportSheet._sortKeys)[column];
     final active = sortKey != null && sortKey == widget.sortColumn;
     final numeric = ReportSheet._numeric.contains(column);
     final label = Text(ReportSheet.labelOf(column), maxLines: 1, overflow: TextOverflow.ellipsis, style: active ? s.head.copyWith(color: Bt.ink) : s.head);
@@ -469,7 +551,7 @@ class _ReportSheetState extends State<ReportSheet> {
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         // Tapping the active column flips the direction; a new column starts newest/highest first.
-        onTap: () => widget.onSort(sortKey, active ? !widget.sortAscending : sortKey == 'project'),
+        onTap: () => widget.onSort(sortKey, active ? !widget.sortAscending : const {'project', 'title', 'type'}.contains(sortKey)),
         child: SizedBox(height: ReportSheet.headerHeight, child: content),
       ),
     );
@@ -490,12 +572,12 @@ class _ReportSheetState extends State<ReportSheet> {
     return GestureDetector(onLongPress: () => pin(column), child: cell);
   }
 
-  Widget _pinnedCell(EntryModel e, String column, int i, _Styles s, BtTheme bt) {
-    final selected = e.id == _selectedId;
+  Widget _pinnedCell(_SheetRow row, String column, int i, _Styles s, BtTheme bt) {
+    final selected = row.id == _selectedId;
     final isItem = ReportSheet.itemColumns.contains(column);
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: () => _tapRow(e),
+      onTap: () => _tapRow(row),
       child: Container(
         padding: const EdgeInsets.only(left: 8, right: 8),
         decoration: BoxDecoration(
@@ -513,20 +595,20 @@ class _ReportSheetState extends State<ReportSheet> {
           const SizedBox(width: 6),
           Expanded(
             child: isItem
-                ? Text(_text(e.description), maxLines: 1, overflow: TextOverflow.ellipsis, style: s.cell.copyWith(fontWeight: FontWeight.w600))
-                : Align(alignment: Alignment.centerLeft, child: _cell(column, e, s, bt)),
+                ? Text(_text(row.money?.description ?? row.entry!.description), maxLines: 1, overflow: TextOverflow.ellipsis, style: s.cell.copyWith(fontWeight: FontWeight.w600))
+                : Align(alignment: Alignment.centerLeft, child: _cell(column, row, s, bt)),
           ),
         ]),
       ),
     );
   }
 
-  Widget _bodyRow(EntryModel e, List<String> cols, int i, _Styles s) {
-    final selected = e.id == _selectedId;
+  Widget _bodyRow(_SheetRow row, List<String> cols, int i, _Styles s) {
+    final selected = row.id == _selectedId;
     final bt = context.bt;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: () => _tapRow(e),
+      onTap: () => _tapRow(row),
       child: Container(
         decoration: BoxDecoration(
           color: selected ? s.selected : (i.isOdd ? _zebra : Bt.card),
@@ -535,11 +617,11 @@ class _ReportSheetState extends State<ReportSheet> {
         child: Row(children: [
           for (final c in cols)
             Container(
-              width: ReportSheet.widthOf(c),
+              width: _widthOf(c),
               padding: const EdgeInsets.symmetric(horizontal: 9),
               alignment: ReportSheet._numeric.contains(c) ? Alignment.centerRight : Alignment.centerLeft,
               decoration: const BoxDecoration(border: Border(right: BorderSide(color: _line))),
-              child: _cell(c, e, s, bt),
+              child: _cell(c, row, s, bt),
             ),
         ]),
       ),
@@ -581,7 +663,65 @@ class _ReportSheetState extends State<ReportSheet> {
     return Text(v, maxLines: 1, overflow: TextOverflow.ellipsis, softWrap: false, style: style);
   }
 
-  Widget _cell(String column, EntryModel e, _Styles s, BtTheme bt) {
+  Widget _cell(String column, _SheetRow row, _Styles s, BtTheme bt) {
+    final m = row.money;
+    return m == null ? _entryCell(column, row.entry!, s, bt) : _moneyCell(column, m, s, bt);
+  }
+
+  /// Cells of the finance table. Actions and Status of spending rows are the
+  /// entries sheet's own; other rows leave the spending-only cells blank.
+  Widget _moneyCell(String column, MoneyRow m, _Styles s, BtTheme bt) {
+    final l = m.ledger;
+    final e = m.entry;
+    switch (column) {
+      case 'Description':
+        return _plain(_text(m.description), s, weight: FontWeight.w600);
+      case 'Date':
+        return _plain(l.date == null ? '—' : formatShortDate(l.date), s, numeric: true);
+      case 'Project':
+        return _plain(_text(l.projectName), s);
+      case 'Type':
+        return _CategoryPill(category: l.category, label: m.categoryLabel, style: s.pill, bt: bt);
+      case 'In':
+        return m.isIn ? _plain(formatInr(l.amount), s, color: Bt.green, weight: FontWeight.w700, numeric: true) : const SizedBox.shrink();
+      case 'Out':
+        return m.isIn ? const SizedBox.shrink() : _plain(formatInr(l.amount), s, weight: FontWeight.w700, numeric: true);
+      case 'Balance':
+        final b = l.runningBalance;
+        return b == null ? _plain('—', s) : _plain(formatInr(b), s, color: b < 0 ? Bt.red : Bt.ink, weight: FontWeight.w600, numeric: true);
+      case 'Paid / Remaining':
+        if (e == null) return const SizedBox.shrink();
+        final rem = e.remainingAmount;
+        return Text.rich(
+          TextSpan(children: [
+            TextSpan(text: formatInr(e.paidAmount), style: TextStyle(color: e.paidAmount > 0 ? Bt.green : Bt.ink3)),
+            const TextSpan(text: ' / ', style: TextStyle(color: Bt.ink3)),
+            TextSpan(text: formatInr(rem), style: TextStyle(color: rem > 0 ? Bt.red : Bt.green, fontWeight: FontWeight.w600)),
+          ]),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          softWrap: false,
+          style: s.cell.copyWith(fontFeatures: BtText.tnum),
+        );
+      case 'Status':
+        if (e != null) return _StatusPill(status: widget.statusOf(e), style: s.pill);
+        // Money that is not a spending entry has no part-payments: it was
+        // received / paid, unless it still waits for approval.
+        return _StatusPill(
+          status: m.waitsForApproval ? 'Partial' : 'Fully Paid',
+          label: m.statusLabel(widget.statusOf),
+          style: s.pill,
+        );
+      case 'Add More':
+      case 'Record Payment':
+      case 'Edit Entry':
+        return e == null ? const SizedBox.shrink() : _entryCell(column, e, s, bt);
+      default:
+        return _plain('—', s);
+    }
+  }
+
+  Widget _entryCell(String column, EntryModel e, _Styles s, BtTheme bt) {
     switch (column) {
       case 'Purchased Date':
         return _plain(formatShortDate(e.date), s, numeric: true);
@@ -642,13 +782,16 @@ class _ReportSheetState extends State<ReportSheet> {
 }
 
 class _StatusPill extends StatelessWidget {
-  const _StatusPill({required this.status, required this.style});
+  const _StatusPill({required this.status, required this.style, this.label});
   final String status;
   final TextStyle style;
 
+  /// Replaces the wording of [status] (its colour stays).
+  final String? label;
+
   @override
   Widget build(BuildContext context) {
-    final (label, fg, bg) = switch (status) {
+    final (text, fg, bg) = switch (status) {
       'Fully Paid' => ('Paid', Bt.green, Bt.greenSoft),
       'Partial' => ('Part paid', Bt.amber, Bt.amberSoft),
       _ => ('Not paid', Bt.red, Bt.redSoft),
@@ -660,7 +803,38 @@ class _StatusPill extends StatelessWidget {
       child: Row(mainAxisSize: MainAxisSize.min, children: [
         Container(width: 5, height: 5, decoration: BoxDecoration(color: fg, shape: BoxShape.circle)),
         const SizedBox(width: 5),
-        Text(label, maxLines: 1, style: style.copyWith(color: fg)),
+        Text(label ?? text, maxLines: 1, style: style.copyWith(color: fg)),
+      ]),
+    );
+  }
+}
+
+/// Category (Material, Client payment, Loan repayment…) pill of the finance table.
+class _CategoryPill extends StatelessWidget {
+  const _CategoryPill({required this.category, required this.label, required this.style, required this.bt});
+  final String category;
+  final String label;
+  final TextStyle style;
+  final BtTheme bt;
+
+  @override
+  Widget build(BuildContext context) {
+    final dot = switch (category) {
+      'material' => bt.series[0],
+      'labour' => bt.series[1],
+      'equipment' => bt.series[2],
+      'client_payment' || 'loan_received' => Bt.green,
+      'loan_repayment' => Bt.amber,
+      _ => Bt.ink3,
+    };
+    return Container(
+      height: 22,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      decoration: BoxDecoration(color: Bt.fill, borderRadius: BorderRadius.circular(11)),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Container(width: 6, height: 6, decoration: BoxDecoration(color: dot, borderRadius: BorderRadius.circular(2))),
+        const SizedBox(width: 6),
+        Flexible(child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: style.copyWith(color: Bt.ink2))),
       ]),
     );
   }
