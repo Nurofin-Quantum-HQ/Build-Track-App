@@ -1,38 +1,8 @@
 import 'dart:convert';
 
+import 'package:buildtrack_mobile/design/design.dart';
+import 'package:buildtrack_mobile/models/project_model.dart';
 import 'package:buildtrack_mobile/services/api_service.dart';
-import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets.dart' as pw;
-import 'package:printing/printing.dart';
-
-import 'save_helper_stub.dart'
-    if (dart.library.html) 'save_helper_web.dart'
-    if (dart.library.io) 'save_helper_mobile.dart';
-
-/// Which side of the money the ledger shows.
-enum LedgerDirection { inbound, outbound, all }
-
-extension LedgerDirectionX on LedgerDirection {
-  String get query => switch (this) {
-        LedgerDirection.inbound => 'in',
-        LedgerDirection.outbound => 'out',
-        LedgerDirection.all => 'all',
-      };
-}
-
-/// How rows are grouped (server `groupBy`).
-enum LedgerGroupBy { none, category, project, month, payee }
-
-extension LedgerGroupByX on LedgerGroupBy {
-  String get query => name;
-  String get label => switch (this) {
-        LedgerGroupBy.none => 'None',
-        LedgerGroupBy.category => 'Category',
-        LedgerGroupBy.project => 'Project',
-        LedgerGroupBy.month => 'Month',
-        LedgerGroupBy.payee => 'Payee',
-      };
-}
 
 /// The seven ledger categories the backend derives (and lets you change).
 class LedgerCategories {
@@ -60,11 +30,33 @@ class LedgerCategories {
 
   static String label(String key) => _labels[key] ?? (key.isEmpty ? 'Other' : key);
 
-  /// Categories that make sense for a view (Money in / Money out / All).
-  static List<String> forDirection(LedgerDirection d) => switch (d) {
-        LedgerDirection.inbound => keys.where(_inbound.contains).toList(),
-        LedgerDirection.outbound => keys.where(_outbound.contains).toList(),
-        LedgerDirection.all => keys,
+  /// Categories that make sense for a money-in or a money-out row.
+  static List<String> forRow({required bool isIn}) => keys.where((isIn ? _inbound : _outbound).contains).toList();
+}
+
+/// The type chips of the finance table. "Loan" covers loan received and
+/// loan repayment.
+enum MoneyType { all, material, labour, equipment, clientPayment, loan, other }
+
+extension MoneyTypeX on MoneyType {
+  String get label => switch (this) {
+        MoneyType.all => 'All',
+        MoneyType.material => 'Material',
+        MoneyType.labour => 'Labour',
+        MoneyType.equipment => 'Equipment',
+        MoneyType.clientPayment => 'Client payment',
+        MoneyType.loan => 'Loan',
+        MoneyType.other => 'Other',
+      };
+
+  bool matches(String category) => switch (this) {
+        MoneyType.all => true,
+        MoneyType.material => category == 'material',
+        MoneyType.labour => category == 'labour',
+        MoneyType.equipment => category == 'equipment',
+        MoneyType.clientPayment => category == 'client_payment',
+        MoneyType.loan => category == 'loan_received' || category == 'loan_repayment',
+        MoneyType.other => category == 'other',
       };
 }
 
@@ -88,6 +80,7 @@ DateTime? _day(dynamic v) {
   return d == null ? null : DateTime(d.year, d.month, d.day);
 }
 
+/// One money movement from `GET /reports/ledger`. [id] is the transaction id.
 class LedgerRow {
   LedgerRow({
     required this.id,
@@ -121,23 +114,6 @@ class LedgerRow {
   final String type;
   final String approvalStatus;
 
-  LedgerRow copyWith({String? category}) => LedgerRow(
-        id: id,
-        date: date,
-        projectId: projectId,
-        projectName: projectName,
-        isIn: isIn,
-        category: category ?? this.category,
-        title: title,
-        payee: payee,
-        notes: notes,
-        amount: amount,
-        paymentStatus: paymentStatus,
-        runningBalance: runningBalance,
-        type: type,
-        approvalStatus: approvalStatus,
-      );
-
   factory LedgerRow.fromJson(Map<String, dynamic> j) => LedgerRow(
         id: _str(j['id'] ?? j['_id']),
         date: _day(j['date']),
@@ -156,33 +132,16 @@ class LedgerRow {
       );
 }
 
-class LedgerGroup {
-  LedgerGroup({required this.key, required this.label, required this.moneyIn, required this.moneyOut, required this.net, required this.count});
-  final String key;
-  final String label;
-  final double moneyIn;
-  final double moneyOut;
-  final double net;
-  final int count;
-
-  factory LedgerGroup.fromJson(Map<String, dynamic> j) => LedgerGroup(
-        key: _str(j['key']),
-        label: _str(j['label']),
-        moneyIn: _num(j['moneyIn']),
-        moneyOut: _num(j['moneyOut']),
-        net: _num(j['net']),
-        count: _num(j['count']).round(),
-      );
-}
-
 class LedgerResult {
-  LedgerResult({required this.moneyIn, required this.moneyOut, required this.net, required this.count, required this.rows, required this.groups, required this.truncated});
+  LedgerResult({required this.moneyIn, required this.moneyOut, required this.net, required this.count, required this.rows, required this.truncated});
   final double moneyIn;
   final double moneyOut;
   final double net;
   final int count;
   final List<LedgerRow> rows;
-  final List<LedgerGroup> groups;
+
+  /// The server cut the row list at its cap (newest rows kept). The summary
+  /// still covers every matching entry.
   final bool truncated;
 
   factory LedgerResult.fromJson(Map<String, dynamic> j) {
@@ -195,10 +154,6 @@ class LedgerResult {
       rows: [
         for (final r in (j['rows'] as List? ?? const []))
           if (r is Map) LedgerRow.fromJson(Map<String, dynamic>.from(r)),
-      ],
-      groups: [
-        for (final g in (j['groups'] as List? ?? const []))
-          if (g is Map) LedgerGroup.fromJson(Map<String, dynamic>.from(g)),
       ],
       truncated: j['truncated'] == true,
     );
@@ -218,37 +173,28 @@ class LedgerFailure implements Exception {
   String toString() => message;
 }
 
-/// Everything that picks which ledger rows are shown (also what exports use).
+/// Which ledger to fetch: project and period only. Direction, type and search
+/// are applied on the phone (the server cannot search category labels), so the
+/// running balance of every row always stays the true one.
 class LedgerQuery {
-  const LedgerQuery({
-    required this.projectId,
-    this.from,
-    this.to,
-    this.direction = LedgerDirection.all,
-    this.categories = const {},
-    this.q = '',
-    this.groupBy = LedgerGroupBy.none,
-  });
+  const LedgerQuery({required this.projectId, this.from, this.to});
   final String projectId; // id or 'all'
   final DateTime? from;
   final DateTime? to;
-  final LedgerDirection direction;
-  final Set<String> categories;
-  final String q;
-  final LedgerGroupBy groupBy;
 
   static String ymd(DateTime d) =>
       '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+  /// Same value for the same project + period (used to know when to reload).
+  String get key => '${projectId.isEmpty ? 'all' : projectId}|${from == null ? '' : ymd(from!)}|${to == null ? '' : ymd(to!)}';
 
   String toEndpoint() {
     final params = <String, String>{
       'projectId': projectId.isEmpty ? 'all' : projectId,
       if (from != null) 'from': ymd(from!),
       if (to != null) 'to': ymd(to!),
-      'direction': direction.query,
-      if (categories.isNotEmpty) 'category': (categories.toList()..sort()).join(','),
-      if (q.trim().isNotEmpty) 'q': q.trim(),
-      'groupBy': groupBy.query,
+      'direction': 'all',
+      'groupBy': 'none',
     };
     return '/reports/ledger?${Uri(queryParameters: params).query}';
   }
@@ -262,17 +208,17 @@ class LedgerApi {
       final res = await ApiService.get(query.toEndpoint());
       if (res.statusCode == 403) throw const LedgerForbidden();
       if (res.statusCode != 200) {
-        throw LedgerFailure("Couldn't load the ledger (${res.statusCode}).");
+        throw LedgerFailure("Couldn't load the money entries (${res.statusCode}).");
       }
       final decoded = json.decode(res.body);
-      if (decoded is! Map) throw const LedgerFailure("Couldn't read the ledger.");
+      if (decoded is! Map) throw const LedgerFailure("Couldn't read the money entries.");
       return LedgerResult.fromJson(Map<String, dynamic>.from(decoded));
     } on LedgerForbidden {
       rethrow;
     } on LedgerFailure {
       rethrow;
     } catch (_) {
-      throw const LedgerFailure("Couldn't load the ledger. Check your connection and try again.");
+      throw const LedgerFailure("Couldn't load the money entries. Check your connection and try again.");
     }
   }
 
@@ -294,143 +240,186 @@ class LedgerApi {
   }
 }
 
-/// Excel (CSV) and PDF of exactly the ledger on screen.
-class LedgerExport {
-  LedgerExport._();
+/// One row of the finance table: a ledger row, plus the spending entry with
+/// the same id when it is one (ledger row id == transaction id == entry id).
+/// Only spending rows have Paid / Remaining and the Add More / Record
+/// Payment / Edit Entry actions.
+class MoneyRow {
+  const MoneyRow({required this.ledger, required this.seq, this.entry});
+  final LedgerRow ledger;
+  final EntryModel? entry;
 
-  static const headers = ['Date', 'Project', 'Direction', 'Category', 'Title', 'Payee', 'Notes', 'Amount', 'Running balance'];
+  /// Position in the server's newest-first order (breaks ties between rows of
+  /// the same day, so the running balance still reads top to bottom).
+  final int seq;
 
-  static String _dmy(DateTime? d) => d == null ? '' : '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+  String get id => ledger.id;
+  bool get isIn => ledger.isIn;
+  bool get isSpending => entry != null;
+  String get categoryLabel => LedgerCategories.label(ledger.category);
 
-  static String _money(double v) => v.toStringAsFixed(2);
+  /// A money row that is not a spending entry and still waits for approval.
+  bool get waitsForApproval => !isSpending && ledger.approvalStatus.toLowerCase() == 'pending';
 
-  /// Indian digit grouping for PDF text (the PDF font has no rupee sign).
-  static String _rs(double v) {
-    final neg = v < 0;
-    final parts = v.abs().toStringAsFixed(2).split('.');
-    final whole = parts[0];
-    String grouped;
-    if (whole.length <= 3) {
-      grouped = whole;
-    } else {
-      final last3 = whole.substring(whole.length - 3);
-      var rest = whole.substring(0, whole.length - 3);
-      final chunks = <String>[];
-      while (rest.length > 2) {
-        chunks.insert(0, rest.substring(rest.length - 2));
-        rest = rest.substring(0, rest.length - 2);
-      }
-      if (rest.isNotEmpty) chunks.insert(0, rest);
-      grouped = '${chunks.join(',')},$last3';
+  /// The Status column's wording (what the pill says, and what exports write).
+  /// [statusOf] gives a spending entry's 'Fully Paid' / 'Partial' / 'Not Paid'.
+  /// Other money was simply received / paid, unless it waits for approval.
+  String statusLabel(String Function(EntryModel) statusOf) {
+    final e = entry;
+    if (e != null) {
+      return switch (statusOf(e)) {
+        'Fully Paid' => 'Paid',
+        'Partial' => 'Part paid',
+        _ => 'Not paid',
+      };
     }
-    return '${neg ? '-' : ''}Rs. $grouped.${parts[1]}';
+    if (waitsForApproval) return 'Pending';
+    return isIn ? 'Received' : 'Paid';
   }
 
-  /// Text cell safe from spreadsheet formula injection.
-  static String _safe(String s) {
-    if (s.isNotEmpty && '=+-@\t\r'.contains(s[0])) return "'$s";
-    return s;
+  /// What the Description column shows.
+  String get description {
+    final e = entry;
+    if (e != null && e.description.trim().isNotEmpty) return e.description.trim();
+    if (ledger.title.isNotEmpty) return ledger.title;
+    return categoryLabel;
   }
+}
 
-  static String _cell(String s) => '"${s.replaceAll('"', '""')}"';
+/// Everything the finance table does with rows, without any widgets:
+/// join, filter, search, sort and totals.
+class MoneyTable {
+  MoneyTable._();
 
-  static String toCsv(LedgerResult r) {
-    final b = StringBuffer('﻿'); // BOM so Excel reads the rupee/UTF-8 text right
-    b.writeln(headers.map(_cell).join(','));
-    for (final row in r.rows) {
-      b.writeln([
-        _dmy(row.date),
-        _safe(row.projectName),
-        row.isIn ? 'In' : 'Out',
-        LedgerCategories.label(row.category),
-        _safe(row.title),
-        _safe(row.payee),
-        _safe(row.notes),
-        _money(row.amount),
-        row.runningBalance == null ? '' : _money(row.runningBalance!),
-      ].map(_cell).join(','));
-    }
-    List<String> total(String label, double v) => ['', '', '', '', label, '', '', _money(v), ''];
-    b.writeln(total('Total money in', r.moneyIn).map(_cell).join(','));
-    b.writeln(total('Total money out', r.moneyOut).map(_cell).join(','));
-    b.writeln(total('Net', r.net).map(_cell).join(','));
-    return b.toString();
-  }
+  /// Ledger rows, each joined to its spending entry (by id) when there is one.
+  static List<MoneyRow> join(LedgerResult ledger, Map<String, EntryModel> entriesById) => [
+        for (var i = 0; i < ledger.rows.length; i++)
+          MoneyRow(ledger: ledger.rows[i], seq: i, entry: entriesById[ledger.rows[i].id]),
+      ];
 
-  static Future<void> shareExcel(LedgerResult r) async {
-    await saveAndShareCsv(
-      csvContent: toCsv(r),
-      filename: 'BuildTrack_Ledger_${DateTime.now().millisecondsSinceEpoch}.csv',
-      shareText: 'BuildTrack money in / money out (${r.rows.length} entries)',
-    );
-  }
+  static final Expando<String> _haystacks = Expando<String>();
 
-  static Future<void> sharePdf(LedgerResult r, {required String title, required String filterSummary}) async {
-    final pdf = pw.Document();
-    final data = [
-      for (final row in r.rows)
-        [
-          _dmy(row.date),
-          row.projectName,
-          row.isIn ? 'In' : 'Out',
-          LedgerCategories.label(row.category),
-          row.title,
-          row.payee,
-          row.notes,
-          _rs(row.amount),
-          row.runningBalance == null ? '' : _rs(row.runningBalance!),
-        ],
-      ['', '', '', '', 'Total money in', '', '', _rs(r.moneyIn), ''],
-      ['', '', '', '', 'Total money out', '', '', _rs(r.moneyOut), ''],
-      ['', '', '', '', 'Net', '', '', _rs(r.net), ''],
+  /// Lower-cased searchable text of a ledger row: title, payee, notes, the
+  /// category label, project, amount and dates.
+  static String _haystack(LedgerRow r) {
+    final cached = _haystacks[r];
+    if (cached != null) return cached;
+    final parts = <String>[
+      r.title,
+      r.payee,
+      r.notes,
+      LedgerCategories.label(r.category),
+      r.projectName,
+      r.amount.toStringAsFixed(2),
+      r.amount.round().toString(),
+      formatInr(r.amount),
+      if (r.date != null) formatShortDate(r.date),
+      if (r.date != null) formatDate(r.date),
     ];
-    pdf.addPage(
-      pw.MultiPage(
-        pageFormat: PdfPageFormat.a4.landscape,
-        margin: const pw.EdgeInsets.all(24),
-        build: (context) => [
-          pw.Text(title, style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
-          pw.SizedBox(height: 4),
-          pw.Text(filterSummary, style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700)),
-          pw.SizedBox(height: 10),
-          pw.TableHelper.fromTextArray(
-            context: context,
-            headers: headers,
-            data: data,
-            border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
-            headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 7, color: PdfColors.white),
-            headerDecoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFF111317)),
-            cellStyle: const pw.TextStyle(fontSize: 6.5),
-            cellAlignments: {
-              0: pw.Alignment.centerLeft,
-              1: pw.Alignment.centerLeft,
-              2: pw.Alignment.center,
-              3: pw.Alignment.centerLeft,
-              4: pw.Alignment.centerLeft,
-              5: pw.Alignment.centerLeft,
-              6: pw.Alignment.centerLeft,
-              7: pw.Alignment.centerRight,
-              8: pw.Alignment.centerRight,
-            },
-            columnWidths: {
-              0: const pw.FixedColumnWidth(48),
-              1: const pw.FlexColumnWidth(2),
-              2: const pw.FixedColumnWidth(30),
-              3: const pw.FixedColumnWidth(62),
-              4: const pw.FlexColumnWidth(2.4),
-              5: const pw.FlexColumnWidth(1.6),
-              6: const pw.FlexColumnWidth(2.2),
-              7: const pw.FixedColumnWidth(70),
-              8: const pw.FixedColumnWidth(70),
-            },
-          ),
-        ],
-      ),
-    );
-    final now = DateTime.now();
-    await Printing.layoutPdf(
-      name: 'BuildTrack_Ledger_${_dmy(now)}',
-      onLayout: (PdfPageFormat format) async => pdf.save(),
-    );
+    return _haystacks[r] = parts.where((p) => p.trim().isNotEmpty).join('\u0001').toLowerCase();
+  }
+
+  /// Every word typed must be found in the row (the whole phrase also counts):
+  /// "loan repayment" finds loan repayments, "ravi cement" finds Ravi's cement.
+  /// Spending rows can also match on everything the entries search covers
+  /// ([entryMatches]).
+  static bool matches(MoneyRow row, String rawQuery, {bool Function(EntryModel entry, String token)? entryMatches}) {
+    final query = rawQuery.toLowerCase().trim();
+    if (query.isEmpty) return true;
+    final hay = _haystack(row.ledger);
+    bool token(String t) {
+      if (hay.contains(t)) return true;
+      final e = row.entry;
+      return e != null && entryMatches != null && entryMatches(e, t);
+    }
+
+    if (token(query)) return true;
+    final words = query.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
+    return words.length > 1 && words.every(token);
+  }
+
+  /// Rows that pass the Money in / Money out toggles, the type chip and the
+  /// search. [inScope] applies the project / floor / phase / status filters.
+  /// Both toggles off counts as both on.
+  static List<MoneyRow> filter(
+    List<MoneyRow> rows, {
+    required bool moneyIn,
+    required bool moneyOut,
+    required MoneyType type,
+    String query = '',
+    bool Function(MoneyRow row)? inScope,
+    bool Function(EntryModel entry, String token)? entryMatches,
+  }) {
+    final both = moneyIn == moneyOut;
+    return [
+      for (final r in rows)
+        if ((both || (r.isIn ? moneyIn : moneyOut)) &&
+            type.matches(r.ledger.category) &&
+            (inScope == null || inScope(r)) &&
+            matches(r, query, entryMatches: entryMatches))
+          r,
+    ];
+  }
+
+  /// Sorts [rows] in place. Keys: 'date' (default), 'title', 'project',
+  /// 'type', 'in', 'out', 'amount'. Same-day rows keep the server's order, so
+  /// the running balance reads top to bottom either way.
+  static void sort(List<MoneyRow> rows, String column, bool ascending) {
+    int byDate(MoneyRow a, MoneyRow b) {
+      final da = a.ledger.date;
+      final db = b.ledger.date;
+      var c = (da == null || db == null) ? (da == null ? (db == null ? 0 : -1) : 1) : da.compareTo(db);
+      if (c == 0) c = b.seq.compareTo(a.seq); // older rows have the higher seq
+      return c;
+    }
+
+    int newestFirst(MoneyRow a, MoneyRow b) => byDate(b, a);
+
+    int compare(MoneyRow a, MoneyRow b) {
+      switch (column) {
+        case 'title':
+          final c = a.description.toLowerCase().compareTo(b.description.toLowerCase());
+          return c != 0 ? (ascending ? c : -c) : newestFirst(a, b);
+        case 'project':
+          final c = a.ledger.projectName.toLowerCase().compareTo(b.ledger.projectName.toLowerCase());
+          return c != 0 ? (ascending ? c : -c) : newestFirst(a, b);
+        case 'type':
+          final c = a.categoryLabel.compareTo(b.categoryLabel);
+          return c != 0 ? (ascending ? c : -c) : newestFirst(a, b);
+        case 'in':
+        case 'out':
+          final side = column == 'in';
+          final aHas = a.isIn == side;
+          final bHas = b.isIn == side;
+          // Rows of the other side have no value in this column: always last.
+          if (aHas != bHas) return aHas ? -1 : 1;
+          if (!aHas) return newestFirst(a, b);
+          final c = a.ledger.amount.compareTo(b.ledger.amount);
+          return c != 0 ? (ascending ? c : -c) : newestFirst(a, b);
+        case 'amount':
+          final c = a.ledger.amount.compareTo(b.ledger.amount);
+          return c != 0 ? (ascending ? c : -c) : newestFirst(a, b);
+        default:
+          return ascending ? byDate(a, b) : newestFirst(a, b);
+      }
+    }
+
+    rows.sort(compare);
+  }
+
+  static double _round2(double v) => (v * 100).roundToDouble() / 100;
+
+  /// In, Out and Net of exactly [rows].
+  static ({double moneyIn, double moneyOut, double net}) totals(Iterable<MoneyRow> rows) {
+    var inn = 0.0;
+    var out = 0.0;
+    for (final r in rows) {
+      if (r.isIn) {
+        inn += r.ledger.amount;
+      } else {
+        out += r.ledger.amount;
+      }
+    }
+    return (moneyIn: _round2(inn), moneyOut: _round2(out), net: _round2(inn - out));
   }
 }

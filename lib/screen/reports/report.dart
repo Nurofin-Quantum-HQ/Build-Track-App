@@ -9,7 +9,7 @@ import 'package:buildtrack_mobile/controller/entry_permissions.dart';
 import 'package:buildtrack_mobile/controller/report_provider.dart';
 import 'package:buildtrack_mobile/controller/role_manager.dart';
 import 'package:buildtrack_mobile/screen/reports/report_ledger_data.dart';
-import 'package:buildtrack_mobile/screen/reports/report_ledger_view.dart';
+import 'package:buildtrack_mobile/screen/reports/report_money.dart';
 import 'package:buildtrack_mobile/models/project_model.dart';
 import 'package:buildtrack_mobile/screen/reports/report_export_helper.dart';
 import 'package:buildtrack_mobile/screen/reports/csv_import_helper.dart';
@@ -131,6 +131,11 @@ class ReportFilterState {
   static bool tableView = true;
   /// "By type" shows the 3-column cost-card grid (true, default) or the list.
   static bool byTypeGrid = true;
+  /// Finance table (View finances): the Money in / Money out toggles (both on
+  /// = everything) and the type chip.
+  static bool moneyIn = true;
+  static bool moneyOut = true;
+  static MoneyType moneyType = MoneyType.all;
 
   /// Reload what Reports shows, in order: projects (and the global project's
   /// entries), then the entries for the project Reports is filtered to (all
@@ -168,6 +173,9 @@ class ReportFilterState {
     hasSavedFilters = false;
     tableView = true;
     byTypeGrid = true;
+    moneyIn = true;
+    moneyOut = true;
+    moneyType = MoneyType.all;
   }
 }
 
@@ -204,12 +212,25 @@ class _ReportsViewState extends State<_ReportsView> {
   final _kCsvRevert = GlobalKey();
   final ScrollController _scrollController = ScrollController();
 
-  /// Spending (the entries report, null) or a money view for people allowed
-  /// to see finances (View finances / Admin).
-  LedgerDirection? _ledgerView;
-  /// The server refused the ledger (403): hide the Money segments.
+  /// The server refused the ledger (403): show the plain spending sheet.
   bool _financeHidden = false;
-  final GlobalKey<LedgerPanelState> _ledgerKey = GlobalKey<LedgerPanelState>();
+
+  /// Finance table (View finances / Admin): every money movement for the
+  /// project + period, null while loading or after an error. Spending entries
+  /// are joined to it by id; direction, type and search are applied here.
+  LedgerResult? _ledger;
+  bool _ledgerLoading = false;
+  String? _ledgerError;
+  /// Project + period of the last ledger request, and a fingerprint of the
+  /// entries it was joined with: either changing reloads the ledger.
+  String _ledgerQueryKey = '';
+  String _ledgerEntriesSig = '';
+  int _ledgerRequest = 0;
+  bool _moneyIn = ReportFilterState.moneyIn;
+  bool _moneyOut = ReportFilterState.moneyOut;
+  MoneyType _moneyType = ReportFilterState.moneyType;
+  /// Bumped whenever the ledger changes, so the full-screen sheet redraws.
+  final ValueNotifier<int> _moneyVersion = ValueNotifier<int>(0);
 
   bool _linked = false;
   String _selectedProjectId = ReportFilterState.selectedProjectId;
@@ -539,6 +560,7 @@ class _ReportsViewState extends State<_ReportsView> {
   void dispose() {
     _scrollController.dispose();
     _searchController.dispose();
+    _moneyVersion.dispose();
     super.dispose();
   }
 
@@ -1301,6 +1323,9 @@ class _ReportsViewState extends State<_ReportsView> {
     ReportFilterState.sortColumn = _sortColumn;
     ReportFilterState.sortAscending = _sortAscending;
     ReportFilterState.currentPage = _currentPage;
+    ReportFilterState.moneyIn = _moneyIn;
+    ReportFilterState.moneyOut = _moneyOut;
+    ReportFilterState.moneyType = _moneyType;
     ReportFilterState.hasSavedFilters = true;
   }
 
@@ -1387,7 +1412,10 @@ class _ReportsViewState extends State<_ReportsView> {
     return _searchTextCache[e] = out.toString();
   }
 
-  List<EntryModel> _filterEntries(ProjectProvider projectProvider, String quickCategoryTab) {
+  /// [scopeOnly]: only where / when (project, floor, phase, activity, payment
+  /// status, period) — the finance table applies type, search and the item
+  /// pick to its own rows.
+  List<EntryModel> _filterEntries(ProjectProvider projectProvider, String quickCategoryTab, {bool scopeOnly = false}) {
     final List<EntryModel> allEntries = projectProvider.entries;
     String getProjectName(String id) {
       return projectProvider.projects
@@ -1427,14 +1455,16 @@ class _ReportsViewState extends State<_ReportsView> {
           }
         }
       }
-      if (!_selectedTypes.contains(entry.type)) {
+      if (!scopeOnly && !_selectedTypes.contains(entry.type)) {
         return false;
       }
-      if (_searchQuery.isNotEmpty &&
+      if (!scopeOnly &&
+          _searchQuery.isNotEmpty &&
           !_matchesSearch(entry, getProjectName(entry.projectId), _searchQuery)) {
         return false;
       }
-      if (quickCategoryTab != 'All' &&
+      if (!scopeOnly &&
+          quickCategoryTab != 'All' &&
           _selectedItemName != null &&
           _selectedItemName != 'All') {
         final matchesItem = entry.description == _selectedItemName ||
@@ -1485,6 +1515,119 @@ class _ReportsViewState extends State<_ReportsView> {
     }).toList();
   }
 
+  // ───────────────────────────────────────────── finance table (money rows)
+
+  bool get _financeOn => RoleManager.canViewFinances && !_financeHidden;
+
+  LedgerQuery get _ledgerQuery => LedgerQuery(projectId: _selectedProjectId, from: _startDate, to: _endDate);
+
+  Future<void> _loadLedger({bool keepRows = false}) async {
+    final id = ++_ledgerRequest;
+    final query = _ledgerQuery;
+    _ledgerQueryKey = query.key;
+    setState(() {
+      _ledgerLoading = true;
+      _ledgerError = null;
+      if (!keepRows) _ledger = null;
+    });
+    try {
+      final r = await LedgerApi.fetch(query);
+      if (!mounted || id != _ledgerRequest) return;
+      setState(() {
+        _ledger = r;
+        _ledgerLoading = false;
+      });
+    } on LedgerForbidden {
+      if (!mounted || id != _ledgerRequest) return;
+      setState(() {
+        _financeHidden = true; // not allowed: back to the spending sheet
+        _ledgerLoading = false;
+      });
+    } on LedgerFailure catch (e) {
+      if (!mounted || id != _ledgerRequest) return;
+      // Never leave old numbers (or a zero) on screen next to an error.
+      setState(() {
+        _ledger = null;
+        _ledgerError = e.message;
+        _ledgerLoading = false;
+      });
+    }
+    if (mounted) _moneyVersion.value++;
+  }
+
+  /// Called from build: loads the ledger on first show and again when the
+  /// project / period changed, or an entry was added, edited or paid.
+  void _syncLedger(ProjectProvider pp) {
+    final key = _ledgerQuery.key;
+    final entries = pp.entries;
+    final sig = '${entries.length}|${entries.fold<double>(0, (a, e) => a + e.amount + e.paidAmount)}';
+    final keyChanged = key != _ledgerQueryKey;
+    final entriesChanged = _ledger != null && !_ledgerLoading && !pp.entriesLoading && sig != _ledgerEntriesSig;
+    if (!keyChanged && !entriesChanged) {
+      if (_ledger == null) _ledgerEntriesSig = sig;
+      return;
+    }
+    _ledgerQueryKey = key;
+    _ledgerEntriesSig = sig;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _loadLedger(keepRows: !keyChanged);
+    });
+  }
+
+  /// Floor / phase / activity / payment-status filters only describe spending
+  /// entries: while one is on, other money rows (client payments…) are hidden.
+  bool get _hasEntryOnlyFilter =>
+      _selectedStatus != 'All' ||
+      (_selectedProjectId != 'all' &&
+          ((_selectedFloor != null && _selectedFloor != 'Select Floor') ||
+              (_selectedPhaseId != null && _selectedPhaseId != 'Select Phase') ||
+              (_selectedActivityName != null && _selectedActivityName != 'Select Activity')));
+
+  /// The finance table's rows under the current filters, sorted as chosen.
+  List<MoneyRow> _moneyRowsNow(ProjectProvider pp) {
+    final ledger = _ledger;
+    if (ledger == null) return const [];
+    String projectName(String id) => pp.projects.where((p) => p.id == id).firstOrNull?.name ?? 'Unknown Project';
+    final all = MoneyTable.join(ledger, {for (final e in pp.entries) e.id: e});
+    final inScope = {for (final e in _filterEntries(pp, 'All', scopeOnly: true)) e.id};
+    final entryOnly = _hasEntryOnlyFilter;
+    final rows = MoneyTable.filter(
+      all,
+      moneyIn: _moneyIn,
+      moneyOut: _moneyOut,
+      type: _moneyType,
+      query: _searchQuery,
+      inScope: (r) => r.entry != null ? inScope.contains(r.id) : !entryOnly,
+      entryMatches: (e, token) => _matchesSearch(e, projectName(e.projectId), token),
+    );
+    MoneyTable.sort(rows, _sortColumn, _sortAscending);
+    return rows;
+  }
+
+  /// Money in / Money out toggle: the last one left on stays on.
+  void _toggleDirection({required bool isIn}) {
+    setState(() {
+      final other = isIn ? _moneyOut : _moneyIn;
+      if (!other) return;
+      if (isIn) {
+        _moneyIn = !_moneyIn;
+      } else {
+        _moneyOut = !_moneyOut;
+      }
+      _currentPage = 1;
+    });
+  }
+
+  String get _moneySortLabel => switch (_sortColumn) {
+        'title' => _sortAscending ? 'Description · A–Z' : 'Description · Z–A',
+        'project' => _sortAscending ? 'Project · A–Z' : 'Project · Z–A',
+        'type' => _sortAscending ? 'Type · A–Z' : 'Type · Z–A',
+        'in' => _sortAscending ? 'In · low' : 'In · high',
+        'out' => _sortAscending ? 'Out · low' : 'Out · high',
+        'amount' => _sortAscending ? 'Amount · low' : 'Amount · high',
+        _ => _sortAscending ? 'Date · oldest' : 'Date · newest',
+      };
+
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<ReportProvider>();
@@ -1498,9 +1641,20 @@ class _ReportsViewState extends State<_ReportsView> {
           'Unknown Project';
     }
 
-    final quickCategoryTab = _quickTab();
-    final filtered = _filterEntries(projectProvider, quickCategoryTab);
-    filtered.sort((a, b) => compareReportEntries(a, b, _sortColumn, _sortAscending, getProjectName));
+    final canFinance = _financeOn;
+    if (canFinance) _syncLedger(projectProvider);
+    // People with View finances get one table of all money (spending entries
+    // are joined to the ledger rows); everyone else the spending entries.
+    final quickCategoryTab = canFinance ? 'All' : _quickTab();
+    final moneyRows = canFinance ? _moneyRowsNow(projectProvider) : const <MoneyRow>[];
+    final List<EntryModel> filtered;
+    if (canFinance) {
+      // Spending entries among the shown rows: what By type adds up.
+      filtered = [for (final r in moneyRows) if (r.entry != null) r.entry!];
+    } else {
+      filtered = _filterEntries(projectProvider, quickCategoryTab);
+      filtered.sort((a, b) => compareReportEntries(a, b, _sortColumn, _sortAscending, getProjectName));
+    }
     double materialTotal = 0;
     double labourTotal = 0;
     double equipmentTotal = 0;
@@ -1522,7 +1676,7 @@ class _ReportsViewState extends State<_ReportsView> {
       }
     }
     final grandRemaining = (grandTotal - grandPaid).clamp(0.0, double.infinity);
-    final totalCount = filtered.length;
+    final totalCount = canFinance ? moneyRows.length : filtered.length;
     final totalPages = (totalCount / _rowsPerPage).ceil() == 0
         ? 1
         : (totalCount / _rowsPerPage).ceil();
@@ -1533,16 +1687,25 @@ class _ReportsViewState extends State<_ReportsView> {
     final endIndex = (startIndex + _rowsPerPage < totalCount)
         ? startIndex + _rowsPerPage
         : totalCount;
-    final List<EntryModel> paginatedEntries = (totalCount > 0)
+    final List<EntryModel> paginatedEntries = (!canFinance && totalCount > 0)
         ? filtered.sublist(startIndex, endIndex)
         : [];
+    final List<MoneyRow> paginatedMoney = (canFinance && totalCount > 0)
+        ? moneyRows.sublist(startIndex, endIndex)
+        : const [];
+    final bool pageEmpty = canFinance ? paginatedMoney.isEmpty : paginatedEntries.isEmpty;
+    // Finance table states: loading (first fetch, or entries still arriving),
+    // error (the ledger, or the entries it is joined with — never zeros).
+    final String? moneyError = !canFinance
+        ? null
+        : (_ledgerError ??
+            (_ledger != null && allEntries.isEmpty && projectProvider.entriesError.isNotEmpty ? projectProvider.entriesError : null));
+    final bool moneyLoading = canFinance && moneyError == null && (_ledger == null || (allEntries.isEmpty && projectProvider.entriesLoading));
     // Pinned column first, then the saved order — same for sheet and exports.
     final List<String> activeCols = _displayColumns(quickCategoryTab);
     final String? pinnedCol = activeCols.isEmpty ? null : activeCols.first;
     void onPinColumn(String column) => _pinColumn(quickCategoryTab, column);
     final bt = context.bt;
-    final canFinance = RoleManager.canViewFinances && !_financeHidden;
-    final ledgerOn = canFinance && _ledgerView != null;
     final entriesTitle = quickCategoryTab == 'All' || quickCategoryTab.isEmpty
         ? 'Entries'
         : '$quickCategoryTab entries';
@@ -1556,9 +1719,16 @@ class _ReportsViewState extends State<_ReportsView> {
         });
 
     void openFullScreen() {
+      if (canFinance && _ledger == null) {
+        btToast(context, 'The money entries are still loading.');
+        return;
+      }
       Navigator.of(context).push(
         MaterialPageRoute(
           builder: (context) => _FullScreenLogsViewer(
+            moneyRowsOf: canFinance ? () => _moneyRowsNow(context.read<ProjectProvider>()) : null,
+            moneyChanged: _moneyVersion,
+            onMoneyRowTap: (r) => _onMoneyRowTap(r, getProjectName),
             // Re-filtered from the live entry list on every rebuild, so rows
             // edited / added / paid from here show their new values.
             entriesOf: (pp) => _filterEntries(pp, quickCategoryTab),
@@ -1569,18 +1739,22 @@ class _ReportsViewState extends State<_ReportsView> {
                 ? 'Report Logs'
                 : '$quickCategoryTab Report Logs',
             // Read at call time: a column pinned in full screen counts too.
-            onExportCsv: (rows) => _handleCsvExport(
-              rows,
-              getProjectName,
-              quickCategoryTab,
-              activeColumns: _displayColumns(quickCategoryTab),
-            ),
-            onExportPdf: (rows) => _handlePdfExport(
-              rows,
-              getProjectName,
-              quickCategoryTab,
-              activeColumns: _displayColumns(quickCategoryTab),
-            ),
+            onExportCsv: (rows) => canFinance
+                ? _exportMoney(context.read<ProjectProvider>(), pdf: false)
+                : _handleCsvExport(
+                    rows,
+                    getProjectName,
+                    quickCategoryTab,
+                    activeColumns: _displayColumns(quickCategoryTab),
+                  ),
+            onExportPdf: (rows) => canFinance
+                ? _exportMoney(context.read<ProjectProvider>(), pdf: true)
+                : _handlePdfExport(
+                    rows,
+                    getProjectName,
+                    quickCategoryTab,
+                    activeColumns: _displayColumns(quickCategoryTab),
+                  ),
             columnsOf: () => _displayColumns(quickCategoryTab),
             onPinColumn: onPinColumn,
             sortColumn: _sortColumn,
@@ -1597,7 +1771,51 @@ class _ReportsViewState extends State<_ReportsView> {
 
     void openEditColumns() => _showCustomizeColumnsDialog(context, quickCategoryTab.isEmpty ? 'All' : quickCategoryTab);
 
+    void openMoneyExport() {
+      if (moneyRows.isEmpty) {
+        btToast(context, 'Nothing to export for these filters.', error: true);
+        return;
+      }
+      showBtSheet(
+        context,
+        title: 'Export',
+        subtitle: '$totalCount ${totalCount == 1 ? 'row' : 'rows'} · current filters',
+        builder: (sheetCtx) => Row(
+          children: [
+            Expanded(
+              child: _ExportFormatCard(
+                format: 'PDF',
+                title: 'Download PDF',
+                subtitle: 'Ready to print or share',
+                dark: true,
+                onTap: () {
+                  Navigator.pop(sheetCtx);
+                  _exportMoney(projectProvider, pdf: true);
+                },
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _ExportFormatCard(
+                format: 'CSV',
+                title: 'Download CSV',
+                subtitle: 'Opens in Excel or Google Sheets',
+                onTap: () {
+                  Navigator.pop(sheetCtx);
+                  _exportMoney(projectProvider, pdf: false);
+                },
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     void openExport() {
+      if (canFinance) {
+        openMoneyExport();
+        return;
+      }
       final shown = activeCols.length;
       final all = _getAllColumnsForTab(quickCategoryTab.isEmpty ? 'All' : quickCategoryTab).length;
       showBtSheet(
@@ -1666,15 +1884,23 @@ class _ReportsViewState extends State<_ReportsView> {
             const BtSectionHeader(title: 'Sort by', caption: true),
             BtGroup(
               children: [
-                for (final o in const [
-                  ['date', false, 'Purchase date: newest first', null],
-                  ['date', true, 'Purchase date: oldest first', null],
-                  ['paymentDate', false, 'Payment date: newest first', 'Latest payment · unpaid entries last'],
-                  ['paymentDate', true, 'Payment date: oldest first', 'Latest payment · unpaid entries last'],
-                  ['amount', false, 'Amount: high to low', null],
-                  ['amount', true, 'Amount: low to high', null],
-                  ['project', true, 'Project name', null],
-                ])
+                for (final o in canFinance
+                    ? const [
+                        ['date', false, 'Date: newest first', null],
+                        ['date', true, 'Date: oldest first', null],
+                        ['amount', false, 'Amount: high to low', null],
+                        ['amount', true, 'Amount: low to high', null],
+                        ['project', true, 'Project name', null],
+                      ]
+                    : const [
+                        ['date', false, 'Purchase date: newest first', null],
+                        ['date', true, 'Purchase date: oldest first', null],
+                        ['paymentDate', false, 'Payment date: newest first', 'Latest payment · unpaid entries last'],
+                        ['paymentDate', true, 'Payment date: oldest first', 'Latest payment · unpaid entries last'],
+                        ['amount', false, 'Amount: high to low', null],
+                        ['amount', true, 'Amount: low to high', null],
+                        ['project', true, 'Project name', null],
+                      ])
                   BtRow(
                     title: o[2] as String,
                     subtitle: o[3] as String?,
@@ -1696,16 +1922,17 @@ class _ReportsViewState extends State<_ReportsView> {
             const SizedBox(height: 16),
             BtGroup(
               children: [
-                BtRow(
-                  leading: const BtTile(icon: Icons.view_column_outlined),
-                  title: 'Edit columns',
-                  subtitle: 'For table and exports',
-                  showChevron: true,
-                  onTap: () {
-                    Navigator.pop(sheetCtx);
-                    openEditColumns();
-                  },
-                ),
+                if (!canFinance)
+                  BtRow(
+                    leading: const BtTile(icon: Icons.view_column_outlined),
+                    title: 'Edit columns',
+                    subtitle: 'For table and exports',
+                    showChevron: true,
+                    onTap: () {
+                      Navigator.pop(sheetCtx);
+                      openEditColumns();
+                    },
+                  ),
                 BtRow(
                   leading: const BtTile(icon: Icons.table_chart_outlined),
                   title: 'Open as table',
@@ -1739,18 +1966,20 @@ class _ReportsViewState extends State<_ReportsView> {
     final periodChip = _datePreset == 'Custom' && (_startDate != null || _endDate != null)
         ? '${_startDate == null ? '…' : formatShortDate(_startDate)} – ${_endDate == null ? '…' : formatShortDate(_endDate)}'
         : _sentence(_datePreset);
-    final showSheet = _tableView && paginatedEntries.isNotEmpty;
+    final showSheet = canFinance ? paginatedMoney.isNotEmpty : (_tableView && paginatedEntries.isNotEmpty);
     // Floor / phase / activity show on their own chips, so the Filter chip
     // counts only what is set inside the sheet alone (payment status).
     final extraFilters = _selectedStatus == 'All' ? 0 : 1;
     final searchVisible = _searchOpen || _searchQuery.isNotEmpty;
     final showWhere = _showWhereChips(projectProvider);
-    final sortLabel = switch (_sortColumn) {
-      'amount' => _sortAscending ? 'Amount · low' : 'Amount · high',
-      'project' => _sortAscending ? 'Project · A–Z' : 'Project · Z–A',
-      'paymentDate' => _sortAscending ? 'Paid on · oldest' : 'Paid on · newest',
-      _ => _sortAscending ? 'Purchased · oldest' : 'Purchased · newest',
-    };
+    final sortLabel = canFinance
+        ? _moneySortLabel
+        : switch (_sortColumn) {
+            'amount' => _sortAscending ? 'Amount · low' : 'Amount · high',
+            'project' => _sortAscending ? 'Project · A–Z' : 'Project · Z–A',
+            'paymentDate' => _sortAscending ? 'Paid on · oldest' : 'Paid on · newest',
+            _ => _sortAscending ? 'Purchased · oldest' : 'Purchased · newest',
+          };
     final topInset = MediaQuery.paddingOf(context).top;
     final glass = Colors.white.withValues(alpha: .09);
 
@@ -1769,12 +1998,8 @@ class _ReportsViewState extends State<_ReportsView> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      ledgerOn
-                          ? '${switch (_ledgerView!) {
-                              LedgerDirection.inbound => 'MONEY IN',
-                              LedgerDirection.outbound => 'MONEY OUT',
-                              LedgerDirection.all => 'MONEY IN AND OUT',
-                            }} · ${periodChip.toUpperCase()}'
+                      moneyLoading
+                          ? 'LOADING · ${periodChip.toUpperCase()}'
                           : '$totalCount ${totalCount == 1 ? 'ENTRY' : 'ENTRIES'} · ${periodChip.toUpperCase()}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -1810,7 +2035,7 @@ class _ReportsViewState extends State<_ReportsView> {
                   color: Bt.bone,
                   size: 20,
                   background: glass,
-                  onTap: ledgerOn ? () => _ledgerKey.currentState?.openExport() : openExport,
+                  onTap: openExport,
                 ),
                 radius: 22,
               ),
@@ -1865,8 +2090,8 @@ class _ReportsViewState extends State<_ReportsView> {
                   ),
                   radius: Bt.rChip,
                 ),
-                if (!ledgerOn) const SizedBox(width: 8),
-                if (!ledgerOn) _tour(
+                const SizedBox(width: 8),
+                _tour(
                   ShowcaseKeys.reportFilters,
                   'More filters',
                   'Every filter in one place, including payment status (paid, partial, not paid). The number shows when a payment filter is on.',
@@ -1882,7 +2107,7 @@ class _ReportsViewState extends State<_ReportsView> {
               ],
             ),
           ),
-          if (showWhere && !ledgerOn) ...[
+          if (showWhere) ...[
           const SizedBox(height: 8),
           _tour(
             _kWhere,
@@ -1929,14 +2154,16 @@ class _ReportsViewState extends State<_ReportsView> {
                   const SizedBox(width: 8),
                   ..._categoryToolbarChips(context, quickCategoryTab, allEntries),
                 ],
-                const SizedBox(width: 8),
-                _tour(
-                  _kEditColumns,
-                  'Edit columns',
-                  'Choose which columns the sheet shows and drag them into the order you like. Each tab remembers its own columns.',
-                  _ToolChip(icon: Icons.view_column_outlined, label: 'Edit columns', onTap: openEditColumns),
-                  radius: Bt.rChip,
-                ),
+                if (!canFinance) ...[
+                  const SizedBox(width: 8),
+                  _tour(
+                    _kEditColumns,
+                    'Edit columns',
+                    'Choose which columns the sheet shows and drag them into the order you like. Each tab remembers its own columns.',
+                    _ToolChip(icon: Icons.view_column_outlined, label: 'Edit columns', onTap: openEditColumns),
+                    radius: Bt.rChip,
+                  ),
+                ],
                 const SizedBox(width: 8),
                 _tour(
                   _kSort,
@@ -1970,30 +2197,44 @@ class _ReportsViewState extends State<_ReportsView> {
             ),
           ),
         ),
-        const SizedBox(width: 8),
-        _tour(
-          _kViewToggle,
-          'Sheet or list',
-          'Left: spreadsheet view, one row per entry in columns (default). Right: card list grouped by date. Your choice is remembered.',
-          ReportViewToggle(
-            table: _tableView,
-            onChanged: (v) => setState(() {
-              _tableView = v;
-              ReportFilterState.tableView = v;
-            }),
+        if (!canFinance) ...[
+          const SizedBox(width: 8),
+          _tour(
+            _kViewToggle,
+            'Sheet or list',
+            'Left: spreadsheet view, one row per entry in columns (default). Right: card list grouped by date. Your choice is remembered.',
+            ReportViewToggle(
+              table: _tableView,
+              onChanged: (v) => setState(() {
+                _tableView = v;
+                ReportFilterState.tableView = v;
+              }),
+            ),
+            radius: Bt.rChip,
           ),
-          radius: Bt.rChip,
-        ),
+        ],
       ],
     );
 
     // ── summary strip: Total billed · Paid · Remaining
-    final summary = _tour(
-      _chartsKey,
-      'Totals',
-      'Total billed, how much is paid and what is still to pay, for exactly the entries matching your project, period and filters.',
-      _SummaryStrip(total: grandTotal, paid: grandPaid, remaining: grandRemaining),
-    );
+    final moneyTotals = MoneyTable.totals(moneyRows);
+    final Widget summary = canFinance
+        ? (moneyLoading
+            ? const BtSkeleton(height: 62, radius: 14)
+            : moneyError != null
+                ? const SizedBox.shrink()
+                : _tour(
+                    _chartsKey,
+                    'Totals',
+                    'Money in, money out and what is left (net), for exactly the rows matching your project, period and filters.',
+                    _SummaryStrip.money(moneyIn: moneyTotals.moneyIn, moneyOut: moneyTotals.moneyOut),
+                  ))
+        : _tour(
+            _chartsKey,
+            'Totals',
+            'Total billed, how much is paid and what is still to pay, for exactly the entries matching your project, period and filters.',
+            _SummaryStrip(total: grandTotal, paid: grandPaid, remaining: grandRemaining),
+          );
 
     return Scaffold(
       backgroundColor: Bt.ground,
@@ -2003,16 +2244,17 @@ class _ReportsViewState extends State<_ReportsView> {
           // toolbar and summary so it is fully visible without scrolling.
           // 297 = header + tabs + toolbar + summary; +44 = the floor / phase /
           // activity chip row.
-          final chromeAbove = topInset + 297 + (showWhere ? 44 : 0) + (searchVisible ? 54 : 0) + (canFinance ? 56 : 0);
+          final chromeAbove = topInset + 297 + (showWhere ? 44 : 0) + (searchVisible ? 54 : 0);
           const chromeBelow = ReportSheet.footerHeight + 60;
           final sheetMax = (viewport.maxHeight - chromeAbove - chromeBelow).clamp(260.0, 900.0);
           return RefreshIndicator(
             color: Bt.noir,
             backgroundColor: bt.accent,
             edgeOffset: topInset,
-            onRefresh: () => ledgerOn
-                ? (_ledgerKey.currentState?.refresh() ?? Future.value())
-                : ReportFilterState.reloadEntries(context),
+            onRefresh: () => Future.wait([
+              ReportFilterState.reloadEntries(context),
+              if (canFinance) _loadLedger(keepRows: true),
+            ]),
             child: ListView(
               controller: _scrollController,
               physics: const AlwaysScrollableScrollPhysics(parent: ClampingScrollPhysics()),
@@ -2025,53 +2267,33 @@ class _ReportsViewState extends State<_ReportsView> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      if (canFinance) ...[
-                        BtSegmented<int>(
-                          segments: const {0: 'Spending', 1: 'Money in', 2: 'Money out', 3: 'All'},
-                          value: switch (_ledgerView) {
-                            null => 0,
-                            LedgerDirection.inbound => 1,
-                            LedgerDirection.outbound => 2,
-                            LedgerDirection.all => 3,
-                          },
-                          onChanged: (v) => setState(() {
-                            _ledgerView = switch (v) {
-                              1 => LedgerDirection.inbound,
-                              2 => LedgerDirection.outbound,
-                              3 => LedgerDirection.all,
-                              _ => null,
-                            };
-                          }),
-                        ),
-                        const SizedBox(height: 12),
-                      ],
-                      if (ledgerOn)
-                        LedgerPanel(
-                          key: _ledgerKey,
-                          direction: _ledgerView!,
-                          projectId: _selectedProjectId,
-                          projectLabel: projectName,
-                          periodLabel: periodChip,
-                          from: _startDate,
-                          to: _endDate,
-                          onForbidden: () => WidgetsBinding.instance.addPostFrameCallback((_) {
-                            if (!mounted) return;
-                            setState(() {
-                              _financeHidden = true;
-                              _ledgerView = null;
-                            });
-                          }),
+                      if (canFinance)
+                        _tour(
+                          _kTabs,
+                          'Money filters',
+                          'Money in and Money out are both on to show everything; turn one off to see only the other. Then pick a type: Material, Labour, Equipment, Client payment, Loan or Other.',
+                          MoneyQuickFilters(
+                            moneyIn: _moneyIn,
+                            moneyOut: _moneyOut,
+                            type: _moneyType,
+                            onMoneyIn: () => _toggleDirection(isIn: true),
+                            onMoneyOut: () => _toggleDirection(isIn: false),
+                            onType: (t) => setState(() {
+                              _moneyType = t;
+                              _currentPage = 1;
+                            }),
+                          ),
                         )
-                      else ...[
-                      _tour(
-                        _kTabs,
-                        'Entry types',
-                        'Switch between All entries, Materials, Labour and Equipment. Each tab has its own columns and an item picker.',
-                        _CategoryTabs(
-                          activeTab: quickCategoryTab,
-                          onTabChanged: _selectCategoryTab,
+                      else
+                        _tour(
+                          _kTabs,
+                          'Entry types',
+                          'Switch between All entries, Materials, Labour and Equipment. Each tab has its own columns and an item picker.',
+                          _CategoryTabs(
+                            activeTab: quickCategoryTab,
+                            onTabChanged: _selectCategoryTab,
+                          ),
                         ),
-                      ),
                       const SizedBox(height: 12),
                       toolbar,
                       AnimatedSize(
@@ -2090,14 +2312,22 @@ class _ReportsViewState extends State<_ReportsView> {
                       const SizedBox(height: 12),
                       summary,
                       const SizedBox(height: 12),
-                      if (paginatedEntries.isEmpty && projectProvider.entriesLoading)
+                      if (moneyError != null)
+                        BtErrorCard(
+                          message: moneyError,
+                          onRetry: () {
+                            ReportFilterState.reloadEntries(context);
+                            _loadLedger();
+                          },
+                        )
+                      else if (canFinance ? moneyLoading : (paginatedEntries.isEmpty && projectProvider.entriesLoading))
                         const BtCard(
                           child: Padding(
                             padding: EdgeInsets.symmetric(vertical: 28),
                             child: Center(child: BtBrickLoader(label: 'Loading entries…')),
                           ),
                         )
-                      else if (paginatedEntries.isEmpty)
+                      else if (pageEmpty)
                         const BtCard(
                           child: BtEmpty(
                             icon: Icons.search_off_outlined,
@@ -2108,8 +2338,27 @@ class _ReportsViewState extends State<_ReportsView> {
                         _tour(
                           _kSheet,
                           'The sheet',
-                          'One row per entry. Tap a row to see all its details and to add more, record a payment or edit it.',
-                          ReportSheet(
+                          canFinance
+                              ? 'One row per money movement: spending entries, client payments, loans and other money out. Tap a row for its details; spending rows also let you add more, record a payment or edit.'
+                              : 'One row per entry. Tap a row to see all its details and to add more, record a payment or edit it.',
+                          canFinance
+                          ? ReportSheet.money(
+                              tourWrap: (part, child) => part == 'header'
+                                  ? _tour(_kSheetHeader, 'Sort by a column', 'Tap the DATE, DESCRIPTION, PROJECT, TYPE, IN or OUT heading to sort by it; tap it again to flip the order.', child, radius: 0)
+                                  : _tour(_kSheetScroll, 'Scroll sideways', 'Swipe the sheet left and right to see every column — the description stays put. This bar shows where you are.', child),
+                              rows: paginatedMoney,
+                              maxHeight: sheetMax,
+                              firstRowNumber: startIndex + 1,
+                              statusOf: statusOf,
+                              sortColumn: _sortColumn,
+                              sortAscending: _sortAscending,
+                              onSort: onSheetSort,
+                              onMoneyRowTap: (r) => _onMoneyRowTap(r, getProjectName, rowNumber: startIndex + paginatedMoney.indexOf(r) + 1),
+                              onAddMore: (e) => _ReportActions.addMore(context, e),
+                              onRecordPayment: (e) => _ReportActions.recordPayment(context, e, getProjectName(e.projectId)),
+                              onEdit: (e) => _ReportActions.editEntry(context, e),
+                            )
+                          : ReportSheet(
                           tourWrap: (part, child) => part == 'header'
                               ? _tour(_kSheetHeader, 'Sort by a column', 'Tap the PURCHASE DATE, PAYMENT DATE, PROJECT or AMOUNT heading to sort by it; tap it again to flip the order. Long-press any heading to pin that column on the left.', child, radius: 0)
                               : _tour(_kSheetScroll, 'Scroll sideways', 'Swipe the sheet left and right to see every column — the pinned column stays put. This bar shows where you are.', child),
@@ -2140,7 +2389,15 @@ class _ReportsViewState extends State<_ReportsView> {
                             children: _buildEntryGroups(context, paginatedEntries, getProjectName),
                           ),
                         ),
-                      if (paginatedEntries.isNotEmpty && (showSheet || totalCount > _rowsPerPage || _rowsPerPage != 10))
+                      if (canFinance && _ledger?.truncated == true && !pageEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2, bottom: 10),
+                          child: Text(
+                            'Showing the newest ${_ledger!.rows.length} entries; totals cover those rows. Narrow the project or period to see the rest.',
+                            style: BtText.caption(context),
+                          ),
+                        ),
+                      if (!pageEmpty && (showSheet || totalCount > _rowsPerPage || _rowsPerPage != 10))
                         _tour(
                           _kPager,
                           'Pages',
@@ -2196,7 +2453,19 @@ class _ReportsViewState extends State<_ReportsView> {
                         labour: labourTotal,
                         equipment: equipmentTotal,
                         onType: (tab) {
-                          _selectCategoryTab(tab);
+                          if (canFinance) {
+                            setState(() {
+                              _moneyType = switch (tab) {
+                                'Materials' => MoneyType.material,
+                                'Labour' => MoneyType.labour,
+                                'Equipment' => MoneyType.equipment,
+                                _ => MoneyType.all,
+                              };
+                              _currentPage = 1;
+                            });
+                          } else {
+                            _selectCategoryTab(tab);
+                          }
                           if (_scrollController.hasClients) {
                             _scrollController.animateTo(0, duration: Bt.medium, curve: Bt.ease);
                           }
@@ -2204,7 +2473,6 @@ class _ReportsViewState extends State<_ReportsView> {
                       ),
                       const SizedBox(height: 28),
                       _buildCsvImportCard(),
-                      ],
                     ],
                   ),
                 ),
@@ -2508,7 +2776,7 @@ class _ReportsViewState extends State<_ReportsView> {
           final phases = o.phases;
           final selectedPhase = o.phase;
           final activityNames = o.activities;
-          final count = _filterEntries(projectProvider, _quickTab()).length;
+          final count = _financeOn ? _moneyRowsNow(projectProvider).length : _filterEntries(projectProvider, _quickTab()).length;
           final hasProject = _selectedProjectId != 'all';
 
           Widget whereRow(String label, String value, bool enabled, Future<void> Function() onTap) => BtRow(
@@ -3027,6 +3295,54 @@ class _ReportsViewState extends State<_ReportsView> {
     );
   }
 
+  /// Finance table row tapped: spending entries open the entry details (with
+  /// Add More / Payment / Edit); other money opens its own details sheet with
+  /// "Change category".
+  void _onMoneyRowTap(MoneyRow r, String Function(String) projectNameOf, {int? rowNumber}) {
+    final e = r.entry;
+    if (e != null) {
+      _showEntryDetailsDialog(context, e, projectNameOf(e.projectId), rowNumber: rowNumber);
+    } else {
+      showMoneyRowDetails(context, r, onChanged: () => _loadLedger(keepRows: true));
+    }
+  }
+
+  /// Download exactly the finance table as shown: the filtered rows in the
+  /// current order, with In / Out / Net at the bottom.
+  Future<void> _exportMoney(ProjectProvider pp, {required bool pdf}) async {
+    final rows = _moneyRowsNow(pp);
+    if (rows.isEmpty) {
+      btToast(context, 'Nothing to export for these filters.', error: true);
+      return;
+    }
+    String statusOf(EntryModel e) => _getPaymentStatusLabel(e.paymentStatus, amount: e.amount, paidAmount: e.paidAmount);
+    try {
+      if (!pdf) {
+        await MoneyExport.shareCsv(rows, statusOf);
+        return;
+      }
+      final project = pp.projects.where((p) => p.id == _selectedProjectId).firstOrNull;
+      final projectName = _selectedProjectId == 'all' ? 'All projects' : (project?.name ?? 'Project');
+      final parts = <String>[
+        'Project: $projectName',
+        'Date Range: $_datePreset',
+        'Showing: ${_moneyIn && _moneyOut ? 'Money in and out' : (_moneyIn ? 'Money in' : 'Money out')}',
+        if (_moneyType != MoneyType.all) 'Type: ${_moneyType.label}',
+        if (_selectedStatus != 'All') 'Status: $_selectedStatus',
+        if (_searchQuery.isNotEmpty) 'Search: $_searchQuery',
+        if (_ledger?.truncated == true) 'Newest ${_ledger!.rows.length} entries only',
+      ];
+      await MoneyExport.sharePdf(
+        rows,
+        statusOf,
+        title: _selectedProjectId == 'all' ? 'All Projects Money Report' : '$projectName Money Report',
+        filterSummary: parts.join(' | '),
+      );
+    } catch (e) {
+      if (mounted) btToast(context, '${pdf ? 'PDF' : 'CSV'} Export failed: $e', error: true);
+    }
+  }
+
   void _showEntryDetailsDialog(
     BuildContext context,
     EntryModel entry,
@@ -3450,16 +3766,30 @@ class _ToolChip extends StatelessWidget {
   }
 }
 
-/// Slim 3-cell strip: Total billed · Paid · Remaining.
+/// Slim 3-cell strip: Total billed · Paid · Remaining (or, for the finance
+/// table, In · Out · Net).
 class _SummaryStrip extends StatelessWidget {
-  const _SummaryStrip({required this.total, required this.paid, required this.remaining});
+  const _SummaryStrip({required this.total, required this.paid, required this.remaining})
+      : labels = const ('Total billed', 'Paid', 'Remaining'),
+        net = false;
+
+  /// In · Out · Net of the finance table's rows. Net is [moneyIn] − [moneyOut].
+  const _SummaryStrip.money({required double moneyIn, required double moneyOut})
+      : total = moneyIn,
+        paid = moneyOut,
+        remaining = moneyIn - moneyOut,
+        labels = const ('In', 'Out', 'Net'),
+        net = true;
+
   final double total;
   final double paid;
   final double remaining;
+  final (String, String, String) labels;
+  final bool net;
 
   @override
   Widget build(BuildContext context) {
-    Widget cell(String label, double v, Color color) => Expanded(
+    Widget cell(String label, double v, Color color, {String Function(double)? format}) => Expanded(
           child: Container(
             color: Bt.card,
             padding: const EdgeInsets.fromLTRB(11, 9, 11, 9),
@@ -3474,7 +3804,7 @@ class _SummaryStrip extends StatelessWidget {
                   alignment: Alignment.centerLeft,
                   child: BtCountUp(
                     value: v,
-                    format: (x) => formatInr(x),
+                    format: format ?? (x) => formatInr(x),
                     style: BtText.body(context, weight: FontWeight.w700, color: color).copyWith(fontSize: 15),
                   ),
                 ),
@@ -3492,11 +3822,19 @@ class _SummaryStrip extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                cell('Total billed', total, Bt.ink),
-                const SizedBox(width: 1),
-                cell('Paid', paid, Bt.green),
-                const SizedBox(width: 1),
-                cell('Remaining', remaining, remaining > 0 ? Bt.red : Bt.green),
+                if (net) ...[
+                  cell(labels.$1, total, Bt.green),
+                  const SizedBox(width: 1),
+                  cell(labels.$2, paid, Bt.red),
+                  const SizedBox(width: 1),
+                  cell(labels.$3, remaining, remaining >= 0 ? Bt.green : Bt.red, format: (x) => x > 0 ? '+${formatInr(x)}' : formatInr(x)),
+                ] else ...[
+                  cell(labels.$1, total, Bt.ink),
+                  const SizedBox(width: 1),
+                  cell(labels.$2, paid, Bt.green),
+                  const SizedBox(width: 1),
+                  cell(labels.$3, remaining, remaining > 0 ? Bt.red : Bt.green),
+                ],
               ],
             ),
           ),
@@ -3671,7 +4009,16 @@ class _FullScreenLogsViewer extends StatefulWidget {
     required this.onAddMore,
     required this.onRecordPayment,
     required this.onEdit,
+    this.moneyRowsOf,
+    this.moneyChanged,
+    this.onMoneyRowTap,
   });
+
+  /// Finance table: the rows (filtered + sorted by Reports, read on each build)
+  /// instead of [entriesOf], and a signal that they changed.
+  final List<MoneyRow> Function()? moneyRowsOf;
+  final Listenable? moneyChanged;
+  final void Function(MoneyRow)? onMoneyRowTap;
   final List<EntryModel> Function(ProjectProvider) entriesOf;
   final String Function(String) getProjectName;
   final String Function(EntryModel) statusOf;
@@ -3699,6 +4046,10 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
   late bool _sortAscending = widget.sortAscending;
   /// Rows as last built (refiltered + sorted in build from the live entries).
   List<EntryModel> _rows = const [];
+  List<MoneyRow> _moneyRows = const [];
+
+  bool get _isMoney => widget.moneyRowsOf != null;
+  int get _count => _isMoney ? _moneyRows.length : _rows.length;
 
   void _toggleRotation() {
     setState(() {
@@ -3716,7 +4067,7 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
     showBtSheet(
       context,
       title: 'Export',
-      subtitle: '${_rows.length} entries',
+      subtitle: '$_count entries',
       builder: (sheetCtx) => BtGroup(
         children: [
           BtRow(
@@ -3772,7 +4123,7 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
                       Text.rich(
                         TextSpan(children: [
                           TextSpan(text: widget.title),
-                          TextSpan(text: '  (${_rows.length} entries)', style: BtText.caption(context, color: Bt.ink2, weight: FontWeight.w500)),
+                          TextSpan(text: '  ($_count entries)', style: BtText.caption(context, color: Bt.ink2, weight: FontWeight.w500)),
                         ]),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -3812,8 +4163,28 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
             child: LayoutBuilder(
               builder: (context, c) => Align(
                 alignment: Alignment.topCenter,
-                child: _rows.isEmpty
+                child: _count == 0
                     ? const BtCard(child: BtEmpty(icon: Icons.search_off_outlined, title: 'No transaction logs match filters.'))
+                    : _isMoney
+                    ? ReportSheet.money(
+                        rows: _moneyRows,
+                        maxHeight: c.maxHeight - ReportSheet.footerHeight,
+                        pinnedWidth: wide ? 158 : 132,
+                        statusOf: widget.statusOf,
+                        sortColumn: _sortColumn,
+                        sortAscending: _sortAscending,
+                        onSort: (column, ascending) {
+                          setState(() {
+                            _sortColumn = column;
+                            _sortAscending = ascending;
+                          });
+                          widget.onSort(column, ascending);
+                        },
+                        onMoneyRowTap: widget.onMoneyRowTap!,
+                        onAddMore: widget.onAddMore,
+                        onRecordPayment: widget.onRecordPayment,
+                        onEdit: widget.onEdit,
+                      )
                     : ReportSheet(
                         entries: _rows,
                         columns: columns,
@@ -3850,27 +4221,46 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
 
   @override
   Widget build(BuildContext context) {
-    _rows = _sorted(widget.entriesOf(context.watch<ProjectProvider>()));
+    final projectProvider = context.watch<ProjectProvider>();
     final rotated = _quarterTurns != 0;
-    return Scaffold(
-      backgroundColor: Bt.ground,
-      body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            if (!rotated) return _content(constraints.maxWidth);
-            return RotatedBox(
-              quarterTurns: _quarterTurns,
-              child: SizedBox(
-                width: constraints.maxHeight,
-                height: constraints.maxWidth,
-                child: _content(constraints.maxHeight),
-              ),
-            );
-          },
-        ),
-      ),
+    return ListenableBuilder(
+      listenable: widget.moneyChanged ?? const _NeverChanges(),
+      builder: (context, _) {
+        if (_isMoney) {
+          _moneyRows = widget.moneyRowsOf!();
+        } else {
+          _rows = _sorted(widget.entriesOf(projectProvider));
+        }
+        return Scaffold(
+          backgroundColor: Bt.ground,
+          body: SafeArea(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                if (!rotated) return _content(constraints.maxWidth);
+                return RotatedBox(
+                  quarterTurns: _quarterTurns,
+                  child: SizedBox(
+                    width: constraints.maxHeight,
+                    height: constraints.maxWidth,
+                    child: _content(constraints.maxHeight),
+                  ),
+                );
+              },
+            ),
+          ),
+        );
+      },
     );
   }
+}
+
+/// A [Listenable] that never notifies (full screen sheet without a ledger).
+class _NeverChanges implements Listenable {
+  const _NeverChanges();
+  @override
+  void addListener(VoidCallback listener) {}
+  @override
+  void removeListener(VoidCallback listener) {}
 }
 
 final _objectIdPattern = RegExp(r'^[0-9a-fA-F]{24}$');
