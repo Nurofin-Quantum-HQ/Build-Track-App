@@ -1,3 +1,4 @@
+import 'package:buildtrack_mobile/common/widgets/record_payment_sheet.dart';
 import 'package:buildtrack_mobile/common/tour_targets.dart';
 import 'package:buildtrack_mobile/controller/nav_controller.dart';
 import 'package:buildtrack_mobile/design/design.dart';
@@ -2278,6 +2279,11 @@ class _ReportsViewState extends State<_ReportsView> {
                             type: _moneyType,
                             onMoneyIn: () => _toggleDirection(isIn: true),
                             onMoneyOut: () => _toggleDirection(isIn: false),
+                            onRecordPayment: () => showRecordPaymentSheet(
+                              context,
+                              projectId: _selectedProjectId == 'all' ? null : _selectedProjectId,
+                              onSaved: () => _loadLedger(keepRows: true),
+                            ),
                             onType: (t) => setState(() {
                               _moneyType = t;
                               _currentPage = 1;

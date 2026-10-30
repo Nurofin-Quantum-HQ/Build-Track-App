@@ -22,6 +22,7 @@ class MoneyQuickFilters extends StatelessWidget {
     required this.onMoneyIn,
     required this.onMoneyOut,
     required this.onType,
+    this.onRecordPayment,
   });
   final bool moneyIn;
   final bool moneyOut;
@@ -29,6 +30,7 @@ class MoneyQuickFilters extends StatelessWidget {
   final VoidCallback onMoneyIn;
   final VoidCallback onMoneyOut;
   final ValueChanged<MoneyType> onType;
+  final VoidCallback? onRecordPayment;
 
   @override
   Widget build(BuildContext context) {
@@ -36,6 +38,10 @@ class MoneyQuickFilters extends StatelessWidget {
       scrollDirection: Axis.horizontal,
       clipBehavior: Clip.none,
       child: Row(children: [
+        if (onRecordPayment != null) ...[
+          BtChip(label: 'Record payment', icon: Icons.add_rounded, selected: true, onTap: onRecordPayment),
+          const SizedBox(width: 12),
+        ],
         Semantics(
           toggled: moneyIn,
           child: BtChip(label: 'Money in', icon: Icons.south_west_rounded, selected: moneyIn, onTap: onMoneyIn),
