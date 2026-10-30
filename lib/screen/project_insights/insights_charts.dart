@@ -39,15 +39,17 @@ double insNiceStep(double raw) {
 TextStyle _axis() => Ins.t(12, c: Ins.ink3);
 
 // ═════════════════════════════════════════════════════════════════════════════
-// HORIZONTAL BARS — names left, values right
+// VERTICAL BARS — one bar per item, names underneath, ₹ scale on the left
 // ═════════════════════════════════════════════════════════════════════════════
 
 class InsBarItem {
   const InsBarItem({required this.label, required this.value, this.share, this.onTap, this.muted = false});
+
+  /// Full name (the axis shortens it to two lines; the tooltip shows it whole).
   final String label;
   final double value;
 
-  /// 0..1 of the whole the bars belong to (shown next to the value).
+  /// 0..1 of the whole the bars belong to (shown in the tooltip).
   final double? share;
   final VoidCallback? onTap;
 
@@ -55,108 +57,265 @@ class InsBarItem {
   final bool muted;
 }
 
-/// Horizontal bar chart: one row per item (name left, value right, bar
-/// underneath), all on one scale. Bars grow in once.
-class InsHBarChart extends StatelessWidget {
-  const InsHBarChart({super.key, required this.items, required this.color});
+/// Vertical bar chart on one ₹ scale. Fits the width when the bars are wide
+/// enough to read; otherwise the bars keep a fixed width and scroll sideways
+/// while the ₹ axis stays put. Bars grow in once (see [insChartDuration]).
+///
+/// Touch: tap a bar → its [InsBarItem.onTap]. Press and hold → tooltip with the
+/// full name, exact ₹ and share. A bar with no onTap shows the tooltip on tap.
+class InsVBarChart extends StatefulWidget {
+  const InsVBarChart({super.key, required this.items, required this.color, this.height = 232});
   final List<InsBarItem> items;
   final Color color;
 
+  /// Whole chart incl. the name labels underneath.
+  final double height;
+
+  @override
+  State<InsVBarChart> createState() => _InsVBarChartState();
+}
+
+class _InsVBarChartState extends State<InsVBarChart> {
+  static const _axisW = 52.0; // ₹ labels
+  static const _nameH = 38.0; // two lines of names
+  static const _fixedBar = 44.0, _fixedGap = 16.0;
+  static const _minFitSlot = 46.0; // below this the value labels would touch
+  static const _mutedBar = Color(0xFF94A3B8);
+
+  int? _pressed, _pinned;
+
+  int? get _sel => _pressed ?? _pinned;
+
+  @override
+  void didUpdateWidget(InsVBarChart old) {
+    super.didUpdateWidget(old);
+    if (old.items.length != widget.items.length) _pressed = _pinned = null;
+  }
+
+  void _touch(FlTouchEvent event, BarTouchResponse? response) {
+    final i = response?.spot?.touchedBarGroupIndex;
+    if (event is FlTapDownEvent || event is FlPanDownEvent || event is FlLongPressStart) {
+      if (i != null && i != _pressed) setState(() => _pressed = i);
+    } else if (event is FlTapUpEvent) {
+      final item = (i != null && i < widget.items.length) ? widget.items[i] : null;
+      setState(() {
+        _pressed = null;
+        if (item?.onTap != null) {
+          _pinned = null;
+        } else {
+          _pinned = (i == null || i == _pinned) ? null : i;
+        }
+      });
+      item?.onTap?.call();
+    } else if (event is FlTapCancelEvent ||
+        event is FlLongPressEnd ||
+        event is FlPanEndEvent ||
+        event is FlPointerExitEvent) {
+      if (_pressed != null) setState(() => _pressed = null);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final max = items.fold<double>(0, (m, i) => math.max(m, i.value));
-    return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0, end: 1),
-      duration: insChartDuration(context),
-      curve: insChartCurve,
-      builder: (context, t, _) => Column(
-        children: [
-          for (var i = 0; i < items.length; i++)
-            _BarRow(
-              item: items[i],
-              fraction: max > 0 ? items[i].value / max * t : 0,
-              color: color,
-              last: i == items.length - 1,
-            ),
-        ],
+    final items = widget.items;
+    if (items.isEmpty) return const SizedBox.shrink();
+    final maxV = items.fold<double>(0, (m, i) => math.max(m, i.value));
+    final room = maxV * 1.12; // headroom for the value label above the tallest bar
+    final step = maxV > 0 ? insNiceStep(room / 4) : 1.0;
+    final maxY = maxV > 0 ? step * (room / step).ceil() : 4.0;
+    final summary = items.map((i) => '${i.label} ${inrFull(i.value)}').join(', ');
+
+    return Semantics(
+      container: true,
+      label: 'Bar chart of ${items.length} ${items.length == 1 ? 'item' : 'items'}: $summary',
+      child: ExcludeSemantics(
+        child: LayoutBuilder(
+          builder: (context, box) {
+            final n = items.length;
+            final fitSlot = (box.maxWidth - _axisW) / n;
+            final scroll = n > 8 || fitSlot < _minFitSlot;
+            final slot = scroll ? _fixedBar + _fixedGap : fitSlot;
+            final barW = scroll ? _fixedBar : math.min(_fixedBar, slot * .6);
+            return TweenAnimationBuilder<double>(
+              key: ValueKey('$n-${widget.color.toARGB32()}'),
+              tween: Tween(begin: 0, end: 1),
+              duration: insChartDuration(context),
+              curve: insChartCurve,
+              builder: (context, t, _) {
+                final plot = SizedBox(
+                  width: scroll ? n * slot : null,
+                  height: widget.height,
+                  child: BarChart(
+                    duration: Duration.zero,
+                    _data(items, t: t, maxY: maxY, step: step, barW: barW, slot: slot, showAxis: !scroll),
+                  ),
+                );
+                if (!scroll) return plot;
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        SizedBox(
+                          width: _axisW,
+                          height: widget.height,
+                          child: BarChart(duration: Duration.zero, _axisOnly(maxY: maxY, step: step)),
+                        ),
+                        Expanded(
+                          child: SingleChildScrollView(scrollDirection: Axis.horizontal, child: plot),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Padding(
+                      padding: const EdgeInsets.only(left: _axisW),
+                      child: Text('Swipe sideways to see all $n', style: Ins.t(12, c: Ins.ink3)),
+                    ),
+                  ],
+                );
+              },
+            );
+          },
+        ),
       ),
     );
   }
-}
 
-class _BarRow extends StatelessWidget {
-  const _BarRow({required this.item, required this.fraction, required this.color, required this.last});
-  final InsBarItem item;
-  final double fraction;
-  final Color color;
-  final bool last;
+  FlTitlesData _titles({AxisTitles? left, Widget Function(double, TitleMeta)? bottom}) => FlTitlesData(
+    topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+    rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+    leftTitles: left ?? const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+    bottomTitles: AxisTitles(
+      sideTitles: SideTitles(
+        showTitles: true,
+        reservedSize: _nameH,
+        getTitlesWidget: bottom ?? (_, _) => const SizedBox.shrink(),
+      ),
+    ),
+  );
 
-  @override
-  Widget build(BuildContext context) {
-    final fill = item.muted ? Ins.borderStrong : color;
-    final share = item.share;
-    final row = Padding(
-      padding: EdgeInsets.fromLTRB(0, 6, 0, last ? 0 : 6),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  item.label,
-                  style: Ins.t(12, c: Ins.ink2, w: FontWeight.w500),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
+  AxisTitles _yTitles(double step) => AxisTitles(
+    sideTitles: SideTitles(
+      showTitles: true,
+      reservedSize: _axisW - 4,
+      interval: step,
+      getTitlesWidget: (v, m) => v == m.max
+          ? const SizedBox.shrink()
+          : Padding(
+              padding: const EdgeInsets.only(right: 6),
+              child: Text(inrCompact(v), textAlign: TextAlign.right, style: _axis()),
+            ),
+    ),
+  );
+
+  /// The fixed ₹ axis that sits beside a scrolling plot. Same height, same
+  /// (empty) name strip underneath, so its ticks line up with the gridlines.
+  BarChartData _axisOnly({required double maxY, required double step}) => BarChartData(
+    maxY: maxY,
+    minY: 0,
+    gridData: const FlGridData(show: false),
+    borderData: FlBorderData(show: false),
+    barTouchData: BarTouchData(enabled: false),
+    titlesData: _titles(left: _yTitles(step)),
+    barGroups: [
+      BarChartGroupData(
+        x: 0,
+        barRods: [BarChartRodData(toY: 0, width: 1, color: Colors.transparent)],
+      ),
+    ],
+  );
+
+  BarChartData _data(
+    List<InsBarItem> items, {
+    required double t,
+    required double maxY,
+    required double step,
+    required double barW,
+    required double slot,
+    required bool showAxis,
+  }) {
+    final sel = _sel;
+    final nameW = math.max(20.0, slot - 4);
+    return BarChartData(
+      maxY: maxY,
+      minY: 0,
+      alignment: BarChartAlignment.spaceAround,
+      gridData: FlGridData(
+        drawVerticalLine: false,
+        horizontalInterval: step,
+        getDrawingHorizontalLine: (_) => const FlLine(color: Ins.border, strokeWidth: 1),
+      ),
+      borderData: FlBorderData(show: false),
+      titlesData: _titles(
+        left: showAxis ? _yTitles(step) : null,
+        bottom: (v, m) {
+          final i = v.toInt();
+          if (i < 0 || i >= items.length) return const SizedBox.shrink();
+          return SideTitleWidget(
+            axisSide: m.axisSide,
+            space: 6,
+            child: SizedBox(
+              width: nameW,
+              child: Text(
+                items[i].label,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: Ins.t(11, c: Ins.ink2, w: FontWeight.w500, h: 1.15),
               ),
-              const SizedBox(width: 8),
-              Text(inrCompact(item.value), style: Ins.num(12.5)),
-              if (share != null)
-                SizedBox(
-                  width: 40,
-                  child: Text(
-                    '${(share * 100).toStringAsFixed(share < .01 && share > 0 ? 1 : 0)}%',
-                    textAlign: TextAlign.right,
-                    style: Ins.t(12, c: Ins.ink3),
-                  ),
-                ),
+            ),
+          );
+        },
+      ),
+      barTouchData: BarTouchData(
+        allowTouchBarBackDraw: true,
+        touchExtraThreshold: const EdgeInsets.symmetric(horizontal: 4),
+        touchCallback: _touch,
+        touchTooltipData: BarTouchTooltipData(
+          getTooltipColor: (g) => g.x == sel ? Ins.ink : Colors.transparent,
+          tooltipRoundedRadius: 8,
+          tooltipMargin: 2,
+          tooltipPadding: const EdgeInsets.symmetric(horizontal: 3, vertical: 2),
+          maxContentWidth: 180,
+          fitInsideHorizontally: true,
+          fitInsideVertically: true,
+          getTooltipItem: (g, _, _, _) {
+            final it = items[g.x];
+            if (sel == null) {
+              // Resting state: just the value above each bar.
+              return BarTooltipItem(inrCompact(it.value), Ins.num(11, c: Ins.ink2), textAlign: TextAlign.center);
+            }
+            if (g.x != sel) return null; // one tooltip at a time
+            final s = it.share;
+            final pct = s == null ? '' : '  ·  ${(s * 100).toStringAsFixed(s < .01 && s > 0 ? 1 : 0)}%';
+            return BarTooltipItem(
+              '${it.label}\n',
+              Ins.t(12, c: Colors.white, w: FontWeight.w600),
+              textAlign: TextAlign.left,
+              children: [
+                TextSpan(text: '${inrFull(it.value)}$pct', style: Ins.t(12, c: const Color(0xFFE2E8F0))),
+              ],
+            );
+          },
+        ),
+      ),
+      barGroups: [
+        for (var i = 0; i < items.length; i++)
+          BarChartGroupData(
+            x: i,
+            showingTooltipIndicators: (sel == null || sel == i) ? const [0] : const [],
+            barRods: [
+              BarChartRodData(
+                toY: items[i].value * t,
+                width: barW,
+                color: items[i].muted ? _mutedBar : widget.color,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(5)),
+                // Full-height invisible column so short bars are easy to tap.
+                backDrawRodData: BackgroundBarChartRodData(show: true, toY: maxY, color: Colors.transparent),
+              ),
             ],
           ),
-          const SizedBox(height: 4),
-          LayoutBuilder(
-            builder: (context, box) {
-              final w = box.maxWidth * fraction.clamp(0.0, 1.0);
-              return Container(
-                height: 10,
-                alignment: Alignment.centerLeft,
-                decoration: BoxDecoration(
-                  color: Ins.border.withValues(alpha: .6),
-                  borderRadius: BorderRadius.circular(5),
-                ),
-                child: Container(
-                  width: item.value > 0 ? math.max(w, fraction > 0 ? 3.0 : 0.0) : 0,
-                  decoration: BoxDecoration(color: fill, borderRadius: BorderRadius.circular(5)),
-                ),
-              );
-            },
-          ),
-        ],
-      ),
-    );
-    if (item.onTap == null) {
-      return Semantics(
-        label: '${item.label}, ${inrFull(item.value)}',
-        child: ExcludeSemantics(child: row),
-      );
-    }
-    return Semantics(
-      button: true,
-      label: '${item.label}, ${inrFull(item.value)}',
-      child: InkWell(
-        onTap: item.onTap,
-        child: ExcludeSemantics(child: row),
-      ),
+      ],
     );
   }
 }
@@ -217,7 +376,8 @@ class InsSingleSummary extends StatelessWidget {
 }
 
 /// Top items of a list of groups (the SAME groups the list below shows):
-/// at most [maxBars] rows in all, everything after that rolled into "Others".
+/// at most [maxBars] bars in all, everything after that rolled into "Others"
+/// (tap it → [onOthers], normally "scroll to the full list").
 /// One group → a summary instead of a one-bar chart. Nothing for none.
 class InsTopGroupsChart extends StatelessWidget {
   const InsTopGroupsChart({
@@ -227,12 +387,16 @@ class InsTopGroupsChart extends StatelessWidget {
     required this.groups,
     required this.color,
     this.onTap,
-    this.maxBars = 8,
+    this.onOthers,
+    this.maxBars = 7,
   });
   final String title, description;
   final List<SpendGroup> groups;
   final Color color;
   final ValueChanged<SpendGroup>? onTap;
+  final VoidCallback? onOthers;
+
+  /// 7 = top 6 + "Others". Drill-down pages pass more so every child gets a bar.
   final int maxBars;
 
   @override
@@ -247,7 +411,7 @@ class InsTopGroupsChart extends StatelessWidget {
       final head = groups.length <= maxBars ? groups : groups.take(maxBars - 1).toList();
       final rest = groups.length <= maxBars ? const <SpendGroup>[] : groups.skip(maxBars - 1).toList();
       final others = rest.fold<double>(0, (s, g) => s + g.amount);
-      chart = InsHBarChart(
+      chart = InsVBarChart(
         color: color,
         items: [
           for (final g in head)
@@ -262,6 +426,7 @@ class InsTopGroupsChart extends StatelessWidget {
               label: 'Others (${rest.length})',
               value: others,
               share: total > 0 ? others / total : null,
+              onTap: onOthers,
               muted: true,
             ),
         ],

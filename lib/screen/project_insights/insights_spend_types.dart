@@ -67,6 +67,9 @@ class _InsSpendByTypeViewState extends State<InsSpendByTypeView> {
   CostCategory _cat = _lastCat;
   _Period _period = _lastPeriod;
 
+  /// The "By labour type / material / equipment" list — target of the chart's Others bar.
+  final GlobalKey _listKey = GlobalKey();
+
   /// The user's own groups per category (nameKey → group name), from "Move
   /// to group" / "Suggest groups". Display only; never changes entries.
   Map<CostCategory, Map<String, String>> _groups = const {};
@@ -597,10 +600,12 @@ class _InsSpendByTypeViewState extends State<InsSpendByTypeView> {
           groups: c.byName,
           color: color,
           onTap: (g) => _open(g, nameTitle.replaceFirst('By ', '')),
+          onOthers: () => _scrollToList(context, _listKey),
         ),
         const SizedBox(height: 12),
       ],
       _GroupsCard(
+        key: _listKey,
         title: nameTitle,
         description: nameHint,
         groups: c.byName,
@@ -781,8 +786,21 @@ class _Stat extends StatelessWidget {
 
 String _qty(double q) => q == q.roundToDouble() ? q.toStringAsFixed(0) : q.toStringAsFixed(q.abs() < 10 ? 2 : 1).replaceFirst(RegExp(r'\.?0+$'), '');
 
+/// Bring the list card behind [key] into view (the chart's "Others" bar).
+void _scrollToList(BuildContext context, GlobalKey key) {
+  final target = key.currentContext;
+  if (target == null) return;
+  Scrollable.ensureVisible(
+    target,
+    alignment: .04,
+    duration: Bt.reduceMotion(context) ? Duration.zero : const Duration(milliseconds: 350),
+    curve: Curves.easeOutCubic,
+  );
+}
+
 class _GroupsCard extends StatefulWidget {
   const _GroupsCard({
+    super.key,
     required this.title,
     required this.description,
     required this.groups,
@@ -999,9 +1017,13 @@ class _Fact extends StatelessWidget {
   ]);
 }
 
+/// Drill-down charts show every child as its own bar (they scroll sideways when
+/// there are many); only an extreme tail is rolled into "Others".
+const _drillMaxBars = 30;
+
 // ── Items inside one of the user's groups (Sand → M-Sand, P Sand, …) ───────
 
-class _ChildrenPage extends StatelessWidget {
+class _ChildrenPage extends StatefulWidget {
   const _ChildrenPage({required this.parent, required this.category, required this.period, this.onRename, this.onRestore, this.onMenu});
   final SpendGroup parent;
   final CostCategory category;
@@ -1012,7 +1034,18 @@ class _ChildrenPage extends StatelessWidget {
   final _RenameCallback? onMenu;
 
   @override
+  State<_ChildrenPage> createState() => _ChildrenPageState();
+}
+
+class _ChildrenPageState extends State<_ChildrenPage> {
+  final GlobalKey _listKey = GlobalKey();
+
+  @override
   Widget build(BuildContext context) {
+    final parent = widget.parent;
+    final category = widget.category;
+    final period = widget.period;
+    final onRename = widget.onRename, onRestore = widget.onRestore, onMenu = widget.onMenu;
     return Scaffold(
       backgroundColor: Ins.bg,
       appBar: _insAppBar(parent.name, '${category.label} · $period'),
@@ -1026,6 +1059,8 @@ class _ChildrenPage extends StatelessWidget {
             description: 'What is inside this group · tap a bar to see its entries',
             groups: parent.children,
             color: Ins.cat(category),
+            maxBars: _drillMaxBars,
+            onOthers: () => _scrollToList(context, _listKey),
             onTap: (c) => Navigator.push(
               context,
               MaterialPageRoute(
@@ -1043,6 +1078,7 @@ class _ChildrenPage extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           _GroupsCard(
+            key: _listKey,
             title: 'Inside ${parent.name}',
             description: onMenu != null ? 'Tap one to see its entries · long-press to move it' : 'Tap one to see its entries',
             groups: parent.children,
@@ -1064,10 +1100,10 @@ class _ChildrenPage extends StatelessWidget {
               ),
             ),
             onLongPress: onMenu != null
-                ? (c) => onMenu!(context, c)
+                ? (c) => onMenu(context, c)
                 : onRename == null
                 ? null
-                : (c) => onRename!(context, c),
+                : (c) => onRename(context, c),
           ),
         ],
       ),
@@ -1104,7 +1140,7 @@ List<Widget> _splitChart(SpendGroup g, CostCategory category, String scope) {
   // One bucket that is just "not recorded" says nothing — leave it out.
   if (parts.isEmpty || (parts.length == 1 && parts.first.name == fallback)) return const [];
   return [
-    InsTopGroupsChart(key: ValueKey('split-${g.name}'), title: title, description: description, groups: parts, color: Ins.cat(category)),
+    InsTopGroupsChart(key: ValueKey('split-${g.name}'), title: title, description: description, groups: parts, color: Ins.cat(category), maxBars: _drillMaxBars),
     const SizedBox(height: 12),
   ];
 }
