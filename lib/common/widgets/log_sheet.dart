@@ -1,6 +1,9 @@
+import 'package:buildtrack_mobile/common/widgets/record_payment_sheet.dart';
+import 'package:buildtrack_mobile/controller/project_provider.dart';
 import 'package:buildtrack_mobile/controller/role_manager.dart';
 import 'package:buildtrack_mobile/design/design.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 /// "Log an entry" sheet opened by the centre + (Design V2 · Log-Sheet board).
 /// Same choices as the Add Entry page: Material / Labour / Equipment go to the
@@ -97,6 +100,20 @@ class _LogSheetState extends State<_LogSheet> {
               ),
             ],
           ]),
+        // Money in (client payment or loan): same gate as the Reports ledger.
+        if (RoleManager.canViewFinances) ...[
+          const SizedBox(height: 14),
+          BtReveal(
+            index: 3,
+            child: _PaymentRow(
+              onTap: () {
+                final selected = context.read<ProjectProvider>().selectedProject?.id;
+                Navigator.of(context).pop();
+                showRecordPaymentSheet(widget.parentContext, initialProjectId: selected);
+              },
+            ),
+          ),
+        ],
         const SizedBox(height: 14),
         // Bulk import (POST /transactions/bulk) has the same backend gate.
         if (RoleManager.canAddTransactions) BtReveal(
@@ -113,6 +130,36 @@ class _LogSheetState extends State<_LogSheet> {
           BtReveal(index: 5, child: Text('Tap a type to continue', textAlign: TextAlign.center, style: BtText.caption(context))),
         ],
       ]),
+    );
+  }
+}
+
+/// "Payment received" tile, shown with Material / Labour / Equipment.
+class _PaymentRow extends StatelessWidget {
+  const _PaymentRow({required this.onTap});
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) {
+    return BtPressable(
+      onTap: onTap,
+      scale: .98,
+      semanticLabel: 'Payment received',
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 64),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(color: Bt.ground, borderRadius: BorderRadius.circular(18), border: Border.all(color: Bt.line)),
+        child: Row(children: [
+          const BtTile(icon: Icons.currency_rupee_rounded, size: 38),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Payment received', style: BtText.body(context, weight: FontWeight.w600)),
+              Text('From a client, or a loan', style: BtText.caption(context, color: Bt.ink2)),
+            ]),
+          ),
+          const Icon(Icons.chevron_right_rounded, color: Bt.ink3),
+        ]),
+      ),
     );
   }
 }

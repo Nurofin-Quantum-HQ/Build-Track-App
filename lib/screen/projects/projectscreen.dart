@@ -3,6 +3,7 @@ import 'package:buildtrack_mobile/design/design.dart';
 import 'package:buildtrack_mobile/common/themes/app_colors.dart';
 import 'package:buildtrack_mobile/controller/nav_controller.dart';
 import 'package:buildtrack_mobile/common/widgets/common_widgets.dart';
+import 'package:buildtrack_mobile/common/widgets/record_payment_sheet.dart';
 import 'package:buildtrack_mobile/controller/project_provider.dart';
 import 'package:buildtrack_mobile/controller/role_manager.dart';
 import 'package:buildtrack_mobile/models/project_model.dart';
@@ -400,16 +401,30 @@ class _ProjectsScreenContentState extends State<_ProjectsScreenContent> {
                       children: [
                         Text('View details', style: BtText.subhead(context, weight: FontWeight.w500)),
                         const Icon(Icons.chevron_right_rounded, size: 18, color: Bt.ink3),
-                        const Spacer(),
-                        if (RoleManager.canAssignTasks)
-                          TextButton(
-                            // From this project's card → this project pre-selected.
-                            onPressed: () => Navigator.pushNamed(context, '/assign-task', arguments: {'projectId': p.id}),
-                            style: TextButton.styleFrom(minimumSize: const Size(44, 40), padding: const EdgeInsets.symmetric(horizontal: 8)),
-                            child: Text('Assign task', style: BtText.subhead(context, weight: FontWeight.w600, color: bt.accentInk)),
-                          )
-                        else
-                          const SizedBox(height: 40),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Wrap(
+                            alignment: WrapAlignment.end,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              if (RoleManager.canViewFinances)
+                                TextButton(
+                                  // Money in for this project (client payment or loan).
+                                  onPressed: () => showRecordPaymentSheet(context, projectId: p.id),
+                                  style: TextButton.styleFrom(minimumSize: const Size(44, 40), padding: const EdgeInsets.symmetric(horizontal: 8)),
+                                  child: Text('Record payment', style: BtText.subhead(context, weight: FontWeight.w600, color: bt.accentInk)),
+                                ),
+                              if (RoleManager.canAssignTasks)
+                                TextButton(
+                                  // From this project's card → this project pre-selected.
+                                  onPressed: () => Navigator.pushNamed(context, '/assign-task', arguments: {'projectId': p.id}),
+                                  style: TextButton.styleFrom(minimumSize: const Size(44, 40), padding: const EdgeInsets.symmetric(horizontal: 8)),
+                                  child: Text('Assign task', style: BtText.subhead(context, weight: FontWeight.w600, color: bt.accentInk)),
+                                ),
+                              if (!RoleManager.canViewFinances && !RoleManager.canAssignTasks) const SizedBox(height: 40),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
                   ],
@@ -457,7 +472,25 @@ class _ProjectsScreenContentState extends State<_ProjectsScreenContent> {
                 ),
               ),
               const SizedBox(width: 10),
-              ProjectStatusChip(statusRaw: p.projectStatus),
+              if (RoleManager.canViewFinances)
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    ProjectStatusChip(statusRaw: p.projectStatus),
+                    const SizedBox(height: 4),
+                    BtIconButton(
+                      icon: Icons.currency_rupee_rounded,
+                      size: 18,
+                      semantic: 'Record payment for ${p.name}',
+                      background: context.bt.accentSoft,
+                      color: context.bt.accentInk,
+                      onTap: () => showRecordPaymentSheet(context, projectId: p.id),
+                    ),
+                  ],
+                )
+              else
+                ProjectStatusChip(statusRaw: p.projectStatus),
             ],
           ),
         ),

@@ -10,6 +10,7 @@ import 'package:buildtrack_mobile/common/utils/currency_formatter.dart';
 import 'dart:convert';
 import 'package:buildtrack_mobile/common/widgets/entry_widgets.dart';
 import 'package:buildtrack_mobile/common/widgets/log_sheet.dart';
+import 'package:buildtrack_mobile/common/widgets/record_payment_sheet.dart';
 import 'package:buildtrack_mobile/services/api_service.dart';
 import 'package:buildtrack_mobile/services/task_service.dart';
 import 'package:buildtrack_mobile/screen/projects/edit_project.dart';
@@ -398,6 +399,22 @@ class _DetailHero extends StatelessWidget {
                 onTap: () => Navigator.of(context).maybePop(),
               ),
               const Spacer(),
+              if (RoleManager.canViewFinances) ...[
+                BtButton(
+                  label: 'Record payment',
+                  icon: Icons.currency_rupee_rounded,
+                  small: true,
+                  expand: false,
+                  variant: BtButtonVariant.accent,
+                  // Project prefilled; refresh this project's money totals after saving.
+                  onPressed: () => showRecordPaymentSheet(
+                    context,
+                    projectId: project.id,
+                    onSaved: () => context.read<ProjectProvider>().refreshProject(project.id),
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ],
               if (RoleManager.canAssignTasks)
                 BtIconButton(
                   icon: Icons.assignment_outlined,
