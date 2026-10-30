@@ -1017,10 +1017,6 @@ class _Fact extends StatelessWidget {
   ]);
 }
 
-/// Drill-down charts show every child as its own bar (they scroll sideways when
-/// there are many); only an extreme tail is rolled into "Others".
-const _drillMaxBars = 30;
-
 // ── Items inside one of the user's groups (Sand → M-Sand, P Sand, …) ───────
 
 class _ChildrenPage extends StatefulWidget {
@@ -1059,7 +1055,7 @@ class _ChildrenPageState extends State<_ChildrenPage> {
             description: 'What is inside this group · tap a bar to see its entries',
             groups: parent.children,
             color: Ins.cat(category),
-            maxBars: _drillMaxBars,
+            drill: true,
             onOthers: () => _scrollToList(context, _listKey),
             onTap: (c) => Navigator.push(
               context,
@@ -1140,7 +1136,7 @@ List<Widget> _splitChart(SpendGroup g, CostCategory category, String scope) {
   // One bucket that is just "not recorded" says nothing — leave it out.
   if (parts.isEmpty || (parts.length == 1 && parts.first.name == fallback)) return const [];
   return [
-    InsTopGroupsChart(key: ValueKey('split-${g.name}'), title: title, description: description, groups: parts, color: Ins.cat(category), maxBars: _drillMaxBars),
+    InsTopGroupsChart(key: ValueKey('split-${g.name}'), title: title, description: description, groups: parts, color: Ins.cat(category), drill: true),
     const SizedBox(height: 12),
   ];
 }

@@ -57,16 +57,20 @@ class InsBarItem {
   final bool muted;
 }
 
-/// Vertical bar chart on one ₹ scale. Fits the width when the bars are wide
-/// enough to read; otherwise the bars keep a fixed width and scroll sideways
-/// while the ₹ axis stays put. Bars grow in once (see [insChartDuration]).
+/// Vertical bar chart on one ₹ scale. Always fits the width, unless
+/// [scrollable] is set and there are more than 8 bars: then the bars keep a
+/// fixed width and scroll sideways while the ₹ axis stays put. Bars grow in
+/// once (see [insChartDuration]).
 ///
 /// Touch: tap a bar → its [InsBarItem.onTap]. Press and hold → tooltip with the
 /// full name, exact ₹ and share. A bar with no onTap shows the tooltip on tap.
 class InsVBarChart extends StatefulWidget {
-  const InsVBarChart({super.key, required this.items, required this.color, this.height = 232});
+  const InsVBarChart({super.key, required this.items, required this.color, this.height = 232, this.scrollable = false});
   final List<InsBarItem> items;
   final Color color;
+
+  /// Drill-down pages: more than 8 bars scroll sideways instead of squeezing.
+  final bool scrollable;
 
   /// Whole chart incl. the name labels underneath.
   final double height;
@@ -76,15 +80,17 @@ class InsVBarChart extends StatefulWidget {
 }
 
 class _InsVBarChartState extends State<InsVBarChart> {
-  static const _axisW = 52.0; // ₹ labels
+  static const _axisW = 44.0; // ₹ labels
   static const _nameH = 38.0; // two lines of names
   static const _fixedBar = 44.0, _fixedGap = 16.0;
-  static const _minFitSlot = 46.0; // below this the value labels would touch
   static const _mutedBar = Color(0xFF94A3B8);
 
   int? _pressed, _pinned;
 
   int? get _sel => _pressed ?? _pinned;
+
+  /// Compact ₹ without the gap: ₹1.2L, ₹3.4Cr, ₹12.5K.
+  static String _short(num v) => inrCompact(v).replaceAll('\u00A0', '');
 
   @override
   void didUpdateWidget(InsVBarChart old) {
@@ -133,9 +139,10 @@ class _InsVBarChartState extends State<InsVBarChart> {
           builder: (context, box) {
             final n = items.length;
             final fitSlot = (box.maxWidth - _axisW) / n;
-            final scroll = n > 8 || fitSlot < _minFitSlot;
+            final scroll = widget.scrollable && n > 8;
             final slot = scroll ? _fixedBar + _fixedGap : fitSlot;
-            final barW = scroll ? _fixedBar : math.min(_fixedBar, slot * .6);
+            // Bars shrink with the slot (28px at 36px slots), never past 14px.
+            final barW = scroll ? _fixedBar : math.min(_fixedBar, math.max(14.0, slot - 8));
             return TweenAnimationBuilder<double>(
               key: ValueKey('$n-${widget.color.toARGB32()}'),
               tween: Tween(begin: 0, end: 1),
@@ -203,7 +210,7 @@ class _InsVBarChartState extends State<InsVBarChart> {
           ? const SizedBox.shrink()
           : Padding(
               padding: const EdgeInsets.only(right: 6),
-              child: Text(inrCompact(v), textAlign: TextAlign.right, style: _axis()),
+              child: Text(_short(v), textAlign: TextAlign.right, style: Ins.t(11, c: Ins.ink3)),
             ),
     ),
   );
@@ -235,7 +242,8 @@ class _InsVBarChartState extends State<InsVBarChart> {
     required bool showAxis,
   }) {
     final sel = _sel;
-    final nameW = math.max(20.0, slot - 4);
+    final nameW = math.max(20.0, slot - 2);
+    final nameSize = slot < 44 ? 10.0 : 11.0;
     return BarChartData(
       maxY: maxY,
       minY: 0,
@@ -261,7 +269,7 @@ class _InsVBarChartState extends State<InsVBarChart> {
                 textAlign: TextAlign.center,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: Ins.t(11, c: Ins.ink2, w: FontWeight.w500, h: 1.15),
+                style: Ins.t(nameSize, c: Ins.ink2, w: FontWeight.w500, h: 1.15),
               ),
             ),
           );
@@ -275,7 +283,7 @@ class _InsVBarChartState extends State<InsVBarChart> {
           getTooltipColor: (g) => g.x == sel ? Ins.ink : Colors.transparent,
           tooltipRoundedRadius: 8,
           tooltipMargin: 2,
-          tooltipPadding: const EdgeInsets.symmetric(horizontal: 3, vertical: 2),
+          tooltipPadding: const EdgeInsets.symmetric(horizontal: 1, vertical: 2),
           maxContentWidth: 180,
           fitInsideHorizontally: true,
           fitInsideVertically: true,
@@ -283,7 +291,7 @@ class _InsVBarChartState extends State<InsVBarChart> {
             final it = items[g.x];
             if (sel == null) {
               // Resting state: just the value above each bar.
-              return BarTooltipItem(inrCompact(it.value), Ins.num(11, c: Ins.ink2), textAlign: TextAlign.center);
+              return BarTooltipItem(_short(it.value), Ins.num(10, c: Ins.ink2), textAlign: TextAlign.center);
             }
             if (g.x != sel) return null; // one tooltip at a time
             final s = it.share;
@@ -375,9 +383,12 @@ class InsSingleSummary extends StatelessWidget {
   }
 }
 
-/// Top items of a list of groups (the SAME groups the list below shows):
-/// at most [maxBars] bars in all, everything after that rolled into "Others"
-/// (tap it → [onOthers], normally "scroll to the full list").
+/// Top items of a list of groups (the SAME groups the list below shows).
+/// On the By type tab ([drill] false) the chart never scrolls: top 6 + "Others"
+/// when the card is wide enough (about 360px screens and up), top 4 + "Others"
+/// on narrower phones. On drill-down pages ([drill] true) every child gets a
+/// bar (up to 30), and more than 8 scroll sideways. "Others" → [onOthers],
+/// normally "scroll to the full list".
 /// One group → a summary instead of a one-bar chart. Nothing for none.
 class InsTopGroupsChart extends StatelessWidget {
   const InsTopGroupsChart({
@@ -388,31 +399,35 @@ class InsTopGroupsChart extends StatelessWidget {
     required this.color,
     this.onTap,
     this.onOthers,
-    this.maxBars = 7,
+    this.drill = false,
   });
   final String title, description;
   final List<SpendGroup> groups;
   final Color color;
   final ValueChanged<SpendGroup>? onTap;
   final VoidCallback? onOthers;
+  final bool drill;
 
-  /// 7 = top 6 + "Others". Drill-down pages pass more so every child gets a bar.
-  final int maxBars;
+  /// Card inner width at which a 360px-wide screen lands (360 − 2×16 gutter −
+  /// 2×16 card padding = 296; 290 leaves a little slack).
+  static const _wideCard = 290.0;
 
   @override
   Widget build(BuildContext context) {
     if (groups.isEmpty) return const SizedBox.shrink();
     final total = groups.fold<double>(0, (s, g) => s + g.amount);
-    final Widget chart;
-    if (groups.length == 1) {
-      final g = groups.first;
-      chart = InsSingleSummary(group: g, color: color, onTap: onTap == null ? null : () => onTap!(g));
-    } else {
+    Widget chartFor(double width) {
+      if (groups.length == 1) {
+        final g = groups.first;
+        return InsSingleSummary(group: g, color: color, onTap: onTap == null ? null : () => onTap!(g));
+      }
+      final maxBars = drill ? 30 : (width >= _wideCard ? 7 : 5);
       final head = groups.length <= maxBars ? groups : groups.take(maxBars - 1).toList();
       final rest = groups.length <= maxBars ? const <SpendGroup>[] : groups.skip(maxBars - 1).toList();
       final others = rest.fold<double>(0, (s, g) => s + g.amount);
-      chart = InsVBarChart(
+      return InsVBarChart(
         color: color,
+        scrollable: drill,
         items: [
           for (final g in head)
             InsBarItem(
@@ -432,12 +447,13 @@ class InsTopGroupsChart extends StatelessWidget {
         ],
       );
     }
+
     return InsCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           InsCardHeader(title: title, description: description),
-          chart,
+          LayoutBuilder(builder: (context, box) => chartFor(box.maxWidth)),
         ],
       ),
     );
