@@ -10,56 +10,97 @@ import 'save_helper_stub.dart'
     if (dart.library.html) 'save_helper_web.dart'
     if (dart.library.io) 'save_helper_mobile.dart';
 
-/// Money in · Money out toggles, then the type chips, for people who can see
-/// finances. Both toggles on means everything; the last one on cannot be
-/// turned off.
+enum MoneyDirection { all, moneyIn, moneyOut }
+
+extension MoneyDirectionX on MoneyDirection {
+  static MoneyDirection of({required bool moneyIn, required bool moneyOut}) =>
+      moneyIn && moneyOut ? MoneyDirection.all : (moneyIn ? MoneyDirection.moneyIn : MoneyDirection.moneyOut);
+}
+
+/// Two fixed rows, nothing scrolls sideways: All · Money in · Money out, then
+/// a Type picker (a sheet with each type's total) and Record payment.
 class MoneyQuickFilters extends StatelessWidget {
   const MoneyQuickFilters({
     super.key,
-    required this.moneyIn,
-    required this.moneyOut,
+    required this.direction,
     required this.type,
-    required this.onMoneyIn,
-    required this.onMoneyOut,
+    required this.typeTotals,
+    required this.onDirection,
     required this.onType,
     this.onRecordPayment,
   });
-  final bool moneyIn;
-  final bool moneyOut;
+  final MoneyDirection direction;
   final MoneyType type;
-  final VoidCallback onMoneyIn;
-  final VoidCallback onMoneyOut;
+  final Map<MoneyType, double> Function() typeTotals;
+  final ValueChanged<MoneyDirection> onDirection;
   final ValueChanged<MoneyType> onType;
   final VoidCallback? onRecordPayment;
 
+  Future<void> _pickType(BuildContext context) async {
+    final totals = typeTotals();
+    final picked = await showBtSheet<MoneyType>(
+      context,
+      title: 'Type',
+      subtitle: 'Totals follow the project, dates and search you have on.',
+      builder: (sheetCtx) => BtGroup(
+        children: [
+          for (final t in MoneyType.values)
+            BtRow(
+              title: t == MoneyType.all ? 'All types' : t.label,
+              minHeight: 48,
+              trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                Text(formatInr(totals[t] ?? 0), style: BtText.subhead(sheetCtx)),
+                SizedBox(
+                  width: 28,
+                  child: t == type ? Icon(Icons.check_rounded, color: sheetCtx.bt.accentInk, size: 20) : null,
+                ),
+              ]),
+              onTap: () => Navigator.pop(sheetCtx, t),
+            ),
+        ],
+      ),
+    );
+    if (picked != null) onType(picked);
+  }
+
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      clipBehavior: Clip.none,
-      child: Row(children: [
-        if (onRecordPayment != null) ...[
-          BtChip(label: 'Record payment', icon: Icons.add_rounded, selected: true, onTap: onRecordPayment),
-          const SizedBox(width: 12),
-        ],
+    final typeOn = type != MoneyType.all;
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      BtSegmented<MoneyDirection>(
+        segments: const {
+          MoneyDirection.all: 'All',
+          MoneyDirection.moneyIn: 'Money in',
+          MoneyDirection.moneyOut: 'Money out',
+        },
+        value: direction,
+        onChanged: onDirection,
+      ),
+      const SizedBox(height: 10),
+      Row(children: [
         Semantics(
-          toggled: moneyIn,
-          child: BtChip(label: 'Money in', icon: Icons.south_west_rounded, selected: moneyIn, onTap: onMoneyIn),
+          button: true,
+          label: 'Type: ${type.label}',
+          child: BtChip(
+            label: 'Type: ${type.label}',
+            icon: Icons.expand_more_rounded,
+            selected: typeOn,
+            onTap: () => _pickType(context),
+          ),
         ),
-        const SizedBox(width: 8),
-        Semantics(
-          toggled: moneyOut,
-          child: BtChip(label: 'Money out', icon: Icons.north_east_rounded, selected: moneyOut, onTap: onMoneyOut),
-        ),
-        const SizedBox(width: 12),
-        Container(width: 1, height: 22, color: Bt.line),
-        const SizedBox(width: 12),
-        for (final t in MoneyType.values) ...[
-          BtChip(label: t.label, selected: t == type, onTap: () => onType(t)),
-          const SizedBox(width: 8),
+        if (typeOn) ...[
+          const SizedBox(width: 4),
+          IconButton(
+            tooltip: 'Clear type',
+            icon: Icon(Icons.close_rounded, size: 18, color: Bt.ink2),
+            onPressed: () => onType(MoneyType.all),
+          ),
         ],
+        const Spacer(),
+        if (onRecordPayment != null)
+          BtChip(label: 'Payment', icon: Icons.add_rounded, selected: true, onTap: onRecordPayment),
       ]),
-    );
+    ]);
   }
 }
 

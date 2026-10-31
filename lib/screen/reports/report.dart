@@ -1585,7 +1585,7 @@ class _ReportsViewState extends State<_ReportsView> {
               (_selectedActivityName != null && _selectedActivityName != 'Select Activity')));
 
   /// The finance table's rows under the current filters, sorted as chosen.
-  List<MoneyRow> _moneyRowsNow(ProjectProvider pp) {
+  List<MoneyRow> _moneyRowsNow(ProjectProvider pp, {MoneyType? type}) {
     final ledger = _ledger;
     if (ledger == null) return const [];
     String projectName(String id) => pp.projects.where((p) => p.id == id).firstOrNull?.name ?? 'Unknown Project';
@@ -1596,7 +1596,7 @@ class _ReportsViewState extends State<_ReportsView> {
       all,
       moneyIn: _moneyIn,
       moneyOut: _moneyOut,
-      type: _moneyType,
+      type: type ?? _moneyType,
       query: _searchQuery,
       inScope: (r) => r.entry != null ? inScope.contains(r.id) : !entryOnly,
       entryMatches: (e, token) => _matchesSearch(e, projectName(e.projectId), token),
@@ -1605,18 +1605,22 @@ class _ReportsViewState extends State<_ReportsView> {
     return rows;
   }
 
-  /// Money in / Money out toggle: the last one left on stays on.
-  void _toggleDirection({required bool isIn}) {
-    setState(() {
-      final other = isIn ? _moneyOut : _moneyIn;
-      if (!other) return;
-      if (isIn) {
-        _moneyIn = !_moneyIn;
-      } else {
-        _moneyOut = !_moneyOut;
+  /// All · Money in · Money out.
+  void _setDirection(MoneyDirection d) => setState(() {
+        _moneyIn = d != MoneyDirection.moneyOut;
+        _moneyOut = d != MoneyDirection.moneyIn;
+        _currentPage = 1;
+      });
+
+  /// Total of each type for the current direction, project and search.
+  Map<MoneyType, double> _moneyTypeTotals(ProjectProvider pp) {
+    final totals = {for (final t in MoneyType.values) t: 0.0};
+    for (final r in _moneyRowsNow(pp, type: MoneyType.all)) {
+      for (final t in MoneyType.values) {
+        if (t.matches(r.ledger.category)) totals[t] = totals[t]! + r.ledger.amount;
       }
-      _currentPage = 1;
-    });
+    }
+    return totals;
   }
 
   String get _moneySortLabel => switch (_sortColumn) {
@@ -2158,325 +2162,328 @@ class _ReportsViewState extends State<_ReportsView> {
                 if (!canFinance) ...[
                   const SizedBox(width: 8),
                   _tour(
-                    _kEditColumns,
-                    'Edit columns',
-                    'Choose which columns the sheet shows and drag them into the order you like. Each tab remembers its own columns.',
-                    _ToolChip(icon: Icons.view_column_outlined, label: 'Edit columns', onTap: openEditColumns),
+                      _kEditColumns,
+                      'Edit columns',
+                      'Choose which columns the sheet shows and drag them into the order you like. Each tab remembers its own columns.',
+                      _ToolChip(icon: Icons.view_column_outlined, label: 'Edit columns', onTap: openEditColumns),
+                      radius: Bt.rChip,
+                    ),
+                  ],
+                  const SizedBox(width: 8),
+                  _tour(
+                    _kSort,
+                    'Sort',
+                    'Order entries by purchase date, payment date, project or amount, newest/highest or oldest/lowest first. The label shows the current order.',
+                    _ToolChip(
+                      icon: _sortAscending ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
+                      label: sortLabel,
+                      semantic: 'Sort, columns, table and export',
+                      onTap: openEntriesMenu,
+                    ),
+                    radius: Bt.rChip,
+                  ),
+                  const SizedBox(width: 8),
+                  _tour(
+                    _kExport,
+                    'Export',
+                    'Save these entries as a CSV or PDF file to share or print.',
+                    _ToolChip(icon: Icons.file_download_outlined, label: 'Export', onTap: openExport),
+                    radius: Bt.rChip,
+                  ),
+                  const SizedBox(width: 8),
+                  _tour(
+                    _kFullScreen,
+                    'Full screen',
+                    'Open the sheet on its own screen. Turn your phone sideways to see more columns at once.',
+                    _ToolChip(icon: Icons.open_in_full_rounded, semantic: 'Full screen, can rotate', onTap: openFullScreen),
                     radius: Bt.rChip,
                   ),
                 ],
-                const SizedBox(width: 8),
-                _tour(
-                  _kSort,
-                  'Sort',
-                  'Order entries by purchase date, payment date, project or amount, newest/highest or oldest/lowest first. The label shows the current order.',
-                  _ToolChip(
-                    icon: _sortAscending ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
-                    label: sortLabel,
-                    semantic: 'Sort, columns, table and export',
-                    onTap: openEntriesMenu,
-                  ),
-                  radius: Bt.rChip,
-                ),
-                const SizedBox(width: 8),
-                _tour(
-                  _kExport,
-                  'Export',
-                  'Save these entries as a CSV or PDF file to share or print.',
-                  _ToolChip(icon: Icons.file_download_outlined, label: 'Export', onTap: openExport),
-                  radius: Bt.rChip,
-                ),
-                const SizedBox(width: 8),
-                _tour(
-                  _kFullScreen,
-                  'Full screen',
-                  'Open the sheet on its own screen. Turn your phone sideways to see more columns at once.',
-                  _ToolChip(icon: Icons.open_in_full_rounded, semantic: 'Full screen, can rotate', onTap: openFullScreen),
-                  radius: Bt.rChip,
-                ),
-              ],
+              ),
             ),
           ),
-        ),
-        if (!canFinance) ...[
-          const SizedBox(width: 8),
-          _tour(
-            _kViewToggle,
-            'Sheet or list',
-            'Left: spreadsheet view, one row per entry in columns (default). Right: card list grouped by date. Your choice is remembered.',
-            ReportViewToggle(
-              table: _tableView,
-              onChanged: (v) => setState(() {
-                _tableView = v;
-                ReportFilterState.tableView = v;
-              }),
+          if (!canFinance) ...[
+            const SizedBox(width: 8),
+            _tour(
+              _kViewToggle,
+              'Sheet or list',
+              'Left: spreadsheet view, one row per entry in columns (default). Right: card list grouped by date. Your choice is remembered.',
+              ReportViewToggle(
+                table: _tableView,
+                onChanged: (v) => setState(() {
+                  _tableView = v;
+                  ReportFilterState.tableView = v;
+                }),
+              ),
+              radius: Bt.rChip,
             ),
-            radius: Bt.rChip,
-          ),
+          ],
         ],
-      ],
-    );
+      );
 
-    // ── summary strip: Total billed · Paid · Remaining
-    final moneyTotals = MoneyTable.totals(moneyRows);
-    final Widget summary = canFinance
-        ? (moneyLoading
-            ? const BtSkeleton(height: 62, radius: 14)
-            : moneyError != null
-                ? const SizedBox.shrink()
-                : _tour(
-                    _chartsKey,
-                    'Totals',
-                    'Money in, money out and what is left (net), for exactly the rows matching your project, period and filters.',
-                    _SummaryStrip.money(moneyIn: moneyTotals.moneyIn, moneyOut: moneyTotals.moneyOut),
-                  ))
-        : _tour(
-            _chartsKey,
-            'Totals',
-            'Total billed, how much is paid and what is still to pay, for exactly the entries matching your project, period and filters.',
-            _SummaryStrip(total: grandTotal, paid: grandPaid, remaining: grandRemaining),
-          );
+      // ── summary strip: Total billed · Paid · Remaining
+      final moneyTotals = MoneyTable.totals(moneyRows);
+      final Widget summary = canFinance
+          ? (moneyLoading
+              ? const BtSkeleton(height: 62, radius: 14)
+              : moneyError != null
+                  ? const SizedBox.shrink()
+                  : _tour(
+                      _chartsKey,
+                      'Totals',
+                      'Money in, money out and what is left (net), for exactly the rows matching your project, period and filters.',
+                      _SummaryStrip.money(moneyIn: moneyTotals.moneyIn, moneyOut: moneyTotals.moneyOut),
+                    ))
+          : _tour(
+              _chartsKey,
+              'Totals',
+              'Total billed, how much is paid and what is still to pay, for exactly the entries matching your project, period and filters.',
+              _SummaryStrip(total: grandTotal, paid: grandPaid, remaining: grandRemaining),
+            );
 
-    return Scaffold(
-      backgroundColor: Bt.ground,
-      body: LayoutBuilder(
-        builder: (context, viewport) {
-          // The sheet takes whatever height is left under the header,
-          // toolbar and summary so it is fully visible without scrolling.
-          // 297 = header + tabs + toolbar + summary; +44 = the floor / phase /
-          // activity chip row.
-          final chromeAbove = topInset + 297 + (showWhere ? 44 : 0) + (searchVisible ? 54 : 0);
-          const chromeBelow = ReportSheet.footerHeight + 60;
-          final sheetMax = (viewport.maxHeight - chromeAbove - chromeBelow).clamp(260.0, 900.0);
-          return RefreshIndicator(
-            color: Bt.noir,
-            backgroundColor: bt.accent,
-            edgeOffset: topInset,
-            onRefresh: () => Future.wait([
-              ReportFilterState.reloadEntries(context),
-              if (canFinance) _loadLedger(keepRows: true),
-            ]),
-            child: ListView(
-              controller: _scrollController,
-              physics: const AlwaysScrollableScrollPhysics(parent: ClampingScrollPhysics()),
-              padding: EdgeInsets.zero,
-              children: [
-                header,
-                BtSheet(
-                  overlap: 22,
-                  padding: const EdgeInsets.fromLTRB(Bt.gutter, 16, Bt.gutter, 32),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      if (canFinance)
-                        _tour(
-                          _kTabs,
-                          'Money filters',
-                          'Money in and Money out are both on to show everything; turn one off to see only the other. Then pick a type: Material, Labour, Equipment, Client payment, Loan or Other.',
-                          MoneyQuickFilters(
-                            moneyIn: _moneyIn,
-                            moneyOut: _moneyOut,
-                            type: _moneyType,
-                            onMoneyIn: () => _toggleDirection(isIn: true),
-                            onMoneyOut: () => _toggleDirection(isIn: false),
-                            onRecordPayment: () => showRecordPaymentSheet(
-                              context,
-                              projectId: _selectedProjectId == 'all' ? null : _selectedProjectId,
-                              onSaved: () => _loadLedger(keepRows: true),
+      return Scaffold(
+        backgroundColor: Bt.ground,
+        body: LayoutBuilder(
+          builder: (context, viewport) {
+            // The sheet takes whatever height is left under the header,
+            // toolbar and summary so it is fully visible without scrolling.
+            // 297 = header + tabs + toolbar + summary; +44 = the floor / phase /
+            // activity chip row.
+            final chromeAbove = topInset + 297 + (showWhere ? 44 : 0) + (searchVisible ? 54 : 0);
+            const chromeBelow = ReportSheet.footerHeight + 60;
+            final sheetMax = (viewport.maxHeight - chromeAbove - chromeBelow).clamp(260.0, 900.0);
+            return RefreshIndicator(
+              color: Bt.noir,
+              backgroundColor: bt.accent,
+              edgeOffset: topInset,
+              onRefresh: () => Future.wait([
+                ReportFilterState.reloadEntries(context),
+                if (canFinance) _loadLedger(keepRows: true),
+              ]),
+              child: ListView(
+                controller: _scrollController,
+                physics: const AlwaysScrollableScrollPhysics(parent: ClampingScrollPhysics()),
+                padding: EdgeInsets.zero,
+                children: [
+                  header,
+                  BtSheet(
+                    overlap: 22,
+                    padding: const EdgeInsets.fromLTRB(Bt.gutter, 16, Bt.gutter, 32),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (canFinance)
+                          _tour(
+                            _kTabs,
+                            'Money filters',
+                            'Pick All, Money in or Money out. Then tap Type to see only Material, Labour, Equipment, Client payment, Loan or Other, with each one\'s total.',
+                            MoneyQuickFilters(
+                              direction: MoneyDirectionX.of(moneyIn: _moneyIn, moneyOut: _moneyOut),
+                              type: _moneyType,
+                              typeTotals: () => _moneyTypeTotals(projectProvider),
+                              onDirection: _setDirection,
+                              onRecordPayment: () => showRecordPaymentSheet(
+                                context,
+                                projectId: _selectedProjectId == 'all' ? null : _selectedProjectId,
+                                onSaved: () => _loadLedger(keepRows: true),
+                              ),
+                              onType: (t) => setState(() {
+                                _moneyType = t;
+                                _currentPage = 1;
+                              }),
                             ),
-                            onType: (t) => setState(() {
-                              _moneyType = t;
-                              _currentPage = 1;
-                            }),
+                          )
+                        else
+                          _tour(
+                            _kTabs,
+                            'Entry types',
+                            'Switch between All entries, Materials, Labour and Equipment. Each tab has its own columns and an item picker.',
+                            _CategoryTabs(
+                              activeTab: quickCategoryTab,
+                              onTabChanged: _selectCategoryTab,
+                            ),
                           ),
-                        )
-                      else
-                        _tour(
-                          _kTabs,
-                          'Entry types',
-                          'Switch between All entries, Materials, Labour and Equipment. Each tab has its own columns and an item picker.',
-                          _CategoryTabs(
-                            activeTab: quickCategoryTab,
-                            onTabChanged: _selectCategoryTab,
-                          ),
+                        const SizedBox(height: 12),
+                        toolbar,
+                        AnimatedSize(
+                          duration: Bt.fast,
+                          curve: Bt.ease,
+                          alignment: Alignment.topCenter,
+                          child: searchVisible
+                              ? Padding(
+                                  padding: const EdgeInsets.only(top: 10),
+                                  child: quickCategoryTab != 'All'
+                                      ? _buildCategorySubFilters(context, quickCategoryTab, allEntries)
+                                      : _buildAllTabSearchBar(context),
+                                )
+                              : const SizedBox(width: double.infinity),
                         ),
-                      const SizedBox(height: 12),
-                      toolbar,
-                      AnimatedSize(
-                        duration: Bt.fast,
-                        curve: Bt.ease,
-                        alignment: Alignment.topCenter,
-                        child: searchVisible
-                            ? Padding(
-                                padding: const EdgeInsets.only(top: 10),
-                                child: quickCategoryTab != 'All'
-                                    ? _buildCategorySubFilters(context, quickCategoryTab, allEntries)
-                                    : _buildAllTabSearchBar(context),
+                        const SizedBox(height: 12),
+                        summary,
+                        const SizedBox(height: 12),
+                        if (moneyError != null)
+                          BtErrorCard(
+                            message: moneyError,
+                            onRetry: () {
+                              ReportFilterState.reloadEntries(context);
+                              _loadLedger();
+                            },
+                          )
+                        else if (canFinance ? moneyLoading : (paginatedEntries.isEmpty && projectProvider.entriesLoading))
+                          const BtCard(
+                            child: Padding(
+                              padding: EdgeInsets.symmetric(vertical: 28),
+                              child: Center(child: BtBrickLoader(label: 'Loading entries…')),
+                            ),
+                          )
+                        else if (pageEmpty)
+                          const BtCard(
+                            child: BtEmpty(
+                              icon: Icons.search_off_outlined,
+                              title: 'No transaction logs match filters.',
+                            ),
+                          )
+                        else if (showSheet)
+                          _tour(
+                            _kSheet,
+                            'The sheet',
+                            canFinance
+                                ? 'One row per money movement: spending entries, client payments, loans and other money out. Tap a row for its details; spending rows also let you add more, record a payment or edit.'
+                                : 'One row per entry. Tap a row to see all its details and to add more, record a payment or edit it.',
+                            canFinance
+                            ? ReportSheet.money(
+                                tourWrap: (part, child) => part == 'header'
+                                    ? _tour(_kSheetHeader, 'Sort by a column', 'Tap the DATE, DESCRIPTION, PROJECT, TYPE, IN or OUT heading to sort by it; tap it again to flip the order.', child, radius: 0)
+                                    : _tour(_kSheetScroll, 'Scroll sideways', 'Swipe the sheet left and right to see every column — the description stays put. This bar shows where you are.', child),
+                                rows: paginatedMoney,
+                                maxHeight: sheetMax,
+                                firstRowNumber: startIndex + 1,
+                                statusOf: statusOf,
+                                sortColumn: _sortColumn,
+                                sortAscending: _sortAscending,
+                                onSort: onSheetSort,
+                                onMoneyRowTap: (r) => _onMoneyRowTap(r, getProjectName, rowNumber: startIndex + paginatedMoney.indexOf(r) + 1),
+                                onAddMore: (e) => _ReportActions.addMore(context, e),
+                                onRecordPayment: (e) => _ReportActions.recordPayment(context, e, getProjectName(e.projectId)),
+                                onEdit: (e) => _ReportActions.editEntry(context, e),
                               )
-                            : const SizedBox(width: double.infinity),
-                      ),
-                      const SizedBox(height: 12),
-                      summary,
-                      const SizedBox(height: 12),
-                      if (moneyError != null)
-                        BtErrorCard(
-                          message: moneyError,
-                          onRetry: () {
-                            ReportFilterState.reloadEntries(context);
-                            _loadLedger();
+                            : ReportSheet(
+                            tourWrap: (part, child) => part == 'header'
+                                ? _tour(_kSheetHeader, 'Sort by a column', 'Tap the PURCHASE DATE, PAYMENT DATE, PROJECT or AMOUNT heading to sort by it; tap it again to flip the order. Long-press any heading to pin that column on the left.', child, radius: 0)
+                                : _tour(_kSheetScroll, 'Scroll sideways', 'Swipe the sheet left and right to see every column — the pinned column stays put. This bar shows where you are.', child),
+                            entries: paginatedEntries,
+                            columns: activeCols,
+                            pinnedColumn: pinnedCol,
+                            onPinColumn: onPinColumn,
+                            maxHeight: sheetMax,
+                            firstRowNumber: startIndex + 1,
+                            projectNameOf: (e) => getProjectName(e.projectId),
+                            statusOf: statusOf,
+                            sortColumn: _sortColumn,
+                            sortAscending: _sortAscending,
+                            onSort: onSheetSort,
+                            onRowTap: (e) => _showEntryDetailsDialog(context, e, getProjectName(e.projectId), rowNumber: startIndex + paginatedEntries.indexOf(e) + 1),
+                            onAddMore: (e) => _ReportActions.addMore(context, e),
+                            onRecordPayment: (e) => _ReportActions.recordPayment(context, e, getProjectName(e.projectId)),
+                            onEdit: (e) => _ReportActions.editEntry(context, e),
+                            ),
+                          )
+                        else
+                          _tour(
+                            _kList,
+                            'Entry list',
+                            'Entries grouped by date. Tap one to see its details and to add more, record a payment or edit it.',
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: _buildEntryGroups(context, paginatedEntries, getProjectName),
+                            ),
+                          ),
+                        if (canFinance && _ledger?.truncated == true && !pageEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 2, bottom: 10),
+                            child: Text(
+                              'Showing the newest ${_ledger!.rows.length} entries; totals cover those rows. Narrow the project or period to see the rest.',
+                              style: BtText.caption(context),
+                            ),
+                          ),
+                        if (!pageEmpty && (showSheet || totalCount > _rowsPerPage || _rowsPerPage != 10))
+                          _tour(
+                            _kPager,
+                            'Pages',
+                            'Choose how many rows to show per page (10, 20 or 50) and move between pages with the arrows.',
+                            _buildPager(context, safeCurrentPage, totalPages),
+                          ),
+                        const SizedBox(height: 24),
+                        _tour(
+                          ShowcaseKeys.reportAskAI,
+                          'Ask AI',
+                          'Ask questions in plain words — costs, missing entries, stock — about this report and get an answer.',
+                          _AskAiBanner(projectName: provider.selectedProjectName),
+                          radius: Bt.rCard,
+                        ),
+                        // Finance users already have Export and full screen
+                        // above the table, and each type's total in the Type sheet.
+                        if (!canFinance) ...[
+                          const SizedBox(height: 10),
+                          _tour(
+                          _kQuickTiles,
+                          'Shortcuts',
+                          'Table view opens the sheet full screen (rotate for more columns). Export saves the report as CSV or PDF.',
+                          IntrinsicHeight(
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Expanded(
+                                  child: ReportQuickTile(
+                                    icon: Icons.screen_rotation_rounded,
+                                    title: 'Table view',
+                                    subtitle: 'Full screen',
+                                    onTap: openFullScreen,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: ReportQuickTile(
+                                    icon: Icons.ios_share_rounded,
+                                    title: 'Export',
+                                    subtitle: 'CSV or PDF',
+                                    onTap: openExport,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          radius: 20,
+                        ),
+                        const SizedBox(height: 28),
+                        _buildByType(
+                          context,
+                          total: grandTotal,
+                          paid: grandPaid,
+                          remaining: grandRemaining,
+                          material: materialTotal,
+                          labour: labourTotal,
+                          equipment: equipmentTotal,
+                          onType: (tab) {
+                            if (canFinance) {
+                              setState(() {
+                                _moneyType = switch (tab) {
+                                  'Materials' => MoneyType.material,
+                                  'Labour' => MoneyType.labour,
+                                  'Equipment' => MoneyType.equipment,
+                                  _ => MoneyType.all,
+                                };
+                                _currentPage = 1;
+                              });
+                            } else {
+                              _selectCategoryTab(tab);
+                            }
+                            if (_scrollController.hasClients) {
+                              _scrollController.animateTo(0, duration: Bt.medium, curve: Bt.ease);
+                            }
                           },
-                        )
-                      else if (canFinance ? moneyLoading : (paginatedEntries.isEmpty && projectProvider.entriesLoading))
-                        const BtCard(
-                          child: Padding(
-                            padding: EdgeInsets.symmetric(vertical: 28),
-                            child: Center(child: BtBrickLoader(label: 'Loading entries…')),
-                          ),
-                        )
-                      else if (pageEmpty)
-                        const BtCard(
-                          child: BtEmpty(
-                            icon: Icons.search_off_outlined,
-                            title: 'No transaction logs match filters.',
-                          ),
-                        )
-                      else if (showSheet)
-                        _tour(
-                          _kSheet,
-                          'The sheet',
-                          canFinance
-                              ? 'One row per money movement: spending entries, client payments, loans and other money out. Tap a row for its details; spending rows also let you add more, record a payment or edit.'
-                              : 'One row per entry. Tap a row to see all its details and to add more, record a payment or edit it.',
-                          canFinance
-                          ? ReportSheet.money(
-                              tourWrap: (part, child) => part == 'header'
-                                  ? _tour(_kSheetHeader, 'Sort by a column', 'Tap the DATE, DESCRIPTION, PROJECT, TYPE, IN or OUT heading to sort by it; tap it again to flip the order.', child, radius: 0)
-                                  : _tour(_kSheetScroll, 'Scroll sideways', 'Swipe the sheet left and right to see every column — the description stays put. This bar shows where you are.', child),
-                              rows: paginatedMoney,
-                              maxHeight: sheetMax,
-                              firstRowNumber: startIndex + 1,
-                              statusOf: statusOf,
-                              sortColumn: _sortColumn,
-                              sortAscending: _sortAscending,
-                              onSort: onSheetSort,
-                              onMoneyRowTap: (r) => _onMoneyRowTap(r, getProjectName, rowNumber: startIndex + paginatedMoney.indexOf(r) + 1),
-                              onAddMore: (e) => _ReportActions.addMore(context, e),
-                              onRecordPayment: (e) => _ReportActions.recordPayment(context, e, getProjectName(e.projectId)),
-                              onEdit: (e) => _ReportActions.editEntry(context, e),
-                            )
-                          : ReportSheet(
-                          tourWrap: (part, child) => part == 'header'
-                              ? _tour(_kSheetHeader, 'Sort by a column', 'Tap the PURCHASE DATE, PAYMENT DATE, PROJECT or AMOUNT heading to sort by it; tap it again to flip the order. Long-press any heading to pin that column on the left.', child, radius: 0)
-                              : _tour(_kSheetScroll, 'Scroll sideways', 'Swipe the sheet left and right to see every column — the pinned column stays put. This bar shows where you are.', child),
-                          entries: paginatedEntries,
-                          columns: activeCols,
-                          pinnedColumn: pinnedCol,
-                          onPinColumn: onPinColumn,
-                          maxHeight: sheetMax,
-                          firstRowNumber: startIndex + 1,
-                          projectNameOf: (e) => getProjectName(e.projectId),
-                          statusOf: statusOf,
-                          sortColumn: _sortColumn,
-                          sortAscending: _sortAscending,
-                          onSort: onSheetSort,
-                          onRowTap: (e) => _showEntryDetailsDialog(context, e, getProjectName(e.projectId), rowNumber: startIndex + paginatedEntries.indexOf(e) + 1),
-                          onAddMore: (e) => _ReportActions.addMore(context, e),
-                          onRecordPayment: (e) => _ReportActions.recordPayment(context, e, getProjectName(e.projectId)),
-                          onEdit: (e) => _ReportActions.editEntry(context, e),
-                          ),
-                        )
-                      else
-                        _tour(
-                          _kList,
-                          'Entry list',
-                          'Entries grouped by date. Tap one to see its details and to add more, record a payment or edit it.',
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: _buildEntryGroups(context, paginatedEntries, getProjectName),
-                          ),
                         ),
-                      if (canFinance && _ledger?.truncated == true && !pageEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 2, bottom: 10),
-                          child: Text(
-                            'Showing the newest ${_ledger!.rows.length} entries; totals cover those rows. Narrow the project or period to see the rest.',
-                            style: BtText.caption(context),
-                          ),
-                        ),
-                      if (!pageEmpty && (showSheet || totalCount > _rowsPerPage || _rowsPerPage != 10))
-                        _tour(
-                          _kPager,
-                          'Pages',
-                          'Choose how many rows to show per page (10, 20 or 50) and move between pages with the arrows.',
-                          _buildPager(context, safeCurrentPage, totalPages),
-                        ),
-                      const SizedBox(height: 24),
-                      _tour(
-                        ShowcaseKeys.reportAskAI,
-                        'Ask AI',
-                        'Ask questions in plain words — costs, missing entries, stock — about this report and get an answer.',
-                        _AskAiBanner(projectName: provider.selectedProjectName),
-                        radius: Bt.rCard,
-                      ),
-                      const SizedBox(height: 10),
-                      _tour(
-                        _kQuickTiles,
-                        'Shortcuts',
-                        'Table view opens the sheet full screen (rotate for more columns). Export saves the report as CSV or PDF.',
-                        IntrinsicHeight(
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              Expanded(
-                                child: ReportQuickTile(
-                                  icon: Icons.screen_rotation_rounded,
-                                  title: 'Table view',
-                                  subtitle: 'Full screen',
-                                  onTap: openFullScreen,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: ReportQuickTile(
-                                  icon: Icons.ios_share_rounded,
-                                  title: 'Export',
-                                  subtitle: 'CSV or PDF',
-                                  onTap: openExport,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        radius: 20,
-                      ),
-                      const SizedBox(height: 28),
-                      _buildByType(
-                        context,
-                        total: grandTotal,
-                        paid: grandPaid,
-                        remaining: grandRemaining,
-                        material: materialTotal,
-                        labour: labourTotal,
-                        equipment: equipmentTotal,
-                        onType: (tab) {
-                          if (canFinance) {
-                            setState(() {
-                              _moneyType = switch (tab) {
-                                'Materials' => MoneyType.material,
-                                'Labour' => MoneyType.labour,
-                                'Equipment' => MoneyType.equipment,
-                                _ => MoneyType.all,
-                              };
-                              _currentPage = 1;
-                            });
-                          } else {
-                            _selectCategoryTab(tab);
-                          }
-                          if (_scrollController.hasClients) {
-                            _scrollController.animateTo(0, duration: Bt.medium, curve: Bt.ease);
-                          }
-                        },
-                      ),
+                      ],
                       const SizedBox(height: 28),
                       _buildCsvImportCard(),
                     ],

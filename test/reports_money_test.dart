@@ -236,29 +236,34 @@ void main() {
     });
   });
 
-  testWidgets('quick filters: both toggles and every type chip are there', (tester) async {
-    var inn = true, out = true;
+  testWidgets('quick filters: direction segment and Type sheet with totals', (tester) async {
+    var dir = MoneyDirection.all;
     MoneyType type = MoneyType.all;
     await tester.pumpWidget(MaterialApp(
       home: Scaffold(
         body: StatefulBuilder(
           builder: (context, setState) => MoneyQuickFilters(
-            moneyIn: inn,
-            moneyOut: out,
+            direction: dir,
             type: type,
-            onMoneyIn: () => setState(() => inn = !inn),
-            onMoneyOut: () => setState(() => out = !out),
+            typeTotals: () => {for (final t in MoneyType.values) t: t == MoneyType.loan ? 25000.0 : 0.0},
+            onDirection: (d) => setState(() => dir = d),
             onType: (t) => setState(() => type = t),
           ),
         ),
       ),
     ));
-    for (final label in ['Money in', 'Money out', 'All', 'Material', 'Labour', 'Equipment', 'Client payment', 'Loan', 'Other']) {
+    for (final label in ['All', 'Money in', 'Money out', 'Type: All']) {
       expect(find.text(label), findsOneWidget, reason: label);
     }
-    await tester.ensureVisible(find.text('Loan'));
-    await tester.tap(find.text('Loan'));
+    await tester.tap(find.text('Money out'));
     await tester.pump();
+    expect(dir, MoneyDirection.moneyOut);
+    await tester.tap(find.text('Type: All'));
+    await tester.pumpAndSettle();
+    expect(find.text('Loan'), findsOneWidget);
+    await tester.tap(find.text('Loan'));
+    await tester.pumpAndSettle();
     expect(type, MoneyType.loan);
+    expect(find.text('Type: Loan'), findsOneWidget);
   });
 }
