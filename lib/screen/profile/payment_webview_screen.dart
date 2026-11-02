@@ -48,7 +48,7 @@ class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
               _handlePaymentReturn(isSuccess);
               return NavigationDecision.prevent;
             }
-            if (url.contains('/api/subscriptions/callback')) {
+            if (url.contains('/api/subscriptions/callback') || url.contains('/api/subscriptions/browser-return')) {
               return NavigationDecision.navigate;
             }
             
