@@ -136,6 +136,7 @@ class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
   }
 
   bool _isVerifying = false;
+  DateTime? _lastExternalLaunchTime;
 
   Future<void> _handlePaymentReturn(bool mayBeSuccess) async {
     if (_isVerifying) return;
@@ -145,6 +146,16 @@ class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
   }
 
   Future<void> _launchExternalUrl(String url) async {
+    // Debounce duplicate intent / UPI invocations from gateway JS fallbacks within 5 seconds
+    // to prevent Google Pay or UPI apps from opening twice.
+    final now = DateTime.now();
+    if (_lastExternalLaunchTime != null &&
+        now.difference(_lastExternalLaunchTime!) < const Duration(seconds: 5)) {
+      debugPrint("Skipping duplicate external intent launch: $url");
+      return;
+    }
+    _lastExternalLaunchTime = now;
+
     // For complex Android Intents (like Google Pay), canLaunchUrl will falsely return false.
     // We must bypass the check and force the OS to handle it.
     if (url.startsWith('intent://') || url.startsWith('upi://') || url.startsWith('gpay://')) {
