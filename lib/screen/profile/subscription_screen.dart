@@ -57,7 +57,7 @@ const _plans = [
   _PlanInfo(
     plan: SubscriptionPlan.starter,
     title: 'Starter',
-    price: '₹1',
+    price: '₹2',
     period: '/month',
     tagline: 'For small teams just getting started.',
     features: [
@@ -200,7 +200,7 @@ class _SubscriptionScreenContentState
   }
 
   SubscriptionPlan? _picked;
-  bool _isAutoPay = false;
+  bool _isAutoPay = true;
 
   @override
   Widget build(BuildContext context) {
@@ -309,44 +309,47 @@ class _SubscriptionScreenContentState
             ]),
           ),
           const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: Bt.card,
-              borderRadius: BorderRadius.circular(Bt.rCard),
-              border: Border.all(color: Bt.line),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  _isAutoPay ? Icons.autorenew_rounded : Icons.flash_on_rounded,
-                  color: _isAutoPay ? bt.accent : Bt.ink2,
-                  size: 22,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _isAutoPay ? 'Monthly AutoPay (Recurring)' : 'One-Time Payment (30 Days)',
-                        style: BtText.subhead(context, weight: FontWeight.w600),
-                      ),
-                      Text(
-                        _isAutoPay
-                            ? 'Auto-renews monthly · Cancel anytime'
-                            : 'Pay once via UPI QR, Cards, or Netbanking',
-                        style: BtText.caption(context),
-                      ),
-                    ],
+          GestureDetector(
+            onTap: () => setState(() => _isAutoPay = !_isAutoPay),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: Bt.card,
+                borderRadius: BorderRadius.circular(Bt.rCard),
+                border: Border.all(color: Bt.line),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    _isAutoPay ? Icons.autorenew_rounded : Icons.flash_on_rounded,
+                    color: _isAutoPay ? bt.accent : Bt.ink2,
+                    size: 22,
                   ),
-                ),
-                Switch.adaptive(
-                  value: _isAutoPay,
-                  activeColor: bt.accent,
-                  onChanged: (val) => setState(() => _isAutoPay = val),
-                ),
-              ],
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _isAutoPay ? 'Monthly AutoPay (Recurring)' : 'One-Time Payment (30 Days)',
+                          style: BtText.subhead(context, weight: FontWeight.w600),
+                        ),
+                        Text(
+                          _isAutoPay
+                              ? 'Auto-renews monthly · Cancel anytime'
+                              : 'Pay once via UPI QR, Cards, or Netbanking',
+                          style: BtText.caption(context),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Switch.adaptive(
+                    value: _isAutoPay,
+                    activeColor: bt.accent,
+                    onChanged: (val) => setState(() => _isAutoPay = val),
+                  ),
+                ],
+              ),
             ),
           ),
           Row(

@@ -6,7 +6,7 @@ const String kProMonthlyId = 'buildtrack_pro_monthly';
 const String kBusinessMonthlyId = 'buildtrack_business_monthly';
 const String kEnterpriseMonthlyId = 'buildtrack_enterprise_monthly';
 const Map<String, double> kPlanAmounts = {
-  kStarterMonthlyId: 1,
+  kStarterMonthlyId: 2,
   kGrowthMonthlyId: 999,
   kProMonthlyId: 1499,
   kBusinessMonthlyId: 2499,
@@ -20,7 +20,7 @@ const Map<String, String> kPlanNames = {
   kEnterpriseMonthlyId: 'enterprise',
 };
 class BillingService {
-  static Future<Map<String, dynamic>?> initiatePayment(String productId, {bool isRecurring = false}) async {
+  static Future<Map<String, dynamic>?> initiatePayment(String productId, {bool isRecurring = true}) async {
     try {
       final planName = kPlanNames[productId];
       if (planName == null) return null;

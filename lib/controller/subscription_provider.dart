@@ -158,7 +158,7 @@ class SubscriptionProvider extends ChangeNotifier {
     }
   }
 
-  Future<Map<String, dynamic>?> purchase(String productId, {bool isRecurring = false}) async {
+  Future<Map<String, dynamic>?> purchase(String productId, {bool isRecurring = true}) async {
     if (_isPurchasing) return null;
     _isPurchasing = true;
     _error = '';
