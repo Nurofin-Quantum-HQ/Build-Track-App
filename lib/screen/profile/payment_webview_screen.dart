@@ -44,8 +44,8 @@ class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
             if (url.startsWith('https://buildtrack.nurofin.com/subscription')) {
               final uri = Uri.parse(url);
               final status = uri.queryParameters['status'];
-              final isSuccess = status == 'success';
-              _handlePaymentReturn(isSuccess);
+              final mayBeSuccess = status == 'success' || status == 'pending';
+              _handlePaymentReturn(mayBeSuccess);
               return NavigationDecision.prevent;
             }
             if (url.contains('/api/subscriptions/callback') || url.contains('/api/subscriptions/browser-return')) {
@@ -135,9 +135,13 @@ class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
 ''';
   }
 
-  void _handlePaymentReturn(bool isSuccess) {
-    context.read<SubscriptionProvider>().handlePaymentResult(isSuccess);
-    if (mounted) Navigator.of(context).pop(isSuccess);
+  bool _isVerifying = false;
+
+  Future<void> _handlePaymentReturn(bool mayBeSuccess) async {
+    if (_isVerifying) return;
+    if (mounted) setState(() => _isVerifying = true);
+    final verified = await context.read<SubscriptionProvider>().handlePaymentResult(mayBeSuccess);
+    if (mounted) Navigator.of(context).pop(verified);
   }
 
   Future<void> _launchExternalUrl(String url) async {
@@ -167,23 +171,35 @@ class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Bt.ground,
-      appBar: BtNavBar(
-        title: 'Secure Payment',
-        close: true,
-        onBack: () => _handlePaymentReturn(false),
-        trailing: const Icon(Icons.lock_rounded, color: Bt.green, size: 18),
-      ),
-      body: Stack(
-        children: [
-          WebViewWidget(controller: _controller),
-          if (_isLoading)
-            Container(
-              color: Bt.ground,
-              child: const BtPageLoader(label: 'Loading secure payment...'),
-            ),
-        ],
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        _handlePaymentReturn(false);
+      },
+      child: Scaffold(
+        backgroundColor: Bt.ground,
+        appBar: BtNavBar(
+          title: 'Secure Payment',
+          close: true,
+          onBack: () => _handlePaymentReturn(false),
+          trailing: const Icon(Icons.lock_rounded, color: Bt.green, size: 18),
+        ),
+        body: Stack(
+          children: [
+            WebViewWidget(controller: _controller),
+            if (_isVerifying)
+              Container(
+                color: Bt.ground,
+                child: const BtPageLoader(label: 'Verifying payment with bank...'),
+              )
+            else if (_isLoading)
+              Container(
+                color: Bt.ground,
+                child: const BtPageLoader(label: 'Loading secure payment...'),
+              ),
+          ],
+        ),
       ),
     );
   }

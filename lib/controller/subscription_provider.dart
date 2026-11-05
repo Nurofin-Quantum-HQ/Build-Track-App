@@ -222,14 +222,39 @@ class SubscriptionProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> handlePaymentResult(bool success) async {
-    _pendingPaymentParams = null;
-    if (success) {
+  Future<bool> verifyPayment({int maxRetries = 6, Duration delay = const Duration(seconds: 2)}) async {
+    _isLoading = true;
+    notifyListeners();
+    for (int attempt = 0; attempt < maxRetries; attempt++) {
       await _fetchStatusFromNetwork();
-    } else {
-      _error = 'Payment was not completed. Please try again.';
-      notifyListeners();
+      if (isPaid && currentPlan != SubscriptionPlan.free) {
+        _error = '';
+        _isLoading = false;
+        notifyListeners();
+        return true;
+      }
+      if (attempt < maxRetries - 1) {
+        await Future.delayed(delay);
+      }
     }
+    _isLoading = false;
+    notifyListeners();
+    return isPaid && currentPlan != SubscriptionPlan.free;
+  }
+
+  Future<bool> handlePaymentResult(bool success) async {
+    _pendingPaymentParams = null;
+    // Always poll network to verify because payment webhooks / GPay can take a few seconds to sync
+    final verified = await verifyPayment(maxRetries: success ? 5 : 4);
+    if (verified) {
+      _error = '';
+      return true;
+    }
+    if (!success) {
+      _error = 'Payment was not completed. Please try again.';
+    }
+    notifyListeners();
+    return false;
   }
 
   void clearError() {

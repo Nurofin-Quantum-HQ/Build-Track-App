@@ -192,6 +192,7 @@ class _SubscriptionScreenContentState
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<SubscriptionProvider>().refreshFromNetwork();
       if (!UserSession.hasSkippedTour &&
           !UserSession.visitedModules.contains('subscription')) {
         ShowCaseWidget.of(context).startShowCase([_plansKey, _ctaKey]);
@@ -420,16 +421,16 @@ class _SubscriptionScreenContentState
       ),
     );
     if (!context.mounted) return;
-    if (result == true) {
+    if (result == true || sub.isPaid) {
       _showSuccessDialog(context, plan);
     } else {
-      // Failed, cancelled or Back from the payment page: say so (no charge
-      // is assumed; the plan is unchanged).
-      btToast(
-        context,
-        result == false ? "Payment didn't go through. You haven't been upgraded." : 'Payment cancelled. Your plan is unchanged.',
-        error: result == false,
-      );
+      if (!sub.isPaid) {
+        btToast(
+          context,
+          sub.error.isNotEmpty ? sub.error : "Payment didn't go through. You haven't been upgraded.",
+          error: true,
+        );
+      }
     }
   }
 
