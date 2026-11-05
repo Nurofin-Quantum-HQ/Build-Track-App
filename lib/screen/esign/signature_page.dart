@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 
 import 'package:http/http.dart' as http;
+import 'package:signature/signature.dart';
 import 'package:buildtrack_mobile/config/api_config.dart';
 class SignaturePage extends StatefulWidget {
   final String token;
@@ -15,14 +16,34 @@ class _SignaturePageState extends State<SignaturePage> {
   bool _isSubmitting = false;
   Map<String, dynamic>? _transaction;
   String? _errorMessage;
+  // The client draws their signature here; it is sent as a PNG data URI.
+  final SignatureController _signatureCtrl = SignatureController(
+    penStrokeWidth: 3,
+    penColor: Bt.ink,
+    exportBackgroundColor: Colors.white,
+    exportPenColor: Colors.black,
+    strokeCap: StrokeCap.round,
+    strokeJoin: StrokeJoin.round,
+  );
   @override
   void initState() {
     super.initState();
+    _signatureCtrl.addListener(_onSignatureChanged);
     _fetchTransaction();
+  }
+  void _onSignatureChanged() {
+    if (mounted) setState(() {});
+  }
+  @override
+  void dispose() {
+    _signatureCtrl.removeListener(_onSignatureChanged);
+    _signatureCtrl.dispose();
+    super.dispose();
   }
   Future<void> _fetchTransaction() async {
     try {
       final response = await http.get(Uri.parse('${ApiConfig.baseUrl}/esign/details/${widget.token}'));
+      if (!mounted) return;
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         setState(() {
@@ -37,6 +58,7 @@ class _SignaturePageState extends State<SignaturePage> {
         });
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _errorMessage = 'Network error. Please try again.';
         _isLoading = false;
@@ -44,9 +66,20 @@ class _SignaturePageState extends State<SignaturePage> {
     }
   }
   Future<void> _submitSignature() async {
+    if (_signatureCtrl.isEmpty) {
+      btToast(context, 'Please sign in the box first', error: true);
+      return;
+    }
     setState(() => _isSubmitting = true);
     try {
-      final dataUri = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='; // dummy 1x1 image as placeholder for authorization
+      final png = await _signatureCtrl.toPngBytes();
+      if (!mounted) return;
+      if (png == null || png.isEmpty) {
+        btToast(context, 'Could not read the signature. Please sign again.', error: true);
+        setState(() => _isSubmitting = false);
+        return;
+      }
+      final dataUri = 'data:image/png;base64,${base64Encode(png)}';
       final response = await http.post(
         Uri.parse('${ApiConfig.baseUrl}/esign/submit'),
         headers: {'Content-Type': 'application/json'},
@@ -55,6 +88,7 @@ class _SignaturePageState extends State<SignaturePage> {
           'signatureData': dataUri
         }),
       );
+      if (!mounted) return;
       if (response.statusCode == 200) {
         await showBtSuccess(
           context,
@@ -69,13 +103,24 @@ class _SignaturePageState extends State<SignaturePage> {
           _isSubmitting = false;
         });
       } else {
-        btToast(context, jsonDecode(response.body)['message'] ?? 'Failed to submit signature', error: true);
+        String msg = 'Failed to submit signature';
+        try {
+          msg = (jsonDecode(response.body)['message'] ?? msg).toString();
+        } catch (_) {}
+        btToast(context, msg, error: true);
         setState(() => _isSubmitting = false);
       }
     } catch (e) {
+      if (!mounted) return;
       btToast(context, 'Error submitting signature', error: true);
       setState(() => _isSubmitting = false);
     }
+  }
+
+  String _dateLabel() {
+    final raw = _transaction?['date']?.toString() ?? '';
+    if (raw.isEmpty) return 'N/A';
+    return raw.length >= 10 ? raw.substring(0, 10) : raw;
   }
 
   String _amountLabel() {
@@ -188,21 +233,51 @@ class _SignaturePageState extends State<SignaturePage> {
                       _buildRow('Project', _transaction?['projectName'] ?? 'N/A'),
                       _buildRow('Type', _transaction?['type'] ?? 'N/A'),
                       _buildRow('Amount', '₹${_transaction?['amount'] ?? 0}'),
-                      _buildRow('Date', _transaction?['date']?.substring(0, 10) ?? 'N/A'),
+                      _buildRow('Date', _dateLabel()),
                     ],
                   ),
                 ),
               ),
               const SizedBox(height: 26),
-              BtReveal(index: 4, child: Text('Authorize & sign:', style: BtText.subhead(context, weight: FontWeight.w600, color: Bt.ink))),
+              BtReveal(index: 4, child: Row(children: [
+                Expanded(child: Text('Sign below:', style: BtText.subhead(context, weight: FontWeight.w600, color: Bt.ink))),
+                if (_signatureCtrl.isNotEmpty)
+                  BtButton(
+                    label: 'Clear',
+                    variant: BtButtonVariant.quiet,
+                    small: true,
+                    expand: false,
+                    onPressed: _isSubmitting ? null : _signatureCtrl.clear,
+                  ),
+              ])),
               const SizedBox(height: 10),
               BtReveal(
                 index: 5,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(Bt.rCard),
+                  child: Container(
+                    height: 180,
+                    decoration: BoxDecoration(
+                      color: Bt.card,
+                      borderRadius: BorderRadius.circular(Bt.rCard),
+                      border: Border.all(color: Bt.inputBorder),
+                    ),
+                    child: Signature(
+                      controller: _signatureCtrl,
+                      height: 180,
+                      backgroundColor: Bt.card,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              BtReveal(
+                index: 6,
                 child: BtButton(
                   label: 'Authorize and Sign',
                   icon: Icons.draw_outlined,
                   loading: _isSubmitting,
-                  onPressed: _isSubmitting ? null : _submitSignature,
+                  onPressed: _isSubmitting || _signatureCtrl.isEmpty ? null : _submitSignature,
                 ),
               ),
             ],

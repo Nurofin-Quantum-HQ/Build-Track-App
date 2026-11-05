@@ -1,6 +1,7 @@
 import 'package:buildtrack_mobile/design/design.dart';
 import 'package:buildtrack_mobile/controller/project_provider.dart';
 import 'package:buildtrack_mobile/controller/user_session.dart';
+import 'package:buildtrack_mobile/controller/role_manager.dart';
 import 'package:buildtrack_mobile/models/construction_models.dart';
 import 'package:buildtrack_mobile/models/project_model.dart';
 import 'dart:convert';
@@ -32,6 +33,9 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
   bool _isLoadingTasks = true;
   final Set<String> _completedTaskIds = {};
   bool _submitting = false;
+  /// True once the user moves the slider. Only then is `progress` sent;
+  /// otherwise the server derives it from completed / total activities.
+  bool _progressTouched = false;
   static const _months = [
     'January',
     'February',
@@ -50,9 +54,13 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
   void initState() {
     super.initState();
     _catalogue = buildDefaultPhases();
-    _selectedProjectId = UserSession.projectId;
     final provider = context.read<ProjectProvider>();
-    _completionProgress = provider.selectedProject?.progress ?? 0.0;
+    // Default: the app's selected project (Home's current project), else the
+    // only project. UserSession.projectId alone could be '' / not in the list.
+    _selectedProjectId = provider.defaultProjectForForm?.id ??
+        (UserSession.projectId.isNotEmpty ? UserSession.projectId : null);
+    _completionProgress = provider.projectById(_selectedProjectId)?.progress ??
+        provider.selectedProject?.progress ?? 0.0;
     _fetchDailyTasks();
   }
   Future<void> _fetchDailyTasks() async {
@@ -81,6 +89,10 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
       text: task.description,
     );
     bool saving = false;
+    // Title/description: Admin, or the assigner who still holds assign_tasks
+    // (PUT /tasks/:id returns 403 otherwise). Assignees may change the status.
+    final bool canEditDetails = UserSession.isAdmin ||
+        (RoleManager.canAssignTasks && task.createdBy != null && task.createdBy == UserSession.userId);
     await showDialog(
       context: context,
       builder: (ctx) {
@@ -100,6 +112,7 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
                     const SizedBox(height: 4),
                     TextField(
                       controller: titleCtrl,
+                      enabled: canEditDetails,
                       style: BtText.body(ctx),
                       decoration: btInput(ctx),
                     ),
@@ -108,6 +121,7 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
                     const SizedBox(height: 4),
                     TextField(
                       controller: descCtrl,
+                      enabled: canEditDetails,
                       maxLines: 3,
                       style: BtText.body(ctx),
                       decoration: btInput(ctx),
@@ -158,10 +172,16 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
                       : () async {
                           setDialogState(() => saving = true);
                           try {
-                            await TaskService.updateTask(task.id, {
-                              'title': titleCtrl.text,
-                              'description': descCtrl.text,
-                            });
+                            // Send only what changed: the details call is
+                            // refused for assignees, which used to block the
+                            // status change too.
+                            final details = <String, dynamic>{
+                              if (canEditDetails && titleCtrl.text.trim() != task.title) 'title': titleCtrl.text.trim(),
+                              if (canEditDetails && descCtrl.text.trim() != task.description) 'description': descCtrl.text.trim(),
+                            };
+                            if (details.isNotEmpty) {
+                              await TaskService.updateTask(task.id, details);
+                            }
                             if (updatedStatus != null && updatedStatus != task.status) {
                               await TaskService.updateTaskStatus(task.id, updatedStatus!);
                             }
@@ -169,6 +189,9 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
                             onSave();
                           } catch (e) {
                             setDialogState(() => saving = false);
+                            if (ctx.mounted) {
+                              btToast(ctx, 'Could not save the task: ${e.toString().replaceFirst('Exception: ', '')}', error: true);
+                            }
                           }
                         },
                   child: saving
@@ -194,16 +217,7 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
       orElse: () => null,
     );
     if (project != null) {
-      final matchedAct = project.selectedPhases
-          ?.expand((ph) => ph.activities)
-          .cast<ProjectActivity?>()
-          .firstWhere(
-            (act) =>
-                (_prefillActivityId != null && act?.id == _prefillActivityId) ||
-                (_selectedActivityName != null &&
-                    act?.name == _selectedActivityName),
-            orElse: () => null,
-          );
+      final matchedAct = _resolveActivity(project);
       if (matchedAct != null) {
         setState(() {
           if (matchedAct.notes != null && matchedAct.notes!.trim().isNotEmpty) {
@@ -249,20 +263,15 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
         if (task.activityName != null && task.activityName!.isNotEmpty) {
           _selectedActivityName = task.activityName;
         }
+        // The task names its activity by id — use it (name alone can match
+        // the same activity name in another phase).
+        if (task.activityId != null && task.activityId!.isNotEmpty) {
+          _prefillActivityId = task.activityId;
+        }
         _completedTaskIds.add(task.id);
+        final String taskProjectId = task.project;
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted) return;
-          final provider = context.read<ProjectProvider>();
-          final project = provider.projects.cast<ProjectModel?>().firstWhere(
-            (p) => p?.id == task.project,
-            orElse: () => null,
-          );
-          if (project != null) {
-            setState(() {
-              _completionProgress = project.progress;
-              _loadActivityDetails();
-            });
-          }
+          if (mounted) _hydrateProject(taskProjectId);
         });
         return; // Early return to skip other args if task is provided
       }
@@ -286,21 +295,80 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
           _selectedFloor = null;
         }
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted) return;
-          final provider = context.read<ProjectProvider>();
-          final project = provider.projects.cast<ProjectModel?>().firstWhere(
-            (p) => p?.id == projectId,
-            orElse: () => null,
-          );
-          if (project != null) {
-            setState(() {
-              _completionProgress = project.progress;
-              _loadActivityDetails();
-            });
-          }
+          if (mounted) _hydrateProject(projectId);
+        });
+      } else if (projectId != null && projectId.isNotEmpty) {
+        // Partial context (project, maybe phase): pre-fill what was given and
+        // leave the rest editable (not the locked tracker layout).
+        _selectedProjectId = projectId;
+        if (floor != null && floor.isNotEmpty) _selectedFloor = floor;
+        if (phaseName != null && phaseName.isNotEmpty) _selectedPhaseName = phaseName;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _hydrateProject(projectId);
         });
       }
     }
+  }
+
+  /// Fill empty floor / phase / activity when the project has exactly one
+  /// (build-safe: local fields only, no setState).
+  void _autoPickSingles(ProjectModel? project) {
+    if (_launchedFromTracker || project == null) return;
+    final floors = project.floors ?? const <String>[];
+    if (floors.length == 1 && _selectedFloor == null) _selectedFloor = floors.first;
+    if (floors.isNotEmpty && _selectedFloor == null) return;
+    if (_selectedPhaseName == null) {
+      final phases = _phasesFor(project);
+      if (phases.length == 1) _selectedPhaseName = phases.first;
+    }
+    if (_selectedPhaseName == null || _selectedActivityName != null) return;
+    final acts = _activitiesFor(project, _selectedPhaseName);
+    if (acts.length == 1) {
+      _selectedActivityName = acts.first;
+      _prefillActivityId = null;
+    }
+  }
+
+  /// Finds the project for this update. A project reached only through an
+  /// assigned task isn't in the user's local list, so it is fetched (the
+  /// backend accepts updates from the task's assignee).
+  Future<ProjectModel?> _projectById(String id) async {
+    final provider = context.read<ProjectProvider>();
+    final local = provider.projects.cast<ProjectModel?>().firstWhere(
+      (p) => p?.id == id,
+      orElse: () => null,
+    );
+    return local ?? await provider.ensureProject(id);
+  }
+
+  Future<void> _hydrateProject(String id) async {
+    final project = await _projectById(id);
+    if (!mounted || project == null) return;
+    setState(() => _completionProgress = project.progress);
+    _loadActivityDetails();
+  }
+
+  /// The project activity this update is for: by id first; then by name in
+  /// the selected phase; then by name anywhere only if exactly one matches.
+  ProjectActivity? _resolveActivity(ProjectModel? project) {
+    if (project == null) return null;
+    final phases = project.selectedPhases ?? const <ProjectPhase>[];
+    final all = phases.expand((ph) => ph.activities).toList();
+    if (_prefillActivityId != null && _prefillActivityId!.isNotEmpty) {
+      for (final a in all) {
+        if (a.id == _prefillActivityId) return a;
+      }
+    }
+    final name = _selectedActivityName;
+    if (name == null || name.isEmpty) return null;
+    for (final ph in phases) {
+      if (ph.phaseName != _selectedPhaseName) continue;
+      for (final a in ph.activities) {
+        if (a.name == name) return a;
+      }
+    }
+    final byName = all.where((a) => a.name == name).toList();
+    return byName.length == 1 ? byName.first : null;
   }
   @override
   void dispose() {
@@ -309,14 +377,26 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
   }
   List<String> _phasesFor(ProjectModel? project) {
     if (project == null) return [];
+    // The project's own plan first (custom phases/activities live there).
+    final planned = (project.selectedPhases ?? const <ProjectPhase>[])
+        .where((ph) => ph.activities.isNotEmpty)
+        .map((ph) => ph.phaseName)
+        .toList();
+    if (planned.isNotEmpty) return planned;
     if (project.selectedPhaseNames != null &&
         project.selectedPhaseNames!.isNotEmpty) {
       return project.selectedPhaseNames!;
     }
     return _catalogue.map((p) => p.name).toList();
   }
-  List<String> _activitiesFor(String? phaseName) {
+  List<String> _activitiesFor(ProjectModel? project, String? phaseName) {
     if (phaseName == null) return [];
+    final planned = (project?.selectedPhases ?? const <ProjectPhase>[])
+        .cast<ProjectPhase?>()
+        .firstWhere((ph) => ph?.phaseName == phaseName, orElse: () => null);
+    if (planned != null && planned.activities.isNotEmpty) {
+      return planned.activities.map((a) => a.name).toSet().toList();
+    }
     final match = _catalogue.cast<ConstructionPhase?>().firstWhere(
       (p) => p?.name == phaseName,
       orElse: () => null,
@@ -384,6 +464,7 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
                 (p) => p?.id == _selectedProjectId,
                 orElse: () => null,
               );
+        _autoPickSingles(selProject);
         final floors = (selProject?.floors?.isNotEmpty ?? false)
             ? List<String>.from(selProject!.floors!)
             : <String>[];
@@ -393,41 +474,56 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
           floors.add(_selectedFloor!);
         }
         final phaseNames = _phasesFor(selProject);
-        final activityNames = _activitiesFor(_selectedPhaseName);
-        final sections = <Widget>[
-          if (_launchedFromTracker) _buildTrackerContextBanner(projects),
-          _buildContextCard(
+        final activityNames = _activitiesFor(selProject, _selectedPhaseName);
+        // Named sections. Each is keyed so a section appearing or going away
+        // (stage card, "Your tasks") never hands another section's state —
+        // e.g. the Notes field and its focus — to a different widget.
+        final sections = <MapEntry<String, Widget>>[
+          if (_launchedFromTracker) MapEntry('banner', _buildTrackerContextBanner(projects)),
+          MapEntry('where', _buildContextCard(
             projects: projects,
             floors: floors,
             phaseNames: phaseNames,
             activityNames: activityNames,
-          ),
+          )),
           if (_selectedPhaseName != null &&
               (floors.isEmpty || _selectedFloor != null))
-            _buildStageSummaryCard(),
-          _buildTaskChecklist(),
-          _buildExecutionNotes(),
-          _buildPhotoUpload(),
-          _buildMaterialConsumption(context, provider),
-          _buildDateField(),
+            MapEntry('stage', _buildStageSummaryCard()),
+          MapEntry('tasks', _buildTaskChecklist()),
+          MapEntry('notes', _buildExecutionNotes()),
+          MapEntry('photos', _buildPhotoUpload()),
+          MapEntry('materials', _buildMaterialConsumption(context, provider)),
+          MapEntry('dates', _buildDateField()),
         ];
-        final visible = sections.where((w) => w is! SizedBox).toList();
+        final visible = sections.where((e) => e.value is! SizedBox).toList();
         return Scaffold(
           backgroundColor: Bt.ground,
           appBar: BtNavBar(
             title: _launchedFromTracker ? 'Progress update' : 'Daily update',
           ),
-          body: ListView(
+          // A plain (non-lazy) column: in a lazy ListView every section was
+          // rebuilt — and its entrance animation replayed — each time it
+          // scrolled back into view. Here each section reveals once.
+          body: SingleChildScrollView(
             physics: const ClampingScrollPhysics(),
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
-            children: [
-              for (var i = 0; i < visible.length; i++) ...[
-                if (i > 0) const SizedBox(height: 24),
-                BtReveal(index: i, child: visible[i]),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (var i = 0; i < visible.length; i++)
+                  Padding(
+                    key: ValueKey('section-${visible[i].key}'),
+                    padding: EdgeInsets.only(top: i > 0 ? 24 : 0),
+                    child: BtReveal(index: i, child: visible[i].value),
+                  ),
               ],
-            ],
+            ),
           ),
-          bottomNavigationBar: BtCtaBar(children: [Expanded(child: _buildSaveButton(context, provider))]),
+          // Lifted by the keyboard height so Submit stays visible while typing.
+          bottomNavigationBar: Padding(
+            padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+            child: BtCtaBar(children: [Expanded(child: _buildSaveButton(context, provider))]),
+          ),
         );
       },
     );
@@ -523,6 +619,8 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
                         _selectedFloor = null;
                         _selectedPhaseName = null;
                         _selectedActivityName = null;
+                        _prefillActivityId = null;
+                        _progressTouched = false;
                         final p = projects.cast<ProjectModel?>().firstWhere(
                           (x) => x?.id == val,
                           orElse: () => null,
@@ -551,6 +649,7 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
                         if (!_launchedFromTracker) {
                           _selectedPhaseName = null;
                           _selectedActivityName = null;
+                          _prefillActivityId = null;
                         }
                       }),
               ),
@@ -580,6 +679,7 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
                           : (val) => setState(() {
                               _selectedPhaseName = val;
                               _selectedActivityName = null;
+                              _prefillActivityId = null;
                             }),
                     ),
             ),
@@ -612,7 +712,10 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
                       onChanged:
                           (_selectedPhaseName == null || activityNames.isEmpty)
                           ? null
-                          : (val) => setState(() => _selectedActivityName = val),
+                          : (val) => setState(() {
+                              _selectedActivityName = val;
+                              _prefillActivityId = null;
+                            }),
                     ),
             ),
           ],
@@ -677,7 +780,10 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
             ),
             child: Slider(
               value: _completionProgress,
-              onChanged: (v) => setState(() => _completionProgress = v),
+              onChanged: (v) => setState(() {
+                _completionProgress = v;
+                _progressTouched = true;
+              }),
             ),
           ),
         ],
@@ -750,6 +856,7 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
                       if (task.activityName != null &&
                           task.activityName!.isNotEmpty) {
                         _selectedActivityName = task.activityName;
+                        _prefillActivityId = (task.activityId != null && task.activityId!.isNotEmpty) ? task.activityId : null;
                       }
 
                       final provider = context.read<ProjectProvider>();
@@ -834,24 +941,17 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _sectionLabel('Update date'),
-              GestureDetector(
-                onTap: () async {
-                  final picked = await showDatePicker(
-                    context: context,
-                    initialDate: _selectedDate,
-                    firstDate: DateTime(2020),
-                    lastDate: DateTime(2100),
-                    builder: pickerTheme,
-                  );
-                  if (picked != null) setState(() => _selectedDate = picked);
-                },
-                child: IgnorePointer(
-                  child: BtPickerField(
-                    text: updateDateStr,
-                    placeholder: updateDateStr == 'Select date',
-                    icon: Icons.calendar_today_outlined,
-                    onTap: () {},
-                  ),
+              // The field handles the tap itself. Before, it sat inside
+              // IgnorePointer under a GestureDetector: IgnorePointer removes the
+              // child from hit-testing, so the (deferToChild) detector never
+              // received the tap and the picker never opened.
+              BtPickerField(
+                text: updateDateStr,
+                icon: Icons.calendar_today_outlined,
+                onTap: () => _pickDate(
+                  initial: _selectedDate,
+                  theme: pickerTheme,
+                  onPicked: (d) => _selectedDate = d,
                 ),
               ),
             ],
@@ -863,24 +963,14 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _sectionLabel('Completion date'),
-              GestureDetector(
-                onTap: () async {
-                  final picked = await showDatePicker(
-                    context: context,
-                    initialDate: _completionDate ?? DateTime.now(),
-                    firstDate: DateTime(2020),
-                    lastDate: DateTime(2100),
-                    builder: pickerTheme,
-                  );
-                  if (picked != null) setState(() => _completionDate = picked);
-                },
-                child: IgnorePointer(
-                  child: BtPickerField(
-                    text: completionDateStr,
-                    placeholder: completionDateStr == 'Select date',
-                    icon: Icons.calendar_today_outlined,
-                    onTap: () {},
-                  ),
+              BtPickerField(
+                text: completionDateStr,
+                placeholder: _completionDate == null,
+                icon: Icons.calendar_today_outlined,
+                onTap: () => _pickDate(
+                  initial: _completionDate ?? DateTime.now(),
+                  theme: pickerTheme,
+                  onPicked: (d) => _completionDate = d,
                 ),
               ),
             ],
@@ -888,6 +978,33 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
         ),
       ],
     );
+  }
+  static final DateTime _firstPickable = DateTime(2020);
+  static final DateTime _lastPickable = DateTime(2100);
+
+  /// Opens the date picker. The initial date is clamped into the picker's
+  /// range (an activity's stored completedAt can be outside it, which made
+  /// showDatePicker throw), and any failure is shown instead of swallowed.
+  Future<void> _pickDate({
+    required DateTime initial,
+    required Widget Function(BuildContext, Widget?) theme,
+    required void Function(DateTime) onPicked,
+  }) async {
+    try {
+      final safeInitial = initial.isBefore(_firstPickable)
+          ? _firstPickable
+          : (initial.isAfter(_lastPickable) ? _lastPickable : initial);
+      final picked = await showDatePicker(
+        context: context,
+        initialDate: safeInitial,
+        firstDate: _firstPickable,
+        lastDate: _lastPickable,
+        builder: theme,
+      );
+      if (picked != null && mounted) setState(() => onPicked(picked));
+    } catch (e) {
+      if (mounted) btToast(context, 'Could not open the date picker: $e', error: true);
+    }
   }
   Future<void> _addPhoto() async {
     final result = await pickAttachmentDirect(context);
@@ -1107,97 +1224,90 @@ class _UpdateProgressScreenState extends State<UpdateProgressScreen> {
       loading: _submitting,
       onPressed: () async {
         if (_submitting) return;
+        // Validate up front so a tap never silently does nothing.
+        if (_selectedProjectId == null || _selectedProjectId!.isEmpty) {
+          btToast(context, 'Select a project first.', error: true);
+          return;
+        }
+        FocusScope.of(context).unfocus();
         setState(() => _submitting = true);
         try {
-        final project =
-            provider.selectedProject ??
-            provider.projects.cast<ProjectModel?>().firstWhere(
-              (p) => p?.id == _selectedProjectId,
-              orElse: () => null,
-            );
-        String? targetActivityId = _prefillActivityId;
-        if (targetActivityId == null &&
-            _selectedActivityName != null &&
-            project != null) {
-          final matchedAct = project.selectedPhases
-              ?.expand((ph) => ph.activities)
-              .cast<ProjectActivity?>()
-              .firstWhere(
-                (act) => act?.name == _selectedActivityName,
-                orElse: () => null,
-              );
-          if (matchedAct != null) {
-            targetActivityId = matchedAct.id;
+          final targetProjectId = _selectedProjectId!;
+          final project = await _projectById(targetProjectId);
+          if (!mounted) return;
+          if (project == null) {
+            btToast(context, 'Could not load this project. Check your connection and try again.', error: true);
+            return;
           }
-        }
-        final targetProjectId = _selectedProjectId ?? project?.id;
-        bool success = false;
-        if (_prefillActivityId != null) {
-          await provider.markActivityComplete(
-            _selectedProjectId!,
-            _prefillActivityId!,
-            _selectedDate,
-          );
-        }
-        for (final taskId in _completedTaskIds) {
-          try {
-            await TaskService.updateTaskStatus(taskId, 'Completed');
-          } catch (e) {
-            debugPrint('Failed to complete task $taskId: $e');
+          final notes = _notesCtrl.text.trim();
+          final hasDetails = notes.isNotEmpty || _attachments.isNotEmpty || _completionDate != null;
+          final activity = _resolveActivity(project);
+          if (_selectedActivityName != null && _selectedActivityName != '__none' && activity == null) {
+            btToast(context, '"$_selectedActivityName" isn\'t in this project\'s plan. Pick an activity from the list.', error: true);
+            return;
           }
-        }
-        if (!mounted) return;
-        if (targetProjectId != null && targetActivityId != null) {
-          success = await provider.toggleActivityCompletion(
-            targetProjectId,
-            targetActivityId,
-            completedAt: _completionDate ?? _selectedDate,
-            notes: _notesCtrl.text.trim().isNotEmpty
-                ? _notesCtrl.text.trim()
-                : null,
-            photo: _attachments.isNotEmpty ? _attachments.first.dataUri : null,
-            photos: _attachments.map((a) => a.dataUri).toList(),
-            manualProgress: _completionProgress,
-          );
-        } else if (targetProjectId != null) {
-          success = await provider.updateProjectProgress(
-            targetProjectId,
-            _completionProgress,
-          );
-        }
-        if (context.mounted) {
-          if (success) {
-            final months = [
-              'Jan',
-              'Feb',
-              'Mar',
-              'Apr',
-              'May',
-              'Jun',
-              'Jul',
-              'Aug',
-              'Sep',
-              'Oct',
-              'Nov',
-              'Dec',
-            ];
-            final dateLabel =
-                '${_selectedDate.day} ${months[_selectedDate.month - 1]} ${_selectedDate.year}';
-            await showBtSuccess(
-              context,
-              kind: BtSuccessKind.bags,
-              title: _launchedFromTracker && _selectedActivityName != null
-                  ? '${_selectedActivityName!} marked done'
-                  : 'Progress updated',
-              message: dateLabel,
-              label: 'DAILY UPDATE',
+          if (activity == null && hasDetails) {
+            btToast(context, 'Pick an activity — notes, photos and the completion date are saved on an activity.', error: true);
+            return;
+          }
+          if (activity == null && !_progressTouched) {
+            btToast(context, 'Nothing to save yet — pick an activity, or move the progress slider.', error: true);
+            return;
+          }
+          final bool success;
+          if (activity != null) {
+            // One save marks the activity done with its date, notes, photos
+            // (and the progress only if the user set it).
+            success = await provider.toggleActivityCompletion(
+              targetProjectId,
+              activity.id,
+              completedAt: _completionDate ?? _selectedDate,
+              notes: notes.isNotEmpty ? notes : null,
+              photo: _attachments.isNotEmpty ? _attachments.first.dataUri : null,
+              photos: _attachments.map((a) => a.dataUri).toList(),
+              manualProgress: _progressTouched ? _completionProgress : null,
             );
-            if (!context.mounted) return;
-            Navigator.maybePop(context);
           } else {
-            btToast(context, 'Failed to save progress details. Please check network connection and try again.', error: true);
+            success = await provider.updateProjectProgress(targetProjectId, _completionProgress);
           }
-        }
+          if (!mounted) return;
+          if (!success) {
+            btToast(context, provider.lastSaveError ?? 'Could not save this update. Try again.', error: true);
+            return;
+          }
+          // Tasks are closed only after the update itself was saved.
+          var taskFailures = 0;
+          for (final taskId in _completedTaskIds) {
+            try {
+              await TaskService.updateTaskStatus(taskId, 'Completed');
+            } catch (e) {
+              taskFailures++;
+              debugPrint('Failed to complete task $taskId: $e');
+            }
+          }
+          if (!context.mounted) return;
+          if (taskFailures > 0) {
+            btToast(context, 'Update saved, but $taskFailures ${taskFailures == 1 ? 'task' : 'tasks'} could not be marked completed.', error: true);
+          }
+          const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+          final dateLabel =
+              '${_selectedDate.day} ${months[_selectedDate.month - 1]} ${_selectedDate.year}';
+          await showBtSuccess(
+            context,
+            kind: BtSuccessKind.progress,
+            title: activity != null
+                ? '${activity.name} marked done'
+                : 'Progress updated',
+            message: dateLabel,
+            label: 'DAILY UPDATE',
+          );
+          if (!context.mounted) return;
+          Navigator.maybePop(context);
+        } catch (e) {
+          debugPrint('Progress update failed: $e');
+          if (context.mounted) {
+            btToast(context, 'Could not save this update: $e', error: true);
+          }
         } finally {
           if (mounted) setState(() => _submitting = false);
         }
@@ -1233,6 +1343,9 @@ class _DashedBorderPainter extends CustomPainter {
 class PhotoAttachment {
   final PickedAttachment? localAttachment;
   final String? remoteUrl;
+  /// Built once: a new MemoryImage per build (base64 decoded again) missed
+  /// the image cache, so every rebuild re-decoded every photo.
+  ImageProvider? _imageProvider;
   PhotoAttachment.local(this.localAttachment) : remoteUrl = null;
   PhotoAttachment.remote(this.remoteUrl) : localAttachment = null;
   bool get isImage {
@@ -1254,7 +1367,8 @@ class PhotoAttachment {
     }
     return remoteUrl!;
   }
-  ImageProvider get imageProvider {
+  ImageProvider get imageProvider => _imageProvider ??= _buildImageProvider();
+  ImageProvider _buildImageProvider() {
     if (localAttachment != null) {
       return localAttachment!.imageProvider!;
     }

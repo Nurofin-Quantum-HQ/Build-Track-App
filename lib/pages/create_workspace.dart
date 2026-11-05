@@ -510,9 +510,9 @@ class _CreateWorkspaceScreenState extends State<CreateWorkspaceScreen> {
   void _verifyOtp() async {
     final email = _emailCtrl.text.trim();
     final otp = _otpCtrl.text.trim();
-    if (otp.length < 5) {
+    if (!RegExp(r'^\d{6}$').hasMatch(otp)) { // the emailed code is 6 digits
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter the OTP')),
+        const SnackBar(content: Text('Enter the 6-digit code from your email')),
       );
       return;
     }
@@ -553,8 +553,10 @@ class _CreateWorkspaceScreenState extends State<CreateWorkspaceScreen> {
     final company = _companyCtrl.text.trim();
     final phone = _phoneCtrl.text.trim();
     final email = _emailCtrl.text.trim();
-    final pass = _passCtrl.text;
-    final confirm = _confirmCtrl.text;
+    // Trimmed like the login screen does — a trailing space saved here could
+    // never be typed back at sign-in.
+    final pass = _passCtrl.text.trim();
+    final confirm = _confirmCtrl.text.trim();
     if (name.isEmpty || company.isEmpty || email.isEmpty || pass.isEmpty || phone.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please fill in all required fields (including Company Name and phone)')),

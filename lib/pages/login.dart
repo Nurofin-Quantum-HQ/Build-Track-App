@@ -1,4 +1,7 @@
+import 'dart:async';
+import 'package:buildtrack_mobile/controller/theme_provider.dart';
 import 'package:buildtrack_mobile/design/design.dart';
+import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -252,25 +255,37 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _loading = true);
     try {
       final data = await AuthService.login(email, password);
-      if (data != null) {
-        if (mounted) {
-          context.read<SubscriptionProvider>().fetchStatus();
-          context.read<ProjectProvider>().load();
-          await PushNotificationService.init();
-          Navigator.pushReplacementNamed(context, '/home');
-        }
-      } else {
-        throw Exception('Invalid login response');
-      }
+      if (data == null) throw Exception('Invalid login response');
+      if (!mounted) return;
+      // Fresh account data: plan, projects, theme (from the account's
+      // themePreference). None of these may block sign-in.
+      context.read<SubscriptionProvider>().fetchStatus();
+      context.read<ProjectProvider>().load();
+      context.read<ThemeProvider>().reload();
+      // Push registration must never stop the user getting in (it threw on
+      // iOS and left them on this screen although signed in).
+      PushNotificationService.init().catchError((Object e) {
+        debugPrint('Push init after login failed: $e');
+      });
+      Navigator.pushReplacementNamed(context, '/home');
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))),
+          SnackBar(content: Text(_loginErrorText(e))),
         );
       }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  String _loginErrorText(Object e) {
+    final msg = e.toString().replaceAll('Exception: ', '');
+    if (msg == 'Unauthorized') return 'Invalid email or password';
+    if (e is TimeoutException || e is http.ClientException || msg.contains('SocketException')) {
+      return "Can't reach the server. Check your connection and try again.";
+    }
+    return msg;
   }
   Widget _buildFooter() {
     return Column(

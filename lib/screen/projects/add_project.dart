@@ -412,7 +412,10 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
           label: _projectCode,
         );
         if (!mounted) return;
-        Navigator.pop(context);
+        // addProject made the new project the app's selected project; open
+        // its detail (in place of this form) so the user lands on it instead
+        // of the list with another project still selected.
+        Navigator.pushReplacementNamed(context, '/project-detail');
       }
     } catch (e) {
       if (mounted) {
@@ -1484,13 +1487,19 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
               FocusManager.instance.primaryFocus?.unfocus();
               Navigator.pop(ctx);
               setState(
-                () => phase.activities.add(
-                  ConstructionActivity(
+                () {
+                  // A newly added activity is part of the plan: select it (and its
+                  // phase). Unselected activities are dropped on save, so before
+                  // this the new activity silently disappeared.
+                  final act = ConstructionActivity(
                     key: '${phase.name}::Custom::$name',
                     name: name,
                     isCustom: true,
-                  ),
-                ),
+                  );
+                  act.isSelected = true;
+                  phase.activities.add(act);
+                  phase.isSelected = true;
+                },
               );
             },
             style: ElevatedButton.styleFrom(

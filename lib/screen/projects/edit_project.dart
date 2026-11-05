@@ -335,11 +335,22 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
         }
       }
     }
+    // Keep the project's own floor names ("First", "Roof"…): renaming or
+    // dropping a floor on save detaches every entry recorded on it. A preset chip
+    // that means the same floor shows the project's name instead.
     final rawFloors = p.floors ?? [];
-    _selectedFloorChips = rawFloors
-        .map((f) => _normalizeFloor(f))
-        .where((f) => _floorChipOptions.contains(f))
-        .toList();
+    _selectedFloorChips = [];
+    for (final f in rawFloors) {
+      final orig = f.trim();
+      if (orig.isEmpty || _selectedFloorChips.contains(orig)) continue;
+      final i = _floorChipOptions.indexOf(_normalizeFloor(orig));
+      if (i != -1) {
+        _floorChipOptions[i] = orig;
+      } else if (!_floorChipOptions.contains(orig)) {
+        _floorChipOptions.add(orig);
+      }
+      _selectedFloorChips.add(orig);
+    }
     _room1BHKCount = p.room1BHK ?? 0;
     _room2BHKCount = p.room2BHK ?? 0;
     _room3BHKCount = p.room3BHK ?? 0;
@@ -575,13 +586,20 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
               phaseName: ph.name,
               isCustom: ph.isCustom,
               activities: ph.allActivities.where((a) => a.isSelected).map((a) {
-                final prev = _existingActivityById[a.key];
+                // Same lookup as _populateFrom (id, then phase::name), so an
+                // activity matched by name keeps its id, completion and the
+                // daily-update notes/photos ($set replaces selectedPhases).
+                final prev = _existingActivityById[a.key] ??
+                    _existingActivityById['${ph.name.trim().toLowerCase()}::${a.name.trim().toLowerCase()}'];
                 return ProjectActivity(
-                  id: a.key,
+                  id: (prev != null && prev.id.isNotEmpty) ? prev.id : a.key,
                   name: a.name,
                   isCustom: a.isCustom,
                   completed: prev?.completed ?? false,
                   completedAt: prev?.completedAt,
+                  notes: prev?.notes,
+                  photo: prev?.photo,
+                  photos: prev?.photos,
                   budgetMaterial: a.budgetMaterial ?? prev?.budgetMaterial,
                   budgetLabour: a.budgetLabour ?? prev?.budgetLabour,
                   budgetEquipment: a.budgetEquipment ?? prev?.budgetEquipment,
@@ -655,7 +673,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
       }
     } catch (e) {
       if (mounted) {
-        btToast(context, 'Error: $e', error: true);
+        btToast(context, 'Could not update the project: ${e.toString().replaceFirst('Exception: ', '')}', error: true);
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -1136,7 +1154,17 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
               icon: Icons.check_rounded,
               variant: BtButtonVariant.accent,
               loading: _saving,
-              onPressed: (_saving || _mainBuildingType == null) ? null : _finish,
+              onPressed: _saving
+                  ? null
+                  : () {
+                      if (_mainBuildingType == null) {
+                        // Was a silently disabled button.
+                        btToast(context, 'Pick what you\'re building (Building step) before saving.', error: true);
+                        _goStep(1);
+                        return;
+                      }
+                      _finish();
+                    },
             ),
           ),
         ],
@@ -1830,13 +1858,19 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
               final name = ctrl.text.trim();
               if (name.isEmpty) return;
               setState(
-                () => phase.activities.add(
-                  ConstructionActivity(
+                () {
+                  // A newly added activity is part of the plan: select it (and its
+                  // phase). Unselected activities are dropped on save, so before
+                  // this the new activity silently disappeared.
+                  final act = ConstructionActivity(
                     key: '${phase.name}::Custom::$name',
                     name: name,
                     isCustom: true,
-                  ),
-                ),
+                  );
+                  act.isSelected = true;
+                  phase.activities.add(act);
+                  phase.isSelected = true;
+                },
               );
               Navigator.pop(ctx);
             },

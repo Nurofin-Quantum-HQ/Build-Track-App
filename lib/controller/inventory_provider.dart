@@ -42,20 +42,38 @@ class InventoryProvider extends ChangeNotifier {
       notifyListeners();
     }
   }
+  /// True when the last load failed (the previous items, if any, are kept).
+  bool get hasError => _error.isNotEmpty;
+  String? _projectId;
+  String? get projectId => _projectId;
+
+  /// Re-runs the last [loadInventory].
+  Future<void> retry() async {
+    final id = _projectId;
+    if (id != null) await loadInventory(id);
+  }
+
   Future<void> loadInventory(String projectId) async {
+    // Items from another project must not be shown as this project's when the load fails.
+    if (_projectId != null && _projectId != projectId) _inventory = [];
+    _projectId = projectId;
     _isLoading = true;
     _error = '';
     notifyListeners();
     try {
+      // Throws on non-200 / network errors: keep the previous items instead of [].
       final rawData = await ApiService.fetchInventory(projectId);
-      debugPrint('RAW INVENTORY JSON');
-      debugPrint(rawData.toString());
+      if (_projectId != projectId) return; // a newer load for another project won
       _inventory = rawData.map((json) => InventoryItem.fromJson(json)).toList();
     } catch (e) {
-      _error = 'Could not fetch inventory: $e';
+      if (_projectId != projectId) return;
+      debugPrint('loadInventory error: $e');
+      _error = "Couldn't load inventory. Check your connection and try again.";
     } finally {
-      _isLoading = false;
-      notifyListeners();
+      if (_projectId == projectId) {
+        _isLoading = false;
+        notifyListeners();
+      }
     }
   }
   Future<void> performSearch(
@@ -83,6 +101,7 @@ class InventoryProvider extends ChangeNotifier {
     }
   }
   void clear() {
+    _projectId = null;
     _inventory = [];
     _isLoading = false;
     _error = '';

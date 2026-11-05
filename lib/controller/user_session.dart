@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:buildtrack_mobile/common/themes/app_colors.dart';
 import 'package:buildtrack_mobile/services/api_service.dart';
+import 'package:buildtrack_mobile/design/bt_motion.dart';
 enum UserRole { admin, supervisor, mason }
 class UserSession extends ChangeNotifier {
   static final UserSession _instance = UserSession._();
@@ -108,6 +109,21 @@ class UserSession extends ChangeNotifier {
     _instance.notifyListeners();
   }
 
+  /// "App Guidelines" (Account page): replay the guided app tour from the
+  /// start. Clears the visited-module flags so every tab's tour runs again,
+  /// marks the tour prompt as answered (no "take the tour?" dialog — the user
+  /// just asked for it) and switches the cross-tab tour on. The caller then
+  /// takes the user to Home, where the tour starts.
+  static Future<void> restartAppTour() async {
+    _hasSkippedTour = false;
+    _visitedModules = [];
+    _appTourPrompted = true;
+    _globalTourActive = true;
+    await _persist();
+    await _rememberTourPrompted();
+    _instance.notifyListeners();
+  }
+
   static Future<void> setGlobalTourActive(bool active) async {
     _globalTourActive = active;
     await _persist();
@@ -117,7 +133,16 @@ class UserSession extends ChangeNotifier {
   static Future<void> markAppTourPrompted() async {
     _appTourPrompted = true;
     await _persist();
+    await _rememberTourPrompted();
     _instance.notifyListeners();
+  }
+
+  static Future<void> _rememberTourPrompted() async {
+    if (_userId.isEmpty) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_tourPromptKey(_userId), true);
+    } catch (_) {}
   }
 
   static Future<void> markModuleVisited(String moduleName) async {
@@ -179,8 +204,15 @@ class UserSession extends ChangeNotifier {
     if (isAdmin) return true;
     return _permissions.contains(key);
   }
+  /// Per-user "the welcome-tour question was answered" flag. Kept in its own
+  /// key so it survives logout (prefs are cleared) and session refreshes.
+  static String _tourPromptKey(String userId) => 'app_tour_prompted_$userId';
+
   static Future<void> fromLoginResponse(Map<String, dynamic> user) async {
-    _userId = user['id']?.toString() ?? '';
+    final newUserId = (user['id'] ?? user['_id'])?.toString() ?? '';
+    final sameUser = newUserId.isNotEmpty && newUserId == _userId;
+    _userId = newUserId;
+    await BtMotion.instance.loadFor(newUserId); // per-user Motion setting
     final rawRoleStr = user['role']?.toString() ?? '';
     
     // Sync themePreference from backend
@@ -201,9 +233,20 @@ class UserSession extends ChangeNotifier {
     }
     _rawRoleName = _toDisplayName(rawRoleStr);
     _role = _parseRole(rawRoleStr);
-    _globalTourActive = false;
-    _appTourPrompted = false;
-    
+    // A session refresh (startup /auth/me, Account page, profile save) must
+    // not reset the tour state — that re-showed the welcome-tour dialog on
+    // every launch. Only a different user starts fresh.
+    if (!sameUser) {
+      _globalTourActive = false;
+      _appTourPrompted = false;
+    }
+    if (!_appTourPrompted && newUserId.isNotEmpty) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        _appTourPrompted = prefs.getBool(_tourPromptKey(newUserId)) ?? false;
+      } catch (_) {}
+    }
+
     final rawIds = user['projectIds'];
     if (rawIds is List) {
       _projectIds = rawIds
@@ -296,6 +339,7 @@ class UserSession extends ChangeNotifier {
       }
       final data = json.decode(raw) as Map<String, dynamic>;
       _userId = data['id']?.toString() ?? '';
+      await BtMotion.instance.loadFor(_userId);
       _profilePhoto = data['profilePhoto']?.toString();
       _companyName = data['companyName']?.toString() ?? '';
       _companyFontStyle = data['companyFontStyle']?.toString() ?? 'Inter';
@@ -325,6 +369,9 @@ class UserSession extends ChangeNotifier {
       _hasCreatedProject = data['hasCreatedProject'] == true;
       _hasAddedEntry = data['hasAddedEntry'] == true;
       _hasViewedReports = data['hasViewedReports'] == true;
+      _globalTourActive = data['globalTourActive'] == true;
+      _appTourPrompted = data['appTourPrompted'] == true ||
+          (_userId.isNotEmpty && (prefs.getBool(_tourPromptKey(_userId)) ?? false));
       if (data['visitedModules'] is List) {
         _visitedModules = (data['visitedModules'] as List).map((e) => e.toString()).toList();
       } else {
@@ -373,8 +420,31 @@ class UserSession extends ChangeNotifier {
         if (val != null) columnPrefs[key] = val;
       }
     }
-    
+    final tourPrompted = <String>[
+      for (final key in allKeys)
+        if (key.startsWith('app_tour_prompted_') && prefs.getBool(key) == true) key,
+    ];
+    // Motion setting is per user and local-only: keep it for their next login.
+    final motionPrefs = <String, String>{
+      for (final key in allKeys)
+        if (BtMotion.isPrefsKey(key) && prefs.getString(key) != null) key: prefs.getString(key)!,
+    };
+    // Unsynced offline entries belong to the user who made them (each item
+    // carries its userId) — keep them so they sync on that user's next login.
+    final offlineQueue = prefs.getString('offline_post_queue');
+
     await prefs.clear();
+
+    for (final key in tourPrompted) {
+      await prefs.setBool(key, true);
+    }
+    for (final e in motionPrefs.entries) {
+      await prefs.setString(e.key, e.value);
+    }
+    BtMotion.instance.reset();
+    if (offlineQueue != null && offlineQueue != '[]') {
+      await prefs.setString('offline_post_queue', offlineQueue);
+    }
     
     if (cachedEmail != null) {
       await prefs.setString('cached_email', cachedEmail);

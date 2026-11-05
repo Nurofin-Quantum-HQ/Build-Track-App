@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'bt_motion.dart';
 import 'bt_theme.dart';
 import 'bt_text.dart';
 
@@ -29,6 +30,7 @@ class _BtPressableState extends State<BtPressable> {
   @override
   Widget build(BuildContext context) {
     final enabled = widget.onTap != null || widget.onLongPress != null;
+    final scales = BtMotion.isFull(context); // Reduced / Off: no press scale
     return Semantics(
       button: enabled,
       label: widget.semanticLabel,
@@ -40,8 +42,8 @@ class _BtPressableState extends State<BtPressable> {
         onTap: widget.onTap,
         onLongPress: widget.onLongPress,
         child: AnimatedScale(
-          scale: _down ? widget.scale : 1,
-          duration: _down ? const Duration(milliseconds: 90) : const Duration(milliseconds: 380),
+          scale: scales && _down ? widget.scale : 1,
+          duration: scales ? (_down ? const Duration(milliseconds: 90) : const Duration(milliseconds: 380)) : Duration.zero,
           curve: _down ? Curves.easeOut : Bt.spring,
           child: widget.child,
         ),
@@ -631,7 +633,7 @@ class BtSegmented<T> extends StatelessWidget {
       decoration: BoxDecoration(color: onDark ? Colors.white.withValues(alpha: .07) : Bt.ink.withValues(alpha: .06), borderRadius: BorderRadius.circular(16)),
       child: Stack(children: [
         AnimatedAlign(
-          duration: Bt.medium,
+          duration: BtMotion.moving(context, Bt.medium),
           curve: Bt.ease,
           alignment: Alignment(n == 1 ? 0 : -1 + 2 * idx / (n - 1), 0),
           child: FractionallySizedBox(
@@ -936,6 +938,23 @@ class BtAvatar extends StatelessWidget {
 
 // ─────────────────────────────────────────────────────────────── sheets
 
+/// Slide-in style for bottom sheets, following the Motion setting: Full = the
+/// usual eased slide, Reduced = a quick one, Off = instant. Pass the caller's
+/// `context` (read once, when the sheet opens).
+AnimationStyle btSheetStyle(BuildContext context, {int ms = 520, int reverseMs = 260}) {
+  switch (BtMotion.peek(context)) {
+    case BtMotionLevel.full:
+      return AnimationStyle(duration: Duration(milliseconds: ms), curve: Bt.ease, reverseDuration: Duration(milliseconds: reverseMs));
+    case BtMotionLevel.reduced:
+      return const AnimationStyle(duration: Duration(milliseconds: 160), curve: Curves.easeOut, reverseDuration: Duration(milliseconds: 120));
+    case BtMotionLevel.off:
+      return AnimationStyle.noAnimation;
+  }
+}
+
+/// For sheets that keep Flutter's default slide when motion is Full.
+AnimationStyle? btSheetStyleDefault(BuildContext context) => BtMotion.peek(context) == BtMotionLevel.full ? null : btSheetStyle(context);
+
 /// Opens a BuildTrack bottom sheet (grabber, title, close, scrim).
 Future<T?> showBtSheet<T>(BuildContext context, {required String title, String? subtitle, required Widget Function(BuildContext) builder, bool scroll = true}) {
   return showModalBottomSheet<T>(
@@ -944,7 +963,7 @@ Future<T?> showBtSheet<T>(BuildContext context, {required String title, String? 
     useSafeArea: true,
     backgroundColor: Bt.card,
     barrierColor: Bt.scrim,
-    sheetAnimationStyle: const AnimationStyle(duration: Duration(milliseconds: 520), curve: Bt.ease, reverseDuration: Duration(milliseconds: 260)),
+    sheetAnimationStyle: btSheetStyle(context),
     shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(Bt.rSheet))),
     builder: (ctx) {
       final body = Padding(

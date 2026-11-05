@@ -22,7 +22,7 @@ class PushNotificationService {
     // Firebase is initialized once in main.dart.
     // Do not call Firebase.initializeApp() here.
     if (kIsWeb) {
-      print('Push notifications are not supported on Web. Skipping init.');
+      debugPrint('Push notifications are not supported on Web. Skipping init.');
       return;
     }
 
@@ -30,8 +30,18 @@ class PushNotificationService {
       const androidInitSettings =
           AndroidInitializationSettings('@mipmap/ic_launcher');
 
+      // iOS needs its own settings — without them initialize() throws on
+      // iOS ("iOS settings must be set…") and login failed every time.
+      // Permission is asked by FirebaseMessaging below, not here.
+      const darwinInitSettings = DarwinInitializationSettings(
+        requestAlertPermission: false,
+        requestBadgePermission: false,
+        requestSoundPermission: false,
+      );
+
       const initSettings = InitializationSettings(
         android: androidInitSettings,
+        iOS: darwinInitSettings,
       );
 
       await _localNotificationsPlugin.initialize(initSettings);
@@ -52,7 +62,7 @@ class PushNotificationService {
     );
 
     if (settings.authorizationStatus != AuthorizationStatus.authorized) {
-      print('Notification permission was not granted.');
+      debugPrint('Notification permission was not granted.');
       return;
     }
 
@@ -60,6 +70,41 @@ class PushNotificationService {
 
     if (token != null && token.isNotEmpty) {
       await _registerTokenWithBackend(token);
+    }
+  }
+
+  /// Logout: stop this device receiving the signed-out user's pushes.
+  /// Tells the backend to forget this device token (needs the JWT, so call it
+  /// before the token is deleted), then deletes the FCM token itself — that
+  /// alone makes any copy the server still holds stop delivering. Never
+  /// throws and never takes more than a few seconds.
+  static Future<void> unregister() async {
+    if (kIsWeb) return;
+    try {
+      final jwtToken = await AuthService.getToken();
+      String? fcmToken;
+      try {
+        fcmToken = await _firebaseMessaging.getToken().timeout(const Duration(seconds: 3));
+      } catch (_) {}
+      if (jwtToken != null && jwtToken.isNotEmpty && fcmToken != null && fcmToken.isNotEmpty) {
+        try {
+          await http
+              .delete(
+                Uri.parse('${ApiService.baseUrl}/notifications/device-token'),
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': 'Bearer $jwtToken',
+                },
+                body: jsonEncode({'token': fcmToken}),
+              )
+              .timeout(const Duration(seconds: 4));
+        } catch (e) {
+          debugPrint('FCM token unregister error: $e');
+        }
+      }
+      await _firebaseMessaging.deleteToken().timeout(const Duration(seconds: 4));
+    } catch (e) {
+      debugPrint('FCM deleteToken error: $e');
     }
   }
 
@@ -85,10 +130,10 @@ class PushNotificationService {
           .timeout(const Duration(seconds: 20));
 
       if (response.statusCode < 200 || response.statusCode >= 300) {
-        print('FCM token registration failed: ${response.statusCode}');
+        debugPrint('FCM token registration failed: ${response.statusCode}');
       }
     } catch (e) {
-      print('FCM token registration error: $e');
+      debugPrint('FCM token registration error: $e');
     }
   }
 

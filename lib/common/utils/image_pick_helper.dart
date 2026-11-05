@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:buildtrack_mobile/design/bt_components.dart';
 class PickedImage {
   final String path;
   final Future<Uint8List> Function() _readBytes;
@@ -85,6 +86,7 @@ Future<PickedAttachment?> pickAttachmentDirect(BuildContext context) async {
     if (!kIsWeb) {
       final choice = await showModalBottomSheet<String>(
         context: context,
+        sheetAnimationStyle: btSheetStyleDefault(context),
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         ),

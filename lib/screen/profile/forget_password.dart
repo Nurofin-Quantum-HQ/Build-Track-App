@@ -149,7 +149,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       child: Column(children: [
         row('01', 'Get the link', 'Sent to your inbox in a few seconds', active: !_step2, done: _step2),
         const Divider(height: 1, color: Bt.line, indent: 16, endIndent: 16),
-        row('02', 'Paste token, set new password', 'At least 6 characters', active: _step2, done: false),
+        row('02', 'Paste token, set new password', 'At least 8 characters', active: _step2, done: false),
       ]),
     );
   }
@@ -187,7 +187,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             style: BtText.body(context),
             decoration: btInput(
               context,
-              hint: 'At least 6 characters',
+              hint: 'At least 8 characters',
               suffix: IconButton(
                 tooltip: _obscurePass ? 'Show password' : 'Hide password',
                 icon: Icon(_obscurePass ? Icons.visibility_outlined : Icons.visibility_off_outlined, color: Bt.ink2),
@@ -231,10 +231,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     }
     setState(() => _isLoading = true);
     try {
-      try {
-        await ApiService.get('/health');
-      } catch (_) {}
-      await Future.delayed(const Duration(seconds: 3));
       final token = await ApiService.resetPassword(email);
       if (!mounted) return;
       _showSnack('Reset link sent! Check your email.');
@@ -256,8 +252,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       _showSnack('Please paste the token from your email', isError: true);
       return;
     }
-    if (password.length < 6) {
-      _showSnack('Password must be at least 6 characters', isError: true);
+    // Same rule as the server's /auth/reset-password (8+).
+    if (password.length < 8) {
+      _showSnack('Password must be at least 8 characters', isError: true);
       return;
     }
     setState(() => _isLoading = true);

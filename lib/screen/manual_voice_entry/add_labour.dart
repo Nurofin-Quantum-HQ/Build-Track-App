@@ -6,6 +6,7 @@ import 'package:buildtrack_mobile/common/widgets/entry_widgets.dart';
 import 'package:buildtrack_mobile/common/widgets/upload_box.dart';
 import 'package:buildtrack_mobile/common/utils/image_pick_helper.dart';
 import 'package:buildtrack_mobile/controller/project_provider.dart';
+import 'package:buildtrack_mobile/common/utils/entry_names.dart';
 import 'package:buildtrack_mobile/controller/user_session.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -20,8 +21,6 @@ class AddLabourScreen extends StatefulWidget {
   State<AddLabourScreen> createState() => _AddLabourScreenState();
 }
 class _AddLabourScreenState extends State<AddLabourScreen> {
-  bool _requestEsign = false;
-  final TextEditingController _clientEmailCtrl = TextEditingController();
   String? _selectedProjectId;
   String? _selectedFloor;
   String? _selectedFloorId;
@@ -31,7 +30,8 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
   String? _selectedActivityId;
   Map<String, dynamic>? _duplicateContext;
   bool _isDuplicate = false;
-  bool _fromReport = false;
+  /// Where to go after saving (route arg from the entry flow; see finishEntrySave).
+  String? _entryExit;
   String? _sourceTransactionId;
   List<String> _floors = [];
   List<String> _phases = [];
@@ -51,6 +51,9 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
   PickedAttachment? _attachment;
   DateTime _selectedDate = DateTime.now();
   List<dynamic> _recentEntries = [];
+
+  /// Labour types used before on this project / in the company (autofill).
+  List<Map<String, dynamic>> _suggestions = [];
   bool _isAddAndPay = false;
   bool _recordPaymentNow = false;
   Map<String, dynamic>? _paymentResult;
@@ -121,7 +124,11 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
     final args = ModalRoute.of(context)?.settings.arguments;
     if (args is Map) {
       _isEditing = args['isEditing'] as bool? ?? false;
-      if (_isEditing && (args['status'] as String?) == 'approved') {
+      // Only non-admins are locked out of approved entries (an admin's own
+      // entries are approved the moment they're saved).
+      if (_isEditing &&
+          !UserSession.isAdmin &&
+          ((args['status'] ?? args['approvalStatus'])?.toString().toLowerCase() == 'approved')) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           Navigator.maybePop(context);
           btToast(context, 'Approved entries cannot be edited', error: true);
@@ -148,18 +155,15 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
         final preActivity = projectProvider.selectedActivity;
         if (preProjectId != null &&
             preProjectId.isNotEmpty &&
-            preFloor != null &&
-            preFloor.isNotEmpty &&
             prePhase != null &&
-            prePhase.isNotEmpty &&
-            preActivity != null &&
-            preActivity.isNotEmpty) {
+            prePhase.isNotEmpty) { // activity is optional
           _selectedProjectId = preProjectId;
-          _selectedFloor = preFloor;
-          _selectedFloorId = preFloor;
+          // Projects without floors have no floor; phase/activity still apply.
+          _selectedFloor = (preFloor != null && preFloor.isNotEmpty) ? preFloor : null;
+          _selectedFloorId = _selectedFloor;
           _selectedPhase = prePhase;
           _selectedPhaseId = projectProvider.selectedPhaseId;
-          _selectedActivity = preActivity;
+          _selectedActivity = (preActivity != null && preActivity.isNotEmpty) ? preActivity : null;
           _selectedActivityId = projectProvider.selectedActivityId;
           debugPrint(
             '[AddLabour] Context injected from ProjectProvider: '
@@ -173,25 +177,21 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
           final routePhase = args['phase']?.toString();
           final routeActivity = args['activity']?.toString();
           if (routeProjectId.isNotEmpty &&
-              routeFloor != null &&
-              routeFloor.isNotEmpty &&
               routePhase != null &&
-              routePhase.isNotEmpty &&
-              routeActivity != null &&
-              routeActivity.isNotEmpty) {
+              routePhase.isNotEmpty) { // activity is optional
             _selectedProjectId = routeProjectId;
-            _selectedFloor = routeFloor;
-            _selectedFloorId = args['floorId']?.toString() ?? routeFloor;
+            _selectedFloor = (routeFloor != null && routeFloor.isNotEmpty) ? routeFloor : null;
+            _selectedFloorId = _selectedFloor == null ? null : (args['floorId']?.toString() ?? routeFloor);
             _selectedPhase = routePhase;
             _selectedPhaseId = args['phaseId']?.toString();
-            _selectedActivity = routeActivity;
+            _selectedActivity = (routeActivity != null && routeActivity.isNotEmpty) ? routeActivity : null;
             _selectedActivityId = args['activityId']?.toString();
           } else {
             _selectedProjectId = routeProjectId;
           }
         }
         _isDuplicate = args['isDuplicate'] as bool? ?? false;
-        _fromReport = args['fromReport'] as bool? ?? false;
+        _entryExit = args['entryExit']?.toString();
         _sourceTransactionId = args['sourceTransactionId']?.toString();
         final prefill = args['prefill'] as String?;
         if (prefill != null) _nameCtrl.text = prefill;
@@ -713,11 +713,9 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
               : freshOvertime.toString())
         : '';
     
-    if (latest['paymentHistory'] != null && latest['paymentHistory'] is List) {
-      _paymentHistory = List<Map<String, dynamic>>.from(
-        (latest['paymentHistory'] as List).map((x) => Map<String, dynamic>.from(x))
-      );
-    }
+    // A repeat is a new entry: never carry the source entry's payments over.
+    _paymentHistory = [];
+    _existingPaidAmount = 0.0;
     debugPrint('REPOPULATED controllers from API. name=${_nameCtrl.text}');
     final contextToRestore = {
       'projectId': _selectedProjectId,
@@ -975,7 +973,6 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
     _paymentAmountCtrl.dispose();
     _paymentNoteCtrl.dispose();
     _scrollCtrl.dispose();
-    _clientEmailCtrl.dispose();
     super.dispose();
   }
   double _totalCost() {
@@ -1025,13 +1022,12 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
       _projectError = _selectedProjectId == null
           ? 'Please select a Project.'
           : null;
-      _floorError = (_floors.isNotEmpty && _selectedFloor == null)
+      // Editing: older/imported entries may have no floor/phase — don't block the save.
+      _floorError = (!_isEditing && _floors.isNotEmpty && _selectedFloor == null)
           ? 'Please select a Floor / Zone.'
           : null;
-      _phaseError = _selectedPhase == null ? 'Please select a Phase.' : null;
-      _activityError = _selectedActivity == null || _selectedActivity!.isEmpty
-          ? 'Please select an Activity.'
-          : null;
+      _phaseError = (!_isEditing && _selectedPhase == null) ? 'Please select a Phase.' : null;
+      _activityError = null; // Activity is optional (some phases have none).
       _unitError = _selectedUnit == null ? 'Please select a Unit.' : null;
       ok =
           _nameError == null &&
@@ -1043,14 +1039,36 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
           _activityError == null &&
           _unitError == null;
     });
-    if (!ok) _scrollToFirstError();
+    if (!ok) {
+      _scrollToFirstError();
+      // Say what's missing: some fields sit in the collapsed "Where" card, so a
+      // scroll alone looked like Save did nothing.
+      final first = [_projectError, _floorError, _phaseError, _activityError, _nameError, _qtyError, _unitError, _rateError]
+          .firstWhere((e) => e != null, orElse: () => null);
+      if (first != null) btToast(context, first, error: true);
+    }
     return ok;
   }
+  /// The user typed or picked a name (edits keep an untouched name as is).
+  bool _nameTouched = false;
+
+  /// Name to save: an existing suggestion with the same [entryNameKey]
+  /// ("msand" → "M-Sand") so spelling variants stop being created, else the
+  /// typed name with spaces collapsed. An edit whose name wasn't touched
+  /// keeps it as it was.
+  String _nameToSave() {
+    final typed = _nameCtrl.text;
+    if (_isEditing && !_nameTouched) return typed.trim();
+    return canonicalEntryName(typed, [for (final s in _suggestions) (s['title'] ?? s['name'] ?? '').toString()]);
+  }
+
   Future<void> _save(BuildContext ctx) async {
     if (!_validate()) return;
     setState(() => _isSaving = true);
+    final name = _nameToSave();
+    if (_nameCtrl.text != name) _nameCtrl.text = name;
     final payload = {
-      "title": _nameCtrl.text.trim(),
+      "title": name,
       "type": "Wages",
       "category": _categoryCtrl.text.trim(),
       "quantity": double.tryParse(_qtyCtrl.text) ?? 0,
@@ -1081,7 +1099,7 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
           (_selectedActivity != null && _selectedActivity!.isNotEmpty
               ? _deriveActivityId(_selectedActivity)
               : null),
-      "amount": _totalCost(),
+      "amount": (_totalCost() * 100).round() / 100, // no float noise
       "overtime": double.tryParse(_overtimeCtrl.text) ?? 0,
       "remarks": _workTypeCtrl.text.trim(),
       "notes": _notesCtrl.text.trim(),
@@ -1089,7 +1107,10 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
         "sourceTransactionId": _sourceTransactionId,
     };
     if (_isEditing) {
-      if (_paymentHistory.isNotEmpty) {
+      // Payment history is only sent by users allowed to record payments; for
+      // everyone else the server keeps the entry's payments as they are.
+      if (!RoleManager.canRecordPayments) {
+      } else if (_paymentHistory.isNotEmpty) {
         payload["paymentHistory"] = _paymentHistory.map((p) {
           final rawDate = p['date'] ?? p['paymentDate'];
           String finalDate = DateTime.now().toUtc().toIso8601String();
@@ -1103,38 +1124,39 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
             "method": p['method'] ?? p['paymentMode'] ?? 'Cash',
             "amount": _parseDouble(p['amount']),
             "note": p['note'] ?? '',
-            "receipt": p['receipt'] ?? p['receiptDataUri'] ?? '',
+            // The sheet returns the picked file's name in 'receipt' and the
+            // image itself in 'receiptDataUri' — send the image, not the name.
+            "receipt": p['receiptDataUri'] ?? p['receipt'] ?? '',
           };
         }).toList();
+        settlePaymentHistory(payload["paymentHistory"] as List, _totalCost());
       } else {
         payload["paymentHistory"] = [];
       }
     } else if (_isAddAndPay) {
       final paid = _parseDouble(_paymentAmountCtrl.text);
-      final totalPaid = _existingPaidAmount + paid;
-      final outstanding = (_totalCost() - _existingPaidAmount).clamp(
+      final bill = _totalCost();
+      final outstanding = (bill - _existingPaidAmount).clamp(
         0.0,
         double.infinity,
       );
-      if (paid > outstanding) {
+      if (paymentExceeds(paid, outstanding)) {
         _snack('Payment amount cannot exceed the outstanding amount.');
         setState(() => _isSaving = false);
         return;
       }
+      // The exact remainder pays the bill in full (sent as the bill itself).
+      final totalPaid = paymentSettles(paid, outstanding) ? bill : _existingPaidAmount + paid;
       String apiMode = _paymentMethod;
       if (apiMode == 'Bank Transfer') apiMode = 'Bank Transfer';
       payload["paidAmount"] = totalPaid;
       payload["paymentMode"] = apiMode;
-      final bool esignReq = (_paymentResult!['requestEsign'] as bool?) ?? false;
+      final bool esignReq = (_paymentResult?['requestEsign'] as bool?) ?? false;
       if (apiMode == 'Cash' && esignReq) {
         payload['requestEsign'] = true;
-        payload['clientEmail'] = (_paymentResult!['clientEmail'] as String?) ?? '';
+        payload['clientEmail'] = (_paymentResult?['clientEmail'] as String?) ?? '';
       }
-      if (apiMode == 'Cash' && _requestEsign) {
-        payload['requestEsign'] = true;
-        payload['clientEmail'] = _clientEmailCtrl.text.trim();
-      }
-      payload["paymentStatus"] = totalPaid >= _totalCost()
+      payload["paymentStatus"] = moneyPaise(totalPaid) >= moneyPaise(bill)
           ? "Paid"
           : totalPaid > 0
           ? "Partial"
@@ -1145,16 +1167,18 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
       }
     } else if (_recordPaymentNow && _paymentResult != null) {
       final paid = (_paymentResult!['amount'] as double?) ?? 0.0;
-      final totalPaid = _existingPaidAmount + paid;
-      final outstanding = (_totalCost() - _existingPaidAmount).clamp(
+      final bill = _totalCost();
+      final outstanding = (bill - _existingPaidAmount).clamp(
         0.0,
         double.infinity,
       );
-      if (paid > outstanding) {
+      if (paymentExceeds(paid, outstanding)) {
         _snack('Payment amount cannot exceed the outstanding amount.');
         setState(() => _isSaving = false);
         return;
       }
+      // The exact remainder pays the bill in full (sent as the bill itself).
+      final totalPaid = paymentSettles(paid, outstanding) ? bill : _existingPaidAmount + paid;
       final method = (_paymentResult!['method'] as String?) ?? 'Cash';
       final payDate =
           (_paymentResult!['paymentDate'] as DateTime?) ?? DateTime.now();
@@ -1167,7 +1191,7 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
         payload['requestEsign'] = true;
         payload['clientEmail'] = (_paymentResult!['clientEmail'] as String?) ?? '';
       }
-      payload["paymentStatus"] = totalPaid >= _totalCost()
+      payload["paymentStatus"] = moneyPaise(totalPaid) >= moneyPaise(bill)
           ? "Paid"
           : totalPaid > 0
           ? "Partial"
@@ -1190,65 +1214,52 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
     debugPrint(
       'SAVE PATH CHECK: _isEditing=$_isEditing  _editingTransactionId=$_editingTransactionId  condition=${_isEditing && _editingTransactionId != null}',
     );
-    final bool success;
+    final EntrySaveResult result;
     if (_isEditing && _editingTransactionId != null) {
-      debugPrint('>>> SAVE PATH: updateTransaction($_editingTransactionId)');
-      success = await ApiService.updateTransaction(
-        _editingTransactionId!,
-        payload,
-      );
+      final ok = await ApiService.updateTransaction(_editingTransactionId!, payload);
+      result = EntrySaveResult(ok ? EntrySaveOutcome.saved : EntrySaveOutcome.failed);
     } else {
-      debugPrint(
-        '>>> SAVE PATH: addMaterial (CREATE NEW) — WARNING: not updating!',
-      );
-      success = await ApiService.addMaterial(payload);
+      result = await postTransaction(payload);
     }
     if (!mounted) return;
-    if (success) {
-      context.read<InventoryProvider>().loadInventory(_selectedProjectId!);
-      context.read<ProjectProvider>().load();
-      final savedTitle = _nameCtrl.text.trim();
-      final savedTotal = _totalCost();
-      await showBtSuccess(
-        context,
-        kind: BtSuccessKind.bags,
-        label: _isEditing
-            ? 'Entry updated'
-            : RoleManager.canApprovePayments
-            ? 'Entry saved'
-            : 'Submitted to supervisor',
-        title: _isEditing ? 'Labour entry updated.' : 'Labour entry saved.',
-        message: [
-          if (savedTitle.isNotEmpty) savedTitle,
-          if (savedTotal > 0) formatInr(savedTotal),
-        ].join(' · '),
-      );
-      if (!mounted) return;
-      if (_fromReport && Navigator.canPop(context)) {
-        Navigator.pop(context, true);
-      } else if (_fromReport) {
-        Navigator.pushNamedAndRemoveUntil(
-          context,
-          '/reports',
-          (route) => route.settings.name == '/' || route.isFirst,
-        );
-      } else if (UserSession.hasPermission('view_inventory')) {
-        Navigator.pushNamedAndRemoveUntil(
-          context,
-          '/reports',
-          (route) => route.settings.name == '/' || route.isFirst,
-        );
-      } else {
-        Navigator.pushNamedAndRemoveUntil(
-          context,
-          '/add-entry',
-          (route) => route.settings.name == '/' || route.isFirst,
-        );
-      }
-    } else {
-      btToast(context, 'Error saving to server. Please try again.', error: true);
+    if (result.offline) {
+      // Queued by the offline queue: no success animation for money that isn't saved yet.
+      btToast(context, result.message ?? EntrySaveResult.offlineMessage);
+      finishEntrySave(context, exit: _entryExit);
+      return;
     }
-    setState(() => _isSaving = false);
+    if (!result.saved) {
+      btToast(context, result.message ?? 'Error saving to server. Please try again.', error: true);
+      setState(() => _isSaving = false);
+      return;
+    }
+    final projectId = _selectedProjectId;
+    if (projectId != null && projectId.isNotEmpty) {
+      context.read<InventoryProvider>().loadInventory(projectId);
+    }
+    // When this screen pops with `true` the caller reloads; the dock / origin exits refresh here.
+    if (_entryExit != null || !Navigator.canPop(context)) {
+      context.read<ProjectProvider>().load();
+    }
+    final savedTitle = _nameCtrl.text.trim();
+    final savedTotal = _totalCost();
+    await showBtSuccess(
+      context,
+      // Hard hat for a new labour entry; an edit is a plain check.
+      kind: _isEditing ? BtSuccessKind.check : BtSuccessKind.labour,
+      label: _isEditing
+          ? 'Entry updated'
+          : RoleManager.isAdmin
+          ? 'Entry saved'
+          : 'Submitted to supervisor',
+      title: _isEditing ? 'Labour entry updated.' : 'Labour entry saved.',
+      message: [
+        if (savedTitle.isNotEmpty) savedTitle,
+        if (savedTotal > 0) formatInr(savedTotal),
+      ].join(' · '),
+    );
+    if (!mounted) return;
+    finishEntrySave(context, exit: _entryExit);
   }
   Widget _buildPaymentSection() {
     return Padding(
@@ -1300,30 +1311,8 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
                         },
                       ),
               ),
-              if (!_isEditing)
-                BtRow(
-                  leading: BtTile(icon: Icons.draw_outlined, bg: context.bt.accentSoft, fg: context.bt.accentInk),
-                  title: 'Request e-signature for cash receipt',
-                  subtitle: 'Client signs on their phone',
-                  subtitleMaxLines: 2,
-                  onTap: () => setState(() => _requestEsign = !_requestEsign),
-                  trailing: BtSwitch(
-                    value: _requestEsign,
-                    onChanged: (val) => setState(() => _requestEsign = val),
-                  ),
-                ),
             ],
           ),
-          if (!_isEditing && _requestEsign)
-            Padding(
-              padding: const EdgeInsets.only(top: 12.0),
-              child: TextFormField(
-                controller: _clientEmailCtrl,
-                keyboardType: TextInputType.emailAddress,
-                style: BtText.body(context, weight: FontWeight.w500),
-                decoration: btInput(context, hint: 'Client email address', prefix: const Icon(Icons.email_outlined, color: Bt.ink3)),
-              ),
-            ),
           if (!_isEditing && _recordPaymentNow && _paymentResult != null) ...[
             const SizedBox(height: 12),
             _buildPaymentSummary(),
@@ -1583,6 +1572,7 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
   void _showRecentEntriesSheet() {
     showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: btSheetStyleDefault(context),
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       barrierColor: Bt.scrim,
@@ -1747,17 +1737,22 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
     if (_selectedProjectId == null) {
       setState(() {
         _recentEntries = [];
+        _suggestions = [];
       });
       return;
     }
-    final recentTxs = await ApiService.fetchRecentTransactions(
+    final recentFuture = ApiService.fetchRecentTransactions(
       projectId: _selectedProjectId!,
       type: 'Wages',
       userId: UserSession.userId,
     );
+    final suggestionFuture = ApiService.fetchSuggestions(projectId: _selectedProjectId!, type: 'Wages');
+    final recentTxs = await recentFuture;
+    final suggestions = await suggestionFuture;
     if (mounted) {
       setState(() {
         _recentEntries = recentTxs.take(5).toList();
+        _suggestions = suggestions;
       });
     }
   }
@@ -1827,7 +1822,8 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
         }
         context.read<ProjectProvider>().load();
         btToast(context, 'Entry deleted successfully');
-        Navigator.pop(context); // Pop edit screen
+        // 'deleted' tells the entry detail screen to close as well.
+        Navigator.pop(context, 'deleted');
       } else if (context.mounted) {
         btToast(context, 'Failed to delete entry', error: true);
       }
@@ -1846,7 +1842,7 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
       backgroundColor: Bt.ground,
       appBar: BtNavBar(
         title: title,
-        trailing: _isEditing
+        trailing: _isEditing && RoleManager.canDeleteEntries
             ? BtIconButton(
                 icon: Icons.delete_outline_rounded,
                 semantic: 'Delete entry',
@@ -1960,9 +1956,15 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
                 child: AutocompleteNameField(
                   controller: _nameCtrl,
                   hint: 'e.g. Mason, Carpenter, Steel Fixer',
-                  suggestions: const [],
-                  onChanged: (_) => setState(() => _nameError = null),
-                  onSuggestionSelected: _prefillFromRecent,
+                  suggestions: _suggestions,
+                  onChanged: (_) => setState(() {
+                    _nameError = null;
+                    _nameTouched = true;
+                  }),
+                  onSuggestionSelected: (tx) {
+                    _nameTouched = true;
+                    _prefillFromRecent(tx);
+                  },
                   errorText: _nameError,
                 ),
               ),
@@ -2081,7 +2083,7 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
               ),
             ]),
           ),
-          if (RoleManager.canApprovePayments) BtReveal(index: 7, child: _buildPaymentSection()),
+          if (RoleManager.canRecordPayments) BtReveal(index: 7, child: _buildPaymentSection()),
           BtReveal(index: 8, child: EntryFormSection(
             title: 'Bill or invoice',
             caption: 'optional',
@@ -2117,7 +2119,7 @@ class _AddLabourScreenState extends State<AddLabourScreen> {
       ),
       bottomNavigationBar: EntryBottomBar(
         child: EntrySubmitButton(
-          label: RoleManager.canApprovePayments
+          label: RoleManager.isAdmin
               ? 'Save Labour Entry'
               : 'Submit to Supervisor',
           icon: Icons.check_circle,

@@ -1,5 +1,4 @@
 import 'package:buildtrack_mobile/design/design.dart';
-import 'package:buildtrack_mobile/common/themes/app_colors.dart';
 import 'package:buildtrack_mobile/controller/project_provider.dart';
 import 'package:buildtrack_mobile/controller/role_manager.dart';
 import 'package:buildtrack_mobile/controller/user_session.dart';
@@ -10,7 +9,10 @@ import 'package:provider/provider.dart';
 import 'package:buildtrack_mobile/common/utils/currency_formatter.dart';
 import 'dart:convert';
 import 'package:buildtrack_mobile/common/widgets/entry_widgets.dart';
+import 'package:buildtrack_mobile/common/widgets/log_sheet.dart';
+import 'package:buildtrack_mobile/common/widgets/record_payment_sheet.dart';
 import 'package:buildtrack_mobile/services/api_service.dart';
+import 'package:buildtrack_mobile/services/task_service.dart';
 import 'package:buildtrack_mobile/screen/projects/edit_project.dart';
 import 'package:buildtrack_mobile/screen/project_insights/project_insights_screen.dart';
 import 'package:file_picker/file_picker.dart';
@@ -30,6 +32,45 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
   // which opens automatically; tapping a phase header folds/unfolds it.
   final Set<String> _toggled = {};
   _DetailTab _tab = _DetailTab.overview;
+
+  /// PUT /projects/:id also accepts anyone with a task on the project, so
+  /// those users keep the update controls even without the permission.
+  bool _hasMyTask = false;
+  String? _taskCheckFor;
+
+  void _checkMyTask(String projectId) {
+    if (_taskCheckFor == projectId) return;
+    _taskCheckFor = projectId;
+    _hasMyTask = false;
+    if (RoleManager.canSubmitProjectUpdate) return;
+    final me = UserSession.userId;
+    TaskService.getProjectTasks(projectId).then((tasks) {
+      final mine = tasks.any((t) => me.isNotEmpty && (t.assignedTo?['_id'] ?? t.assignedTo?['id'])?.toString() == me);
+      if (mounted && _taskCheckFor == projectId && mine) setState(() => _hasMyTask = true);
+    }).catchError((_) {});
+  }
+
+  /// Phases-tab tick. Un-marking clears the activity's notes and photos, so it
+  /// asks first; the result is always reported.
+  Future<void> _toggleActivity(ProjectModel project, ProjectActivity activity) async {
+    if (activity.completed) {
+      final ok = await btConfirm(
+        context,
+        title: 'Mark "${activity.name}" as not done?',
+        message: 'Its completion date, notes and photos will be removed.',
+        confirmLabel: 'Mark not done',
+      );
+      if (!ok || !mounted) return;
+    }
+    final provider = context.read<ProjectProvider>();
+    final success = await provider.toggleActivityCompletion(project.id, activity.id);
+    if (!mounted) return;
+    if (success) {
+      btToast(context, activity.completed ? '${activity.name} marked not done' : '${activity.name} marked done');
+    } else {
+      btToast(context, provider.lastSaveError ?? 'Could not save. Try again.', error: true);
+    }
+  }
   @override
   void initState() {
     super.initState();
@@ -75,6 +116,8 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
         ),
       );
     }
+    _checkMyTask(project.id);
+    final canUpdate = RoleManager.canSubmitProjectUpdate || _hasMyTask;
     final selectedPhases = project.selectedPhases;
     final hasNewTracker = selectedPhases != null && selectedPhases.isNotEmpty;
     final int trackerTotal = hasNewTracker
@@ -151,14 +194,8 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                     _toggled.add(id);
                   }
                 }),
-                onToggleActivity: (activityId) {
-                  context
-                      .read<ProjectProvider>()
-                      .toggleActivityCompletion(
-                        project.id,
-                        activityId,
-                      );
-                },
+                canUpdate: canUpdate,
+                onToggleActivity: (activity) => _toggleActivity(project, activity),
               )
           else
             const BtCard(
@@ -172,12 +209,15 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
 
     List<Widget> money() => [
           _FinancialCard(project: project),
-          if (RoleManager.canViewReports) ...[
+          if (RoleManager.canViewReports && RoleManager.canViewProjectBudget) ...[
             const SizedBox(height: 12),
             _InsightsEntryCard(project: project),
           ],
-          _gap,
-          _CsvImportExportCard(project: project),
+          // CSV import/export reads and writes activity budget amounts.
+          if (RoleManager.canViewProjectBudget) ...[
+            _gap,
+            _CsvImportExportCard(project: project),
+          ],
         ];
 
     final hasRooms = (project.room1BHK ?? 0) +
@@ -359,6 +399,22 @@ class _DetailHero extends StatelessWidget {
                 onTap: () => Navigator.of(context).maybePop(),
               ),
               const Spacer(),
+              if (RoleManager.canViewFinances) ...[
+                BtButton(
+                  label: 'Record payment',
+                  icon: Icons.currency_rupee_rounded,
+                  small: true,
+                  expand: false,
+                  variant: BtButtonVariant.accent,
+                  // Project prefilled; refresh this project's money totals after saving.
+                  onPressed: () => showRecordPaymentSheet(
+                    context,
+                    projectId: project.id,
+                    onSaved: () => context.read<ProjectProvider>().refreshProject(project.id),
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ],
               if (RoleManager.canAssignTasks)
                 BtIconButton(
                   icon: Icons.assignment_outlined,
@@ -366,7 +422,8 @@ class _DetailHero extends StatelessWidget {
                   semantic: 'Assign task',
                   color: Bt.bone,
                   background: glass,
-                  onTap: () => Navigator.pushNamed(context, '/assign-task'),
+                  // Opened from this project → it is pre-selected.
+                  onTap: () => Navigator.pushNamed(context, '/assign-task', arguments: {'projectId': project.id}),
                 ),
             ],
           ),
@@ -394,13 +451,16 @@ class _DetailHero extends StatelessWidget {
             child: tab == _DetailTab.money
                 ? Padding(
                     padding: const EdgeInsets.only(top: 18),
-                    child: Row(
-                      children: [
-                        Expanded(child: _HeroStat(label: 'Total budget', value: project.totalBudget, color: Bt.bone)),
-                        Expanded(child: _HeroStat(label: 'Spent', value: project.spentAmount, color: project.spentAmount > project.totalBudget ? Bt.redBright : context.bt.accent)),
-                        Expanded(child: _HeroStat(label: 'Remaining', value: project.remainingBudget, color: project.remainingBudget >= 0 ? const Color(0xFF4ADBA4) : Bt.redBright)),
-                      ],
-                    ),
+                    child: RoleManager.canViewProjectBudget
+                        ? Row(
+                            children: [
+                              Expanded(child: _HeroStat(label: 'Total budget', value: project.totalBudget, color: Bt.bone)),
+                              Expanded(child: _HeroStat(label: 'Spent', value: project.spentAmount, color: project.spentAmount > project.totalBudget ? Bt.redBright : context.bt.accent)),
+                              Expanded(child: _HeroStat(label: 'Remaining', value: project.remainingBudget, color: project.remainingBudget >= 0 ? const Color(0xFF4ADBA4) : Bt.redBright)),
+                            ],
+                          )
+                        // No budget access: spent only (its colour must not hint at the budget).
+                        : Row(children: [Expanded(child: _HeroStat(label: 'Spent', value: project.spentAmount, color: context.bt.accent))]),
                   )
                 : const SizedBox(width: double.infinity),
           ),
@@ -579,14 +639,17 @@ class _TrackerPhaseCard extends StatelessWidget {
     required this.isExpanded,
     required this.onToggleExpand,
     required this.onToggleActivity,
+    this.canUpdate = true,
   });
+  /// False → no tick / "Update progress" controls (the user can't save them).
+  final bool canUpdate;
   final int index;
   final ProjectPhase phase;
   final ProjectModel project;
   final bool isActive;
   final bool isExpanded;
   final VoidCallback onToggleExpand;
-  final void Function(String activityId) onToggleActivity;
+  final void Function(ProjectActivity activity) onToggleActivity;
   @override
   Widget build(BuildContext context) {
     final done = phase.completedCount;
@@ -688,10 +751,11 @@ class _TrackerPhaseCard extends StatelessWidget {
                             _TrackerActivityRow(
                               activity: phase.activities[i],
                               project: project,
+                              phase: phase,
                               phaseName: phase.phaseName,
                               isFirst: i == 0,
                               isLast: i == phase.activities.length - 1,
-                              onToggle: () => onToggleActivity(phase.activities[i].id),
+                              onToggle: canUpdate ? () => onToggleActivity(phase.activities[i]) : null,
                             ),
                         ],
                       ),
@@ -727,15 +791,19 @@ class _TrackerActivityRow extends StatefulWidget {
   const _TrackerActivityRow({
     required this.activity,
     required this.project,
+    required this.phase,
     required this.phaseName,
     required this.onToggle,
     this.isFirst = false,
     this.isLast = false,
   });
+  bool get canUpdate => onToggle != null;
   final ProjectActivity activity;
   final ProjectModel project;
+  final ProjectPhase phase;
   final String phaseName;
-  final VoidCallback onToggle;
+  /// Null when the user can't update progress (controls hidden).
+  final VoidCallback? onToggle;
   final bool isFirst, isLast;
   @override
   State<_TrackerActivityRow> createState() => _TrackerActivityRowState();
@@ -765,6 +833,24 @@ class _TrackerActivityRowState extends State<_TrackerActivityRow> {
       return 'Date not recorded';
     }
     return '${dt.day} ${_months[dt.month - 1]} ${dt.year}';
+  }
+  bool get _canAddEntry => logEntryKinds.any((k) => logKindAllowed(k.$1));
+  /// Assign a task for this activity: project, phase and activity are
+  /// pre-selected (floor too when the project has exactly one).
+  void _openAssignTask(BuildContext context) {
+    final floors = widget.project.floors ?? const <String>[];
+    Navigator.pushNamed(
+      context,
+      '/assign-task',
+      arguments: <String, dynamic>{
+        'projectId': widget.project.id,
+        if (floors.length == 1) 'floor': floors.first,
+        'phase': widget.phaseName,
+        'phaseId': widget.phase.id,
+        'activity': widget.activity.name,
+        'activityId': widget.activity.id,
+      },
+    );
   }
   void _openUpdateProgress(BuildContext context) {
     final floors = widget.project.floors ?? [];
@@ -804,17 +890,20 @@ class _TrackerActivityRowState extends State<_TrackerActivityRow> {
       }
     }
 
+    // A zero budget starts empty (hint "0") so typing doesn't append to a
+    // literal "0"; a set value is selected on focus (see _BudgetAmountField).
     final materialController = TextEditingController(
-      text: (currentActivity.budgetMaterial ?? 0.0).toStringAsFixed(0),
+      text: _budgetText(currentActivity.budgetMaterial),
     );
     final labourController = TextEditingController(
-      text: (currentActivity.budgetLabour ?? 0.0).toStringAsFixed(0),
+      text: _budgetText(currentActivity.budgetLabour),
     );
     final equipmentController = TextEditingController(
-      text: (currentActivity.budgetEquipment ?? 0.0).toStringAsFixed(0),
+      text: _budgetText(currentActivity.budgetEquipment),
     );
     showModalBottomSheet(
       context: context,
+      sheetAnimationStyle: btSheetStyleDefault(context),
       isScrollControlled: true,
       backgroundColor: Bt.ground,
       barrierColor: Bt.scrim,
@@ -829,7 +918,10 @@ class _TrackerActivityRowState extends State<_TrackerActivityRow> {
             top: 10,
             bottom: MediaQuery.of(modalContext).viewInsets.bottom + MediaQuery.of(modalContext).padding.bottom + 16,
           ),
-          child: Column(
+          // Scrolls so the fields and Save stay reachable with the keyboard open.
+          child: SingleChildScrollView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -892,26 +984,27 @@ class _TrackerActivityRowState extends State<_TrackerActivityRow> {
                     if (success) {
                       btToast(context, 'Budget updated successfully!');
                     } else {
-                      btToast(context, 'Failed to update budget. Please try again.', error: true);
+                      btToast(context, context.read<ProjectProvider>().lastSaveError ?? 'Failed to update budget. Please try again.', error: true);
                     }
                   }
                 },
               ),
             ],
           ),
+          ),
         );
       },
     );
   }
+  static String _budgetText(double? v) {
+    final value = v ?? 0.0;
+    if (value == 0) return '';
+    return value == value.roundToDouble() ? value.toStringAsFixed(0) : value.toString();
+  }
   Widget _buildDialogTextField(String label, TextEditingController controller) {
     return BtField(
       label: label,
-      child: TextField(
-        controller: controller,
-        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        style: BtText.num(BtText.body(context)),
-        decoration: btInput(context, prefixText: '₹ '),
-      ),
+      child: _BudgetAmountField(controller: controller),
     );
   }
   Widget _buildBudgetSection(BuildContext context) {
@@ -999,6 +1092,7 @@ class _TrackerActivityRowState extends State<_TrackerActivityRow> {
     );
 
     final bt = context.bt;
+    final canSeeBudget = RoleManager.canViewProjectBudget;
     return Container(
       margin: const EdgeInsets.fromLTRB(58, 0, 14, 14),
       padding: const EdgeInsets.fromLTRB(14, 8, 14, 14),
@@ -1012,8 +1106,9 @@ class _TrackerActivityRowState extends State<_TrackerActivityRow> {
           Row(
             children: [
               Expanded(
-                child: Text('ACTIVITY BUDGET', style: BtText.mono(context)),
+                child: Text(canSeeBudget ? 'ACTIVITY BUDGET' : 'ACTIVITY SPEND', style: BtText.mono(context)),
               ),
+              if (canSeeBudget)
               TextButton.icon(
                 onPressed: () => _openUpdateBudgetDialog(context),
                 style: TextButton.styleFrom(
@@ -1031,25 +1126,29 @@ class _TrackerActivityRowState extends State<_TrackerActivityRow> {
             label: 'Materials',
             category: matCat,
             color: bt.series[0],
+            showBudget: canSeeBudget,
           ),
           const SizedBox(height: 8),
           _buildBudgetItem(
             label: 'Labour',
             category: labCat,
             color: bt.series[1],
+            showBudget: canSeeBudget,
           ),
           const SizedBox(height: 8),
           _buildBudgetItem(
             label: 'Equipment',
             category: equCat,
             color: bt.series[2],
+            showBudget: canSeeBudget,
           ),
           const Divider(height: 20, color: Bt.line),
           _buildBudgetItem(
-            label: 'Total budget',
+            label: canSeeBudget ? 'Total budget' : 'Total spent',
             category: totalCat,
             color: Bt.ink2,
             isBold: true,
+            showBudget: canSeeBudget,
           ),
         ],
       ),
@@ -1060,8 +1159,27 @@ class _TrackerActivityRowState extends State<_TrackerActivityRow> {
     required ActivityBudgetCategory category,
     required Color color,
     bool isBold = false,
+    bool showBudget = true,
   }) {
     final spent = category.spent;
+    if (!showBudget) {
+      // Spent only: no allocation, remaining, utilisation bar or over-budget hint.
+      return Row(
+        children: [
+          if (!isBold) ...[
+            Container(width: 8, height: 8, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2))),
+            const SizedBox(width: 6),
+          ],
+          Expanded(
+            child: Text(
+              label,
+              style: BtText.caption(context, color: isBold ? Bt.ink : Bt.ink2, weight: isBold ? FontWeight.w600 : FontWeight.w500),
+            ),
+          ),
+          Text(formatCurrency(spent), style: BtText.num(BtText.caption(context, color: Bt.ink, weight: FontWeight.w600))),
+        ],
+      );
+    }
     final allocated = category.allocated;
     final remaining = category.remaining;
     final pct = category.progress;
@@ -1182,7 +1300,23 @@ class _TrackerActivityRowState extends State<_TrackerActivityRow> {
                             spacing: 8,
                             runSpacing: 6,
                             children: [
-                              _rowAction(context, Icons.add_rounded, 'Add update', bt.accentInk, () => _openUpdateProgress(context)),
+                              if (widget.canUpdate)
+                                _rowAction(context, Icons.trending_up_rounded, 'Update progress', bt.accentInk, () => _openUpdateProgress(context)),
+                              if (_canAddEntry)
+                                _rowAction(
+                                  context,
+                                  Icons.add_rounded,
+                                  'Add entry',
+                                  Bt.ink,
+                                  () => _showAddEntrySheet(
+                                    context,
+                                    project: widget.project,
+                                    phase: widget.phase,
+                                    activity: widget.activity,
+                                  ),
+                                ),
+                              if (!done && RoleManager.canAssignTasks)
+                                _rowAction(context, Icons.assignment_outlined, 'Assign task', Bt.ink2, () => _openAssignTask(context)),
                               if (done) _rowAction(context, Icons.visibility_outlined, 'View', Bt.ink2, () => _showActivityDetails(context)),
                             ],
                           ),
@@ -1254,6 +1388,7 @@ class _TrackerActivityRowState extends State<_TrackerActivityRow> {
   void _showActivityDetails(BuildContext context) {
     showModalBottomSheet(
       context: context,
+      sheetAnimationStyle: btSheetStyleDefault(context),
       isScrollControlled: true,
       backgroundColor: Bt.ground,
       barrierColor: Bt.scrim,
@@ -1355,11 +1490,12 @@ class _TrackerActivityRowState extends State<_TrackerActivityRow> {
                     ),
                   ),
                 ),
+                if (widget.canUpdate)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
                   child: BtButton(
-                    label: 'Add update',
-                    icon: Icons.edit_outlined,
+                    label: 'Update progress',
+                    icon: Icons.trending_up_rounded,
                     onPressed: () {
                       Navigator.pop(sheetContext);
                       _openUpdateProgress(context);
@@ -1539,16 +1675,18 @@ class _SummaryCard extends StatelessWidget {
                 subtitle: totalCount > 0 ? '$doneCount of $totalCount' : '$pct% complete',
               ),
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _RingStat(
-                value: util.clamp(0.0, 1.0).toDouble(),
-                color: utilColor,
-                center: '${(util * 100).toStringAsFixed(0)}%',
-                title: 'Budget used',
-                subtitle: project.formattedSpent,
+            if (RoleManager.canViewProjectBudget) ...[
+              const SizedBox(width: 10),
+              Expanded(
+                child: _RingStat(
+                  value: util.clamp(0.0, 1.0).toDouble(),
+                  color: utilColor,
+                  center: '${(util * 100).toStringAsFixed(0)}%',
+                  title: 'Budget used',
+                  subtitle: project.formattedSpent,
+                ),
               ),
-            ),
+            ],
           ],
         ),
         if (activePhase != null || hasClient || hasFloors) ...[
@@ -2119,6 +2257,7 @@ class _FinancialCard extends StatelessWidget {
   final ProjectModel project;
   @override
   Widget build(BuildContext context) {
+    if (!RoleManager.canViewProjectBudget) return _spentOnly(context);
     final bt = context.bt;
     final util = project.budgetUtilization;
     final over = project.spentAmount > project.totalBudget;
@@ -2215,6 +2354,27 @@ class _FinancialCard extends StatelessWidget {
       ],
     );
   }
+  /// Users without "Project budget" access see what was spent, never the
+  /// budget, budget used or remaining.
+  Widget _spentOnly(BuildContext context) {
+    return BtCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('SPENDING', style: BtText.mono(context)),
+          const SizedBox(height: 10),
+          Text('Spent so far', style: BtText.caption(context)),
+          BtCountUp(
+            value: project.spentAmount,
+            format: (v) => formatCurrency(v),
+            style: BtText.num(BtText.d2(context)),
+          ),
+          const SizedBox(height: 8),
+          Text('Budget figures are visible to admins and people given Project budget access.', style: BtText.caption(context)),
+        ],
+      ),
+    );
+  }
   Widget _frow(BuildContext context, String label, String value, Color color) => Padding(
         padding: const EdgeInsets.only(top: 10),
         child: Row(
@@ -2237,7 +2397,7 @@ class _RecentEntriesSection extends StatelessWidget {
   final String? currentUserId;
   @override
   Widget build(BuildContext context) {
-    final isAdmin = true;
+    final isAdmin = UserSession.isAdmin;
     final isSupervisor = UserSession.isSupervisor || RoleManager.isSupervisor;
     final hasProjectAccess = UserSession.hasProjectAccess(project.id);
     final allEntries = provider.entriesForProject(project.id).toList();
@@ -2251,8 +2411,11 @@ class _RecentEntriesSection extends StatelessWidget {
     }).toList();
     filtered.sort((a, b) => b.date.compareTo(a.date));
     final entries = filtered.take(3).toList();
+    final canAddEntry = logEntryKinds.any((k) => logKindAllowed(k.$1));
+    // Stretch: with `start`, the empty-state card shrank to its content and sat
+    // off to the left.
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         BtSectionHeader(
           title: 'Recent activity',
@@ -2272,14 +2435,18 @@ class _RecentEntriesSection extends StatelessWidget {
           },
         ),
         if (entries.isEmpty)
-          const BtCard(
+          BtCard(
+            padding: EdgeInsets.zero,
             child: BtEmpty(
-              icon: Icons.receipt_long_outlined,
-              title: 'No entries logged yet.',
+              icon: Icons.history_toggle_off_rounded,
+              title: 'No entries yet',
+              message: 'Material, labour and equipment logged for this project will show up here.',
+              action: canAddEntry ? 'Add entry' : null,
+              onAction: canAddEntry ? () => _showAddEntrySheet(context, project: project) : null,
             ),
           )
         else
-          ...entries.map((e) => _EntryTile(entry: e)),
+          BtGroup(children: [for (final e in entries) _EntryTile(entry: e)]),
       ],
     );
   }
@@ -2301,16 +2468,6 @@ class _EntryTile extends StatelessWidget {
     'Nov',
     'Dec',
   ];
-  (Color, IconData) _style(EntryType t) {
-    switch (t) {
-      case EntryType.material:
-        return (AppColors.primary, Icons.category_outlined);
-      case EntryType.labour:
-        return (AppColors.info, Icons.people_outline);
-      case EntryType.equipment:
-        return (const Color(0xFF0B63CE), Icons.construction_outlined);
-    }
-  }
   void _navigateToDetailFallback(BuildContext context) {
     Navigator.pushNamed(
       context,
@@ -2344,11 +2501,18 @@ class _EntryTile extends StatelessWidget {
   }
   @override
   Widget build(BuildContext context) {
-    final (_, icon) = _style(entry.type);
     final d = entry.date;
     final dateStr = '${d.day} ${_months[d.month - 1]} ${d.year}';
-    return BtPressable(
-      scale: .98,
+    // A plain list row inside a BtGroup (like the rest of the app) instead of
+    // a separate floating card per entry.
+    return BtRow(
+      leading: BtTypeTile(type: entry.type.name),
+      title: entry.description.isEmpty ? entry.type.label : entry.description,
+      subtitle: '${entry.type.label} · $dateStr',
+      trailing: Text(
+        formatCurrency(entry.amount),
+        style: BtText.num(BtText.body(context, weight: FontWeight.w600)),
+      ),
       onTap: () async {
         showDialog(
           context: context,
@@ -2485,39 +2649,6 @@ class _EntryTile extends StatelessWidget {
           }
         }
       },
-      child: Padding(
-        padding: const EdgeInsets.only(bottom: 10),
-        child: BtCard(
-          padding: const EdgeInsets.fromLTRB(14, 12, 16, 12),
-          child: Row(
-            children: [
-              BtTile(icon: icon),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      entry.description.isEmpty
-                          ? entry.type.label
-                          : entry.description,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: BtText.body(context, weight: FontWeight.w500),
-                    ),
-                    Text('${entry.type.label} · $dateStr', style: BtText.caption(context)),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                formatCurrency(entry.amount),
-                style: BtText.num(BtText.body(context, weight: FontWeight.w600)),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }
@@ -2701,18 +2832,17 @@ class _AllProjectEntriesScreen extends StatelessWidget {
       body: entries.isEmpty
           ? const Center(
               child: BtEmpty(
-                icon: Icons.receipt_long_outlined,
-                title: 'No entries logged yet.',
+                icon: Icons.history_toggle_off_rounded,
+                title: 'No entries yet',
+                message: 'Material, labour and equipment logged for this project will show up here.',
               ),
             )
-          : ListView.builder(
+          : ListView(
               physics: const ClampingScrollPhysics(),
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-              itemCount: entries.length,
-              itemBuilder: (context, index) {
-                final tile = _EntryTile(entry: entries[index]);
-                return index < 8 ? BtReveal(index: index, child: tile) : tile;
-              },
+              children: [
+                BtReveal(child: BtGroup(children: [for (final e in entries) _EntryTile(entry: e)])),
+              ],
             ),
     );
   }
@@ -3281,4 +3411,124 @@ class _DocumentsCard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Budget amount input for the activity budget sheet: empty with a "0" hint
+/// when there is no budget, and the whole value selected on focus so a new
+/// figure replaces it instead of being appended.
+class _BudgetAmountField extends StatefulWidget {
+  const _BudgetAmountField({required this.controller});
+  final TextEditingController controller;
+  @override
+  State<_BudgetAmountField> createState() => _BudgetAmountFieldState();
+}
+
+class _BudgetAmountFieldState extends State<_BudgetAmountField> {
+  final FocusNode _focus = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _focus.addListener(_onFocus);
+  }
+
+  void _onFocus() {
+    if (!_focus.hasFocus) return;
+    final c = widget.controller;
+    if (c.text.isEmpty) return;
+    // After the tap has placed the caret, select everything.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_focus.hasFocus) return;
+      c.selection = TextSelection(baseOffset: 0, extentOffset: c.text.length);
+    });
+  }
+
+  @override
+  void dispose() {
+    _focus.removeListener(_onFocus);
+    _focus.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: widget.controller,
+      focusNode: _focus,
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      style: BtText.num(BtText.body(context)),
+      decoration: btInput(context, hint: '0', prefixText: '₹ '),
+    );
+  }
+}
+
+/// "Add entry" from a project (optionally for one phase + activity): pick
+/// Material / Labour / Equipment (same tiles and RoleManager gates as the log
+/// sheet), then open the existing where-step with this project, phase and
+/// activity already chosen so the user only confirms.
+Future<void> _showAddEntrySheet(
+  BuildContext context, {
+  required ProjectModel project,
+  ProjectPhase? phase,
+  ProjectActivity? activity,
+}) {
+  final kinds = logEntryKinds.where((k) => logKindAllowed(k.$1)).toList();
+  if (kinds.isEmpty) {
+    btToast(context, 'You do not have permission to add entries.', error: true);
+    return Future.value();
+  }
+  final floors = project.floors ?? const <String>[];
+  final where = [if (phase != null) phase.phaseName, if (activity != null) activity.name].join(' · ');
+  final nav = Navigator.of(context);
+  return showBtSheet<void>(
+    context,
+    title: 'Add entry',
+    subtitle: where.isNotEmpty ? where : project.name,
+    builder: (ctx) => Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (var i = 0; i < kinds.length; i++) ...[
+              if (i > 0) const SizedBox(width: 8),
+              Expanded(
+                child: BtReveal(
+                  index: i,
+                  child: LogKindTile(
+                    type: kinds[i].$1,
+                    title: kinds[i].$2,
+                    subtitle: kinds[i].$3,
+                    height: 160,
+                    onTap: () {
+                      Navigator.of(ctx).pop();
+                      nav.pushNamed('/execution-context', arguments: <String, dynamic>{
+                        'type': kinds[i].$1,
+                        'projectId': project.id,
+                        if (phase != null) ...{
+                          // Phases/activities aren't tied to a floor; prefill
+                          // it only when the project has exactly one (otherwise
+                          // the where-step keeps the last floor or asks).
+                          if (floors.length == 1) 'floor': floors.first,
+                          'phase': phase.phaseName,
+                          'phaseId': phase.id,
+                        },
+                        if (activity != null) ...{
+                          'activity': activity.name,
+                          'activityId': activity.id,
+                        },
+                      });
+                    },
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+        const SizedBox(height: 14),
+        Text('Tap a type to continue', textAlign: TextAlign.center, style: BtText.caption(ctx)),
+      ],
+    ),
+  );
 }

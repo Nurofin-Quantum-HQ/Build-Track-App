@@ -1,8 +1,10 @@
+import 'package:buildtrack_mobile/common/tour_targets.dart';
 import 'package:buildtrack_mobile/common/themes/app_colors.dart';
 import 'package:buildtrack_mobile/models/task_model.dart';
 import 'package:buildtrack_mobile/services/task_service.dart';
 import 'package:buildtrack_mobile/controller/role_manager.dart';
 import 'package:buildtrack_mobile/common/widgets/common_widgets.dart';
+import 'package:buildtrack_mobile/common/widgets/record_payment_sheet.dart';
 import 'package:buildtrack_mobile/controller/project_provider.dart';
 import 'package:buildtrack_mobile/controller/user_session.dart';
 import 'package:buildtrack_mobile/common/utils/currency_formatter.dart';
@@ -14,7 +16,6 @@ import 'package:share_plus/share_plus.dart';
 import 'package:buildtrack_mobile/services/api_service.dart';
 import 'package:buildtrack_mobile/models/project_model.dart';
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import 'package:showcaseview/showcaseview.dart';
 import 'package:buildtrack_mobile/controller/showcase_keys.dart';
 import 'package:buildtrack_mobile/controller/nav_controller.dart';
@@ -85,8 +86,8 @@ class HomeScreen extends StatelessWidget {
         if (UserSession.globalTourActive) {
           Future.delayed(const Duration(milliseconds: 300), () {
             if (context.mounted) {
-              final nav = Provider.of<NavController>(context, listen: false);
-              nav.setRoute('/projects', context);
+              // Next tab this user can open (skips disabled ones), or ends the tour.
+              context.read<NavController>().continueTour(context, from: '/home');
             }
           });
         }
@@ -102,28 +103,31 @@ class _HomeScreenContent extends StatefulWidget {
   State<_HomeScreenContent> createState() => _HomeScreenContentState();
 }
 class _HomeScreenContentState extends State<_HomeScreenContent> {
+  /// Home tour steps in the order they appear on screen (top → bottom, then
+  /// the bottom dock left → right). Only keys whose widgets are mounted right
+  /// now are used — the admin cards don't exist on the supervisor / mason
+  /// homes, and the dock hides tabs the user can't open; passing an unmounted
+  /// key makes the tour jump or stall. (Before: a fixed list in arbitrary
+  /// order incl. `inventoryTab`, which is no longer on screen anywhere.)
   List<GlobalKey> _getShowcaseKeys({bool isReplay = false}) {
-    final keys = <GlobalKey>[];
-    if (isReplay || !UserSession.hasCreatedProject) {
-      keys.add(ShowcaseKeys.projects);
-    }
-    keys.add(ShowcaseKeys.inventoryTab);
-    keys.add(ShowcaseKeys.profileIcon);
-    keys.add(ShowcaseKeys.progress);
-    keys.add(ShowcaseKeys.dashboardTotalCost);
-    keys.add(ShowcaseKeys.dashboardTotalBudget);
-    keys.add(ShowcaseKeys.dashboardTotalRevenue);
-    keys.add(ShowcaseKeys.dashboardNetCashFlow);
-    if (isReplay || !UserSession.hasAddedEntry) {
-      keys.add(ShowcaseKeys.addEntry);
-    }
-    keys.add(ShowcaseKeys.recentEntries);
-    if (isReplay || !UserSession.hasViewedReports) {
-      keys.add(ShowcaseKeys.reports);
-    }
-    keys.add(ShowcaseKeys.quickAddEntry);
-    keys.add(ShowcaseKeys.helpButton);
-    return keys;
+    final ordered = <GlobalKey>[
+      _notificationsTourKey,
+      ShowcaseKeys.helpButton,
+      ShowcaseKeys.profileIcon,
+      // Admin hero + cards
+      ShowcaseKeys.dashboardTotalCost,
+      ShowcaseKeys.dashboardTotalBudget,
+      ShowcaseKeys.quickAddEntry,
+      ShowcaseKeys.progress,
+      ShowcaseKeys.dashboardTotalRevenue,
+      ShowcaseKeys.dashboardNetCashFlow,
+      ShowcaseKeys.recentEntries,
+      // Bottom dock
+      if (isReplay || !UserSession.hasCreatedProject) ShowcaseKeys.projects,
+      if (isReplay || !UserSession.hasAddedEntry) ShowcaseKeys.addEntry,
+      if (isReplay || !UserSession.hasViewedReports) ShowcaseKeys.reports,
+    ];
+    return renderedTourKeys(context, ordered);
   }
 
   bool _tourChecked = false;
@@ -138,7 +142,10 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
     if (!provider.projectsLoaded) return;
     _tourChecked = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (provider.projects.isNotEmpty || UserSession.hasAddedEntry) {
+      // Existing users skip the first-run prompt — unless they restarted the
+      // tour themselves (Account › App Guidelines).
+      if (!UserSession.globalTourActive &&
+          (provider.projects.isNotEmpty || UserSession.hasAddedEntry)) {
         UserSession.markAllModulesVisited();
       } else {
         if (!UserSession.appTourPrompted) {
@@ -180,46 +187,38 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
     }
   }
 
-  void _showEntryOptions(BuildContext context, String type) {
-    Navigator.pushNamed(context, '/add-entry');
+  /// A specific type (Mason's "Add Material Entry") opens the same flow as
+  /// the + sheet's choice (`/execution-context` with that type); anything
+  /// else opens the Add Entry page.
+  Future<void> _showEntryOptions(BuildContext context, String type) async {
+    if (type == 'material' || type == 'labour' || type == 'equipment') {
+      await Navigator.pushNamed(context, '/execution-context', arguments: {'type': type});
+      return;
+    }
+    await Navigator.pushNamed(context, '/add-entry');
   }
 
   /// Top row of every role's hero: company caption + greeting, then
   /// Inbox bell · help/tour · account (same targets as before).
   Widget _buildHeroTop(BuildContext context) {
     final company = UserSession.companyName.isNotEmpty ? UserSession.companyName : 'BuildTrack';
-    final hasLogo = UserSession.companyLogo != null && UserSession.companyLogo!.isNotEmpty;
     return BtReveal(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
+          _CompanyLogoTile(company: company),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(children: [
-                  if (hasLogo) ...[
-                    Container(
-                      width: 18,
-                      height: 18,
-                      margin: const EdgeInsets.only(right: 7),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(5),
-                        image: DecorationImage(image: getProfileImageProvider(UserSession.companyLogo)!, fit: BoxFit.contain),
-                      ),
-                    ),
-                  ],
-                  Flexible(
-                    child: Text(
-                      company,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      // The company's chosen name style (Create workspace / Edit profile).
-                      style: UserSession.getCompanyTextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Bt.onNoir2),
-                    ),
-                  ),
-                ]),
+                Text(
+                  company,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  // The company's chosen name style (Create workspace / Edit profile).
+                  style: UserSession.getCompanyTextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Bt.onNoir2),
+                ),
                 const SizedBox(height: 3),
                 Text(
                   _homeGreeting(),
@@ -231,11 +230,19 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
             ),
           ),
           const SizedBox(width: 6),
-          const NotificationsBell(),
+          Showcase(
+            key: _notificationsTourKey,
+            description: 'Notifications — approvals, rejections and updates about your entries. The dot shows how many are unread.',
+            tooltipBackgroundColor: Bt.ink,
+            textColor: Colors.white,
+            tooltipBorderRadius: BorderRadius.circular(16),
+            tooltipPadding: const EdgeInsets.all(16),
+            child: const NotificationsBell(),
+          ),
           const SizedBox(width: 6),
           Showcase(
             key: ShowcaseKeys.helpButton,
-            description: 'Tap here anytime to replay this tour and get help.',
+            description: 'App guidelines — tap here anytime to replay this tour.',
             tooltipBackgroundColor: Bt.ink,
             textColor: Colors.white,
             tooltipBorderRadius: BorderRadius.circular(16),
@@ -257,7 +264,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
           const SizedBox(width: 6),
           Showcase(
             key: ShowcaseKeys.profileIcon,
-            description: 'Tap your profile for your account, team, plan, logs and settings.',
+            description: 'Your account — profile, team, plan, logs and settings.',
             tooltipBackgroundColor: Bt.ink,
             textColor: Colors.white,
             tooltipBorderRadius: BorderRadius.circular(16),
@@ -302,6 +309,114 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
 
 // ───────────────────────────────────────────────────────── shared home pieces
 
+/// Tour step for the Home bell (the bell has no key in [ShowcaseKeys]).
+final GlobalKey _notificationsTourKey = GlobalKey();
+
+/// Company logo in the Home hero: a 40 px rounded white tile next to the
+/// company name. No logo (or one that fails to load) → the company's initial
+/// on a glass tile, so the header never shows an empty box.
+class _CompanyLogoTile extends StatelessWidget {
+  const _CompanyLogoTile({required this.company});
+  final String company;
+  static const double size = 40;
+
+  @override
+  Widget build(BuildContext context) {
+    final provider = getProfileImageProvider(UserSession.companyLogo);
+    final initial = company.trim().isNotEmpty ? company.trim()[0].toUpperCase() : 'B';
+    final fallback = Container(
+      width: size,
+      height: size,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: .09),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withValues(alpha: .14)),
+      ),
+      child: Text(initial, style: BtText.headline(context).copyWith(color: Bt.bone)),
+    );
+    if (provider == null) return ExcludeSemantics(child: fallback);
+    return Semantics(
+      image: true,
+      label: '$company logo',
+      child: Container(
+        width: size,
+        height: size,
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: Image(
+            image: provider,
+            fit: BoxFit.contain,
+            errorBuilder: (_, _, _) => Center(child: Text(initial, style: BtText.headline(context).copyWith(color: Bt.ink))),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Quiet "Powered by Nurofin" line at the bottom of every role's Home
+/// (same asset and treatment as the login screen footer).
+class _PoweredByFooter extends StatelessWidget {
+  const _PoweredByFooter();
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 32, bottom: 4),
+      child: Semantics(
+        label: 'Powered by Nurofin',
+        child: ExcludeSemantics(
+          child: Opacity(
+            opacity: .75,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text('POWERED BY', style: BtText.mono(context)),
+                const SizedBox(width: 6),
+                Image.asset(
+                  'assets/images/nurofin-logo.png',
+                  height: 16,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, _, _) => Text('Nurofin', style: BtText.caption(context, weight: FontWeight.w600)),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Money Out records. The server never accepts a negative `amount`
+/// (`validateTransactionAmounts` → "amount cannot be negative", and the
+/// Transaction schema has `min: 0`), so the old "Income with -amount" save
+/// was rejected with a 400 every time and money out never appeared. A Money
+/// Out is saved as a positive `Expense` tagged with this category: the
+/// server counts it in the project's cost (`spentAmount`) and keeps it out
+/// of `totalIncome`, so net cash flow = money in − cost is right everywhere.
+
+bool _isMoneyOutRow(Map<String, dynamic> tx) =>
+    tx['type']?.toString() == 'Expense' && tx['category']?.toString() == kMoneyOutCategory;
+
+/// Where a revenue entry's proof image lives: the uploaded photo
+/// (`attachments`) or, for a cash e-signature, `paymentReceipt`.
+String? _revenueProofUrl(Map<String, dynamic> tx) {
+  final att = tx['attachments'];
+  if (att is List) {
+    for (final a in att) {
+      final s = a?.toString() ?? '';
+      if (s.isNotEmpty) return s;
+    }
+  }
+  final r = tx['paymentReceipt']?.toString() ?? '';
+  return r.isNotEmpty ? r : null;
+}
+
+ImageProvider? _proofImageProvider(String? src) => proofImageProvider(src);
+
 String _homeGreeting() {
   final h = DateTime.now().hour;
   final part = h < 12 ? 'Good morning' : (h < 17 ? 'Good afternoon' : 'Good evening');
@@ -329,7 +444,7 @@ Future<bool> _approveTx(BuildContext context, String id) async {
   if (ok) {
     btToast(context, 'Transaction approved');
   } else {
-    btToast(context, 'Failed to approve', error: true);
+    btToast(context, "Couldn't approve — check your connection and try again.", error: true);
   }
   return ok;
 }
@@ -340,6 +455,8 @@ Future<bool> _rejectTx(BuildContext context, String id) async {
   if (!context.mounted) return ok;
   if (ok) {
     btToast(context, 'Transaction rejected');
+  } else {
+    btToast(context, "Couldn't reject — check your connection and try again.", error: true);
   }
   return ok;
 }
@@ -353,7 +470,7 @@ double _sumAmounts(Iterable<dynamic> txs) => txs.fold<double>(0.0, (s, t) {
       return s + ((a is num) ? a.toDouble() : (double.tryParse(a?.toString() ?? '') ?? 0.0));
     });
 
-/// "4 entries need your approval · ₹99,963 waiting" — opens the Inbox.
+/// "4 entries need your approval · ₹99,963 waiting" — opens Approvals.
 class _ApprovalsSummaryCard extends StatelessWidget {
   const _ApprovalsSummaryCard({required this.count, required this.amount, required this.onTap, this.updates = 0});
   final int count;
@@ -376,7 +493,10 @@ class _ApprovalsSummaryCard extends StatelessWidget {
         const SizedBox(width: 14),
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('$count ${count == 1 ? 'entry needs' : 'entries need'} your approval', style: BtText.headline(context)),
+            Text(
+              updates > 0 ? '$count ${count == 1 ? 'item needs' : 'items need'} your approval' : '$count ${count == 1 ? 'entry needs' : 'entries need'} your approval',
+              style: BtText.headline(context),
+            ),
             if (sub.isNotEmpty) ...[
               const SizedBox(height: 2),
               Text(sub.join(' · '), style: BtText.num(BtText.subhead(context))),
@@ -390,9 +510,9 @@ class _ApprovalsSummaryCard extends StatelessWidget {
 }
 
 /// Pending approvals on Home for anyone who can approve: count + amount,
-/// the top two entries with Approve / Reject…, and "See all" → Inbox.
+/// the top two entries with Approve / Reject…, and "See all" → Approvals.
 class _HomeApprovals extends StatefulWidget {
-  const _HomeApprovals();
+  const _HomeApprovals({super.key});
   @override
   State<_HomeApprovals> createState() => _HomeApprovalsState();
 }
@@ -402,6 +522,10 @@ class _HomeApprovalsState extends State<_HomeApprovals> {
   int _updates = 0;
   bool _loaded = false;
 
+  /// The last load failed (network / server error) — show Retry instead of
+  /// hiding the card as if nothing were waiting.
+  bool _failed = false;
+
   @override
   void initState() {
     super.initState();
@@ -409,17 +533,26 @@ class _HomeApprovalsState extends State<_HomeApprovals> {
   }
 
   Future<void> _load() async {
-    final data = await ApiService.fetchPendingApprovals();
+    Map<String, dynamic>? data;
+    try {
+      data = await ApiService.fetchPendingApprovals();
+    } catch (_) {
+      data = null;
+    }
     if (!mounted) return;
     setState(() {
-      _txs = (data?['transactions'] as List?) ?? [];
-      _updates = (data?['projectUpdates'] as List?)?.length ?? 0;
       _loaded = true;
+      _failed = data == null;
+      // Keep what was shown before when a refresh fails.
+      if (data != null) {
+        _txs = (data['transactions'] as List?) ?? [];
+        _updates = (data['projectUpdates'] as List?)?.length ?? 0;
+      }
     });
   }
 
   void _seeAll() {
-    Navigator.pushNamed(context, '/inbox').then((_) {
+    Navigator.pushNamed(context, '/approvals').then((_) {
       if (mounted) _load();
     });
   }
@@ -442,6 +575,12 @@ class _HomeApprovalsState extends State<_HomeApprovals> {
       return const Padding(padding: EdgeInsets.only(bottom: 16), child: BtSkeleton(height: 76, radius: Bt.rCard));
     }
     final total = _txs.length + _updates;
+    if (_failed && total == 0) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 16),
+        child: BtErrorCard(message: "Couldn't load pending approvals", onRetry: _load),
+      );
+    }
     if (total == 0) return const SizedBox.shrink();
     final top = _txs.take(2).toList();
     return Padding(
@@ -464,7 +603,7 @@ class _HomeApprovalsState extends State<_HomeApprovals> {
         if (_txs.length > top.length)
           Padding(
             padding: const EdgeInsets.only(top: 4),
-            child: BtButton(label: 'See all ${_txs.length} in Inbox', variant: BtButtonVariant.quiet, icon: Icons.arrow_forward_rounded, onPressed: _seeAll),
+            child: BtButton(label: 'See all ${_txs.length} approvals', variant: BtButtonVariant.quiet, icon: Icons.arrow_forward_rounded, onPressed: _seeAll),
           ),
       ]),
     );
@@ -597,66 +736,6 @@ class _StaticWave extends StatelessWidget {
   }
 }
 
-/// Money in / Money out switch (Record-Money board).
-class _MoneyDirectionToggle extends StatelessWidget {
-  const _MoneyDirectionToggle({required this.isInflow, required this.onChanged});
-  final bool isInflow;
-  final ValueChanged<bool> onChanged;
-  @override
-  Widget build(BuildContext context) {
-    Widget seg(bool inflow) {
-      final on = inflow == isInflow;
-      final bg = on ? (inflow ? Bt.green : Bt.red) : Colors.transparent;
-      final fg = on ? Colors.white : Bt.ink2;
-      return Expanded(
-        child: Semantics(
-          button: true,
-          selected: on,
-          child: BtPressable(
-            onTap: () => onChanged(inflow),
-            child: AnimatedContainer(
-              duration: Bt.fast,
-              curve: Bt.ease,
-              height: 44,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(12)),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(inflow ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded, size: 18, color: fg),
-                const SizedBox(width: 6),
-                Text(inflow ? 'Money In' : 'Money Out', style: BtText.button(context, size: 15, color: fg)),
-              ]),
-            ),
-          ),
-        ),
-      );
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(color: Bt.fill, borderRadius: BorderRadius.circular(16)),
-      child: Row(children: [seg(true), const SizedBox(width: 4), seg(false)]),
-    );
-  }
-}
-
-/// Small "×" used to clear a receipt / signature / image in the money sheet.
-class _ClearButton extends StatelessWidget {
-  const _ClearButton({required this.onTap});
-  final VoidCallback onTap;
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      label: 'Remove',
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: const Padding(padding: EdgeInsets.all(8), child: Icon(Icons.cancel, color: Bt.red, size: 20)),
-      ),
-    );
-  }
-}
-
 class _TaskCard extends StatelessWidget {
   final TaskModel task;
   final VoidCallback? onEdit;
@@ -691,7 +770,7 @@ class _TaskCard extends StatelessWidget {
 
 class _AdminDashboard extends StatefulWidget {
   const _AdminDashboard({required this.onEntryTap, required this.top});
-  final void Function(BuildContext, String) onEntryTap;
+  final Future<void> Function(BuildContext, String) onEntryTap;
   final Widget top;
   @override
   State<_AdminDashboard> createState() => _AdminDashboardState();
@@ -701,30 +780,119 @@ class _AdminDashboardState extends State<_AdminDashboard> {
   bool _isGlobalView = true;
   bool _loadingRevenue = false;
   String? _lastProjectId;
+
+  /// Revenue for the selected project failed to load — the card says so
+  /// (with Retry) instead of showing ₹0.
+  bool _revenueError = false;
+  final _approvalsKey = GlobalKey<_HomeApprovalsState>();
+
+  /// Pull-to-refresh: projects + entries (totals), this project's revenue and
+  /// the pending-approvals card.
+  Future<void> _refresh() async {
+    final provider = context.read<ProjectProvider>();
+    final projectId = _isGlobalView ? null : provider.selectedProject?.id;
+    await Future.wait<void>([
+      provider.load().catchError((_) {}),
+      if (projectId != null) _loadRevenue(projectId),
+      if (_approvalsKey.currentState != null) _approvalsKey.currentState!._load(),
+    ]);
+  }
+
+  /// Bumped when proof images arrive, so an open Revenue History sheet redraws.
+  final ValueNotifier<int> _revenueProofs = ValueNotifier<int>(0);
+
+  @override
+  void dispose() {
+    _revenueProofs.dispose();
+    super.dispose();
+  }
+
+  /// The revenue list (`GET /transactions?type=Income`) is served WITHOUT
+  /// `attachments` (the backend list query does `.select("-attachments")`),
+  /// so rows, the detail sheet and the edit sheet never had the uploaded
+  /// image. `GET /transactions/:id` returns it; copy `attachments` (and the
+  /// e-sign `paymentReceipt`) onto the row. Rows that already carry the
+  /// field are left alone.
+  Future<void> _withProof(Map<String, dynamic> tx) async {
+    if (tx['attachments'] is List) return;
+    final id = (tx['_id'] ?? tx['id'] ?? '').toString();
+    if (id.isEmpty) return;
+    final full = await ApiService.fetchTransactionById(id);
+    if (full == null) return;
+    tx['attachments'] = full['attachments'] is List ? full['attachments'] : <dynamic>[];
+    tx['paymentReceipt'] ??= full['paymentReceipt'];
+  }
+
+  Future<void> _hydrateRevenueProofs(List<dynamic> entries, String projectId) async {
+    final rows = entries.whereType<Map<String, dynamic>>().toList();
+    for (var i = 0; i < rows.length; i += 6) {
+      await Future.wait(rows.skip(i).take(6).map(_withProof));
+      if (!mounted || projectId != _lastProjectId) return;
+      setState(() {});
+      _revenueProofs.value++;
+    }
+  }
+
+  /// Money in − money out (the Revenue History balance).
   double get _totalRevenueSum {
     return _revenueEntries.fold<double>(0.0, (sum, tx) {
       final amount = double.tryParse(tx['amount']?.toString() ?? '0') ?? 0.0;
       return sum + amount;
     });
   }
+
+  /// Money in only — the card's "Total revenue". Money out is already in the
+  /// cost (it is saved as an Expense), so it must not be taken off twice.
+  double get _moneyInSum {
+    return _revenueEntries.fold<double>(0.0, (sum, tx) {
+      final amount = double.tryParse(tx['amount']?.toString() ?? '0') ?? 0.0;
+      return amount > 0 ? sum + amount : sum;
+    });
+  }
+
+  /// Money returned to the client (mapped to negative amounts in _loadRevenue).
+  double get _moneyOutSum {
+    return _revenueEntries.fold<double>(0.0, (sum, tx) {
+      final amount = double.tryParse(tx['amount']?.toString() ?? '0') ?? 0.0;
+      return amount < 0 ? sum - amount : sum;
+    });
+  }
+
+  static List<dynamic> _txList(String body) {
+    final decoded = json.decode(body);
+    if (decoded is List) return decoded;
+    if (decoded is Map) {
+      return (decoded['transactions'] ?? decoded['data'] ?? []) as List<dynamic>;
+    }
+    return [];
+  }
+
   Future<void> _loadRevenue(String projectId) async {
+    if (!mounted) return;
     setState(() {
       _loadingRevenue = true;
+      _revenueError = false;
     });
     try {
-      final response = await ApiService.get(
-        '/transactions?project=$projectId&type=Income',
-      );
-      if (response.statusCode == 200) {
-        final decoded = json.decode(response.body);
-        List<dynamic> entries = [];
-        if (decoded is List) {
-          entries = decoded;
-        } else if (decoded is Map) {
-          entries =
-              (decoded['transactions'] ?? decoded['data'] ?? [])
-                  as List<dynamic>;
-        }
+      // Money in (Income) + money out (Expense tagged "Money Out").
+      final responses = await Future.wait([
+        ApiService.get('/transactions?project=$projectId&type=Income'),
+        ApiService.get(
+          '/transactions?project=$projectId&type=Expense&category=${Uri.encodeQueryComponent(kMoneyOutCategory)}',
+        ),
+      ]);
+      if (responses.every((r) => r.statusCode == 200)) {
+        final List<dynamic> entries = [
+          ..._txList(responses[0].body),
+          // Shown as outflows (negative), the way the history tiles,
+          // detail and edit sheets already read a money-out row.
+          for (final tx in _txList(responses[1].body))
+            if (tx is Map<String, dynamic> && _isMoneyOutRow(tx))
+              {
+                ...tx,
+                'amount': -((double.tryParse(tx['amount']?.toString() ?? '0') ?? 0.0).abs()),
+              },
+        ];
         entries.sort((a, b) {
           final dateA =
               DateTime.tryParse(a['date']?.toString() ?? '')?.toLocal() ?? DateTime.now();
@@ -737,523 +905,46 @@ class _AdminDashboardState extends State<_AdminDashboard> {
             _revenueEntries = entries;
             _loadingRevenue = false;
           });
+          _hydrateRevenueProofs(entries, projectId);
         }
       } else {
-        if (mounted) {
+        if (mounted && projectId == _lastProjectId) {
           setState(() {
             _loadingRevenue = false;
+            _revenueError = true;
           });
         }
       }
     } catch (e) {
-      if (mounted) {
+      if (mounted && projectId == _lastProjectId) {
         setState(() {
           _loadingRevenue = false;
+          _revenueError = true;
         });
       }
     }
-  }
-  void _showAddRevenueDialog(
-    BuildContext context,
-    String projectId, {
-    Map<String, dynamic>? editingTx,
-    VoidCallback? onSave,
-  }) {
-    final titleCtrl = TextEditingController(
-      text: editingTx?['title']?.toString() ?? '',
-    );
-    final double initialAmt =
-        double.tryParse(editingTx?['amount']?.toString() ?? '') ?? 0.0;
-    final amountCtrl = TextEditingController(
-      text: initialAmt != 0.0 ? initialAmt.abs().toString() : '',
-    );
-    final notesCtrl = TextEditingController(
-      text: editingTx?['notes']?.toString() ?? '',
-    );
-    String selectedMode =
-        editingTx?['paymentMode']?.toString() ?? 'Bank Transfer';
-    DateTime selectedDate = DateTime.now();
-    if (editingTx?['date'] != null) {
-      try {
-        selectedDate = DateTime.parse(editingTx!['date'].toString()).toLocal();
-      } catch (_) {}
-    }
-    PickedImage? pickedImage;
-    List<dynamic> attachments = editingTx?['attachments'] is List
-        ? editingTx!['attachments'] as List
-        : [];
-    String? existingImageUrl = attachments.isNotEmpty
-        ? attachments.first.toString()
-        : (editingTx?['paymentReceipt']?.toString());
-    bool isInflow = editingTx != null ? initialAmt >= 0 : true;
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Bt.ground,
-      barrierColor: Bt.scrim,
-      sheetAnimationStyle: const AnimationStyle(duration: Duration(milliseconds: 520), curve: Bt.ease, reverseDuration: Duration(milliseconds: 260)),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(Bt.rSheet)),
-      ),
-      builder: (ctx) {
-        bool isSaving = false;
-        bool isEsignPolling = false;
-        bool isEsignCompleted = false;
-        String esignStatusText = '';
-        bool requestEsign = false;
-        final clientEmailCtrl = TextEditingController();
-        String? newReceiptDataUri;
-        Future<void> startEsignFlow(StateSetter ss) async {
-          final amt = double.tryParse(amountCtrl.text.trim()) ?? 0.0;
-          if (amt <= 0) {
-            btToast(context, 'Please enter a valid amount before requesting an E-Signature', error: true);
-            return;
-          }
-          if (clientEmailCtrl.text.isEmpty) {
-            btToast(context, 'Please enter client email', error: true);
-            return;
-          }
-          ss(() {
-            isEsignPolling = true;
-            esignStatusText = 'Sending request...';
-          });
-          final meta = {
-            'projectName': 'BuildTrack Revenue',
-            'type': titleCtrl.text.isNotEmpty ? titleCtrl.text : 'Revenue',
-            'amount': amt,
-            'paymentMethod': selectedMode,
-            'notes': notesCtrl.text.trim(),
-            'date': selectedDate.toIso8601String(),
-          };
-          final res = await ApiService.requestEsignature(clientEmailCtrl.text.trim(), meta);
-          if (res == null || res['requestId'] == null) {
-            ss(() {
-              isEsignPolling = false;
-              esignStatusText = 'Failed to send request';
-            });
-            return;
-          }
-          ss(() {
-            esignStatusText = 'Waiting for client to sign...';
-          });
-          final reqId = res['requestId'];
-          while (isEsignPolling) {
-            await Future.delayed(const Duration(seconds: 3));
-            if (!isEsignPolling) break;
-            final statusRes = await ApiService.checkEsignatureStatus(reqId);
-            if (statusRes != null && statusRes['status'] == 'signed') {
-              ss(() {
-                isEsignPolling = false;
-                isEsignCompleted = true;
-                newReceiptDataUri = statusRes['signatureData'];
-                esignStatusText = 'Signature captured!';
-              });
-              break;
-            }
-          }
-        }
-        return StatefulBuilder(
-          builder: (ctx, setModalState) {
-            Widget preview(Widget child) => Padding(
-                  padding: const EdgeInsets.only(top: 10),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Container(
-                      height: 80,
-                      width: 120,
-                      decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), color: Bt.fill),
-                      child: ClipRRect(borderRadius: BorderRadius.circular(12), child: child),
-                    ),
-                  ),
-                );
-            const brokenImage = Center(child: Icon(Icons.broken_image_outlined, color: Bt.ink3));
-            return Padding(
-              padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  BtSheetHeader(
-                    title: editingTx != null
-                        ? (isInflow ? 'Edit Revenue Inflow' : 'Edit Revenue Outflow')
-                        : (isInflow ? 'Record Revenue Inflow' : 'Record Revenue Outflow'),
-                  ),
-                  Flexible(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.fromLTRB(18, 4, 18, 24),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          _MoneyDirectionToggle(
-                            isInflow: isInflow,
-                            onChanged: (v) => setModalState(() {
-                              isInflow = v;
-                            }),
-                          ),
-                          const SizedBox(height: 16),
-                          BtField(
-                            label: 'Payment title / milestone',
-                            child: TextField(
-                              controller: titleCtrl,
-                              textCapitalization: TextCapitalization.sentences,
-                              style: BtText.body(context),
-                              decoration: btInput(context, hint: 'e.g. Milestone 1 Payment, Advance Payment'),
-                            ),
-                          ),
-                          const SizedBox(height: 14),
-                          BtField(
-                            label: isInflow ? 'Amount received (₹)' : 'Amount sent (₹)',
-                            child: TextField(
-                              controller: amountCtrl,
-                              keyboardType: TextInputType.number,
-                              style: BtText.amount(context, size: 24),
-                              decoration: btInput(context, hint: 'e.g. 500000', prefixText: '₹  '),
-                            ),
-                          ),
-                          const SizedBox(height: 14),
-                          BtField(
-                            label: 'Payment mode',
-                            child: Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: [
-                                for (final mode in const ['UPI', 'Bank Transfer', 'Cash', 'Cheque'])
-                                  BtChip(
-                                    label: mode,
-                                    selected: selectedMode == mode,
-                                    onTap: () => setModalState(() {
-                                      selectedMode = mode;
-                                    }),
-                                  ),
-                              ],
-                            ),
-                          ),
-                          if (selectedMode == 'Cash') ...[
-                            const SizedBox(height: 14),
-                            Container(
-                              padding: const EdgeInsets.fromLTRB(14, 8, 10, 8),
-                              decoration: BoxDecoration(color: Bt.card, borderRadius: BorderRadius.circular(Bt.rInput), border: Border.all(color: Bt.inputBorder)),
-                              child: Row(children: [
-                                const Icon(Icons.draw_outlined, size: 20, color: Bt.ink2),
-                                const SizedBox(width: 10),
-                                Expanded(child: Text('Request E-Signature for Cash Receipt', style: BtText.subhead(context, weight: FontWeight.w600, color: Bt.ink))),
-                                BtSwitch(value: requestEsign, onChanged: (val) => setModalState(() => requestEsign = val)),
-                              ]),
-                            ),
-                            if (requestEsign) ...[
-                              const SizedBox(height: 10),
-                              BtField(
-                                label: 'Client email address',
-                                child: TextField(
-                                  controller: clientEmailCtrl,
-                                  keyboardType: TextInputType.emailAddress,
-                                  style: BtText.body(context),
-                                  decoration: btInput(context, hint: 'client@email.com', prefix: const Icon(Icons.email_outlined, color: Bt.ink3)),
-                                ),
-                              ),
-                            ],
-                            if (requestEsign && !isEsignCompleted) ...[
-                              const SizedBox(height: 10),
-                              BtButton(
-                                label: isEsignPolling ? 'Cancel Polling' : 'Send for E-Signature',
-                                icon: isEsignPolling ? Icons.close_rounded : Icons.send_rounded,
-                                small: true,
-                                variant: isEsignPolling ? BtButtonVariant.destructive : BtButtonVariant.secondary,
-                                onPressed: isEsignPolling
-                                    ? () {
-                                        setModalState(() => isEsignPolling = false);
-                                      }
-                                    : () => startEsignFlow(setModalState),
-                              ),
-                              if (esignStatusText.isNotEmpty)
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 8),
-                                  child: Row(children: [
-                                    if (isEsignPolling) ...[
-                                      const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Bt.amber)),
-                                      const SizedBox(width: 8),
-                                    ],
-                                    Expanded(
-                                      child: Text(
-                                        esignStatusText,
-                                        style: BtText.subhead(context, weight: FontWeight.w600, color: isEsignPolling ? Bt.amber : (isEsignCompleted ? Bt.green : Bt.red)),
-                                      ),
-                                    ),
-                                  ]),
-                                ),
-                            ],
-                            if (isEsignCompleted) ...[
-                              const SizedBox(height: 10),
-                              Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(color: Bt.greenSoft, borderRadius: BorderRadius.circular(Bt.rTile)),
-                                child: Row(children: [
-                                  const Icon(Icons.check_circle, color: Bt.green),
-                                  const SizedBox(width: 8),
-                                  Expanded(child: Text('Signature successfully captured!', style: BtText.subhead(context, weight: FontWeight.w600, color: Bt.green))),
-                                ]),
-                              ),
-                            ],
-                          ],
-                          const SizedBox(height: 14),
-                          BtField(
-                            label: 'Date received',
-                            child: BtPickerField(
-                              leading: Icons.calendar_today_outlined,
-                              icon: Icons.chevron_right_rounded,
-                              text: '${selectedDate.day.toString().padLeft(2, '0')}/${selectedDate.month.toString().padLeft(2, '0')}/${selectedDate.year}',
-                              onTap: () async {
-                                final picked = await showDatePicker(
-                                  context: context,
-                                  initialDate: selectedDate,
-                                  firstDate: DateTime(2020),
-                                  lastDate: DateTime(2100),
-                                );
-                                if (picked != null) {
-                                  final now = DateTime.now();
-                                  setModalState(() {
-                                    selectedDate = DateTime(
-                                      picked.year,
-                                      picked.month,
-                                      picked.day,
-                                      now.hour,
-                                      now.minute,
-                                      now.second,
-                                    );
-                                  });
-                                }
-                              },
-                            ),
-                          ),
-                          const SizedBox(height: 14),
-                          BtField(
-                            label: 'Notes / remarks',
-                            optional: true,
-                            child: TextField(
-                              controller: notesCtrl,
-                              textCapitalization: TextCapitalization.sentences,
-                              style: BtText.body(context),
-                              decoration: btInput(
-                                context,
-                                hint: isInflow
-                                    ? 'e.g. Initial payment received for start of work'
-                                    : 'e.g. Refund sent for milestone delay',
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 14),
-                          Semantics(
-                            button: true,
-                            label: 'Upload receipt proof',
-                            child: BtPressable(
-                              onTap: () async {
-                                final img = await pickImageFromGallery(context);
-                                if (img != null) {
-                                  setModalState(() {
-                                    pickedImage = img;
-                                  });
-                                }
-                              },
-                              child: Container(
-                                padding: const EdgeInsets.fromLTRB(14, 12, 6, 12),
-                                decoration: BoxDecoration(
-                                  color: Bt.card,
-                                  borderRadius: BorderRadius.circular(Bt.rInput),
-                                  border: Border.all(color: Bt.inputBorder, width: 1.2),
-                                ),
-                                child: Row(children: [
-                                  const BtTile(icon: Icons.image_outlined, size: 36),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                      Text('Upload receipt proof', style: BtText.body(context, weight: FontWeight.w600)),
-                                      Text('Optional', style: BtText.caption(context)),
-                                    ]),
-                                  ),
-                                  if (pickedImage != null) ...[
-                                    Text('Selected', style: BtText.subhead(context, weight: FontWeight.w600, color: Bt.green)),
-                                    _ClearButton(onTap: () => setModalState(() {
-                                          pickedImage = null;
-                                        })),
-                                  ] else if (newReceiptDataUri != null) ...[
-                                    Text('E-Signature', style: BtText.subhead(context, weight: FontWeight.w600, color: context.bt.accentInk)),
-                                    _ClearButton(onTap: () => setModalState(() {
-                                          newReceiptDataUri = null;
-                                        })),
-                                  ] else if (existingImageUrl != null) ...[
-                                    Text('Has Image', style: BtText.subhead(context, weight: FontWeight.w600, color: context.bt.accentInk)),
-                                    _ClearButton(onTap: () => setModalState(() {
-                                          existingImageUrl = null;
-                                        })),
-                                  ] else
-                                    const Padding(padding: EdgeInsets.only(right: 8), child: Icon(Icons.chevron_right_rounded, color: Bt.placeholder)),
-                                ]),
-                              ),
-                            ),
-                          ),
-                          if (pickedImage != null)
-                            preview(
-                              FutureBuilder<Uint8List>(
-                                future: pickedImage!.readAsBytes(),
-                                builder: (context, snapshot) {
-                                  if (snapshot.hasData) {
-                                    return Image.memory(snapshot.data!, fit: BoxFit.cover);
-                                  }
-                                  return const Center(child: CircularProgressIndicator(strokeWidth: 2));
-                                },
-                              ),
-                            )
-                          else if (newReceiptDataUri != null)
-                            preview(
-                              Image.memory(
-                                base64Decode(newReceiptDataUri!.split(',').last),
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) => brokenImage,
-                              ),
-                            )
-                          else if (existingImageUrl != null)
-                            preview(
-                              Image.network(
-                                existingImageUrl!,
-                                fit: BoxFit.cover,
-                                loadingBuilder: (context, child, loadingProgress) {
-                                  if (loadingProgress == null) return child;
-                                  return const Center(child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)));
-                                },
-                                errorBuilder: (context, error, stackTrace) => brokenImage,
-                              ),
-                            ),
-                          const SizedBox(height: 22),
-                          BtButton(
-                            label: editingTx != null ? 'Save Changes' : 'Save',
-                            loading: isSaving,
-                            onPressed: isSaving
-                                ? null
-                                : () async {
-                                    final title = titleCtrl.text.trim();
-                                    var amount =
-                                        double.tryParse(amountCtrl.text.trim()) ??
-                                        0.0;
-                                    amount = amount.abs();
-                                    if (title.isEmpty) {
-                                      btToast(context, 'Please enter a payment title', error: true);
-                                      return;
-                                    }
-                                    if (amount <= 0) {
-                                      btToast(context, 'Please enter a valid amount', error: true);
-                                      return;
-                                    }
-                                    setModalState(() {
-                                      isSaving = true;
-                                    });
-                                    if (!isInflow) {
-                                      amount = -amount;
-                                    }
-                                    try {
-                                      String? base64Image;
-                                      if (pickedImage != null) {
-                                        final bytes = await pickedImage!
-                                            .readAsBytes();
-                                        base64Image =
-                                            'data:image/jpeg;base64,${base64Encode(bytes)}';
-                                      }
-                                      final payload = {
-                                        'title': title,
-                                        'type': 'Income',
-                                        'project': projectId,
-                                        'amount': amount,
-                                        'date': selectedDate.toIso8601String(),
-                                        'paymentStatus': 'Paid',
-                                        'paymentMode': selectedMode,
-                                        'paidAmount': amount,
-                                        'notes': notesCtrl.text.trim(),
-                                        if (newReceiptDataUri != null) 'paymentReceipt': newReceiptDataUri,
-                                        if (newReceiptDataUri != null) 'receiptImage': newReceiptDataUri,
-                                        if (base64Image != null) 'receiptImage': base64Image,
-                                        if (base64Image == null && newReceiptDataUri == null && editingTx != null)
-                                          'attachments': existingImageUrl != null
-                                              ? [existingImageUrl]
-                                              : [],
-                                      };
-                                      final bool isEdit = editingTx != null;
-                                      final bool success;
-                                      if (isEdit) {
-                                        final txId =
-                                            editingTx['_id']?.toString() ??
-                                            editingTx['id']?.toString() ??
-                                            '';
-                                        success = await ApiService.updateTransaction(
-                                          txId,
-                                          payload,
-                                        );
-                                      } else {
-                                        final result =
-                                            await ApiService.addTransaction(payload);
-                                        success = result != null;
-                                      }
-                                      if (success) {
-                                        if (context.mounted) {
-                                          Navigator.pop(ctx);
-                                          await showBtSuccess(
-                                            context,
-                                            kind: BtSuccessKind.money,
-                                            title: isEdit ? 'Revenue updated' : 'Revenue recorded',
-                                            message: isEdit
-                                                ? 'Revenue updated successfully'
-                                                : 'Revenue recorded successfully',
-                                            label: '${amount < 0 ? 'Money out' : 'Money in'} · ${formatInr(amount.abs())}',
-                                          );
-                                          if (!context.mounted) return;
-                                          context.read<ProjectProvider>().load();
-                                          if (onSave != null) {
-                                            onSave();
-                                          } else {
-                                            _loadRevenue(projectId);
-                                          }
-                                        }
-                                      } else {
-                                        if (context.mounted) {
-                                          btToast(
-                                            context,
-                                            isEdit
-                                                ? 'Failed to update revenue'
-                                                : 'Failed to record revenue',
-                                            error: true,
-                                          );
-                                        }
-                                      }
-                                    } catch (e) {
-                                      if (context.mounted) {
-                                        btToast(context, 'Error: $e', error: true);
-                                      }
-                                    } finally {
-                                      if (ctx.mounted) {
-                                        setModalState(() {
-                                          isSaving = false;
-                                        });
-                                      }
-                                    }
-                                  },
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
   }
 
   /// Footer line of the Client money card → opens the revenue timeline.
   Widget _buildRevenueHistory(BuildContext context) {
     if (_loadingRevenue) {
       return const BtSkeleton(height: 16, width: 110, radius: 6);
+    }
+    if (_revenueError) {
+      final id = _lastProjectId;
+      return Semantics(
+        button: true,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: id == null ? null : () => _loadRevenue(id),
+          child: Text(
+            "Couldn't load · Retry",
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: BtText.caption(context, color: Bt.red, weight: FontWeight.w600),
+          ),
+        ),
+      );
     }
     final project = Provider.of<ProjectProvider>(
       context,
@@ -1278,14 +969,16 @@ class _AdminDashboardState extends State<_AdminDashboard> {
       useSafeArea: true,
       backgroundColor: Bt.ground,
       barrierColor: Bt.scrim,
-      sheetAnimationStyle: const AnimationStyle(duration: Duration(milliseconds: 520), curve: Bt.ease, reverseDuration: Duration(milliseconds: 260)),
+      sheetAnimationStyle: btSheetStyle(context),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(Bt.rSheet)),
       ),
       builder: (ctx) {
         return StatefulBuilder(
-          builder: (ctx, setSheetState) {
-            return DraggableScrollableSheet(
+          builder: (ctx, setSheetState) => ValueListenableBuilder<int>(
+            // Redraw when proof images (thumbnails) arrive.
+            valueListenable: _revenueProofs,
+            builder: (_, _, _) => DraggableScrollableSheet(
               initialChildSize: 0.7,
               minChildSize: 0.4,
               maxChildSize: 0.9,
@@ -1365,10 +1058,10 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                               expand: false,
                               variant: BtButtonVariant.accent,
                               onPressed: () {
-                                _showAddRevenueDialog(
+                                showRecordPaymentSheet(
                                   context,
-                                  projectId,
-                                  onSave: () async {
+                                  projectId: projectId,
+                                  onSaved: () async {
                                     await _loadRevenue(projectId);
                                     setSheetState(() {});
                                   },
@@ -1412,12 +1105,24 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                   ),
                 );
               },
-            );
-          },
+            ),
+          ),
         );
       },
     );
   }
+  /// Detail sheet needs the entry's image (missing from the list rows until
+  /// hydrated) — fetch it first if needed, then open.
+  Future<void> _openRevenueDetail(
+    BuildContext context,
+    Map<String, dynamic> tx, {
+    VoidCallback? onRefresh,
+  }) async {
+    await _withProof(tx);
+    if (!context.mounted) return;
+    _showRevenueDetailDialog(context, tx, onRefresh: onRefresh);
+  }
+
   void _showRevenueDetailDialog(
     BuildContext context,
     Map<String, dynamic> tx, {
@@ -1433,9 +1138,9 @@ class _AdminDashboardState extends State<_AdminDashboard> {
     final paymentStatus = tx['paymentStatus']?.toString() ?? 'Paid';
     final rawId = tx['_id']?.toString() ?? tx['id']?.toString() ?? '';
     final refId = rawId.isNotEmpty ? rawId.toUpperCase() : 'N/A';
-    final List<dynamic> attachments = tx['attachments'] is List
-        ? tx['attachments'] as List
-        : [];
+    final proofUrl = _revenueProofUrl(tx);
+    final proofImage = _proofImageProvider(proofUrl);
+    final List<dynamic> attachments = proofUrl != null ? [proofUrl] : [];
 
     DateTime date = DateTime.now();
     if (tx['date'] != null) {
@@ -1457,7 +1162,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
       useSafeArea: true,
       backgroundColor: Bt.card,
       barrierColor: Bt.scrim,
-      sheetAnimationStyle: const AnimationStyle(duration: Duration(milliseconds: 520), curve: Bt.ease, reverseDuration: Duration(milliseconds: 260)),
+      sheetAnimationStyle: btSheetStyle(context),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(Bt.rSheet)),
       ),
@@ -1554,7 +1259,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                     ),
                   ),
                 ],
-                if (attachments.isNotEmpty) ...[
+                if (proofUrl != null && proofImage != null) ...[
                   const SizedBox(height: 12),
                   Container(
                     padding: const EdgeInsets.all(14),
@@ -1562,7 +1267,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('PROOF OF PAYMENT', style: BtText.mono(context)),
+                        Text(proofUrl == tx['paymentReceipt']?.toString() ? 'CLIENT E-SIGNATURE' : 'PROOF OF PAYMENT', style: BtText.mono(context)),
                         const SizedBox(height: 8),
                         BtPressable(
                           onTap: () {
@@ -1570,7 +1275,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                               context,
                               '/receipt-viewer',
                               arguments: {
-                                'receipt': attachments.first.toString(),
+                                'receipt': proofUrl,
                               },
                             );
                           },
@@ -1579,8 +1284,8 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                             children: [
                               ClipRRect(
                                 borderRadius: BorderRadius.circular(12),
-                                child: Image.network(
-                                  attachments.first.toString(),
+                                child: Image(
+                                  image: proofImage,
                                   height: 150,
                                   width: double.infinity,
                                   fit: BoxFit.cover,
@@ -1676,11 +1381,11 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                         icon: Icons.edit_outlined,
                         onPressed: () {
                           Navigator.pop(ctx);
-                          _showAddRevenueDialog(
+                          showRecordPaymentSheet(
                             context,
-                            project?.id ?? tx['project']?.toString() ?? '',
+                            projectId: project?.id ?? tx['project']?.toString() ?? '',
                             editingTx: tx,
-                            onSave: onRefresh,
+                            onSaved: onRefresh,
                           );
                         },
                       ),
@@ -1806,72 +1511,6 @@ class _AdminDashboardState extends State<_AdminDashboard> {
       ),
     );
   }
-  void _showFullScreenImageDialog(BuildContext context, String imageUrl) {
-    showDialog(
-      context: context,
-      barrierColor: Colors.black.withValues(alpha: .88),
-      builder: (BuildContext ctx) {
-        return Dialog(
-          backgroundColor: Colors.transparent,
-          insetPadding: const EdgeInsets.all(10),
-          child: GestureDetector(
-            onTap: () => Navigator.of(ctx).pop(),
-            child: Stack(
-              alignment: Alignment.topRight,
-              children: [
-                InteractiveViewer(
-                  panEnabled: true,
-                  boundaryMargin: const EdgeInsets.all(20),
-                  minScale: 0.5,
-                  maxScale: 4.0,
-                  child: Center(
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(14),
-                      child: Image.network(
-                        imageUrl,
-                        fit: BoxFit.contain,
-                        loadingBuilder: (context, child, loadingProgress) {
-                          if (loadingProgress == null) return child;
-                          return const Center(
-                            child: CircularProgressIndicator(color: Colors.white),
-                          );
-                        },
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
-                            padding: const EdgeInsets.all(20),
-                            color: Bt.card,
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.broken_image_outlined, color: Bt.red, size: 40),
-                                const SizedBox(height: 8),
-                                Text('Failed to load image', style: BtText.subhead(context, color: Bt.ink)),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ),
-                ),
-                Positioned(
-                  top: 10,
-                  right: 10,
-                  child: BtIconButton(
-                    icon: Icons.close_rounded,
-                    semantic: 'Close',
-                    color: Bt.bone,
-                    background: Colors.white.withValues(alpha: .12),
-                    onTap: () => Navigator.of(ctx).pop(),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
   Widget _revenueTile(
     BuildContext context,
     Map<String, dynamic> tx, {
@@ -1884,11 +1523,8 @@ class _AdminDashboardState extends State<_AdminDashboard> {
     final formattedAmt = formatCurrency(absAmount);
     final textColor = isOutflow ? Bt.ink : Bt.green;
     final paymentMode = tx['paymentMode']?.toString() ?? 'Cash';
-    final List<dynamic> attachments = tx['attachments'] is List
-        ? tx['attachments'] as List
-        : [];
-    final hasImage =
-        attachments.isNotEmpty && attachments.first.toString().isNotEmpty;
+    final proofUrl = _revenueProofUrl(tx);
+    final proofImage = _proofImageProvider(proofUrl);
 
     DateTime date = DateTime.now();
     if (tx['date'] != null) {
@@ -1900,20 +1536,20 @@ class _AdminDashboardState extends State<_AdminDashboard> {
         '${date.day.toString().padLeft(2, '0')} ${_getMonthName(date.month)}';
     final timeStr = _formatTime12Hour(date);
     Widget? thumbnail;
-    if (hasImage) {
-      final imageUrl = attachments.first.toString();
-      thumbnail = GestureDetector(
-        onTap: () {
-          _showFullScreenImageDialog(context, imageUrl);
-        },
+    if (proofUrl != null && proofImage != null) {
+      thumbnail = Semantics(
+        button: true,
+        label: 'View proof image',
+        child: GestureDetector(
+        onTap: () => Navigator.pushNamed(context, '/receipt-viewer', arguments: {'receipt': proofUrl}),
         child: Container(
           width: 40,
           height: 40,
           decoration: BoxDecoration(color: Bt.fill, borderRadius: BorderRadius.circular(10)),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(10),
-            child: Image.network(
-              imageUrl,
+            child: Image(
+              image: proofImage,
               fit: BoxFit.cover,
               loadingBuilder: (context, child, loadingProgress) {
                 if (loadingProgress == null) return child;
@@ -1933,11 +1569,12 @@ class _AdminDashboardState extends State<_AdminDashboard> {
             ),
           ),
         ),
+        ),
       );
     }
     return InkWell(
       onTap: () {
-        _showRevenueDetailDialog(context, tx, onRefresh: onRefresh);
+        _openRevenueDetail(context, tx, onRefresh: onRefresh);
       },
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -2010,7 +1647,10 @@ class _AdminDashboardState extends State<_AdminDashboard> {
     if (_isGlobalView) {
       for (var p in provider.projects) {
         gBudget += p.totalBudget;
-        gSpent += provider.totalSpentForProject(p.id);
+        // Only the selected project's entries are loaded, so the others'
+        // cost comes from the server's per-project total.
+        final local = provider.totalSpentForProject(p.id);
+        gSpent += local > p.spentAmount ? local : p.spentAmount;
         gRev += p.totalIncome;
         gProg += p.progress;
       }
@@ -2027,8 +1667,13 @@ class _AdminDashboardState extends State<_AdminDashboard> {
     final spent = _isGlobalView ? gSpent : (project != null ? provider.totalSpentForProject(project.id) : 0.0);
     final budget = _isGlobalView ? gBudget : (project?.totalBudget ?? 0.0);
     final remaining = _isGlobalView ? (gBudget - gSpent) : (project?.remainingBudget ?? 0.0);
-    final revenue = _isGlobalView ? gRev : (project != null ? _totalRevenueSum : 0.0);
-    final netCash = revenue - spent;
+    final revenue = _isGlobalView ? gRev : (project != null ? _moneyInSum : 0.0);
+    // Project revenue failed to load and nothing was loaded before: don't
+    // show ₹0 / a fake loss.
+    final revenueUnknown = !_isGlobalView && project != null && _revenueError && _revenueEntries.isEmpty;
+    // Project view: money out isn't a site cost (excluded from entries), so it's
+    // subtracted here. Global view uses the server totals, whose cost includes it.
+    final netCash = _isGlobalView ? revenue - spent : revenue - _moneyOutSum - spent;
     final isLoss = netCash < 0;
     final progress = _isGlobalView ? gProg : (project?.progress ?? 0.0);
     final usedPct = budget > 0 ? (spent / budget) : 0.0;
@@ -2046,7 +1691,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
         const SizedBox(height: 20),
         Showcase(
           key: ShowcaseKeys.dashboardTotalCost,
-          description: 'Track your total funds spent across all categories for this project.',
+          description: 'Total cost so far — everything spent on materials, labour and equipment. Tap the project chip above to switch project or see all projects.',
           tooltipBackgroundColor: Bt.ink,
           textColor: Colors.white,
           tooltipBorderRadius: BorderRadius.circular(16),
@@ -2092,7 +1737,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
             Expanded(
               child: Showcase(
                 key: ShowcaseKeys.dashboardTotalBudget,
-                description: 'Track the total allocated budget and remaining balance for this project.',
+                description: 'Budget left — how much of the planned budget is still available.',
                 tooltipBackgroundColor: Bt.ink,
                 textColor: Colors.white,
                 tooltipBorderRadius: BorderRadius.circular(16),
@@ -2104,13 +1749,6 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                 ),
               ),
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: BtGlassTile(
-                label: 'Upcoming · planned',
-                value: Text(budget > 0 ? formatInr(remaining < 0 ? 0 : remaining, compact: true) : '—', maxLines: 1, overflow: TextOverflow.ellipsis),
-              ),
-            ),
           ]),
         ),
       ],
@@ -2118,7 +1756,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
 
     final workDone = Showcase(
       key: ShowcaseKeys.progress,
-      description: 'Track your overall project completion here',
+      description: 'Work done — overall completion of the project.',
       tooltipBackgroundColor: Bt.ink,
       textColor: Colors.white,
       tooltipBorderRadius: BorderRadius.circular(16),
@@ -2157,27 +1795,27 @@ class _AdminDashboardState extends State<_AdminDashboard> {
         const SizedBox(height: 10),
         Showcase(
           key: ShowcaseKeys.dashboardTotalRevenue,
-          description: 'View the total revenue inflow recorded for this project.',
+          description: 'Total revenue — money received from the client. Tap this card to see every payment and record a new one.',
           tooltipBackgroundColor: Bt.ink,
           textColor: Colors.white,
           tooltipBorderRadius: BorderRadius.circular(16),
           tooltipPadding: const EdgeInsets.all(16),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('Total revenue', style: BtText.caption(context)),
-            Text(formatInr(revenue, compact: true), maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.num(BtText.headline(context).copyWith(color: Bt.green))),
+            Text(revenueUnknown ? '—' : formatInr(revenue, compact: true), maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.num(BtText.headline(context).copyWith(color: Bt.green))),
           ]),
         ),
         const SizedBox(height: 8),
         Showcase(
           key: ShowcaseKeys.dashboardNetCashFlow,
-          description: 'See your net profit or loss calculated instantly.',
+          description: 'Net cash flow — revenue minus cost, so you see profit or loss at a glance.',
           tooltipBackgroundColor: Bt.ink,
           textColor: Colors.white,
           tooltipBorderRadius: BorderRadius.circular(16),
           tooltipPadding: const EdgeInsets.all(16),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(isLoss ? 'Net cash flow · loss' : 'Net cash flow · profit', maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.caption(context)),
-            Text(formatInr(netCash, compact: true), maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.num(BtText.headline(context).copyWith(color: isLoss ? Bt.red : Bt.green))),
+            Text(revenueUnknown ? '—' : formatInr(netCash, compact: true), maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.num(BtText.headline(context).copyWith(color: revenueUnknown ? Bt.ink2 : (isLoss ? Bt.red : Bt.green)))),
           ]),
         ),
         if (project != null) ...[
@@ -2189,8 +1827,9 @@ class _AdminDashboardState extends State<_AdminDashboard> {
 
     return BtHeroScroll(
       hero: hero,
+      onRefresh: _refresh,
       children: [
-        if (RoleManager.canApproveUpdates) const _HomeApprovals(),
+        if (RoleManager.canApproveUpdates) _HomeApprovals(key: _approvalsKey),
         BtReveal(index: 1, child: _buildSpeakUpdate(context)),
         const SizedBox(height: 12),
         BtReveal(
@@ -2208,7 +1847,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
           index: 3,
           child: Showcase(
             key: ShowcaseKeys.recentEntries,
-            description: 'Quickly view or edit your most recently added entries',
+            description: 'Recent activity — your team\'s approved / rejected entries and the latest entries. "View all" opens the full log.',
             tooltipBackgroundColor: Bt.ink,
             textColor: Colors.white,
             tooltipBorderRadius: BorderRadius.circular(16),
@@ -2216,6 +1855,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
             child: _buildRecentActivity(context),
           ),
         ),
+        const _PoweredByFooter(),
       ],
     );
   }
@@ -2303,7 +1943,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
     final bt = context.bt;
     return Showcase(
       key: ShowcaseKeys.quickAddEntry,
-      description: 'Quickly add a new entry from here.',
+      description: 'Speak Update — say what happened and we fill in the entry form for you.',
       tooltipBackgroundColor: Bt.ink,
       textColor: Colors.white,
       tooltipBorderRadius: BorderRadius.circular(16),
@@ -2411,9 +2051,11 @@ class _SupervisorDashboard extends StatefulWidget {
 class _SupervisorDashboardState extends State<_SupervisorDashboard> {
   List<dynamic> _pendingTransactions = [];
   List<dynamic> _historyTransactions = [];
+  int _pendingUpdates = 0;
   List<TaskModel> _tasks = [];
   bool _isLoading = true;
   String? _error;
+  bool _tasksError = false;
   String _activeTab = 'pending';
   @override
   void initState() {
@@ -2425,22 +2067,30 @@ class _SupervisorDashboardState extends State<_SupervisorDashboard> {
       _isLoading = true;
       _error = null;
     });
-    final results = await Future.wait([
-      ApiService.fetchPendingApprovals(),
-      ApiService.fetchApprovalsHistory(),
-      TaskService.getDailyTasks(),
+    // Each call fails on its own (getDailyTasks throws on errors; before, one
+    // failure left the whole Home stuck on skeletons).
+    final results = await Future.wait<Object?>([
+      ApiService.fetchPendingApprovals().catchError((_) => null),
+      ApiService.fetchApprovalsHistory().catchError((_) => null),
+      TaskService.getDailyTasks().then<List<TaskModel>?>((t) => t).catchError((_) => null),
     ]);
     if (!mounted) return;
     final pendingData = results[0] as Map<String, dynamic>?;
     final historyData = results[1] as Map<String, dynamic>?;
-    final tasksData = results[2] as List<TaskModel>;
+    final tasksData = results[2] as List<TaskModel>?;
     setState(() {
-      _pendingTransactions = (pendingData?['transactions'] as List?) ?? [];
-      _historyTransactions = (historyData?['transactions'] as List?) ?? [];
-      _tasks = tasksData;
+      if (pendingData != null) {
+        _pendingTransactions = (pendingData['transactions'] as List?) ?? [];
+        _pendingUpdates = (pendingData['projectUpdates'] as List?)?.length ?? 0;
+      }
+      if (historyData != null) _historyTransactions = (historyData['transactions'] as List?) ?? [];
+      if (tasksData != null) _tasks = tasksData;
+      _tasksError = tasksData == null;
       _isLoading = false;
-      if (pendingData == null && historyData == null) {
-        _error = 'Failed to load data';
+      // Pending approvals are the point of this Home — a failed load is an
+      // error (with Retry), not "No pending approvals".
+      if (pendingData == null) {
+        _error = "Couldn't load approvals. Check your connection.";
       }
     });
   }
@@ -2463,7 +2113,7 @@ class _SupervisorDashboardState extends State<_SupervisorDashboard> {
     if (ok) _handleReject(id);
   }
   void _openInbox() {
-    Navigator.pushNamed(context, '/inbox').then((_) {
+    Navigator.pushNamed(context, '/approvals').then((_) {
       if (mounted) _loadAll();
     });
   }
@@ -2543,7 +2193,16 @@ class _SupervisorDashboardState extends State<_SupervisorDashboard> {
           index: 1,
           child: Row(children: [
             if (RoleManager.canAssignTasks) ...[
-              Expanded(child: BtButton(label: 'Assign Task', icon: Icons.assignment_turned_in_outlined, onPressed: () => Navigator.pushNamed(context, '/assign-task'))),
+              Expanded(
+                child: BtButton(
+                  label: 'Assign Task',
+                  icon: Icons.assignment_turned_in_outlined,
+                  // Back from Assign Task → refresh "Tasks assigned".
+                  onPressed: () => Navigator.pushNamed(context, '/assign-task').then((_) {
+                    if (mounted) _loadAll();
+                  }),
+                ),
+              ),
               const SizedBox(width: 10),
               Semantics(
                 button: true,
@@ -2579,7 +2238,9 @@ class _SupervisorDashboardState extends State<_SupervisorDashboard> {
           title: 'Tasks assigned',
           action: _tasks.isEmpty ? null : '${_tasks.where((t) => t.status != 'Completed').length} open',
         ),
-        if (_tasks.isEmpty)
+        if (!_isLoading && _tasksError && _tasks.isEmpty)
+          BtErrorCard(message: "Couldn't load tasks", onRetry: _loadAll)
+        else if (_tasks.isEmpty)
           const BtCard(child: BtEmpty(icon: Icons.task_alt, title: 'No tasks currently active.'))
         else
           BtGroup(children: [
@@ -2595,6 +2256,7 @@ class _SupervisorDashboardState extends State<_SupervisorDashboard> {
           const SizedBox(height: 28),
           _buildRecentHistorySection(),
         ],
+        const _PoweredByFooter(),
       ],
     );
   }
@@ -2630,10 +2292,11 @@ class _SupervisorDashboardState extends State<_SupervisorDashboard> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             BtSectionHeader(title: 'Pending approvals', action: 'See all', onAction: _openInbox),
-            if (pendingCount == 0)
+            if (pendingCount == 0 && _pendingUpdates == 0)
               const BtCard(child: BtEmpty(icon: Icons.check_circle_outline, title: 'No pending approvals', message: 'Pull down to refresh'))
             else ...[
-              _ApprovalsSummaryCard(count: pendingCount, amount: pendingSum, onTap: _openInbox),
+              // Project updates are approved on the Approvals screen (See all).
+              _ApprovalsSummaryCard(count: pendingCount + _pendingUpdates, amount: pendingSum, updates: _pendingUpdates, onTap: _openInbox),
               for (var i = 0; i < _pendingTransactions.length; i++)
                 Padding(
                   padding: const EdgeInsets.only(top: 10),
@@ -2641,8 +2304,10 @@ class _SupervisorDashboardState extends State<_SupervisorDashboard> {
                     index: i < 8 ? i + 1 : 0,
                     child: _PendingTxCard(
                       tx: _pendingTransactions[i] as Map<String, dynamic>,
-                      onApprove: () => _handleApprove(_pendingTransactions[i]['_id']?.toString() ?? ''),
-                      onReject: () => _confirmReject(_pendingTransactions[i]['_id']?.toString() ?? ''),
+                      // PUT /transactions/:id/approve|reject need approve_payments /
+                      // approve_updates (or add_entries); others only see the queue.
+                      onApprove: RoleManager.canApproveUpdates ? () => _handleApprove(_pendingTransactions[i]['_id']?.toString() ?? '') : null,
+                      onReject: RoleManager.canApproveUpdates ? () => _confirmReject(_pendingTransactions[i]['_id']?.toString() ?? '') : null,
                     ),
                   ),
                 ),
@@ -2710,8 +2375,9 @@ class _PendingTxCard extends StatelessWidget {
     required this.onReject,
   });
   final Map<String, dynamic> tx;
-  final VoidCallback onApprove;
-  final VoidCallback onReject;
+  /// Null when the viewer may not approve/reject: the buttons are left out.
+  final VoidCallback? onApprove;
+  final VoidCallback? onReject;
   @override
   Widget build(BuildContext context) {
     final title = tx['title']?.toString() ?? 'Entry';
@@ -2735,12 +2401,14 @@ class _PendingTxCard extends StatelessWidget {
           const SizedBox(width: 8),
           Text(formatInr(amount), style: BtText.num(BtText.headline(context))),
         ]),
-        const SizedBox(height: 12),
-        Row(children: [
-          Expanded(child: BtButton(label: 'Reject…', variant: BtButtonVariant.destructive, small: true, onPressed: onReject)),
-          const SizedBox(width: 10),
-          Expanded(child: BtButton(label: 'Approve', icon: Icons.check_rounded, small: true, onPressed: onApprove)),
-        ]),
+        if (onApprove != null && onReject != null) ...[
+          const SizedBox(height: 12),
+          Row(children: [
+            Expanded(child: BtButton(label: 'Reject…', variant: BtButtonVariant.destructive, small: true, onPressed: onReject)),
+            const SizedBox(width: 10),
+            Expanded(child: BtButton(label: 'Approve', icon: Icons.check_rounded, small: true, onPressed: onApprove)),
+          ]),
+        ],
       ]),
     );
   }
@@ -2818,7 +2486,7 @@ class _BigAction extends StatelessWidget {
 
 class _MasonDashboard extends StatefulWidget {
   const _MasonDashboard({required this.onEntryTap, required this.top});
-  final void Function(BuildContext, String) onEntryTap;
+  final Future<void> Function(BuildContext, String) onEntryTap;
   final Widget top;
   @override
   State<_MasonDashboard> createState() => _MasonDashboardState();
@@ -2827,14 +2495,60 @@ class _MasonDashboardState extends State<_MasonDashboard> {
   late Future<List<dynamic>> _recentEntriesFuture;
   List<TaskModel> _tasks = [];
   bool _isLoadingTasks = true;
+  bool _tasksError = false;
+  final _approvalsKey = GlobalKey<_HomeApprovalsState>();
   @override
   void initState() {
     super.initState();
     final projectId = context.read<ProjectProvider>().selectedProject?.id;
-    _recentEntriesFuture = ApiService.fetchMyRecentEntries(
-      projectId: projectId,
-    );
+    _recentEntriesFuture = _fetchOwnRecentEntries(projectId);
     _loadTasks();
+  }
+
+  /// Pull-to-refresh (and after adding an entry): tasks, own recent entries
+  /// and the approvals card — same idea as the Supervisor Home's reload.
+  Future<void> _refresh() async {
+    if (!mounted) return;
+    final projectId = context.read<ProjectProvider>().selectedProject?.id;
+    final entries = _fetchOwnRecentEntries(projectId);
+    setState(() => _recentEntriesFuture = entries);
+    await Future.wait<void>([
+      _loadTasks(),
+      entries.then<void>((_) {}, onError: (_) {}),
+      if (_approvalsKey.currentState != null) _approvalsKey.currentState!._load(),
+    ]);
+  }
+
+  /// The mason's OWN recent entries. `fetchMyRecentEntries` reads
+  /// `/transactions?filterByViewAccess=true`, which returns every entry on the
+  /// mason's projects — incl. admin / supervisor entries. `/transactions/my`
+  /// is scoped to `createdBy = me` server-side; the creator check below is a
+  /// second guard. Same filters as before otherwise (no revenue, approved
+  /// only, current project when one is selected, newest first).
+  static Future<List<dynamic>> _fetchOwnRecentEntries(String? projectId) async {
+    final me = UserSession.userId;
+    String idOf(dynamic v) => v is Map ? (v['_id'] ?? v['id'] ?? '').toString() : (v ?? '').toString();
+    try {
+      final response = await ApiService.get('/transactions/my?limit=50');
+      if (response.statusCode != 200) throw Exception('HTTP ${response.statusCode}');
+      final decoded = json.decode(response.body);
+      final List<dynamic> raw = decoded is List ? decoded : ((decoded['transactions'] ?? decoded['data'] ?? []) as List<dynamic>);
+      final own = raw.where((e) {
+        if (e is! Map<String, dynamic>) return false;
+        if (me.isNotEmpty && idOf(e['createdBy']) != me) return false;
+        final type = (e['type'] ?? '').toString().toLowerCase().trim();
+        if (type == 'income' || type == 'revenue') return false;
+        if ((e['approvalStatus'] ?? '').toString().toLowerCase().trim() != 'approved') return false;
+        if (projectId != null && projectId.isNotEmpty && e['project'] != null && idOf(e['project']) != projectId) return false;
+        return true;
+      }).toList()
+        ..sort((a, b) => (b['date'] ?? b['createdAt'] ?? '').toString().compareTo((a['date'] ?? a['createdAt'] ?? '').toString()));
+      return own;
+    } catch (e) {
+      // Surface as an error (FutureBuilder shows Retry), not "No entries yet".
+      debugPrint('Mason recent entries error: $e');
+      rethrow;
+    }
   }
   Future<void> _loadTasks() async {
     try {
@@ -2843,11 +2557,15 @@ class _MasonDashboardState extends State<_MasonDashboard> {
         setState(() {
           _tasks = tasks;
           _isLoadingTasks = false;
+          _tasksError = false;
         });
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _isLoadingTasks = false);
+        setState(() {
+          _isLoadingTasks = false;
+          _tasksError = true;
+        });
       }
     }
   }
@@ -2855,6 +2573,13 @@ class _MasonDashboardState extends State<_MasonDashboard> {
   Widget build(BuildContext context) {
     final projectName = context.watch<ProjectProvider>().selectedProject?.name;
     final openTasks = _tasks.where((t) => t.status != 'Completed').length;
+    // Only offer what the backend accepts: daily update = PUT /projects/:id
+    // (role/permission, or a task assigned to me on the project); material
+    // entry = POST /transactions (manage_expenses / add_entries).
+    final me = UserSession.userId;
+    final canDailyUpdate = RoleManager.canSubmitProjectUpdate ||
+        _tasks.any((t) => me.isNotEmpty && (t.assignedTo?['_id'] ?? t.assignedTo?['id'])?.toString() == me);
+    final canMaterialEntry = RoleManager.canAddTransactions;
     final hero = _HomeHero(
       top: widget.top,
       children: [
@@ -2880,37 +2605,49 @@ class _MasonDashboardState extends State<_MasonDashboard> {
     );
     return BtHeroScroll(
       hero: hero,
+      onRefresh: _refresh,
       children: [
+        if (canDailyUpdate || canMaterialEntry) ...[
         BtReveal(
           index: 1,
           child: IntrinsicHeight(
             child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              if (canDailyUpdate)
               Expanded(
                 child: _BigAction(
                   ink: true,
                   icon: Icons.add_task_rounded,
                   title: 'Add Daily Update',
                   subtitle: 'Work, photos, notes',
-                  onTap: () => Navigator.pushNamed(context, '/update-progress'),
+                  onTap: () => Navigator.pushNamed(context, '/update-progress').then((_) {
+                    if (mounted) _refresh();
+                  }),
                 ),
               ),
-              const SizedBox(width: 12),
+              if (canDailyUpdate && canMaterialEntry) const SizedBox(width: 12),
+              if (canMaterialEntry)
               Expanded(
                 child: _BigAction(
                   icon: Icons.inventory_2_outlined,
                   title: 'Add Material Entry',
                   subtitle: 'Cement, steel, bricks…',
-                  onTap: () => widget.onEntryTap(context, 'material'),
+                  // Same flow as the + sheet's "Material" choice.
+                  onTap: () => widget.onEntryTap(context, 'material').then((_) {
+                    if (mounted) _refresh();
+                  }),
                 ),
               ),
             ]),
           ),
         ),
         const SizedBox(height: 24),
-        if (RoleManager.canApproveUpdates) const _HomeApprovals(),
+        ],
+        if (RoleManager.canApproveUpdates) _HomeApprovals(key: _approvalsKey),
         BtSectionHeader(title: 'Tasks assigned', action: _isLoadingTasks || _tasks.isEmpty ? null : '$openTasks open'),
         if (_isLoadingTasks)
           const BtSkeletonList(count: 2)
+        else if (_tasksError && _tasks.isEmpty)
+          BtErrorCard(message: "Couldn't load tasks", onRetry: _loadTasks)
         else if (_tasks.isEmpty)
           const BtCard(child: BtEmpty(icon: Icons.task_alt, title: 'No tasks currently active.'))
         else
@@ -2941,7 +2678,7 @@ class _MasonDashboardState extends State<_MasonDashboard> {
               return const BtSkeletonList(count: 3);
             }
             if (snapshot.hasError) {
-              return const BtErrorCard(message: 'Failed to load recent entries.');
+              return BtErrorCard(message: "Couldn't load recent entries.", onRetry: _refresh);
             }
             final entries = snapshot.data ?? [];
             if (entries.isEmpty) {
@@ -2955,6 +2692,7 @@ class _MasonDashboardState extends State<_MasonDashboard> {
             );
           },
         ),
+        const _PoweredByFooter(),
       ],
     );
   }
@@ -3067,7 +2805,11 @@ class _TeamApprovalHistoryWidgetState
   }
   Future<void> _load() async {
     try {
-      final data = await ApiService.fetchApprovalsHistory();
+      // Filter on the server before its 20-row limit (was: last 20 overall, then by project).
+      final pid = widget.projectId?.trim() ?? '';
+      final data = await ApiService.fetchApprovalsHistory(
+        projectId: RegExp(r'^[a-f0-9]{24}$').hasMatch(pid) ? pid : null,
+      );
       final List<dynamic> all = (data?['transactions'] as List?) ?? [];
       final filtered =
           all.where((t) {

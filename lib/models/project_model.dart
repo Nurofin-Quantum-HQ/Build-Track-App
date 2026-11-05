@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:buildtrack_mobile/common/utils/date_parse.dart';
 import 'package:buildtrack_mobile/common/utils/currency_formatter.dart';
 enum ProjectStage {
   preConstruction,
@@ -49,10 +50,7 @@ extension EntryTypeX on EntryType {
   }
 }
 
-DateTime? _parseLocal(String? s) {
-  if (s == null || s.isEmpty) return null;
-  return DateTime.tryParse(s)?.toLocal();
-}
+DateTime? _parseLocal(String? s) => parseFlexibleDate(s);
 
 class EntryModel {
   EntryModel({
@@ -811,7 +809,9 @@ class ProjectModel {
       'budgetEquipment': budgetEquipment ?? 0,
       'budgetMisc': budgetMisc ?? 0,
       'budgetMiscellaneous': budgetMisc ?? 0,
-      'buildingType': {'mainType': mainType, 'subType': subType},
+      // No type → leave buildingType out: the backend enum rejects '' (400).
+      if (mainType.isNotEmpty)
+        'buildingType': {'mainType': mainType, 'subType': subType},
       'budget': {
         'total': totalBudget,
         'material': budgetMaterial ?? 0,

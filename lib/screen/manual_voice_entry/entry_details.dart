@@ -35,13 +35,15 @@ class _EntryDetailScreenState extends State<EntryDetailScreen> {
     _argsLoaded = true;
     final args = (ModalRoute.of(context)?.settings.arguments as Map?) ?? {};
     _args = args;
-    final statusStr = args['status'] as String? ?? 'pending';
+    final statusStr = (args['status'] ?? args['approvalStatus'] ?? 'pending')
+        .toString()
+        .toLowerCase();
     _entryStatus = EntryStatus.values.firstWhere(
       (e) => e.name == statusStr,
       orElse: () => EntryStatus.pending,
     );
-    _payStatus =
-        args['paymentStatus'] as PaymentStatus? ?? PaymentStatus.pending;
+    final rawPay = args['paymentStatus'];
+    _payStatus = rawPay is PaymentStatus ? rawPay : PaymentStatus.pending;
     _billAmount = (args['billAmount'] as num?)?.toDouble() ?? 0;
     _paidAmount = (args['paidAmount'] as num?)?.toDouble() ?? 0;
     final rawHistory = args['paymentHistory'];
@@ -51,9 +53,9 @@ class _EntryDetailScreenState extends State<EntryDetailScreen> {
       _paymentHistory = [];
     }
     _customDate = args['date'] as String?;
-    _floor = args['floor'] as String?;
-    _phase = args['phase'] as String?;
-    _activity = args['activity'] as String?;
+    _floor = args['floor']?.toString();
+    _phase = args['phase']?.toString();
+    _activity = args['activity']?.toString();
     _projectName = args['projectName'] as String?;
     _paymentReceiptFile =
         args['paymentReceipt'] as String? ??
@@ -69,7 +71,22 @@ class _EntryDetailScreenState extends State<EntryDetailScreen> {
       final latest = await ApiService.fetchTransactionById(id.toString());
       if (latest != null && mounted) {
         setState(() {
-          _args = { ..._args, ...latest };
+          // Keep the route's own `type` ('material' / 'labour' / 'equipment') and
+          // display `amount`: the server's type is 'Materials' / 'Wages' / 'Expense'
+          // and its amount is the bill, which sent labour/equipment edits to the
+          // Material form.
+          final keep = {
+            if (_args.containsKey('type')) 'type': _args['type'],
+            if (_args.containsKey('amount')) 'amount': _args['amount'],
+          };
+          _args = { ..._args, ...latest, ...keep };
+          final approval = latest['approvalStatus']?.toString().toLowerCase();
+          if (approval != null && approval.isNotEmpty) {
+            _entryStatus = EntryStatus.values.firstWhere(
+              (e) => e.name == approval,
+              orElse: () => _entryStatus,
+            );
+          }
           final pStatus = latest['paymentStatus']?.toString().toLowerCase() ?? 'pending';
           if (pStatus == 'paid') {
             _payStatus = PaymentStatus.paid;
@@ -87,6 +104,10 @@ class _EntryDetailScreenState extends State<EntryDetailScreen> {
               : [];
           _paymentReceiptFile = latest['paymentReceipt'] as String? ??
               (_paymentHistory.isNotEmpty ? _paymentHistory.last['receipt'] as String? : null);
+          String? str(dynamic v) => (v == null || v.toString().trim().isEmpty) ? null : v.toString();
+          _phase = str(latest['phase']) ?? _phase;
+          _activity = str(latest['activity']) ?? _activity;
+          _floor = str(latest['floor']) ?? _floor;
         });
       }
     } catch (e) {
@@ -237,7 +258,7 @@ class _EntryDetailScreenState extends State<EntryDetailScreen> {
         _payStatus == PaymentStatus.overdue;
     final bool isSettled = _payStatus == PaymentStatus.paid;
     final double progress = _billAmount > 0 ? (_paidAmount / _billAmount).clamp(0.0, 1.0) : 0.0;
-    final bool showPay = canSettle && RoleManager.canApprovePayments;
+    final bool showPay = canSettle && RoleManager.canRecordPayments;
     final String payLabel = _payStatus == PaymentStatus.partial
         ? 'Settle remaining'
         : 'Record payment';
@@ -417,15 +438,23 @@ class _EntryDetailScreenState extends State<EntryDetailScreen> {
                       child: BtButton(
                         label: 'Edit',
                         variant: BtButtonVariant.secondary,
-                        onPressed: () => Navigator.pushNamed(
-                          context,
-                          _editRoute(type),
-                          arguments: {
-                            ...args,
-                            'isEditing': true,
-                            'status': _entryStatus.name,
-                          },
-                        ),
+                        onPressed: () async {
+                          final result = await Navigator.pushNamed(
+                            context,
+                            _editRoute(type),
+                            arguments: {
+                              ...args,
+                              'isEditing': true,
+                              'status': _entryStatus.name,
+                            },
+                          );
+                          if (!mounted) return;
+                          if (result == 'deleted') {
+                            Navigator.of(this.context).pop(true);
+                          } else if (result == true) {
+                            _fetchInitialDetails();
+                          }
+                        },
                       ),
                     ),
                 ],
@@ -472,7 +501,7 @@ class _EntryDetailScreenState extends State<EntryDetailScreen> {
                 BtGroup(
                   children: [
                     BtValueRow(label: 'Project', value: projectLabel),
-                    if (whereParts.isNotEmpty) BtValueRow(label: 'Where', value: whereParts),
+                    if (whereParts.isNotEmpty) BtValueRow(label: 'Used in', value: whereParts),
                     BtValueRow(label: 'Date', value: displayDate),
                     BtValueRow(label: 'Quantity / value', value: amount, valueColor: isPositive ? null : Bt.red),
                     BtValueRow(label: 'Reference', value: ref),
@@ -496,7 +525,10 @@ class _EntryDetailScreenState extends State<EntryDetailScreen> {
   }) {
         final projectProvider = context.read<ProjectProvider>();
         String pName = 'Unknown Project';
-        String pId = _args['projectId'] ?? _args['project'] ?? '';
+        final rawProject = _args['projectId'] ?? _args['project'];
+        final String pId = rawProject is Map
+            ? (rawProject['_id'] ?? rawProject['id'] ?? '').toString()
+            : (rawProject ?? '').toString();
         final matchedProj = projectProvider.projects.where((p) => p.id == pId);
         if (matchedProj.isNotEmpty) {
           pName = matchedProj.first.name;
@@ -619,7 +651,7 @@ class _EntryDetailScreenState extends State<EntryDetailScreen> {
         }
         context.read<ProjectProvider>().load();
         btToast(context, 'Entry deleted successfully');
-        Navigator.pop(context);
+        Navigator.pop(context, true);
       } else if (context.mounted) {
         btToast(context, 'Failed to delete entry', error: true);
       }

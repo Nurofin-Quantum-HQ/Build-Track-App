@@ -25,10 +25,16 @@ class _AssignRolesScreenState extends State<AssignRolesScreen> {
     {
       'type': 'table',
       'label': 'Project Status',
-      'desc': 'View progress, budget, and project details',
+      'desc': 'View progress and project details',
       'view': 'view_assigned_project',
       'edit': 'edit_project',
       'delete': null,
+    },
+    {
+      'type': 'toggle',
+      'label': 'Project budget',
+      'desc': 'See budgets, budget used and remaining',
+      'key': RoleManager.viewProjectBudgetKey,
     },
     {
       'type': 'table',
@@ -57,6 +63,12 @@ class _AssignRolesScreenState extends State<AssignRolesScreen> {
       'desc': 'Can file a daily update with photos and checklist',
       'key': 'submit_daily_update',
     },
+    {
+      'type': 'toggle',
+      'label': 'Assign Tasks',
+      'desc': 'Can give work to team members (e.g. pre-construction)',
+      'key': RoleManager.assignTasksKey,
+    },
     {'section': 'Approvals & Payments'},
     {
       'type': 'toggle',
@@ -71,6 +83,12 @@ class _AssignRolesScreenState extends State<AssignRolesScreen> {
       'key': 'approve_updates',
     },
     {'section': 'Visibility'},
+    {
+      'type': 'toggle',
+      'label': 'View finances',
+      'desc': 'See money in, money out, loans and revenue in Reports',
+      'key': RoleManager.viewFinancesKey,
+    },
     {
       'type': 'table',
       'label': 'Reports & Analytics',
@@ -100,10 +118,16 @@ class _AssignRolesScreenState extends State<AssignRolesScreen> {
   final Map<String, bool> _permissions = {
     'view_assigned_project': false,
     'edit_project': false,
+    // Off by default for every preset (Supervisor / Mason / custom); an Admin
+    // turns it on per person. Read by RoleManager.canViewProjectBudget.
+    RoleManager.viewProjectBudgetKey: false,
+    // Off by default for every preset; an Admin turns it on per person.
+    RoleManager.viewFinancesKey: false,
     'delete_entry': false,
     'manage_expenses': false,
     'manage_equipment_master': false,
     'submit_daily_update': false,
+    RoleManager.assignTasksKey: false,
     'approve_payments': false,
     'approve_updates': false,
     'view_reports': false,
@@ -116,6 +140,11 @@ class _AssignRolesScreenState extends State<AssignRolesScreen> {
   bool _isEditMode = false;
   String? _editingUserId;
   final Set<String> _selectedProjectIds = {};
+
+  /// Edit mode: the user's permission list as loaded. Keys this screen has no
+  /// switch for (e.g. reject_updates, mark_paid, manage_users…) are sent back
+  /// unchanged — before, saving an edit silently deleted them.
+  List<String> _originalPermissions = const [];
   List<Map<String, String>> _projects = [];
   bool _isLoadingProjects = true;
   String? _projectsError;
@@ -164,7 +193,8 @@ class _AssignRolesScreenState extends State<AssignRolesScreen> {
       _selectedRole = _customRoleValue;
       _customRoleCtrl.text = role;
     }
-    final perms = (userData['permissions'] as List?)?.cast<String>() ?? [];
+    final perms = ((userData['permissions'] as List?) ?? const []).map((p) => p.toString()).toList();
+    _originalPermissions = perms;
     for (final key in _permissions.keys) {
       _permissions[key] = perms.contains(key);
     }
@@ -173,7 +203,10 @@ class _AssignRolesScreenState extends State<AssignRolesScreen> {
     _selectedOverseesRoles
       ..clear()
       ..addAll(overseesRoles);
-    final projectIds = (userData['projectIds'] as List?)?.cast<String>() ?? [];
+    final projectIds = ((userData['projectIds'] as List?) ?? const [])
+        .map((p) => p is Map ? (p['_id'] ?? p['id'] ?? '').toString() : p.toString())
+        .where((id) => id.isNotEmpty)
+        .toList();
     _selectedProjectIds
       ..clear()
       ..addAll(projectIds);
@@ -258,6 +291,7 @@ class _AssignRolesScreenState extends State<AssignRolesScreen> {
         'manage_expenses',
         'manage_equipment_master',
         'submit_daily_update',
+        RoleManager.assignTasksKey,
         'approve_payments',
         'approve_updates',
         'view_reports',
@@ -341,9 +375,14 @@ class _AssignRolesScreenState extends State<AssignRolesScreen> {
           'name': name,
           'email': email,
           'role': roleToSend,
-          'permissions': selectedPermissions,
-          if (_selectedProjectIds.isNotEmpty)
-            'projectIds': _selectedProjectIds.toList(),
+          // Known keys from the switches + every key the screen doesn't show.
+          'permissions': {
+            ..._originalPermissions.where((k) => !_permissions.containsKey(k)),
+            ...selectedPermissions,
+          }.toList(),
+          // Always sent: an empty list clears project access (the server
+          // only updates projectIds when the field is an array).
+          'projectIds': _selectedProjectIds.toList(),
           'overseesRoles': _selectedOverseesRoles.toList(),
           if (pass.isNotEmpty) 'password': pass,
         };

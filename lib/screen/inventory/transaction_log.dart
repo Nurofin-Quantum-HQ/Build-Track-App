@@ -2,7 +2,9 @@ import 'package:buildtrack_mobile/design/design.dart';
 import 'dart:convert';
 import 'dart:developer' as dev;
 import 'package:buildtrack_mobile/common/widgets/entry_widgets.dart';
+import 'package:buildtrack_mobile/common/widgets/log_sheet.dart';
 import 'package:buildtrack_mobile/controller/entry_permissions.dart';
+import 'package:buildtrack_mobile/controller/role_manager.dart';
 import 'package:flutter/material.dart';
 import 'package:buildtrack_mobile/common/utils/currency_formatter.dart';
 import 'package:provider/provider.dart';
@@ -213,11 +215,14 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
     }
   }
   Future<void> _fetchRealLogs() async {
+    // Also called from `.then` of pushed screens, which may outlive this one.
+    if (!mounted) return;
     setState(() {
       _isLoading = true;
     });
     try {
       final response = await ApiService.get('/transactions?limit=10000');
+      if (!mounted) return;
       if (response.statusCode == 200) {
         final decoded = json.decode(response.body);
         List<dynamic> raw = [];
@@ -248,6 +253,10 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
               .trim()
               .toLowerCase();
           if (rawType == 'income' || rawType == 'revenue') {
+            continue;
+          }
+          // Home "Money Out" records are cash flow, not site entries.
+          if (rawType == 'expense' && (t['category'] ?? '').toString() == 'Money Out') {
             continue;
           }
           String category = 'material';
@@ -334,6 +343,9 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
             'projectId': pId,
             'createdBy': t['createdBy'] ?? '',
             'id': tId,
+            // Approval status (pending / approved / rejected): entry detail and the
+            // edit screens use it to block editing approved entries.
+            'status': (t['approvalStatus'] ?? 'pending').toString().toLowerCase(),
             'category': category,
             'unit': t['unit']?.toString(),
             'paymentHistory': t['paymentHistory'],
@@ -370,12 +382,14 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
           _isLoading = false;
         });
       } else {
+        if (!mounted) return;
         setState(() {
           _isLoading = false;
         });
       }
     } catch (e, stack) {
       dev.log('Error fetching logs', error: e, stackTrace: stack);
+      if (!mounted) return;
       setState(() {
         _isLoading = false;
       });
@@ -464,10 +478,13 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
     final groups = _groupByDate(_filteredLogs);
     final widgets = <Widget>[];
     var revealIndex = 3;
+    // The most recent non-empty group starts open (not just "Today"); otherwise a
+    // project with no entries today opened with every group collapsed and looked empty.
+    final String? firstGroup = groups.keys.isEmpty ? null : groups.keys.first;
     for (final entry in groups.entries) {
       final groupLabel = entry.key;
       final logs = entry.value;
-      final collapsed = _collapsedGroups[groupLabel] ?? (groupLabel != 'Today');
+      final collapsed = _collapsedGroups[groupLabel] ?? (groupLabel != firstGroup);
       widgets.add(
         Semantics(
           button: true,
@@ -646,6 +663,16 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
     );
   }
   Widget _buildEmptyState() {
+    if (_isGeneral) {
+      // Project-wide logs: start the same "Log an entry" flow as the centre + button.
+      return BtEmpty(
+        icon: Icons.receipt_long_outlined,
+        title: 'No entries yet',
+        message: 'Material, labour and equipment entries for this project will appear here.',
+        action: 'New entry',
+        onAction: () => showLogSheet(context),
+      );
+    }
     String title, subtitle;
     IconData icon;
     switch (_itemType) {
@@ -759,6 +786,12 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
         payStatus == PaymentStatus.partial ||
         payStatus == PaymentStatus.overdue;
     final logCategory = log['category'] as String? ?? _itemType;
+    // "Used in": where on site the entry went (phase · activity · floor), from the
+    // transaction's phase/activity/floor fields; the line is hidden when none are set.
+    final usedIn = [log['phase'], log['activity'], log['floor']]
+        .map((v) => v?.toString().trim() ?? '')
+        .where((v) => v.isNotEmpty && v.toLowerCase() != 'null')
+        .join(' · ');
     final String statusLabel;
     final BtTone statusTone;
     switch (payStatus) {
@@ -778,7 +811,8 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
         statusLabel = 'Pending';
         statusTone = BtTone.red;
     }
-    final VoidCallback? onRecordPayment = canSettle
+    // Recording a payment needs approve_payments / mark_paid on the backend.
+    final VoidCallback? onRecordPayment = canSettle && RoleManager.canRecordPayments
         ? () {
                             final projectProvider = context
                                 .read<ProjectProvider>();
@@ -884,6 +918,18 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
                       overflow: TextOverflow.ellipsis,
                       style: BtText.caption(context),
                     ),
+                    if (usedIn.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text.rich(
+                        TextSpan(children: [
+                          TextSpan(text: 'Used in ', style: BtText.caption(context, weight: FontWeight.w600)),
+                          TextSpan(text: usedIn),
+                        ]),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: BtText.caption(context),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -930,7 +976,7 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
                 ),
               ),
               const SizedBox(width: 8),
-              if (canSettle)
+              if (canSettle && onRecordPayment != null)
                 BtButton(
                   label: 'Record Payment',
                   icon: Icons.receipt_long_outlined,
@@ -939,7 +985,7 @@ class _TransactionLogsScreenState extends State<TransactionLogsScreen> {
                   expand: false,
                   onPressed: onRecordPayment,
                 )
-              else
+              else if (!canSettle)
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [

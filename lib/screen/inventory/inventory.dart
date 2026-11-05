@@ -1,7 +1,6 @@
 import 'package:buildtrack_mobile/design/design.dart';
 import 'dart:async';
 import 'package:buildtrack_mobile/common/themes/app_colors.dart';
-import 'package:buildtrack_mobile/controller/nav_controller.dart';
 import 'package:buildtrack_mobile/common/utils/currency_formatter.dart';
 import 'package:buildtrack_mobile/common/widgets/common_widgets.dart';
 import 'package:buildtrack_mobile/common/widgets/entry_widgets.dart';
@@ -12,6 +11,8 @@ import 'package:buildtrack_mobile/models/inventory_model.dart';
 import 'package:flutter/material.dart';
 import 'package:showcaseview/showcaseview.dart';
 import 'package:buildtrack_mobile/controller/user_session.dart';
+import 'package:buildtrack_mobile/controller/role_manager.dart';
+import 'package:buildtrack_mobile/controller/entry_permissions.dart';
 import 'package:buildtrack_mobile/controller/showcase_keys.dart';
 import 'package:provider/provider.dart';
 
@@ -40,17 +41,10 @@ class InventoryScreen extends StatelessWidget {
         )
       ], 
       enableAutoScroll: true,
-      onFinish: () {
-        UserSession.markModuleVisited('InventoryScreen');
-        if (UserSession.globalTourActive) {
-          Future.delayed(const Duration(milliseconds: 300), () {
-            if (context.mounted) {
-              final nav = Provider.of<NavController>(context, listen: false);
-              nav.setRoute('/reports', context);
-            }
-          });
-        }
-      },
+      // Inventory is no longer part of the guided app tour (NavController.tourOrder),
+      // so finishing its own tour only marks it visited — it must not chain to
+      // another tab (that used to pull an active app tour through Inventory).
+      onFinish: () => UserSession.markModuleVisited('InventoryScreen'),
       builder: (context) => const _InventoryScreenContent(),
     );
   }
@@ -469,6 +463,7 @@ class _InventoryScreenContentState extends State<_InventoryScreenContent> {
     final idMap = <String, String?>{for (final p in projects) p.name: p.id};
     showModalBottomSheet<void>(
       context: ctx,
+      sheetAnimationStyle: btSheetStyleDefault(ctx),
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (sheetCtx) => _ProjectSelectorSheet(
@@ -801,6 +796,8 @@ class _InventoryScreenContentState extends State<_InventoryScreenContent> {
       return const BtPageLoader(label: 'Loading inventory…');
     }
     final all = provider.materialInventory;
+    // Load failed and nothing to show: say so instead of an empty "no entries" list.
+    if (provider.hasError && all.isEmpty) return _InventoryLoadError(provider: provider);
     final flat = _flatten(all);
     final chips = _buildChips(flat);
     final filtered = _filterDate(
@@ -810,7 +807,7 @@ class _InventoryScreenContentState extends State<_InventoryScreenContent> {
     );
     final groups = _groupByDate(filtered);
     final kpis = _buildKpis(filtered, 'material');
-    return _TimelineTabContent(
+    return _withLoadErrorBanner(provider, _TimelineTabContent(
       groups: groups,
       kpis: kpis,
       chips: chips,
@@ -826,9 +823,54 @@ class _InventoryScreenContentState extends State<_InventoryScreenContent> {
         _matDateFilter = f;
         _matCustomRange = cr;
       }),
-      onNavigate: (route, args) =>
-          Navigator.pushNamed(ctx, route, arguments: args),
+      onNavigate: (route, args) => _openAndReload(ctx, route, args),
+    ));
+  }
+  /// A failed refresh keeps the previous items; say they may be out of date.
+  Widget _withLoadErrorBanner(InventoryProvider provider, Widget content) {
+    if (!provider.hasError) return content;
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          child: BtCard(
+            padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
+            child: Row(children: [
+              const Icon(Icons.cloud_off_rounded, size: 18, color: Bt.red),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  "Couldn't refresh — showing the last loaded items.",
+                  style: BtText.caption(context, color: Bt.ink2),
+                ),
+              ),
+              BtButton(
+                label: 'Retry',
+                variant: BtButtonVariant.quiet,
+                small: true,
+                expand: false,
+                onPressed: provider.retry,
+              ),
+            ]),
+          ),
+        ),
+        Expanded(child: content),
+      ],
     );
+  }
+  /// Add More / Edit open an entry form; it pops with `true` after saving.
+  Future<void> _openAndReload(
+    BuildContext ctx,
+    String route,
+    Map<String, dynamic> args,
+  ) async {
+    final result = await Navigator.pushNamed(ctx, route, arguments: args);
+    if (!mounted) return;
+    if ((result == true || result == 'deleted') &&
+        _selectedProjectId != null &&
+        _selectedProjectId!.isNotEmpty) {
+      context.read<InventoryProvider>().loadInventory(_selectedProjectId!);
+    }
   }
   Widget _buildLabourTab(BuildContext ctx) {
     final provider = ctx.watch<InventoryProvider>();
@@ -836,6 +878,8 @@ class _InventoryScreenContentState extends State<_InventoryScreenContent> {
       return const BtPageLoader(label: 'Loading inventory…');
     }
     final all = provider.labourInventory;
+    // Load failed and nothing to show: say so instead of an empty "no entries" list.
+    if (provider.hasError && all.isEmpty) return _InventoryLoadError(provider: provider);
     final flat = _flatten(all);
     final chips = _buildChips(flat);
     final filtered = _filterDate(
@@ -845,7 +889,7 @@ class _InventoryScreenContentState extends State<_InventoryScreenContent> {
     );
     final groups = _groupByDate(filtered);
     final kpis = _buildKpis(filtered, 'labour');
-    return _TimelineTabContent(
+    return _withLoadErrorBanner(provider, _TimelineTabContent(
       groups: groups,
       kpis: kpis,
       chips: chips,
@@ -861,9 +905,8 @@ class _InventoryScreenContentState extends State<_InventoryScreenContent> {
         _labDateFilter = f;
         _labCustomRange = cr;
       }),
-      onNavigate: (route, args) =>
-          Navigator.pushNamed(ctx, route, arguments: args),
-    );
+      onNavigate: (route, args) => _openAndReload(ctx, route, args),
+    ));
   }
   Widget _buildEquipmentTab(BuildContext ctx) {
     final provider = ctx.watch<InventoryProvider>();
@@ -871,6 +914,8 @@ class _InventoryScreenContentState extends State<_InventoryScreenContent> {
       return const BtPageLoader(label: 'Loading inventory…');
     }
     final all = provider.equipmentInventory;
+    // Load failed and nothing to show: say so instead of an empty "no entries" list.
+    if (provider.hasError && all.isEmpty) return _InventoryLoadError(provider: provider);
     final flat = _flatten(all);
     final chips = _buildChips(flat);
     final filtered = _filterDate(
@@ -880,7 +925,7 @@ class _InventoryScreenContentState extends State<_InventoryScreenContent> {
     );
     final groups = _groupByDate(filtered);
     final kpis = _buildKpis(filtered, 'equipment');
-    return _TimelineTabContent(
+    return _withLoadErrorBanner(provider, _TimelineTabContent(
       groups: groups,
       kpis: kpis,
       chips: chips,
@@ -896,9 +941,8 @@ class _InventoryScreenContentState extends State<_InventoryScreenContent> {
         _eqpDateFilter = f;
         _eqpCustomRange = cr;
       }),
-      onNavigate: (route, args) =>
-          Navigator.pushNamed(ctx, route, arguments: args),
-    );
+      onNavigate: (route, args) => _openAndReload(ctx, route, args),
+    ));
   }
 }
 class _PurchaseRecord {
@@ -917,6 +961,8 @@ class _PurchaseRecord {
   final String categoryName;
   final String type;
   final Map<String, dynamic> rawTx;
+  String get approvalStatus =>
+      (rawTx['approvalStatus'] ?? 'pending').toString().toLowerCase();
   _PurchaseRecord({
     required this.itemId,
     required this.itemName,
@@ -1045,7 +1091,9 @@ class _TimelineTabContentState extends State<_TimelineTabContent> {
             title: widget.emptyTitle,
             subtitle: widget.emptySubtitle,
             icon: _typeIcon,
-            onAdd: () => widget.onNavigate(widget.emptyRoute, {}),
+            onAdd: RoleManager.canAddTransactions
+                ? () => widget.onNavigate(widget.emptyRoute, {})
+                : null,
           ),
         ),
       );
@@ -1180,6 +1228,21 @@ class _PurchaseCard extends StatelessWidget {
       default:
         return 'Qty';
     }
+  }
+  /// Inventory only lists approved entries; editing follows the same rules as
+  /// everywhere else (approved entries are not editable).
+  bool get _canEdit {
+    final createdBy = record.rawTx['createdBy'];
+    final project = record.rawTx['project'] ?? record.rawTx['projectId'];
+    return EntryPermissions.canEdit(
+      status: record.approvalStatus,
+      createdBy: createdBy is Map
+          ? (createdBy['_id'] ?? '').toString()
+          : (createdBy ?? '').toString(),
+      projectId: project is Map
+          ? (project['_id'] ?? '').toString()
+          : (project ?? selectedProjectId ?? '').toString(),
+    );
   }
   String get _vendorLabel {
     switch (record.type) {
@@ -1337,6 +1400,7 @@ class _PurchaseCard extends StatelessWidget {
                               );
                               editArgs['isEditing'] = true;
                               editArgs['id'] = record.txId;
+                              editArgs['status'] = record.approvalStatus;
                               debugPrint('EDIT PAYLOAD');
                               debugPrint(editArgs.toString());
                               onNavigate(_addRoute, editArgs);
@@ -1353,10 +1417,11 @@ class _PurchaseCard extends StatelessWidget {
                             }
                           },
                   itemBuilder: (_) => [
-                    PopupMenuItem(
-                      value: 'edit',
-                      child: Text('Edit Entry', style: BtText.body(context)),
-                    ),
+                    if (_canEdit)
+                      PopupMenuItem(
+                        value: 'edit',
+                        child: Text('Edit Entry', style: BtText.body(context)),
+                      ),
                     PopupMenuItem(
                       value: 'history',
                       child: Text('View History', style: BtText.body(context)),
@@ -1421,7 +1486,7 @@ class _PurchaseCard extends StatelessWidget {
           const SizedBox(height: 12),
           Row(
             children: [
-              Expanded(
+              if (RoleManager.canAddTransactions) Expanded(
                 child: _PurchaseActionBtn(
                   label: 'Add More',
                   icon: Icons.add_rounded,
@@ -1438,8 +1503,10 @@ class _PurchaseCard extends StatelessWidget {
                         },
                 ),
               ),
-              const SizedBox(width: 8),
-              Expanded(
+              if (RoleManager.canAddTransactions && RoleManager.canRecordPayments)
+                const SizedBox(width: 8),
+              // Recording a payment needs approve_payments / mark_paid on the backend.
+              if (RoleManager.canRecordPayments) Expanded(
                 child: _PurchaseActionBtn(
                   label: 'Record Payment',
                   icon: Icons.credit_card_outlined,
@@ -1514,7 +1581,10 @@ class _PurchaseCard extends StatelessWidget {
                         },
                 ),
               ),
-              const SizedBox(width: 4),
+              if (RoleManager.canAddTransactions || RoleManager.canRecordPayments)
+                const SizedBox(width: 4)
+              else
+                const Spacer(),
               _PurchaseActionBtn(
                 label: 'History',
                 icon: Icons.history_rounded,
@@ -1737,6 +1807,7 @@ class _FiltersRow extends StatelessWidget {
               onTap: () {
                 showModalBottomSheet<void>(
                   context: context,
+                  sheetAnimationStyle: btSheetStyleDefault(context),
                   isScrollControlled: true,
                   backgroundColor: Colors.transparent,
                   builder: (ctx) => _DateRangeSheet(
@@ -1978,7 +2049,7 @@ class _KpiCard extends StatelessWidget {
 class _EmptyState extends StatelessWidget {
   final String title, subtitle;
   final IconData icon;
-  final VoidCallback onAdd;
+  final VoidCallback? onAdd;
   const _EmptyState({
     required this.title,
     required this.subtitle,
@@ -2007,7 +2078,7 @@ class _EmptyState extends StatelessWidget {
               textColor: Colors.white,
               tooltipBorderRadius: BorderRadius.circular(16),
               tooltipPadding: const EdgeInsets.all(16),
-              child: BtButton(
+              child: onAdd == null ? const SizedBox.shrink() : BtButton(
                 label: 'Add First Entry',
                 icon: Icons.add_rounded,
                 small: true,
@@ -2051,6 +2122,22 @@ class _ProjectSelectorSheet extends StatelessWidget {
           );
         }).toList(),
       ),
+    );
+  }
+}
+
+/// Shown when the inventory could not be loaded (instead of a misleading empty list).
+class _InventoryLoadError extends StatelessWidget {
+  const _InventoryLoadError({required this.provider});
+  final InventoryProvider provider;
+  @override
+  Widget build(BuildContext context) {
+    return BtEmpty(
+      icon: Icons.cloud_off_rounded,
+      title: "Couldn't load inventory",
+      message: provider.error,
+      action: 'Retry',
+      onAction: provider.retry,
     );
   }
 }

@@ -20,6 +20,10 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
+          # Pinned: an unpinned "latest stable" broke the release build when
+          # material.dart stopped re-exporting CupertinoPageTransitionsBuilder.
+          # Bump on purpose after checking `flutter build apk` locally.
+          flutter-version: '3.41.9'
           
       - run: yes | flutter doctor --android-licenses
       

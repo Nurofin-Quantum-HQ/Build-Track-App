@@ -1,3 +1,5 @@
+import 'package:buildtrack_mobile/common/widgets/record_payment_sheet.dart';
+import 'package:buildtrack_mobile/common/tour_targets.dart';
 import 'package:buildtrack_mobile/controller/nav_controller.dart';
 import 'package:buildtrack_mobile/design/design.dart';
 import 'dart:convert';
@@ -6,10 +8,13 @@ import 'package:buildtrack_mobile/common/widgets/common_widgets.dart';
 import 'package:buildtrack_mobile/controller/project_provider.dart';
 import 'package:buildtrack_mobile/controller/entry_permissions.dart';
 import 'package:buildtrack_mobile/controller/report_provider.dart';
+import 'package:buildtrack_mobile/controller/role_manager.dart';
+import 'package:buildtrack_mobile/screen/reports/report_ledger_data.dart';
+import 'package:buildtrack_mobile/screen/reports/report_money.dart';
 import 'package:buildtrack_mobile/models/project_model.dart';
 import 'package:buildtrack_mobile/screen/reports/report_export_helper.dart';
 import 'package:buildtrack_mobile/screen/reports/csv_import_helper.dart';
-import 'package:buildtrack_mobile/screen/reports/report_widgets.dart' show EfficiencyBanner, ReportQuickTile;
+import 'package:buildtrack_mobile/screen/reports/report_widgets.dart' show ReportQuickTile;
 import 'package:buildtrack_mobile/screen/reports/report_sheet.dart';
 import 'package:buildtrack_mobile/services/api_service.dart';
 import 'package:flutter/material.dart';
@@ -49,7 +54,8 @@ class ReportsScreen extends StatelessWidget {
             )
           ],
           onFinish: () {
-            UserSession.markModuleVisited('ReportScreen');
+            UserSession.markModuleVisited('ReportsScreen');
+            // Reports is the last tab of the app tour: finishing here ends it.
             if (UserSession.globalTourActive) {
               UserSession.setGlobalTourActive(false);
             }
@@ -61,6 +67,46 @@ class ReportsScreen extends StatelessWidget {
   }
 }
 
+/// Order of two report entries for a sort key:
+///  * 'date' — purchase (entry) date, by calendar day, then by when the entry
+///    was made, so same-day rows stay in entry order;
+///  * 'paymentDate' — date of the latest payment; unpaid entries always last
+///    (in either direction), among themselves by purchase date;
+///  * 'amount', 'project' — ties broken by purchase date, newest first.
+/// Dates are compared as DateTime values (parsed with parseFlexibleDate in
+/// EntryModel.fromJson), never as strings.
+int compareReportEntries(EntryModel a, EntryModel b, String column, bool ascending, String Function(String) projectName) {
+  int dir(int c) => ascending ? c : -c;
+  int byPurchase(bool asc) {
+    final da = DateTime(a.date.year, a.date.month, a.date.day);
+    final db = DateTime(b.date.year, b.date.month, b.date.day);
+    var c = da.compareTo(db);
+    if (c == 0) c = a.createdAt.compareTo(b.createdAt);
+    if (c == 0) c = a.id.compareTo(b.id);
+    return asc ? c : -c;
+  }
+
+  switch (column) {
+    case 'paymentDate':
+      final pa = ReportSheet.paymentDateOf(a);
+      final pb = ReportSheet.paymentDateOf(b);
+      if (pa == null || pb == null) {
+        if (pa == null && pb == null) return byPurchase(ascending);
+        return pa == null ? 1 : -1;
+      }
+      final c = pa.compareTo(pb);
+      return c != 0 ? dir(c) : byPurchase(ascending);
+    case 'amount':
+      final c = a.amount.compareTo(b.amount);
+      return c != 0 ? dir(c) : byPurchase(false);
+    case 'project':
+      final c = projectName(a.projectId).toLowerCase().compareTo(projectName(b.projectId).toLowerCase());
+      return c != 0 ? dir(c) : byPurchase(false);
+    default:
+      return byPurchase(ascending);
+  }
+}
+
 class ReportFilterState {
   static String selectedProjectId = 'all';
   static String? selectedFloor;
@@ -68,7 +114,6 @@ class ReportFilterState {
   static String? selectedActivityName;
   static String searchQuery = '';
   static String? selectedItemName;
-  static bool reportGenerated = true;
   static Set<EntryType> selectedTypes = {
     EntryType.material,
     EntryType.labour,
@@ -83,9 +128,29 @@ class ReportFilterState {
   static int currentPage = 1;
   static String? lastKnownProjectProviderId;
   static bool hasSavedFilters = false;
-  /// Entries show as a spreadsheet (true) or as the card list (false).
+  /// Entries show as a spreadsheet (true, default) or as the card list (false).
   static bool tableView = true;
+  /// "By type" shows the 3-column cost-card grid (true, default) or the list.
+  static bool byTypeGrid = true;
+  /// Finance table (View finances): the Money in / Money out toggles (both on
+  /// = everything) and the type chip.
+  static bool moneyIn = true;
+  static bool moneyOut = true;
+  static MoneyType moneyType = MoneyType.all;
 
+  /// Reload what Reports shows, in order: projects (and the global project's
+  /// entries), then the entries for the project Reports is filtered to (all
+  /// projects when 'all'). Awaited in sequence so a later global-project load
+  /// can no longer overwrite the Reports list and leave every total at 0.
+  static Future<void> reloadEntries(BuildContext context) async {
+    final projectProvider = context.read<ProjectProvider>();
+    await projectProvider.load();
+    await projectProvider.loadEntriesForProject(
+      selectedProjectId == 'all' ? null : selectedProjectId,
+    );
+  }
+
+  /// Clear every saved Reports filter (call on logout / account switch).
   static void reset() {
     selectedProjectId = 'all';
     selectedFloor = null;
@@ -93,7 +158,6 @@ class ReportFilterState {
     selectedActivityName = null;
     searchQuery = '';
     selectedItemName = null;
-    reportGenerated = true;
     selectedTypes = {
       EntryType.material,
       EntryType.labour,
@@ -108,6 +172,11 @@ class ReportFilterState {
     currentPage = 1;
     lastKnownProjectProviderId = null;
     hasSavedFilters = false;
+    tableView = true;
+    byTypeGrid = true;
+    moneyIn = true;
+    moneyOut = true;
+    moneyType = MoneyType.all;
   }
 }
 
@@ -119,7 +188,50 @@ class _ReportsView extends StatefulWidget {
 
 class _ReportsViewState extends State<_ReportsView> {
   final GlobalKey _chartsKey = GlobalKey();
+  // Guided tour: one key per control, walked in visual order (see _tourKeys).
+  final _kAccount = GlobalKey();
+  final _kHeaderExport = GlobalKey();
+  final _kProject = GlobalKey();
+  final _kPeriod = GlobalKey();
+  final _kWhere = GlobalKey();
+  final _kTabs = GlobalKey();
+  final _kSearch = GlobalKey();
+  final _kItem = GlobalKey();
+  final _kEditColumns = GlobalKey();
+  final _kSort = GlobalKey();
+  final _kExport = GlobalKey();
+  final _kFullScreen = GlobalKey();
+  final _kViewToggle = GlobalKey();
+  final _kSheet = GlobalKey();
+  final _kSheetHeader = GlobalKey();
+  final _kSheetScroll = GlobalKey();
+  final _kList = GlobalKey();
+  final _kPager = GlobalKey();
+  final _kQuickTiles = GlobalKey();
+  final _kByType = GlobalKey();
+  final _kByTypeToggle = GlobalKey();
+  final _kCsvRevert = GlobalKey();
   final ScrollController _scrollController = ScrollController();
+
+  /// The server refused the ledger (403): show the plain spending sheet.
+  bool _financeHidden = false;
+
+  /// Finance table (View finances / Admin): every money movement for the
+  /// project + period, null while loading or after an error. Spending entries
+  /// are joined to it by id; direction, type and search are applied here.
+  LedgerResult? _ledger;
+  bool _ledgerLoading = false;
+  String? _ledgerError;
+  /// Project + period of the last ledger request, and a fingerprint of the
+  /// entries it was joined with: either changing reloads the ledger.
+  String _ledgerQueryKey = '';
+  String _ledgerEntriesSig = '';
+  int _ledgerRequest = 0;
+  bool _moneyIn = ReportFilterState.moneyIn;
+  bool _moneyOut = ReportFilterState.moneyOut;
+  MoneyType _moneyType = ReportFilterState.moneyType;
+  /// Bumped whenever the ledger changes, so the full-screen sheet redraws.
+  final ValueNotifier<int> _moneyVersion = ValueNotifier<int>(0);
 
   bool _linked = false;
   String _selectedProjectId = ReportFilterState.selectedProjectId;
@@ -128,7 +240,6 @@ class _ReportsViewState extends State<_ReportsView> {
   String? _selectedActivityName = ReportFilterState.selectedActivityName;
   String _searchQuery = ReportFilterState.searchQuery;
   String? _selectedItemName = ReportFilterState.selectedItemName;
-  bool _reportGenerated = ReportFilterState.reportGenerated;
   bool _showSuggestions = false;
   /// Search field shown under the toolbar (always shown while a search is active).
   bool _searchOpen = false;
@@ -145,6 +256,7 @@ class _ReportsViewState extends State<_ReportsView> {
   int _currentPage = ReportFilterState.currentPage;
   int _rowsPerPage = 10;
   bool _tableView = ReportFilterState.tableView;
+  bool _byTypeGrid = ReportFilterState.byTypeGrid;
   List<String> _activeColumnsAll = [
     'Purchased Date',
     'Project',
@@ -203,52 +315,190 @@ class _ReportsViewState extends State<_ReportsView> {
   void initState() {
     super.initState();
     _loadActiveColumns();
+    // Highlight the Reports tab after the first frame (notifying the nav
+    // controller inside build() marks other widgets dirty mid-build).
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.read<NavController>().markCurrent('/reports');
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!UserSession.hasSkippedTour && !UserSession.visitedModules.contains('ReportsScreen')) {
-        ShowCaseWidget.of(context).startShowCase([
-          ShowcaseKeys.reportAskAI,
-          ShowcaseKeys.reportFilters,
-          _chartsKey,
-          ShowcaseKeys.reportCSV,
-          ShowcaseKeys.helpButton,
-        ]);
+        // Let the first entries arrive so the sheet steps can be shown too.
+        await Future.delayed(const Duration(milliseconds: 600));
+        if (!mounted) return;
+        _startTour();
         UserSession.markModuleVisited('ReportsScreen');
       }
     });
   }
 
+  /// Every Reports control in visual order (top to bottom, left to right).
+  /// Only keys whose widgets are on screen right now are used.
+  List<GlobalKey> _tourKeys() => renderedTourKeys(context, [
+        _kProject,
+        _kPeriod,
+        ShowcaseKeys.reportFilters,
+        _kWhere,
+        _kHeaderExport,
+        _kAccount,
+        _kTabs,
+        _kSearch,
+        _kItem,
+        _kEditColumns,
+        _kSort,
+        _kExport,
+        _kFullScreen,
+        _kViewToggle,
+        _chartsKey,
+        _kSheet,
+        _kSheetHeader,
+        _kSheetScroll,
+        _kList,
+        _kPager,
+        ShowcaseKeys.reportAskAI,
+        _kQuickTiles,
+        _kByType,
+        _kByTypeToggle,
+        ShowcaseKeys.reportCSV,
+        _kCsvRevert,
+        ShowcaseKeys.helpButton,
+      ]);
+
+  void _startTour() {
+    final keys = _tourKeys();
+    if (keys.isNotEmpty) ShowCaseWidget.of(context).startShowCase(keys);
+  }
+
+  /// One tour step: a short title and a plain explanation.
+  Widget _tour(GlobalKey key, String title, String description, Widget child, {double radius = 14}) {
+    return Showcase(
+      key: key,
+      title: title,
+      description: description,
+      tooltipBackgroundColor: Bt.ink,
+      textColor: Colors.white,
+      titleTextStyle: BtText.body(context, color: Colors.white, weight: FontWeight.w700),
+      descTextStyle: BtText.subhead(context, color: Colors.white.withValues(alpha: .85)),
+      tooltipBorderRadius: BorderRadius.circular(16),
+      tooltipPadding: const EdgeInsets.all(16),
+      targetBorderRadius: BorderRadius.circular(radius),
+      child: child,
+    );
+  }
+
+  static const _columnTabs = ['All', 'Materials', 'Labour', 'Equipment'];
+
+  /// The user's pinned (frozen, left) column per tab; null = the default
+  /// (the item column: Description / Material / Worker Type / Equipment).
+  final Map<String, String?> _pinnedColumns = {};
+
+  /// Tabs whose columns were changed before the saved ones finished loading;
+  /// the late load must not overwrite them.
+  final Set<String> _editedColumnTabs = {};
+  bool _columnsLoaded = false;
+
+  static String _columnTab(String tab) => _columnTabs.contains(tab) ? tab : 'All';
+
+  /// A saved column list, minus names this tab doesn't have (older builds /
+  /// the web app) and duplicates. Null when nothing usable is left.
+  List<String>? _cleanColumns(String tab, dynamic raw) {
+    if (raw is! List) return null;
+    final allowed = _getAllColumnsForTab(tab).toSet();
+    final out = <String>[];
+    for (final v in raw) {
+      final c = v?.toString();
+      if (c != null && allowed.contains(c) && !out.contains(c)) out.add(c);
+    }
+    return out.isEmpty ? null : out;
+  }
+
+  String? _cleanPin(String tab, dynamic raw) {
+    final c = raw?.toString();
+    return c != null && _getAllColumnsForTab(tab).contains(c) ? c : null;
+  }
+
+  /// Saved columns (order + pinned column) per tab: this device first, then
+  /// the profile (so they follow the user to another phone).
   Future<void> _loadActiveColumns() async {
-    final prefs = await SharedPreferences.getInstance();
     final userId = UserSession.userId;
-    List<String>? all = prefs.getStringList('activeColumnsAll_$userId');
-    List<String>? materials = prefs.getStringList('activeColumnsMaterials_$userId');
-    List<String>? labour = prefs.getStringList('activeColumnsLabour_$userId');
-    List<String>? equipment = prefs.getStringList('activeColumnsEquipment_$userId');
-    
+    final cols = <String, List<String>?>{};
+    final pins = <String, String?>{};
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      for (final t in _columnTabs) {
+        cols[t] = _cleanColumns(t, prefs.getStringList('activeColumns${t}_$userId'));
+        pins[t] = _cleanPin(t, prefs.getString('reportPinnedColumn${t}_$userId'));
+      }
+    } catch (_) {}
+
     try {
       final res = await ApiService.get('/users/profile');
       if (res.statusCode == 200) {
-        final decoded = json.decode(res.body);
-        if (decoded != null && decoded['user'] != null && decoded['user']['preferences'] != null) {
-          final rc = decoded['user']['preferences']['reportColumns'];
-          if (rc != null) {
-            if (rc['All'] != null) all = List<String>.from(rc['All']);
-            if (rc['Materials'] != null) materials = List<String>.from(rc['Materials']);
-            if (rc['Labour'] != null) labour = List<String>.from(rc['Labour']);
-            if (rc['Equipment'] != null) equipment = List<String>.from(rc['Equipment']);
+        final saved = json.decode(res.body)?['user']?['preferences'];
+        if (saved is Map) {
+          final rc = saved['reportColumns'];
+          final rp = saved['reportPinnedColumns'];
+          for (final t in _columnTabs) {
+            if (rc is Map) cols[t] = _cleanColumns(t, rc[t]) ?? cols[t];
+            if (rp is Map && rp.containsKey(t)) pins[t] = _cleanPin(t, rp[t]);
           }
         }
       }
-    } catch(e) {}
-    
-    if (mounted) {
-      setState(() {
-        if (all != null) _activeColumnsAll = all;
-        if (materials != null) _activeColumnsMaterials = materials;
-        if (labour != null) _activeColumnsLabour = labour;
-        if (equipment != null) _activeColumnsEquipment = equipment;
-      });
+    } catch (_) {}
+
+    if (!mounted) return;
+    setState(() {
+      for (final t in _columnTabs) {
+        if (_editedColumnTabs.contains(t)) continue;
+        final c = cols[t];
+        if (c != null) _storeActiveColumns(t, c);
+        _pinnedColumns[t] = pins[t];
+      }
+    });
+    _columnsLoaded = true;
+    // Columns edited while loading were saved without the other tabs'
+    // saved lists; save again now that every tab is known.
+    if (_editedColumnTabs.isNotEmpty) _persistColumns();
+  }
+
+  void _storeActiveColumns(String tab, List<String> cols) {
+    switch (tab) {
+      case 'Materials':
+        _activeColumnsMaterials = cols;
+      case 'Labour':
+        _activeColumnsLabour = cols;
+      case 'Equipment':
+        _activeColumnsEquipment = cols;
+      default:
+        _activeColumnsAll = cols;
     }
+  }
+
+  /// Save every tab's columns + pinned column on this device and to the
+  /// profile. The live server merges `preferences` only one level deep, so
+  /// all four tabs are sent each time — sending just the edited tab (as
+  /// before) replaced `reportColumns` and wiped the other tabs' saved order.
+  Future<void> _persistColumns() async {
+    final userId = UserSession.userId;
+    final cols = {for (final t in _columnTabs) t: List<String>.from(_getActiveColumnsForTab(t))};
+    final pins = {for (final t in _columnTabs) t: _pinnedColumns[t]};
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      for (final t in _columnTabs) {
+        await prefs.setStringList('activeColumns${t}_$userId', cols[t]!);
+        final pin = pins[t];
+        if (pin == null) {
+          await prefs.remove('reportPinnedColumn${t}_$userId');
+        } else {
+          await prefs.setString('reportPinnedColumn${t}_$userId', pin);
+        }
+      }
+    } catch (_) {}
+    if (!_columnsLoaded) return; // the load finishing will send everything
+    try {
+      await ApiService.put('/users/profile', {
+        'preferences': {'reportColumns': cols, 'reportPinnedColumns': pins},
+      });
+    } catch (_) {}
   }
 
   @override
@@ -261,21 +511,21 @@ class _ReportsViewState extends State<_ReportsView> {
       reportProvider.linkProjectProvider(projectProvider);
       
       final currentGlobalProjId = projectProvider.selectedProject?.id;
-      if (!ReportFilterState.hasSavedFilters) {
-        if (currentGlobalProjId != null) {
-          ReportFilterState.selectedProjectId = currentGlobalProjId;
-          ReportFilterState.selectedFloor = projectProvider.selectedFloor;
-          ReportFilterState.selectedPhaseId = projectProvider.selectedPhaseId;
-          ReportFilterState.selectedActivityName = projectProvider.selectedActivity;
-          ReportFilterState.lastKnownProjectProviderId = currentGlobalProjId;
+      // Follow the app's selected project only. The floor / phase / activity
+      // picked while adding an entry are not Reports filters, so they are not
+      // copied (that narrowed Reports to one activity after every save).
+      final followGlobal = currentGlobalProjId != null &&
+          (!ReportFilterState.hasSavedFilters ||
+              (ReportFilterState.lastKnownProjectProviderId != null &&
+                  currentGlobalProjId != ReportFilterState.lastKnownProjectProviderId));
+      if (followGlobal) {
+        if (ReportFilterState.selectedProjectId != currentGlobalProjId) {
+          ReportFilterState.selectedFloor = null;
+          ReportFilterState.selectedPhaseId = null;
+          ReportFilterState.selectedActivityName = null;
+          ReportFilterState.currentPage = 1;
         }
-      } else if (currentGlobalProjId != null &&
-          ReportFilterState.lastKnownProjectProviderId != null &&
-          currentGlobalProjId != ReportFilterState.lastKnownProjectProviderId) {
         ReportFilterState.selectedProjectId = currentGlobalProjId;
-        ReportFilterState.selectedFloor = projectProvider.selectedFloor;
-        ReportFilterState.selectedPhaseId = projectProvider.selectedPhaseId;
-        ReportFilterState.selectedActivityName = projectProvider.selectedActivity;
         ReportFilterState.lastKnownProjectProviderId = currentGlobalProjId;
       }
 
@@ -288,7 +538,6 @@ class _ReportsViewState extends State<_ReportsView> {
         _searchController.text = ReportFilterState.searchQuery;
       }
       _selectedItemName = ReportFilterState.selectedItemName;
-      _reportGenerated = ReportFilterState.reportGenerated;
       _selectedTypes = Set.from(ReportFilterState.selectedTypes);
       _selectedStatus = ReportFilterState.selectedStatus;
       _startDate = ReportFilterState.startDate;
@@ -312,6 +561,7 @@ class _ReportsViewState extends State<_ReportsView> {
   void dispose() {
     _scrollController.dispose();
     _searchController.dispose();
+    _moneyVersion.dispose();
     super.dispose();
   }
 
@@ -400,49 +650,51 @@ class _ReportsViewState extends State<_ReportsView> {
     }
   }
 
-  Future<void> _syncPreferences(String key, List<String> cols) async {
-    try {
-      final tabKey = key.replaceAll('activeColumns', '');
-      await ApiService.put('/users/profile', {
-        'preferences': {
-          'reportColumns': {
-            tabKey: cols,
-          }
-        }
-      });
-    } catch(e) {}
+  void _setActiveColumnsForTab(String tabName, List<String> cols, String? pinned) {
+    final tab = _columnTab(tabName);
+    _editedColumnTabs.add(tab);
+    setState(() {
+      _storeActiveColumns(tab, cols);
+      _pinnedColumns[tab] = pinned;
+    });
+    _persistColumns();
   }
 
-  Future<void> _setActiveColumnsForTab(String tabName, List<String> cols) async {
-    final prefs = await SharedPreferences.getInstance();
-    final userId = UserSession.userId;
-    
-    setState(() {
-      if (tabName == 'Materials') {
-        _activeColumnsMaterials = cols;
-        prefs.setStringList('activeColumnsMaterials_$userId', cols); _syncPreferences('activeColumnsMaterials', cols);
-      } else if (tabName == 'Labour') {
-        _activeColumnsLabour = cols;
-        prefs.setStringList('activeColumnsLabour_$userId', cols); _syncPreferences('activeColumnsLabour', cols);
-      } else if (tabName == 'Equipment') {
-        _activeColumnsEquipment = cols;
-        prefs.setStringList('activeColumnsEquipment_$userId', cols); _syncPreferences('activeColumnsEquipment', cols);
-      } else {
-        _activeColumnsAll = cols;
-        prefs.setStringList('activeColumnsAll_$userId', cols); _syncPreferences('activeColumnsAll', cols);
-      }
-    });
+  /// Long-press on a sheet heading: freeze that column on the left.
+  void _pinColumn(String tabName, String column) {
+    final tab = _columnTab(tabName);
+    final cols = List<String>.from(_getActiveColumnsForTab(tab));
+    if (!cols.contains(column)) cols.add(column);
+    _setActiveColumnsForTab(tab, cols, column);
+    btToast(context, '${_columnLabel(column)} is now pinned on the left');
   }
+
+  /// The tab's columns in on-screen order (pinned first) — the sheet and
+  /// both exports use this, so files match what the user sees.
+  List<String> _displayColumns(String tabName) {
+    final tab = _columnTab(tabName);
+    return ReportSheet.displayOrder(_getActiveColumnsForTab(tab), _pinnedColumns[tab]);
+  }
+
+  static String _columnLabel(String column) => column == 'Purchased Date' ? 'Purchase date' : _sentence(column);
 
   void _showCustomizeColumnsDialog(BuildContext context, String tabName) {
-    final List<String> allCols = _getAllColumnsForTab(tabName);
-    List<String> tempActive = List.from(_getActiveColumnsForTab(tabName));
+    final tab = _columnTab(tabName);
+    final List<String> allCols = _getAllColumnsForTab(tab);
+    List<String> tempActive = List.from(_getActiveColumnsForTab(tab));
     final inactive = allCols.where((c) => !tempActive.contains(c)).toList();
     List<String> tempAll = [...tempActive, ...inactive];
+    // The user's own pick; null = default (the item column).
+    String? tempPinned = _pinnedColumns[tab];
+    // Keep the shown list in the dragged order.
+    void syncActive() => tempActive = [for (final c in tempAll) if (tempActive.contains(c)) c];
     showModalBottomSheet(
       context: context,
+      sheetAnimationStyle: btSheetStyleDefault(context),
       isScrollControlled: true,
       useSafeArea: true,
+      // Dragging a row must not drag the sheet closed.
+      enableDrag: false,
       backgroundColor: Bt.card,
       barrierColor: Bt.scrim,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(Bt.rSheet))),
@@ -450,6 +702,7 @@ class _ReportsViewState extends State<_ReportsView> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             final maxListH = MediaQuery.of(context).size.height * 0.55;
+            final pinned = ReportSheet.pinnedOf(tempActive, tempPinned);
             return SafeArea(
               top: false,
               child: Column(
@@ -458,7 +711,7 @@ class _ReportsViewState extends State<_ReportsView> {
                 children: [
                   BtSheetHeader(
                     title: 'Edit columns',
-                    subtitle: '${tempActive.length} of ${tempAll.length} shown · drag ≡ to reorder',
+                    subtitle: '${tempActive.length} of ${tempAll.length} shown · drag ≡ to reorder · tap the pin to freeze a column on the left',
                   ),
                   ConstrainedBox(
                     constraints: BoxConstraints(maxHeight: maxListH),
@@ -477,23 +730,16 @@ class _ReportsViewState extends State<_ReportsView> {
                           itemCount: tempAll.length,
                           onReorder: (oldIndex, newIndex) {
                             setDialogState(() {
-                              if (newIndex > oldIndex) {
-                                newIndex -= 1;
-                              }
+                              if (newIndex > oldIndex) newIndex -= 1;
                               final item = tempAll.removeAt(oldIndex);
                               tempAll.insert(newIndex, item);
-                              final newTempActive = <String>[];
-                              for (final col in tempAll) {
-                                if (tempActive.contains(col)) {
-                                  newTempActive.add(col);
-                                }
-                              }
-                              tempActive = newTempActive;
+                              syncActive();
                             });
                           },
                           itemBuilder: (context, index) {
                             final col = tempAll[index];
                             final isChecked = tempActive.contains(col);
+                            final isPinned = col == pinned;
                             return Material(
                               key: ValueKey(col),
                               color: Bt.card,
@@ -502,12 +748,45 @@ class _ReportsViewState extends State<_ReportsView> {
                                 children: [
                                   if (index > 0) const Divider(height: 1, indent: 16, color: Bt.line),
                                   SizedBox(
-                                    height: 52,
+                                    height: 56,
                                     child: Row(
                                       children: [
                                         const SizedBox(width: 16),
                                         Expanded(
-                                          child: Text(col, style: BtText.body(context, color: isChecked ? Bt.ink : Bt.ink3)),
+                                          child: Column(
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(col, maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.body(context, color: isChecked ? Bt.ink : Bt.ink3)),
+                                              if (isPinned)
+                                                Text('Pinned · always first, stays put', maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.caption(context).copyWith(fontSize: 12)),
+                                            ],
+                                          ),
+                                        ),
+                                        Semantics(
+                                          button: true,
+                                          selected: isPinned,
+                                          label: isPinned ? '$col is pinned' : 'Pin $col on the left',
+                                          excludeSemantics: true,
+                                          child: InkResponse(
+                                            radius: 22,
+                                            onTap: () => setDialogState(() {
+                                              tempPinned = col;
+                                              if (!tempActive.contains(col)) {
+                                                tempActive.add(col);
+                                                syncActive();
+                                              }
+                                            }),
+                                            child: SizedBox(
+                                              width: 44,
+                                              height: 56,
+                                              child: Icon(
+                                                isPinned ? Icons.push_pin_rounded : Icons.push_pin_outlined,
+                                                size: 19,
+                                                color: isPinned ? context.bt.accentInk : Bt.placeholder,
+                                              ),
+                                            ),
+                                          ),
                                         ),
                                         BtSwitch(
                                           value: isChecked,
@@ -515,19 +794,13 @@ class _ReportsViewState extends State<_ReportsView> {
                                             setDialogState(() {
                                               if (val == true) {
                                                 tempActive.add(col);
-                                                final newTempActive = <String>[];
-                                                for (final c in tempAll) {
-                                                  if (tempActive.contains(c)) {
-                                                    newTempActive.add(c);
-                                                  }
-                                                }
-                                                tempActive = newTempActive;
+                                                syncActive();
+                                              } else if (tempActive.length > 1) {
+                                                tempActive.remove(col);
+                                                // A hidden column can't stay pinned.
+                                                if (tempPinned == col) tempPinned = null;
                                               } else {
-                                                if (tempActive.length > 1) {
-                                                  tempActive.remove(col);
-                                                } else {
-                                                  btToast(context, 'At least one column must be visible.', error: true);
-                                                }
+                                                btToast(context, 'At least one column must be visible.', error: true);
                                               }
                                             });
                                           },
@@ -536,7 +809,7 @@ class _ReportsViewState extends State<_ReportsView> {
                                           index: index,
                                           child: const SizedBox(
                                             width: 48,
-                                            height: 52,
+                                            height: 56,
                                             child: Icon(Icons.drag_handle_rounded, size: 22, color: Bt.ink3),
                                           ),
                                         ),
@@ -563,6 +836,7 @@ class _ReportsViewState extends State<_ReportsView> {
                               setDialogState(() {
                                 tempActive = List.from(allCols);
                                 tempAll = List.from(allCols);
+                                tempPinned = null;
                               });
                             },
                           ),
@@ -573,7 +847,7 @@ class _ReportsViewState extends State<_ReportsView> {
                           child: BtButton(
                             label: 'Save',
                             onPressed: () {
-                              _setActiveColumnsForTab(tabName, tempActive);
+                              _setActiveColumnsForTab(tab, List.of(tempActive), tempPinned);
                               Navigator.of(context).pop();
                             },
                           ),
@@ -831,15 +1105,10 @@ class _ReportsViewState extends State<_ReportsView> {
     }
   }
 
-  Future<void> _handleDownloadImportTemplate(
-    String quickCategoryTab,
-    List<String> activeCols,
-  ) async {
+  /// Same template as Add Entry (shared generator in csv_import_helper.dart).
+  Future<void> _handleDownloadImportTemplate() async {
     try {
-      await CsvImportHelper.downloadTemplate(
-        quickCategoryTab: quickCategoryTab,
-        activeColumns: activeCols,
-      );
+      await CsvImportHelper.downloadTemplate();
       if (mounted) {
         btToast(context, 'Import template downloaded!');
       }
@@ -847,6 +1116,13 @@ class _ReportsViewState extends State<_ReportsView> {
       if (mounted) {
         btToast(context, 'Template download failed: $e', error: true);
       }
+    }
+  }
+
+  Future<void> _openTemplateColumns() async {
+    final cols = await CsvTemplate.openColumnsSheet(context);
+    if (cols != null && mounted) {
+      btToast(context, 'Template columns saved · ${cols.length} columns');
     }
   }
 
@@ -861,12 +1137,13 @@ class _ReportsViewState extends State<_ReportsView> {
     
     setState(() => _isImportingCsv = true);
     final success = await ApiService.revertCsv();
+    if (!mounted) return;
     setState(() => _isImportingCsv = false);
     
     if (success) {
       if (mounted) {
         btToast(context, 'Successfully reverted last CSV import');
-        context.read<ReportProvider>().refresh();
+        ReportFilterState.reloadEntries(context);
       }
     } else {
       if (mounted) {
@@ -884,15 +1161,12 @@ class _ReportsViewState extends State<_ReportsView> {
     try {
       final result = await CsvImportHelper.importCsv(
         projects: projectProvider.projects,
-        selectedProjectId: _selectedProjectId == 'all'
+        defaultProject: _selectedProjectId == 'all'
             ? null
-            : _selectedProjectId,
+            : projectProvider.projects.where((p) => p.id == _selectedProjectId).firstOrNull,
       );
-      if (!mounted) return;
-      final activeProjId = projectProvider.selectedProject?.id;
-      if (activeProjId != null) {
-        context.read<ProjectProvider>().load();
-      }
+      if (result == null || !mounted) return; // picker cancelled
+      ReportFilterState.reloadEntries(context);
       showDialog(
         context: context,
         barrierColor: Bt.scrim,
@@ -970,50 +1244,62 @@ class _ReportsViewState extends State<_ReportsView> {
     }
   }
 
-  Widget _buildCsvImportCard(String quickCategoryTab, List<String> activeCols) {
-    final tab = quickCategoryTab.isEmpty ? 'All' : quickCategoryTab;
+  /// Bulk import — same template and parser as Add Entry (csv_import_helper.dart).
+  Widget _buildCsvImportCard() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const BtSectionHeader(title: 'Import from a spreadsheet'),
-        BtGroup(
-          children: [
-            BtRow(
-              leading: const BtTile(icon: Icons.download_rounded),
-              title: 'Download template',
-              subtitle: 'CSV with your chosen columns',
-              showChevron: true,
-              onTap: _isImportingCsv ? null : () => _handleDownloadImportTemplate(tab, activeCols),
-            ),
-            BtRow(
-              leading: const BtTile(icon: Icons.view_column_outlined),
-              title: 'Customize columns',
-              subtitle: 'Pick and reorder template columns',
-              showChevron: true,
-              onTap: _isImportingCsv ? null : () => _showCustomizeColumnsDialog(context, tab),
-            ),
-            BtRow(
-              leading: _isImportingCsv
-                  ? const SizedBox(width: 40, height: 40, child: Padding(padding: EdgeInsets.all(10), child: CircularProgressIndicator(strokeWidth: 2)))
-                  : const BtTile(icon: Icons.upload_file_rounded),
-              title: _isImportingCsv ? 'Importing…' : 'Upload CSV file',
-              subtitle: 'Adds every row as an entry',
-              titleColor: context.bt.brand,
-              titleWeight: FontWeight.w600,
-              onTap: _isImportingCsv ? null : _handleUploadCsv,
-            ),
-          ],
+        _tour(
+          ShowcaseKeys.reportCSV,
+          'Import many entries',
+          'Download the template (the same one as on Add Entry), choose its columns, fill one row per entry, then upload the CSV — each row becomes an entry.',
+          BtGroup(
+            children: [
+              BtRow(
+                leading: const BtTile(icon: Icons.download_rounded),
+                title: 'Download template',
+                subtitle: 'Same template as Add Entry',
+                showChevron: true,
+                onTap: _isImportingCsv ? null : _handleDownloadImportTemplate,
+              ),
+              BtRow(
+                leading: const BtTile(icon: Icons.view_column_outlined),
+                title: 'Customize columns',
+                subtitle: 'Pick and reorder template columns',
+                showChevron: true,
+                onTap: _isImportingCsv ? null : _openTemplateColumns,
+              ),
+              BtRow(
+                leading: _isImportingCsv
+                    ? const SizedBox(width: 40, height: 40, child: Padding(padding: EdgeInsets.all(10), child: CircularProgressIndicator(strokeWidth: 2)))
+                    : const BtTile(icon: Icons.upload_file_rounded),
+                title: _isImportingCsv ? 'Importing…' : 'Upload CSV file',
+                subtitle: 'Adds every row as an entry',
+                titleColor: context.bt.brand,
+                titleWeight: FontWeight.w600,
+                onTap: _isImportingCsv ? null : _handleUploadCsv,
+              ),
+            ],
+          ),
+          radius: Bt.rCard,
         ),
         const SizedBox(height: 12),
-        BtGroup(
-          children: [
-            BtRow(
-              leading: BtTile(icon: Icons.undo_rounded, bg: Bt.redSoft, fg: Bt.red),
-              title: 'Revert last CSV import…',
-              titleColor: Bt.red,
-              onTap: _isImportingCsv ? null : _handleRevertCsv,
-            ),
-          ],
+        _tour(
+          _kCsvRevert,
+          'Undo an import',
+          'Made a mistake in the file? This puts back what was there before your last CSV upload.',
+          BtGroup(
+            children: [
+              BtRow(
+                leading: BtTile(icon: Icons.undo_rounded, bg: Bt.redSoft, fg: Bt.red),
+                title: 'Revert last CSV import…',
+                titleColor: Bt.red,
+                onTap: _isImportingCsv ? null : _handleRevertCsv,
+              ),
+            ],
+          ),
+          radius: Bt.rCard,
         ),
       ],
     );
@@ -1030,7 +1316,6 @@ class _ReportsViewState extends State<_ReportsView> {
     ReportFilterState.selectedActivityName = _selectedActivityName;
     ReportFilterState.searchQuery = _searchQuery;
     ReportFilterState.selectedItemName = _selectedItemName;
-    ReportFilterState.reportGenerated = _reportGenerated;
     ReportFilterState.selectedTypes = Set.from(_selectedTypes);
     ReportFilterState.selectedStatus = _selectedStatus;
     ReportFilterState.startDate = _startDate;
@@ -1039,6 +1324,9 @@ class _ReportsViewState extends State<_ReportsView> {
     ReportFilterState.sortColumn = _sortColumn;
     ReportFilterState.sortAscending = _sortAscending;
     ReportFilterState.currentPage = _currentPage;
+    ReportFilterState.moneyIn = _moneyIn;
+    ReportFilterState.moneyOut = _moneyOut;
+    ReportFilterState.moneyType = _moneyType;
     ReportFilterState.hasSavedFilters = true;
   }
 
@@ -1125,7 +1413,10 @@ class _ReportsViewState extends State<_ReportsView> {
     return _searchTextCache[e] = out.toString();
   }
 
-  List<EntryModel> _filterEntries(ProjectProvider projectProvider, String quickCategoryTab) {
+  /// [scopeOnly]: only where / when (project, floor, phase, activity, payment
+  /// status, period) — the finance table applies type, search and the item
+  /// pick to its own rows.
+  List<EntryModel> _filterEntries(ProjectProvider projectProvider, String quickCategoryTab, {bool scopeOnly = false}) {
     final List<EntryModel> allEntries = projectProvider.entries;
     String getProjectName(String id) {
       return projectProvider.projects
@@ -1165,14 +1456,16 @@ class _ReportsViewState extends State<_ReportsView> {
           }
         }
       }
-      if (!_selectedTypes.contains(entry.type)) {
+      if (!scopeOnly && !_selectedTypes.contains(entry.type)) {
         return false;
       }
-      if (_searchQuery.isNotEmpty &&
+      if (!scopeOnly &&
+          _searchQuery.isNotEmpty &&
           !_matchesSearch(entry, getProjectName(entry.projectId), _searchQuery)) {
         return false;
       }
-      if (quickCategoryTab != 'All' &&
+      if (!scopeOnly &&
+          quickCategoryTab != 'All' &&
           _selectedItemName != null &&
           _selectedItemName != 'All') {
         final matchesItem = entry.description == _selectedItemName ||
@@ -1223,6 +1516,123 @@ class _ReportsViewState extends State<_ReportsView> {
     }).toList();
   }
 
+  // ───────────────────────────────────────────── finance table (money rows)
+
+  bool get _financeOn => RoleManager.canViewFinances && !_financeHidden;
+
+  LedgerQuery get _ledgerQuery => LedgerQuery(projectId: _selectedProjectId, from: _startDate, to: _endDate);
+
+  Future<void> _loadLedger({bool keepRows = false}) async {
+    final id = ++_ledgerRequest;
+    final query = _ledgerQuery;
+    _ledgerQueryKey = query.key;
+    setState(() {
+      _ledgerLoading = true;
+      _ledgerError = null;
+      if (!keepRows) _ledger = null;
+    });
+    try {
+      final r = await LedgerApi.fetch(query);
+      if (!mounted || id != _ledgerRequest) return;
+      setState(() {
+        _ledger = r;
+        _ledgerLoading = false;
+      });
+    } on LedgerForbidden {
+      if (!mounted || id != _ledgerRequest) return;
+      setState(() {
+        _financeHidden = true; // not allowed: back to the spending sheet
+        _ledgerLoading = false;
+      });
+    } on LedgerFailure catch (e) {
+      if (!mounted || id != _ledgerRequest) return;
+      // Never leave old numbers (or a zero) on screen next to an error.
+      setState(() {
+        _ledger = null;
+        _ledgerError = e.message;
+        _ledgerLoading = false;
+      });
+    }
+    if (mounted) _moneyVersion.value++;
+  }
+
+  /// Called from build: loads the ledger on first show and again when the
+  /// project / period changed, or an entry was added, edited or paid.
+  void _syncLedger(ProjectProvider pp) {
+    final key = _ledgerQuery.key;
+    final entries = pp.entries;
+    final sig = '${entries.length}|${entries.fold<double>(0, (a, e) => a + e.amount + e.paidAmount)}';
+    final keyChanged = key != _ledgerQueryKey;
+    final entriesChanged = _ledger != null && !_ledgerLoading && !pp.entriesLoading && sig != _ledgerEntriesSig;
+    if (!keyChanged && !entriesChanged) {
+      if (_ledger == null) _ledgerEntriesSig = sig;
+      return;
+    }
+    _ledgerQueryKey = key;
+    _ledgerEntriesSig = sig;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _loadLedger(keepRows: !keyChanged);
+    });
+  }
+
+  /// Floor / phase / activity / payment-status filters only describe spending
+  /// entries: while one is on, other money rows (client payments…) are hidden.
+  bool get _hasEntryOnlyFilter =>
+      _selectedStatus != 'All' ||
+      (_selectedProjectId != 'all' &&
+          ((_selectedFloor != null && _selectedFloor != 'Select Floor') ||
+              (_selectedPhaseId != null && _selectedPhaseId != 'Select Phase') ||
+              (_selectedActivityName != null && _selectedActivityName != 'Select Activity')));
+
+  /// The finance table's rows under the current filters, sorted as chosen.
+  List<MoneyRow> _moneyRowsNow(ProjectProvider pp, {MoneyType? type}) {
+    final ledger = _ledger;
+    if (ledger == null) return const [];
+    String projectName(String id) => pp.projects.where((p) => p.id == id).firstOrNull?.name ?? 'Unknown Project';
+    final all = MoneyTable.join(ledger, {for (final e in pp.entries) e.id: e});
+    final inScope = {for (final e in _filterEntries(pp, 'All', scopeOnly: true)) e.id};
+    final entryOnly = _hasEntryOnlyFilter;
+    final rows = MoneyTable.filter(
+      all,
+      moneyIn: _moneyIn,
+      moneyOut: _moneyOut,
+      type: type ?? _moneyType,
+      query: _searchQuery,
+      inScope: (r) => r.entry != null ? inScope.contains(r.id) : !entryOnly,
+      entryMatches: (e, token) => _matchesSearch(e, projectName(e.projectId), token),
+    );
+    MoneyTable.sort(rows, _sortColumn, _sortAscending);
+    return rows;
+  }
+
+  /// All · Money in · Money out.
+  void _setDirection(MoneyDirection d) => setState(() {
+        _moneyIn = d != MoneyDirection.moneyOut;
+        _moneyOut = d != MoneyDirection.moneyIn;
+        _currentPage = 1;
+      });
+
+  /// Total of each type for the current direction, project and search.
+  Map<MoneyType, double> _moneyTypeTotals(ProjectProvider pp) {
+    final totals = {for (final t in MoneyType.values) t: 0.0};
+    for (final r in _moneyRowsNow(pp, type: MoneyType.all)) {
+      for (final t in MoneyType.values) {
+        if (t.matches(r.ledger.category)) totals[t] = totals[t]! + r.ledger.amount;
+      }
+    }
+    return totals;
+  }
+
+  String get _moneySortLabel => switch (_sortColumn) {
+        'title' => _sortAscending ? 'Description · A–Z' : 'Description · Z–A',
+        'project' => _sortAscending ? 'Project · A–Z' : 'Project · Z–A',
+        'type' => _sortAscending ? 'Type · A–Z' : 'Type · Z–A',
+        'in' => _sortAscending ? 'In · low' : 'In · high',
+        'out' => _sortAscending ? 'Out · low' : 'Out · high',
+        'amount' => _sortAscending ? 'Amount · low' : 'Amount · high',
+        _ => _sortAscending ? 'Date · oldest' : 'Date · newest',
+      };
+
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<ReportProvider>();
@@ -1236,21 +1646,20 @@ class _ReportsViewState extends State<_ReportsView> {
           'Unknown Project';
     }
 
-    final quickCategoryTab = _quickTab();
-    final filtered = _filterEntries(projectProvider, quickCategoryTab);
-    filtered.sort((a, b) {
-      int cmp = 0;
-      if (_sortColumn == 'date') {
-        cmp = a.date.compareTo(b.date);
-      } else if (_sortColumn == 'amount') {
-        cmp = a.amount.compareTo(b.amount);
-      } else if (_sortColumn == 'project') {
-        cmp = getProjectName(
-          a.projectId,
-        ).compareTo(getProjectName(b.projectId));
-      }
-      return _sortAscending ? cmp : -cmp;
-    });
+    final canFinance = _financeOn;
+    if (canFinance) _syncLedger(projectProvider);
+    // People with View finances get one table of all money (spending entries
+    // are joined to the ledger rows); everyone else the spending entries.
+    final quickCategoryTab = canFinance ? 'All' : _quickTab();
+    final moneyRows = canFinance ? _moneyRowsNow(projectProvider) : const <MoneyRow>[];
+    final List<EntryModel> filtered;
+    if (canFinance) {
+      // Spending entries among the shown rows: what By type adds up.
+      filtered = [for (final r in moneyRows) if (r.entry != null) r.entry!];
+    } else {
+      filtered = _filterEntries(projectProvider, quickCategoryTab);
+      filtered.sort((a, b) => compareReportEntries(a, b, _sortColumn, _sortAscending, getProjectName));
+    }
     double materialTotal = 0;
     double labourTotal = 0;
     double equipmentTotal = 0;
@@ -1272,7 +1681,7 @@ class _ReportsViewState extends State<_ReportsView> {
       }
     }
     final grandRemaining = (grandTotal - grandPaid).clamp(0.0, double.infinity);
-    final totalCount = filtered.length;
+    final totalCount = canFinance ? moneyRows.length : filtered.length;
     final totalPages = (totalCount / _rowsPerPage).ceil() == 0
         ? 1
         : (totalCount / _rowsPerPage).ceil();
@@ -1283,11 +1692,24 @@ class _ReportsViewState extends State<_ReportsView> {
     final endIndex = (startIndex + _rowsPerPage < totalCount)
         ? startIndex + _rowsPerPage
         : totalCount;
-    final List<EntryModel> paginatedEntries = (totalCount > 0)
+    final List<EntryModel> paginatedEntries = (!canFinance && totalCount > 0)
         ? filtered.sublist(startIndex, endIndex)
         : [];
-    final List<String> activeCols = _getActiveColumnsForTab(quickCategoryTab);
-    context.read<NavController>().markCurrent('/reports');
+    final List<MoneyRow> paginatedMoney = (canFinance && totalCount > 0)
+        ? moneyRows.sublist(startIndex, endIndex)
+        : const [];
+    final bool pageEmpty = canFinance ? paginatedMoney.isEmpty : paginatedEntries.isEmpty;
+    // Finance table states: loading (first fetch, or entries still arriving),
+    // error (the ledger, or the entries it is joined with — never zeros).
+    final String? moneyError = !canFinance
+        ? null
+        : (_ledgerError ??
+            (_ledger != null && allEntries.isEmpty && projectProvider.entriesError.isNotEmpty ? projectProvider.entriesError : null));
+    final bool moneyLoading = canFinance && moneyError == null && (_ledger == null || (allEntries.isEmpty && projectProvider.entriesLoading));
+    // Pinned column first, then the saved order — same for sheet and exports.
+    final List<String> activeCols = _displayColumns(quickCategoryTab);
+    final String? pinnedCol = activeCols.isEmpty ? null : activeCols.first;
+    void onPinColumn(String column) => _pinColumn(quickCategoryTab, column);
     final bt = context.bt;
     final entriesTitle = quickCategoryTab == 'All' || quickCategoryTab.isEmpty
         ? 'Entries'
@@ -1302,29 +1724,44 @@ class _ReportsViewState extends State<_ReportsView> {
         });
 
     void openFullScreen() {
+      if (canFinance && _ledger == null) {
+        btToast(context, 'The money entries are still loading.');
+        return;
+      }
       Navigator.of(context).push(
         MaterialPageRoute(
           builder: (context) => _FullScreenLogsViewer(
-            filteredEntries: filtered,
+            moneyRowsOf: canFinance ? () => _moneyRowsNow(context.read<ProjectProvider>()) : null,
+            moneyChanged: _moneyVersion,
+            onMoneyRowTap: (r) => _onMoneyRowTap(r, getProjectName),
+            // Re-filtered from the live entry list on every rebuild, so rows
+            // edited / added / paid from here show their new values.
+            entriesOf: (pp) => _filterEntries(pp, quickCategoryTab),
             getProjectName: getProjectName,
             statusOf: statusOf,
             quickCategoryTab: quickCategoryTab,
             title: quickCategoryTab == 'All'
                 ? 'Report Logs'
                 : '$quickCategoryTab Report Logs',
-            onExportCsv: () => _handleCsvExport(
-              filtered,
-              getProjectName,
-              quickCategoryTab,
-              activeColumns: activeCols,
-            ),
-            onExportPdf: () => _handlePdfExport(
-              filtered,
-              getProjectName,
-              quickCategoryTab,
-              activeColumns: activeCols,
-            ),
-            activeColumns: activeCols,
+            // Read at call time: a column pinned in full screen counts too.
+            onExportCsv: (rows) => canFinance
+                ? _exportMoney(context.read<ProjectProvider>(), pdf: false)
+                : _handleCsvExport(
+                    rows,
+                    getProjectName,
+                    quickCategoryTab,
+                    activeColumns: _displayColumns(quickCategoryTab),
+                  ),
+            onExportPdf: (rows) => canFinance
+                ? _exportMoney(context.read<ProjectProvider>(), pdf: true)
+                : _handlePdfExport(
+                    rows,
+                    getProjectName,
+                    quickCategoryTab,
+                    activeColumns: _displayColumns(quickCategoryTab),
+                  ),
+            columnsOf: () => _displayColumns(quickCategoryTab),
+            onPinColumn: onPinColumn,
             sortColumn: _sortColumn,
             sortAscending: _sortAscending,
             onSort: onSheetSort,
@@ -1339,7 +1776,51 @@ class _ReportsViewState extends State<_ReportsView> {
 
     void openEditColumns() => _showCustomizeColumnsDialog(context, quickCategoryTab.isEmpty ? 'All' : quickCategoryTab);
 
+    void openMoneyExport() {
+      if (moneyRows.isEmpty) {
+        btToast(context, 'Nothing to export for these filters.', error: true);
+        return;
+      }
+      showBtSheet(
+        context,
+        title: 'Export',
+        subtitle: '$totalCount ${totalCount == 1 ? 'row' : 'rows'} · current filters',
+        builder: (sheetCtx) => Row(
+          children: [
+            Expanded(
+              child: _ExportFormatCard(
+                format: 'PDF',
+                title: 'Download PDF',
+                subtitle: 'Ready to print or share',
+                dark: true,
+                onTap: () {
+                  Navigator.pop(sheetCtx);
+                  _exportMoney(projectProvider, pdf: true);
+                },
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _ExportFormatCard(
+                format: 'CSV',
+                title: 'Download CSV',
+                subtitle: 'Opens in Excel or Google Sheets',
+                onTap: () {
+                  Navigator.pop(sheetCtx);
+                  _exportMoney(projectProvider, pdf: false);
+                },
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     void openExport() {
+      if (canFinance) {
+        openMoneyExport();
+        return;
+      }
       final shown = activeCols.length;
       final all = _getAllColumnsForTab(quickCategoryTab.isEmpty ? 'All' : quickCategoryTab).length;
       showBtSheet(
@@ -1408,15 +1889,26 @@ class _ReportsViewState extends State<_ReportsView> {
             const BtSectionHeader(title: 'Sort by', caption: true),
             BtGroup(
               children: [
-                for (final o in const [
-                  ['date', false, 'Newest first'],
-                  ['date', true, 'Oldest first'],
-                  ['amount', false, 'Amount: high to low'],
-                  ['amount', true, 'Amount: low to high'],
-                  ['project', true, 'Project name'],
-                ])
+                for (final o in canFinance
+                    ? const [
+                        ['date', false, 'Date: newest first', null],
+                        ['date', true, 'Date: oldest first', null],
+                        ['amount', false, 'Amount: high to low', null],
+                        ['amount', true, 'Amount: low to high', null],
+                        ['project', true, 'Project name', null],
+                      ]
+                    : const [
+                        ['date', false, 'Purchase date: newest first', null],
+                        ['date', true, 'Purchase date: oldest first', null],
+                        ['paymentDate', false, 'Payment date: newest first', 'Latest payment · unpaid entries last'],
+                        ['paymentDate', true, 'Payment date: oldest first', 'Latest payment · unpaid entries last'],
+                        ['amount', false, 'Amount: high to low', null],
+                        ['amount', true, 'Amount: low to high', null],
+                        ['project', true, 'Project name', null],
+                      ])
                   BtRow(
                     title: o[2] as String,
+                    subtitle: o[3] as String?,
                     minHeight: 48,
                     trailing: (_sortColumn == o[0] && _sortAscending == o[1])
                         ? Icon(Icons.check_rounded, color: bt.accentInk, size: 20)
@@ -1435,16 +1927,17 @@ class _ReportsViewState extends State<_ReportsView> {
             const SizedBox(height: 16),
             BtGroup(
               children: [
-                BtRow(
-                  leading: const BtTile(icon: Icons.view_column_outlined),
-                  title: 'Edit columns',
-                  subtitle: 'For table and exports',
-                  showChevron: true,
-                  onTap: () {
-                    Navigator.pop(sheetCtx);
-                    openEditColumns();
-                  },
-                ),
+                if (!canFinance)
+                  BtRow(
+                    leading: const BtTile(icon: Icons.view_column_outlined),
+                    title: 'Edit columns',
+                    subtitle: 'For table and exports',
+                    showChevron: true,
+                    onTap: () {
+                      Navigator.pop(sheetCtx);
+                      openEditColumns();
+                    },
+                  ),
                 BtRow(
                   leading: const BtTile(icon: Icons.table_chart_outlined),
                   title: 'Open as table',
@@ -1478,20 +1971,20 @@ class _ReportsViewState extends State<_ReportsView> {
     final periodChip = _datePreset == 'Custom' && (_startDate != null || _endDate != null)
         ? '${_startDate == null ? '…' : formatShortDate(_startDate)} – ${_endDate == null ? '…' : formatShortDate(_endDate)}'
         : _sentence(_datePreset);
-    final notGenerated = quickCategoryTab != 'All' && !_reportGenerated;
-    final showSheet = _tableView && !notGenerated && paginatedEntries.isNotEmpty;
-    final extraFilters = [
-      _selectedFloor,
-      _selectedPhaseId,
-      _selectedActivityName,
-      _selectedStatus == 'All' ? null : _selectedStatus,
-    ].where((v) => v != null).length;
+    final showSheet = canFinance ? paginatedMoney.isNotEmpty : (_tableView && paginatedEntries.isNotEmpty);
+    // Floor / phase / activity show on their own chips, so the Filter chip
+    // counts only what is set inside the sheet alone (payment status).
+    final extraFilters = _selectedStatus == 'All' ? 0 : 1;
     final searchVisible = _searchOpen || _searchQuery.isNotEmpty;
-    final sortLabel = switch (_sortColumn) {
-      'amount' => _sortAscending ? 'Amount · low' : 'Amount · high',
-      'project' => _sortAscending ? 'Project · A–Z' : 'Project · Z–A',
-      _ => _sortAscending ? 'Date · oldest' : 'Date · newest',
-    };
+    final showWhere = _showWhereChips(projectProvider);
+    final sortLabel = canFinance
+        ? _moneySortLabel
+        : switch (_sortColumn) {
+            'amount' => _sortAscending ? 'Amount · low' : 'Amount · high',
+            'project' => _sortAscending ? 'Project · A–Z' : 'Project · Z–A',
+            'paymentDate' => _sortAscending ? 'Paid on · oldest' : 'Paid on · newest',
+            _ => _sortAscending ? 'Purchased · oldest' : 'Purchased · newest',
+          };
     final topInset = MediaQuery.paddingOf(context).top;
     final glass = Colors.white.withValues(alpha: .09);
 
@@ -1510,7 +2003,9 @@ class _ReportsViewState extends State<_ReportsView> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      '$totalCount ${totalCount == 1 ? 'ENTRY' : 'ENTRIES'} · ${periodChip.toUpperCase()}',
+                      moneyLoading
+                          ? 'LOADING · ${periodChip.toUpperCase()}'
+                          : '$totalCount ${totalCount == 1 ? 'ENTRY' : 'ENTRIES'} · ${periodChip.toUpperCase()}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: BtText.num(BtText.mono(context, color: Bt.onNoir2)),
@@ -1520,64 +2015,63 @@ class _ReportsViewState extends State<_ReportsView> {
                   ],
                 ),
               ),
-              Showcase(
-                key: ShowcaseKeys.helpButton,
-                description: 'Tap here anytime to replay this tour and get help.',
-                tooltipBackgroundColor: Bt.ink,
-                textColor: Colors.white,
-                tooltipBorderRadius: BorderRadius.circular(16),
-                tooltipPadding: const EdgeInsets.all(16),
-                child: BtIconButton(
+              _tour(
+                ShowcaseKeys.helpButton,
+                'Guidelines',
+                'Tap here anytime to replay this tour of every Reports control.',
+                BtIconButton(
                   icon: Icons.help_outline_rounded,
                   semantic: 'App guidelines',
                   color: Bt.bone,
                   size: 21,
                   background: glass,
-                  onTap: () {
-                    ShowCaseWidget.of(context).startShowCase([
-                      ShowcaseKeys.reportAskAI,
-                      ShowcaseKeys.reportFilters,
-                      _chartsKey,
-                      ShowcaseKeys.reportCSV,
-                      ShowcaseKeys.helpButton,
-                    ]);
-                  },
+                  onTap: _startTour,
                 ),
+                radius: 22,
               ),
               const SizedBox(width: 6),
-              BtIconButton(
-                icon: Icons.ios_share_rounded,
-                semantic: 'Export report',
-                color: Bt.bone,
-                size: 20,
-                background: glass,
-                onTap: openExport,
+              _tour(
+                _kHeaderExport,
+                'Share the report',
+                'Download the entries you are looking at as a CSV (spreadsheet) or PDF file, with the current filters applied.',
+                BtIconButton(
+                  icon: Icons.ios_share_rounded,
+                  semantic: 'Export report',
+                  color: Bt.bone,
+                  size: 20,
+                  background: glass,
+                  onTap: openExport,
+                ),
+                radius: 22,
               ),
               const SizedBox(width: 4),
-              Semantics(
-                button: true,
-                label: 'Account',
-                child: InkWell(
-                  customBorder: const CircleBorder(),
-                  onTap: () => Navigator.pushNamed(context, '/profile'),
-                  child: const Padding(padding: EdgeInsets.all(4), child: ProfileAvatar(radius: 18)),
+              _tour(
+                _kAccount,
+                'Your account',
+                'Open your profile, settings and sign out.',
+                Semantics(
+                  button: true,
+                  label: 'Account',
+                  child: InkWell(
+                    customBorder: const CircleBorder(),
+                    onTap: () => Navigator.pushNamed(context, '/profile'),
+                    child: const Padding(padding: EdgeInsets.all(4), child: ProfileAvatar(radius: 18)),
+                  ),
                 ),
+                radius: 24,
               ),
             ],
           ),
           const SizedBox(height: 12),
-          Showcase(
-            key: ShowcaseKeys.reportFilters,
-            description: 'Filter your reports by project, date, status and more.',
-            tooltipBackgroundColor: Bt.ink,
-            textColor: Colors.white,
-            tooltipBorderRadius: BorderRadius.circular(16),
-            tooltipPadding: const EdgeInsets.all(16),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              clipBehavior: Clip.none,
-              child: Row(
-                children: [
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            clipBehavior: Clip.none,
+            child: Row(
+              children: [
+                _tour(
+                  _kProject,
+                  'Project',
+                  'Pick one project, or "All projects" to see every active project together. Everything below follows this choice.',
                   BtChip(
                     label: projectChip,
                     onDark: true,
@@ -1585,7 +2079,13 @@ class _ReportsViewState extends State<_ReportsView> {
                     selected: _selectedProjectId != 'all',
                     onTap: () => _pickProject(context, projectProvider),
                   ),
-                  const SizedBox(width: 8),
+                  radius: Bt.rChip,
+                ),
+                const SizedBox(width: 8),
+                _tour(
+                  _kPeriod,
+                  'Period',
+                  'Choose the dates to report on: All time, this week, this month… or a custom From–To range.',
                   BtChip(
                     label: periodChip,
                     onDark: true,
@@ -1593,7 +2093,13 @@ class _ReportsViewState extends State<_ReportsView> {
                     selected: _datePreset != 'All Time',
                     onTap: () => _pickPeriod(context),
                   ),
-                  const SizedBox(width: 8),
+                  radius: Bt.rChip,
+                ),
+                const SizedBox(width: 8),
+                _tour(
+                  ShowcaseKeys.reportFilters,
+                  'More filters',
+                  'Every filter in one place, including payment status (paid, partial, not paid). The number shows when a payment filter is on.',
                   BtChip(
                     label: extraFilters == 0 ? 'Filter' : 'Filter · $extraFilters',
                     onDark: true,
@@ -1601,10 +2107,21 @@ class _ReportsViewState extends State<_ReportsView> {
                     selected: extraFilters > 0,
                     onTap: () => _openFilterSheet(context, projectProvider),
                   ),
-                ],
-              ),
+                  radius: Bt.rChip,
+                ),
+              ],
             ),
           ),
+          if (showWhere) ...[
+          const SizedBox(height: 8),
+          _tour(
+            _kWhere,
+            'Floor, phase, activity',
+            'Filter by floor, phase and activity in one tap. A chosen filter shows its value — tap × to clear it. Pick a project first.',
+            _buildWhereChips(context, projectProvider),
+            radius: Bt.rChip,
+          ),
+          ],
         ],
       ),
     );
@@ -1618,210 +2135,357 @@ class _ReportsViewState extends State<_ReportsView> {
             clipBehavior: Clip.hardEdge,
             child: Row(
               children: [
-                _ToolChip(
-                  icon: Icons.search_rounded,
-                  semantic: searchVisible ? 'Hide search' : 'Search entries',
-                  selected: _searchQuery.isNotEmpty,
-                  onTap: () => setState(() {
-                    if (_searchQuery.isNotEmpty) {
-                      _searchOpen = true;
-                    } else {
-                      _searchOpen = !_searchOpen;
-                    }
-                  }),
+                _tour(
+                  _kSearch,
+                  'Search',
+                  quickCategoryTab == 'All'
+                      ? 'Find entries by name, brand, project and more. Tap again to hide the search box.'
+                      : 'Find ${quickCategoryTab.toLowerCase()} entries by name. Tap again to hide the search box.',
+                  _ToolChip(
+                    icon: Icons.search_rounded,
+                    semantic: searchVisible ? 'Hide search' : 'Search entries',
+                    selected: _searchQuery.isNotEmpty,
+                    onTap: () => setState(() {
+                      if (_searchQuery.isNotEmpty) {
+                        _searchOpen = true;
+                      } else {
+                        _searchOpen = !_searchOpen;
+                      }
+                    }),
+                  ),
+                  radius: Bt.rChip,
                 ),
                 if (quickCategoryTab != 'All') ...[
                   const SizedBox(width: 8),
                   ..._categoryToolbarChips(context, quickCategoryTab, allEntries),
                 ],
-                const SizedBox(width: 8),
-                _ToolChip(icon: Icons.view_column_outlined, label: 'Edit columns', onTap: openEditColumns),
-                const SizedBox(width: 8),
-                _ToolChip(
-                  icon: _sortAscending ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
-                  label: sortLabel,
-                  semantic: 'Sort, columns, table and export',
-                  onTap: openEntriesMenu,
-                ),
-                const SizedBox(width: 8),
-                _ToolChip(icon: Icons.file_download_outlined, label: 'Export', onTap: openExport),
-                const SizedBox(width: 8),
-                _ToolChip(icon: Icons.open_in_full_rounded, semantic: 'Full screen, can rotate', onTap: openFullScreen),
-              ],
+                if (!canFinance) ...[
+                  const SizedBox(width: 8),
+                  _tour(
+                      _kEditColumns,
+                      'Edit columns',
+                      'Choose which columns the sheet shows and drag them into the order you like. Each tab remembers its own columns.',
+                      _ToolChip(icon: Icons.view_column_outlined, label: 'Edit columns', onTap: openEditColumns),
+                      radius: Bt.rChip,
+                    ),
+                  ],
+                  const SizedBox(width: 8),
+                  _tour(
+                    _kSort,
+                    'Sort',
+                    'Order entries by purchase date, payment date, project or amount, newest/highest or oldest/lowest first. The label shows the current order.',
+                    _ToolChip(
+                      icon: _sortAscending ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
+                      label: sortLabel,
+                      semantic: 'Sort, columns, table and export',
+                      onTap: openEntriesMenu,
+                    ),
+                    radius: Bt.rChip,
+                  ),
+                  const SizedBox(width: 8),
+                  _tour(
+                    _kExport,
+                    'Export',
+                    'Save these entries as a CSV or PDF file to share or print.',
+                    _ToolChip(icon: Icons.file_download_outlined, label: 'Export', onTap: openExport),
+                    radius: Bt.rChip,
+                  ),
+                  const SizedBox(width: 8),
+                  _tour(
+                    _kFullScreen,
+                    'Full screen',
+                    'Open the sheet on its own screen. Turn your phone sideways to see more columns at once.',
+                    _ToolChip(icon: Icons.open_in_full_rounded, semantic: 'Full screen, can rotate', onTap: openFullScreen),
+                    radius: Bt.rChip,
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
-        const SizedBox(width: 8),
-        ReportViewToggle(
-          table: _tableView,
-          onChanged: (v) => setState(() {
-            _tableView = v;
-            ReportFilterState.tableView = v;
-          }),
-        ),
-      ],
-    );
+          if (!canFinance) ...[
+            const SizedBox(width: 8),
+            _tour(
+              _kViewToggle,
+              'Sheet or list',
+              'Left: spreadsheet view, one row per entry in columns (default). Right: card list grouped by date. Your choice is remembered.',
+              ReportViewToggle(
+                table: _tableView,
+                onChanged: (v) => setState(() {
+                  _tableView = v;
+                  ReportFilterState.tableView = v;
+                }),
+              ),
+              radius: Bt.rChip,
+            ),
+          ],
+        ],
+      );
 
-    // ── summary strip: Total billed · Paid · Remaining
-    final summary = Showcase(
-      key: _chartsKey,
-      description: 'View a quick financial summary based on your filters.',
-      tooltipBackgroundColor: Bt.ink,
-      textColor: Colors.white,
-      tooltipBorderRadius: BorderRadius.circular(16),
-      tooltipPadding: const EdgeInsets.all(16),
-      child: _SummaryStrip(total: grandTotal, paid: grandPaid, remaining: grandRemaining),
-    );
+      // ── summary strip: Total billed · Paid · Remaining
+      final moneyTotals = MoneyTable.totals(moneyRows);
+      final Widget summary = canFinance
+          ? (moneyLoading
+              ? const BtSkeleton(height: 62, radius: 14)
+              : moneyError != null
+                  ? const SizedBox.shrink()
+                  : _tour(
+                      _chartsKey,
+                      'Totals',
+                      'Money in, money out and what is left (net), for exactly the rows matching your project, period and filters.',
+                      _SummaryStrip.money(moneyIn: moneyTotals.moneyIn, moneyOut: moneyTotals.moneyOut),
+                    ))
+          : _tour(
+              _chartsKey,
+              'Totals',
+              'Total billed, how much is paid and what is still to pay, for exactly the entries matching your project, period and filters.',
+              _SummaryStrip(total: grandTotal, paid: grandPaid, remaining: grandRemaining),
+            );
 
-    return Scaffold(
-      backgroundColor: Bt.ground,
-      body: LayoutBuilder(
-        builder: (context, viewport) {
-          // The sheet takes whatever height is left under the header,
-          // toolbar and summary so it is fully visible without scrolling.
-          final chromeAbove = topInset + 297 + (searchVisible ? 54 : 0);
-          const chromeBelow = ReportSheet.footerHeight + 60;
-          final sheetMax = (viewport.maxHeight - chromeAbove - chromeBelow).clamp(260.0, 900.0);
-          return RefreshIndicator(
-            color: Bt.noir,
-            backgroundColor: bt.accent,
-            edgeOffset: topInset,
-            onRefresh: provider.refresh,
-            child: ListView(
-              controller: _scrollController,
-              physics: const AlwaysScrollableScrollPhysics(parent: ClampingScrollPhysics()),
-              padding: EdgeInsets.zero,
-              children: [
-                header,
-                BtSheet(
-                  overlap: 22,
-                  padding: const EdgeInsets.fromLTRB(Bt.gutter, 16, Bt.gutter, 32),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _CategoryTabs(
-                        activeTab: quickCategoryTab,
-                        onTabChanged: _selectCategoryTab,
-                      ),
-                      const SizedBox(height: 12),
-                      toolbar,
-                      AnimatedSize(
-                        duration: Bt.fast,
-                        curve: Bt.ease,
-                        alignment: Alignment.topCenter,
-                        child: searchVisible
-                            ? Padding(
-                                padding: const EdgeInsets.only(top: 10),
-                                child: quickCategoryTab != 'All'
-                                    ? _buildCategorySubFilters(context, quickCategoryTab, allEntries)
-                                    : _buildAllTabSearchBar(context),
-                              )
-                            : const SizedBox(width: double.infinity),
-                      ),
-                      const SizedBox(height: 12),
-                      summary,
-                      const SizedBox(height: 12),
-                      if (notGenerated)
-                        BtCard(
-                          child: BtEmpty(
-                            icon: Icons.analytics_outlined,
-                            title: 'Set your filters',
-                            message: 'Configure filters above and tap "Generate report" to view logs.',
+      return Scaffold(
+        backgroundColor: Bt.ground,
+        body: LayoutBuilder(
+          builder: (context, viewport) {
+            // The sheet takes whatever height is left under the header,
+            // toolbar and summary so it is fully visible without scrolling.
+            // 297 = header + tabs + toolbar + summary; +44 = the floor / phase /
+            // activity chip row.
+            final chromeAbove = topInset + 297 + (showWhere ? 44 : 0) + (searchVisible ? 54 : 0);
+            const chromeBelow = ReportSheet.footerHeight + 60;
+            final sheetMax = (viewport.maxHeight - chromeAbove - chromeBelow).clamp(260.0, 900.0);
+            return RefreshIndicator(
+              color: Bt.noir,
+              backgroundColor: bt.accent,
+              edgeOffset: topInset,
+              onRefresh: () => Future.wait([
+                ReportFilterState.reloadEntries(context),
+                if (canFinance) _loadLedger(keepRows: true),
+              ]),
+              child: ListView(
+                controller: _scrollController,
+                physics: const AlwaysScrollableScrollPhysics(parent: ClampingScrollPhysics()),
+                padding: EdgeInsets.zero,
+                children: [
+                  header,
+                  BtSheet(
+                    overlap: 22,
+                    padding: const EdgeInsets.fromLTRB(Bt.gutter, 16, Bt.gutter, 32),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (canFinance)
+                          _tour(
+                            _kTabs,
+                            'Money filters',
+                            'Pick All, Money in or Money out. Then tap Type to see only Material, Labour, Equipment, Client payment, Loan or Other, with each one\'s total.',
+                            MoneyQuickFilters(
+                              direction: MoneyDirectionX.of(moneyIn: _moneyIn, moneyOut: _moneyOut),
+                              type: _moneyType,
+                              typeTotals: () => _moneyTypeTotals(projectProvider),
+                              onDirection: _setDirection,
+                              onRecordPayment: () => showRecordPaymentSheet(
+                                context,
+                                projectId: _selectedProjectId == 'all' ? null : _selectedProjectId,
+                                onSaved: () => _loadLedger(keepRows: true),
+                              ),
+                              onType: (t) => setState(() {
+                                _moneyType = t;
+                                _currentPage = 1;
+                              }),
+                            ),
+                          )
+                        else
+                          _tour(
+                            _kTabs,
+                            'Entry types',
+                            'Switch between All entries, Materials, Labour and Equipment. Each tab has its own columns and an item picker.',
+                            _CategoryTabs(
+                              activeTab: quickCategoryTab,
+                              onTabChanged: _selectCategoryTab,
+                            ),
                           ),
-                        )
-                      else if (paginatedEntries.isEmpty)
-                        const BtCard(
-                          child: BtEmpty(
-                            icon: Icons.search_off_outlined,
-                            title: 'No transaction logs match filters.',
-                          ),
-                        )
-                      else if (showSheet)
-                        ReportSheet(
-                          entries: paginatedEntries,
-                          columns: activeCols,
-                          maxHeight: sheetMax,
-                          firstRowNumber: startIndex + 1,
-                          projectNameOf: (e) => getProjectName(e.projectId),
-                          statusOf: statusOf,
-                          sortColumn: _sortColumn,
-                          sortAscending: _sortAscending,
-                          onSort: onSheetSort,
-                          onRowTap: (e) => _showEntryDetailsDialog(context, e, getProjectName(e.projectId), rowNumber: startIndex + paginatedEntries.indexOf(e) + 1),
-                          onAddMore: (e) => _ReportActions.addMore(context, e),
-                          onRecordPayment: (e) => _ReportActions.recordPayment(context, e, getProjectName(e.projectId)),
-                          onEdit: (e) => _ReportActions.editEntry(context, e),
-                        )
-                      else
-                        ..._buildEntryGroups(context, paginatedEntries, getProjectName),
-                      if (!notGenerated && paginatedEntries.isNotEmpty && (showSheet || totalCount > _rowsPerPage || _rowsPerPage != 10))
-                        _buildPager(context, safeCurrentPage, totalPages),
-                      const SizedBox(height: 24),
-                      Showcase(
-                        key: ShowcaseKeys.reportAskAI,
-                        description: 'Ask AI about costs, missing entries, or anything related to this report.',
-                        tooltipBackgroundColor: Bt.ink,
-                        textColor: Colors.white,
-                        tooltipBorderRadius: BorderRadius.circular(16),
-                        tooltipPadding: const EdgeInsets.all(16),
-                        child: _AskAiBanner(projectName: provider.selectedProjectName),
-                      ),
-                      const SizedBox(height: 10),
-                      IntrinsicHeight(
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Expanded(
-                              child: EfficiencyBanner(
-                                note: 'Budget vs spend',
-                                isExceeded: grandRemaining > 0,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: ReportQuickTile(
-                                icon: Icons.screen_rotation_rounded,
-                                title: 'Table view',
-                                subtitle: 'Full screen',
-                                onTap: openFullScreen,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: ReportQuickTile(
-                                icon: Icons.ios_share_rounded,
-                                title: 'Export',
-                                subtitle: 'CSV or PDF',
-                                onTap: openExport,
-                              ),
-                            ),
-                          ],
+                        const SizedBox(height: 12),
+                        toolbar,
+                        AnimatedSize(
+                          duration: Bt.fast,
+                          curve: Bt.ease,
+                          alignment: Alignment.topCenter,
+                          child: searchVisible
+                              ? Padding(
+                                  padding: const EdgeInsets.only(top: 10),
+                                  child: quickCategoryTab != 'All'
+                                      ? _buildCategorySubFilters(context, quickCategoryTab, allEntries)
+                                      : _buildAllTabSearchBar(context),
+                                )
+                              : const SizedBox(width: double.infinity),
                         ),
-                      ),
+                        const SizedBox(height: 12),
+                        summary,
+                        const SizedBox(height: 12),
+                        if (moneyError != null)
+                          BtErrorCard(
+                            message: moneyError,
+                            onRetry: () {
+                              ReportFilterState.reloadEntries(context);
+                              _loadLedger();
+                            },
+                          )
+                        else if (canFinance ? moneyLoading : (paginatedEntries.isEmpty && projectProvider.entriesLoading))
+                          const BtCard(
+                            child: Padding(
+                              padding: EdgeInsets.symmetric(vertical: 28),
+                              child: Center(child: BtBrickLoader(label: 'Loading entries…')),
+                            ),
+                          )
+                        else if (pageEmpty)
+                          const BtCard(
+                            child: BtEmpty(
+                              icon: Icons.search_off_outlined,
+                              title: 'No transaction logs match filters.',
+                            ),
+                          )
+                        else if (showSheet)
+                          _tour(
+                            _kSheet,
+                            'The sheet',
+                            canFinance
+                                ? 'One row per money movement: spending entries, client payments, loans and other money out. Tap a row for its details; spending rows also let you add more, record a payment or edit.'
+                                : 'One row per entry. Tap a row to see all its details and to add more, record a payment or edit it.',
+                            canFinance
+                            ? ReportSheet.money(
+                                tourWrap: (part, child) => part == 'header'
+                                    ? _tour(_kSheetHeader, 'Sort by a column', 'Tap the DATE, DESCRIPTION, PROJECT, TYPE, IN or OUT heading to sort by it; tap it again to flip the order.', child, radius: 0)
+                                    : _tour(_kSheetScroll, 'Scroll sideways', 'Swipe the sheet left and right to see every column — the description stays put. This bar shows where you are.', child),
+                                rows: paginatedMoney,
+                                maxHeight: sheetMax,
+                                firstRowNumber: startIndex + 1,
+                                statusOf: statusOf,
+                                sortColumn: _sortColumn,
+                                sortAscending: _sortAscending,
+                                onSort: onSheetSort,
+                                onMoneyRowTap: (r) => _onMoneyRowTap(r, getProjectName, rowNumber: startIndex + paginatedMoney.indexOf(r) + 1),
+                                onAddMore: (e) => _ReportActions.addMore(context, e),
+                                onRecordPayment: (e) => _ReportActions.recordPayment(context, e, getProjectName(e.projectId)),
+                                onEdit: (e) => _ReportActions.editEntry(context, e),
+                              )
+                            : ReportSheet(
+                            tourWrap: (part, child) => part == 'header'
+                                ? _tour(_kSheetHeader, 'Sort by a column', 'Tap the PURCHASE DATE, PAYMENT DATE, PROJECT or AMOUNT heading to sort by it; tap it again to flip the order. Long-press any heading to pin that column on the left.', child, radius: 0)
+                                : _tour(_kSheetScroll, 'Scroll sideways', 'Swipe the sheet left and right to see every column — the pinned column stays put. This bar shows where you are.', child),
+                            entries: paginatedEntries,
+                            columns: activeCols,
+                            pinnedColumn: pinnedCol,
+                            onPinColumn: onPinColumn,
+                            maxHeight: sheetMax,
+                            firstRowNumber: startIndex + 1,
+                            projectNameOf: (e) => getProjectName(e.projectId),
+                            statusOf: statusOf,
+                            sortColumn: _sortColumn,
+                            sortAscending: _sortAscending,
+                            onSort: onSheetSort,
+                            onRowTap: (e) => _showEntryDetailsDialog(context, e, getProjectName(e.projectId), rowNumber: startIndex + paginatedEntries.indexOf(e) + 1),
+                            onAddMore: (e) => _ReportActions.addMore(context, e),
+                            onRecordPayment: (e) => _ReportActions.recordPayment(context, e, getProjectName(e.projectId)),
+                            onEdit: (e) => _ReportActions.editEntry(context, e),
+                            ),
+                          )
+                        else
+                          _tour(
+                            _kList,
+                            'Entry list',
+                            'Entries grouped by date. Tap one to see its details and to add more, record a payment or edit it.',
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: _buildEntryGroups(context, paginatedEntries, getProjectName),
+                            ),
+                          ),
+                        if (canFinance && _ledger?.truncated == true && !pageEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 2, bottom: 10),
+                            child: Text(
+                              'Showing the newest ${_ledger!.rows.length} entries; totals cover those rows. Narrow the project or period to see the rest.',
+                              style: BtText.caption(context),
+                            ),
+                          ),
+                        if (!pageEmpty && (showSheet || totalCount > _rowsPerPage || _rowsPerPage != 10))
+                          _tour(
+                            _kPager,
+                            'Pages',
+                            'Choose how many rows to show per page (10, 20 or 50) and move between pages with the arrows.',
+                            _buildPager(context, safeCurrentPage, totalPages),
+                          ),
+                        const SizedBox(height: 24),
+                        _tour(
+                          ShowcaseKeys.reportAskAI,
+                          'Ask AI',
+                          'Ask questions in plain words — costs, missing entries, stock — about this report and get an answer.',
+                          _AskAiBanner(projectName: provider.selectedProjectName),
+                          radius: Bt.rCard,
+                        ),
+                        // Finance users already have Export and full screen
+                        // above the table, and each type's total in the Type sheet.
+                        if (!canFinance) ...[
+                          const SizedBox(height: 10),
+                          _tour(
+                          _kQuickTiles,
+                          'Shortcuts',
+                          'Table view opens the sheet full screen (rotate for more columns). Export saves the report as CSV or PDF.',
+                          IntrinsicHeight(
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Expanded(
+                                  child: ReportQuickTile(
+                                    icon: Icons.screen_rotation_rounded,
+                                    title: 'Table view',
+                                    subtitle: 'Full screen',
+                                    onTap: openFullScreen,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: ReportQuickTile(
+                                    icon: Icons.ios_share_rounded,
+                                    title: 'Export',
+                                    subtitle: 'CSV or PDF',
+                                    onTap: openExport,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          radius: 20,
+                        ),
+                        const SizedBox(height: 28),
+                        _buildByType(
+                          context,
+                          total: grandTotal,
+                          paid: grandPaid,
+                          remaining: grandRemaining,
+                          material: materialTotal,
+                          labour: labourTotal,
+                          equipment: equipmentTotal,
+                          onType: (tab) {
+                            if (canFinance) {
+                              setState(() {
+                                _moneyType = switch (tab) {
+                                  'Materials' => MoneyType.material,
+                                  'Labour' => MoneyType.labour,
+                                  'Equipment' => MoneyType.equipment,
+                                  _ => MoneyType.all,
+                                };
+                                _currentPage = 1;
+                              });
+                            } else {
+                              _selectCategoryTab(tab);
+                            }
+                            if (_scrollController.hasClients) {
+                              _scrollController.animateTo(0, duration: Bt.medium, curve: Bt.ease);
+                            }
+                          },
+                        ),
+                      ],
                       const SizedBox(height: 28),
-                      _buildByType(
-                        context,
-                        total: grandTotal,
-                        material: materialTotal,
-                        labour: labourTotal,
-                        equipment: equipmentTotal,
-                        onType: (tab) {
-                          _selectCategoryTab(tab);
-                          if (_scrollController.hasClients) {
-                            _scrollController.animateTo(0, duration: Bt.medium, curve: Bt.ease);
-                          }
-                        },
-                      ),
-                      const SizedBox(height: 28),
-                      Showcase(
-                        key: ShowcaseKeys.reportCSV,
-                        description: 'Use this to export data to CSV or import bulk entries from a CSV file.',
-                        tooltipBackgroundColor: Bt.ink,
-                        textColor: Colors.white,
-                        tooltipBorderRadius: BorderRadius.circular(16),
-                        tooltipPadding: const EdgeInsets.all(16),
-                        child: _buildCsvImportCard(quickCategoryTab, activeCols),
-                      ),
+                      _buildCsvImportCard(),
                     ],
                   ),
                 ),
@@ -1840,7 +2504,6 @@ class _ReportsViewState extends State<_ReportsView> {
     setState(() {
       _currentPage = 1;
       _selectedItemName = null;
-      _reportGenerated = true;
       _showSuggestions = false;
       if (newTab == 'All') {
         _selectedTypes.addAll({
@@ -1869,7 +2532,20 @@ class _ReportsViewState extends State<_ReportsView> {
       _selectedActivityName = null;
       _currentPage = 1;
     });
-    context.read<ProjectProvider>().loadEntriesForProject(val == 'all' ? null : val);
+    ReportFilterState.lastKnownProjectProviderId = val == 'all' ? null : val;
+    final projectProvider = context.read<ProjectProvider>();
+    final match = val == 'all'
+        ? null
+        : projectProvider.projects.where((p) => p.id == val).firstOrNull;
+    if (match != null) {
+      // Make it the app's selected project too (as on main): every later
+      // ProjectProvider.load() then refetches this project's entries instead
+      // of replacing them with another project's and zeroing the report.
+      // selectProject() also loads this project's entries.
+      projectProvider.selectProject(match);
+    } else {
+      projectProvider.loadEntriesForProject(val == 'all' ? null : val);
+    }
     context.read<ReportProvider>().selectProject(val);
   }
 
@@ -1983,6 +2659,123 @@ class _ReportsViewState extends State<_ReportsView> {
     );
   }
 
+  /// What the Floor / Phase / Activity filters offer for the selected
+  /// project (shared by the quick chips and the Filter sheet).
+  _WhereOptions _whereOptions(ProjectProvider projectProvider) {
+    final proj = _selectedProjectId == 'all'
+        ? null
+        : projectProvider.projects.where((p) => p.id == _selectedProjectId).firstOrNull;
+    final floors = proj?.floors ?? const <String>[];
+    final phases = proj?.selectedPhases ?? const <ProjectPhase>[];
+    final phase = phases.where((p) => p.id == _selectedPhaseId).firstOrNull;
+    final names = <String>{};
+    if (phase != null) {
+      names.addAll(phase.activities.map((a) => a.name));
+    } else if (proj != null) {
+      names.addAll(phases.expand((p) => p.activities).map((a) => a.name));
+    }
+    if (names.isEmpty && proj != null) {
+      // Project without a phase plan: offer the activities its entries use.
+      for (final e in projectProvider.entries) {
+        if (e.projectId.trim() != proj.id.trim()) continue;
+        if (phase != null && e.phaseId != phase.id && e.phase != phase.phaseName) continue;
+        final a = e.activity?.trim();
+        if (a != null && a.isNotEmpty) names.add(a);
+      }
+    }
+    names.removeWhere((n) => n.trim().isEmpty);
+    return _WhereOptions(project: proj, floors: floors, phases: phases, phase: phase, activities: names.toList());
+  }
+
+  Future<void> _pickFloor(BuildContext context, ProjectProvider projectProvider) async {
+    final o = _whereOptions(projectProvider);
+    final v = await _pickOption(context, 'Floor', [const MapEntry('Select Floor', 'All floors'), ...o.floors.map((f) => MapEntry(f, f))], _selectedFloor ?? 'Select Floor');
+    if (v != null && mounted) setState(() { _selectedFloor = v == 'Select Floor' ? null : v; _currentPage = 1; });
+  }
+
+  Future<void> _pickPhase(BuildContext context, ProjectProvider projectProvider) async {
+    final o = _whereOptions(projectProvider);
+    final v = await _pickOption(context, 'Phase', [const MapEntry('Select Phase', 'All phases'), ...o.phases.map((ph) => MapEntry(ph.id, ph.phaseName))], _selectedPhaseId ?? 'Select Phase');
+    if (v == null || !mounted) return;
+    final next = v == 'Select Phase' ? null : v;
+    if (next == _selectedPhaseId) return;
+    // A new phase has its own activities, so the activity choice is cleared.
+    setState(() { _selectedPhaseId = next; _selectedActivityName = null; _currentPage = 1; });
+  }
+
+  Future<void> _pickActivity(BuildContext context, ProjectProvider projectProvider) async {
+    final o = _whereOptions(projectProvider);
+    final v = await _pickOption(context, 'Activity', [const MapEntry('Select Activity', 'All activities'), ...o.activities.map((n) => MapEntry(n, n))], _selectedActivityName ?? 'Select Activity');
+    if (v != null && mounted) setState(() { _selectedActivityName = v == 'Select Activity' ? null : v; _currentPage = 1; });
+  }
+
+  /// Quick chip tapped while "All projects" is selected: pick a project
+  /// first, then go straight on to the picker that was tapped.
+  Future<void> _whereChipTap(BuildContext context, ProjectProvider projectProvider, Future<void> Function(BuildContext, ProjectProvider) picker) async {
+    if (_selectedProjectId == 'all') {
+      btToast(context, 'Pick a project to filter by phase or activity.');
+      await _pickProject(context, projectProvider);
+      if (!mounted || _selectedProjectId == 'all') return;
+    }
+    if (!context.mounted) return;
+    await picker(context, projectProvider);
+  }
+
+  /// Floor ▾ · Phase ▾ · Activity ▾ under the project / period chips: the
+  /// same filters as the Filter sheet (same state), one tap away, each
+  /// showing its value with an × to clear it.
+  /// The chip row is left out for a project with no floors, phases or
+  /// activities (and nothing picked) — it would only hold dead chips.
+  bool _showWhereChips(ProjectProvider projectProvider) {
+    final o = _whereOptions(projectProvider);
+    return o.project == null ||
+        o.floors.isNotEmpty ||
+        o.phases.isNotEmpty ||
+        o.activities.isNotEmpty ||
+        _selectedFloor != null ||
+        _selectedPhaseId != null ||
+        _selectedActivityName != null;
+  }
+
+  Widget _buildWhereChips(BuildContext context, ProjectProvider projectProvider) {
+    final o = _whereOptions(projectProvider);
+    final hasProject = o.project != null;
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      clipBehavior: Clip.none,
+      child: Row(
+        children: [
+          if (o.floors.isNotEmpty) ...[
+            _WhereChip(
+              label: 'Floor',
+              value: _selectedFloor,
+              onTap: () => _pickFloor(context, projectProvider),
+              onClear: () => setState(() { _selectedFloor = null; _currentPage = 1; }),
+            ),
+            const SizedBox(width: 8),
+          ],
+          _WhereChip(
+            label: 'Phase',
+            value: o.phase?.phaseName ?? (_selectedPhaseId == null ? null : 'Phase'),
+            enabled: !hasProject || o.phases.isNotEmpty,
+            dim: !hasProject,
+            onTap: () => _whereChipTap(context, projectProvider, _pickPhase),
+            onClear: () => setState(() { _selectedPhaseId = null; _selectedActivityName = null; _currentPage = 1; }),
+          ),
+          const SizedBox(width: 8),
+          _WhereChip(
+            label: 'Activity',
+            value: _selectedActivityName,
+            enabled: !hasProject || o.activities.isNotEmpty || _selectedActivityName != null,
+            dim: !hasProject,
+            onTap: () => _whereChipTap(context, projectProvider, _pickActivity),
+            onClear: () => setState(() { _selectedActivityName = null; _currentPage = 1; }),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _openFilterSheet(BuildContext context, ProjectProvider projectProvider) {
     showBtSheet(
       context,
@@ -1990,18 +2783,13 @@ class _ReportsViewState extends State<_ReportsView> {
       builder: (sheetCtx) => StatefulBuilder(
         builder: (sheetCtx, setSheet) {
           void refresh() => setSheet(() {});
-          final proj = projectProvider.projects.where((p) => p.id == _selectedProjectId).firstOrNull;
-          final floors = proj?.floors ?? [];
-          final phases = proj?.selectedPhases ?? [];
-          final selectedPhase = phases.where((p) => p.id == _selectedPhaseId).firstOrNull;
-          final List<ProjectActivity> activities = [];
-          if (_selectedPhaseId != null) {
-            activities.addAll(selectedPhase?.activities ?? []);
-          } else if (proj != null) {
-            activities.addAll(phases.expand((p) => p.activities));
-          }
-          final activityNames = activities.map((a) => a.name).toSet().toList();
-          final count = _filterEntries(projectProvider, _quickTab()).length;
+          final o = _whereOptions(projectProvider);
+          final proj = o.project;
+          final floors = o.floors;
+          final phases = o.phases;
+          final selectedPhase = o.phase;
+          final activityNames = o.activities;
+          final count = _financeOn ? _moneyRowsNow(projectProvider).length : _filterEntries(projectProvider, _quickTab()).length;
           final hasProject = _selectedProjectId != 'all';
 
           Widget whereRow(String label, String value, bool enabled, Future<void> Function() onTap) => BtRow(
@@ -2060,18 +2848,9 @@ class _ReportsViewState extends State<_ReportsView> {
                   whereRow('Project', hasProject ? (proj?.name ?? 'Project') : 'All projects', true, () async {
                     await _pickProject(sheetCtx, projectProvider);
                   }),
-                  whereRow('Floor', _selectedFloor ?? 'All', hasProject && floors.isNotEmpty, () async {
-                    final v = await _pickOption(sheetCtx, 'Floor', [const MapEntry('Select Floor', 'All floors'), ...floors.map((f) => MapEntry(f, f))], _selectedFloor ?? 'Select Floor');
-                    if (v != null) setState(() { _selectedFloor = v == 'Select Floor' ? null : v; _currentPage = 1; });
-                  }),
-                  whereRow('Phase', selectedPhase?.phaseName ?? 'All', hasProject && phases.isNotEmpty, () async {
-                    final v = await _pickOption(sheetCtx, 'Phase', [const MapEntry('Select Phase', 'All phases'), ...phases.map((ph) => MapEntry(ph.id, ph.phaseName))], _selectedPhaseId ?? 'Select Phase');
-                    if (v != null) setState(() { _selectedPhaseId = v == 'Select Phase' ? null : v; _selectedActivityName = null; _currentPage = 1; });
-                  }),
-                  whereRow('Activity', _selectedActivityName ?? 'All', hasProject && activityNames.isNotEmpty, () async {
-                    final v = await _pickOption(sheetCtx, 'Activity', [const MapEntry('Select Activity', 'All activities'), ...activityNames.map((n) => MapEntry(n, n))], _selectedActivityName ?? 'Select Activity');
-                    if (v != null) setState(() { _selectedActivityName = v == 'Select Activity' ? null : v; _currentPage = 1; });
-                  }),
+                  whereRow('Floor', _selectedFloor ?? 'All', hasProject && floors.isNotEmpty, () => _pickFloor(sheetCtx, projectProvider)),
+                  whereRow('Phase', selectedPhase?.phaseName ?? 'All', hasProject && phases.isNotEmpty, () => _pickPhase(sheetCtx, projectProvider)),
+                  whereRow('Activity', _selectedActivityName ?? 'All', hasProject && (activityNames.isNotEmpty || _selectedActivityName != null), () => _pickActivity(sheetCtx, projectProvider)),
                 ],
               ),
               if (!hasProject)
@@ -2094,7 +2873,15 @@ class _ReportsViewState extends State<_ReportsView> {
   List<Widget> _buildEntryGroups(BuildContext context, List<EntryModel> entries, String Function(String) getProjectName) {
     final groups = <String, List<EntryModel>>{};
     for (final e in entries) {
-      final key = _sortColumn == 'date' ? formatDayGroup(e.date) : '';
+      final String key;
+      if (_sortColumn == 'date') {
+        key = formatDayGroup(e.date);
+      } else if (_sortColumn == 'paymentDate') {
+        final paid = ReportSheet.paymentDateOf(e);
+        key = paid == null ? 'Not paid yet' : 'Paid · ${formatDayGroup(paid)}';
+      } else {
+        key = '';
+      }
       groups.putIfAbsent(key, () => []).add(e);
     }
     final out = <Widget>[];
@@ -2188,22 +2975,26 @@ class _ReportsViewState extends State<_ReportsView> {
     );
   }
 
-  /// Totals per entry type (tap a row to open that tab).
+  /// "By type": 3-column cost-card grid (default, as in the original app) or
+  /// the per-type list. Tap a type to open its tab.
   Widget _buildByType(
     BuildContext context, {
     required double total,
+    required double paid,
+    required double remaining,
     required double material,
     required double labour,
     required double equipment,
     required ValueChanged<String> onType,
   }) {
     final bt = context.bt;
-    Widget type(String label, String tab, String typeName, double v, Color c) {
-      final share = total > 0 ? (v / total).clamp(0.0, 1.0) : 0.0;
+    double share(double v) => total > 0 ? (v / total).clamp(0.0, 1.0) : 0.0;
+
+    Widget listRow(String label, String tab, String typeName, double v, Color c) {
       return BtRow(
         leading: BtTypeTile(type: typeName),
         title: label,
-        subtitle: '${(share * 100).round()}% of billed',
+        subtitle: '${(share(v) * 100).round()}% of billed',
         minHeight: 64,
         onTap: () => onType(tab),
         trailing: Row(mainAxisSize: MainAxisSize.min, children: [
@@ -2215,7 +3006,7 @@ class _ReportsViewState extends State<_ReportsView> {
               children: [
                 Text(formatInr(v, compact: true), style: BtText.num(BtText.body(context, weight: FontWeight.w600))),
                 const SizedBox(height: 6),
-                BtProgress(value: share, color: c, thin: true),
+                BtProgress(value: share(v), color: c, thin: true),
               ],
             ),
           ),
@@ -2225,15 +3016,97 @@ class _ReportsViewState extends State<_ReportsView> {
       );
     }
 
+    Widget gridRow(List<Widget> cards) => IntrinsicHeight(
+          child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            for (var i = 0; i < cards.length; i++) ...[
+              if (i > 0) const SizedBox(width: 8),
+              Expanded(child: cards[i]),
+            ],
+          ]),
+        );
+
+    final body = _byTypeGrid
+        ? Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              gridRow([
+                _CostCard(title: 'Total billed', value: total, icon: Icons.account_balance_wallet_outlined, featured: true),
+                _CostCard(title: 'Paid', value: paid, icon: Icons.check_circle_outline_rounded, color: Bt.green),
+                _CostCard(
+                  title: 'Remaining',
+                  value: remaining,
+                  icon: Icons.pending_outlined,
+                  color: remaining > 0 ? Bt.red : Bt.green,
+                ),
+              ]),
+              const SizedBox(height: 8),
+              gridRow([
+                _CostCard(
+                  title: 'Material',
+                  value: material,
+                  icon: BtTypeTile.iconFor('material'),
+                  color: bt.series[0],
+                  share: share(material),
+                  onTap: () => onType('Materials'),
+                ),
+                _CostCard(
+                  title: 'Labour',
+                  value: labour,
+                  icon: BtTypeTile.iconFor('labour'),
+                  color: bt.series[1],
+                  share: share(labour),
+                  onTap: () => onType('Labour'),
+                ),
+                _CostCard(
+                  title: 'Equipment',
+                  value: equipment,
+                  icon: BtTypeTile.iconFor('equipment'),
+                  color: bt.series[2],
+                  share: share(equipment),
+                  onTap: () => onType('Equipment'),
+                ),
+              ]),
+            ],
+          )
+        : BtGroup(children: [
+            listRow('Material', 'Materials', 'material', material, bt.series[0]),
+            listRow('Labour', 'Labour', 'labour', labour, bt.series[1]),
+            listRow('Equipment', 'Equipment', 'equipment', equipment, bt.series[2]),
+          ]);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const BtSectionHeader(title: 'By type', caption: true),
-        BtGroup(children: [
-          type('Material', 'Materials', 'material', material, bt.series[0]),
-          type('Labour', 'Labour', 'labour', labour, bt.series[1]),
-          type('Equipment', 'Equipment', 'equipment', equipment, bt.series[2]),
-        ]),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: Row(children: [
+            Expanded(child: Text('BY TYPE', style: BtText.mono(context))),
+            _tour(
+              _kByTypeToggle,
+              'Cards or list',
+              'Left: cost cards in three columns (default). Right: one row per type with its share of the total. Your choice is remembered.',
+              ReportViewToggle(
+                table: _byTypeGrid,
+                tableIcon: Icons.grid_view_rounded,
+                tableLabel: 'Cards',
+                listIcon: Icons.view_list_rounded,
+                listLabel: 'List',
+                onChanged: (v) => setState(() {
+                  _byTypeGrid = v;
+                  ReportFilterState.byTypeGrid = v;
+                }),
+              ),
+              radius: Bt.rChip,
+            ),
+          ]),
+        ),
+        _tour(
+          _kByType,
+          'By type',
+          'What you spent, paid and still owe, then the split between Material, Labour and Equipment. Tap a type to open its tab.',
+          body,
+          radius: 16,
+        ),
       ],
     );
   }
@@ -2319,7 +3192,12 @@ class _ReportsViewState extends State<_ReportsView> {
     final uniqueNames = _uniqueItemNames(meta.type, allEntries);
     final itemLabel = _selectedItemName ?? 'All';
     return [
-      BtChip(
+      _tour(
+        _kItem,
+        '$dropdownLabel picker',
+        'Show only one ${dropdownLabel.toLowerCase()} — the totals and the sheet follow it. Pick "All" to see every one again.',
+        radius: Bt.rChip,
+        BtChip(
         label: '$dropdownLabel: ${itemLabel.length > 16 ? '${itemLabel.substring(0, 15).trimRight()}…' : itemLabel}',
         trailingIcon: Icons.expand_more_rounded,
         selected: _selectedItemName != null,
@@ -2341,22 +3219,7 @@ class _ReportsViewState extends State<_ReportsView> {
           });
         },
       ),
-      if (!_reportGenerated) ...[
-        const SizedBox(width: 8),
-        BtButton(
-          label: 'Generate report',
-          small: true,
-          expand: false,
-          icon: Icons.analytics_outlined,
-          onPressed: () {
-            setState(() {
-              _reportGenerated = true;
-              _currentPage = 1;
-              _showSuggestions = false;
-            });
-          },
-        ),
-      ],
+      ),
     ];
   }
 
@@ -2443,6 +3306,54 @@ class _ReportsViewState extends State<_ReportsView> {
         ],
       ),
     );
+  }
+
+  /// Finance table row tapped: spending entries open the entry details (with
+  /// Add More / Payment / Edit); other money opens its own details sheet with
+  /// "Change category".
+  void _onMoneyRowTap(MoneyRow r, String Function(String) projectNameOf, {int? rowNumber}) {
+    final e = r.entry;
+    if (e != null) {
+      _showEntryDetailsDialog(context, e, projectNameOf(e.projectId), rowNumber: rowNumber);
+    } else {
+      showMoneyRowDetails(context, r, onChanged: () => _loadLedger(keepRows: true));
+    }
+  }
+
+  /// Download exactly the finance table as shown: the filtered rows in the
+  /// current order, with In / Out / Net at the bottom.
+  Future<void> _exportMoney(ProjectProvider pp, {required bool pdf}) async {
+    final rows = _moneyRowsNow(pp);
+    if (rows.isEmpty) {
+      btToast(context, 'Nothing to export for these filters.', error: true);
+      return;
+    }
+    String statusOf(EntryModel e) => _getPaymentStatusLabel(e.paymentStatus, amount: e.amount, paidAmount: e.paidAmount);
+    try {
+      if (!pdf) {
+        await MoneyExport.shareCsv(rows, statusOf);
+        return;
+      }
+      final project = pp.projects.where((p) => p.id == _selectedProjectId).firstOrNull;
+      final projectName = _selectedProjectId == 'all' ? 'All projects' : (project?.name ?? 'Project');
+      final parts = <String>[
+        'Project: $projectName',
+        'Date Range: $_datePreset',
+        'Showing: ${_moneyIn && _moneyOut ? 'Money in and out' : (_moneyIn ? 'Money in' : 'Money out')}',
+        if (_moneyType != MoneyType.all) 'Type: ${_moneyType.label}',
+        if (_selectedStatus != 'All') 'Status: $_selectedStatus',
+        if (_searchQuery.isNotEmpty) 'Search: $_searchQuery',
+        if (_ledger?.truncated == true) 'Newest ${_ledger!.rows.length} entries only',
+      ];
+      await MoneyExport.sharePdf(
+        rows,
+        statusOf,
+        title: _selectedProjectId == 'all' ? 'All Projects Money Report' : '$projectName Money Report',
+        filterSummary: parts.join(' | '),
+      );
+    } catch (e) {
+      if (mounted) btToast(context, '${pdf ? 'PDF' : 'CSV'} Export failed: $e', error: true);
+    }
   }
 
   void _showEntryDetailsDialog(
@@ -2622,6 +3533,143 @@ class _ReportsViewState extends State<_ReportsView> {
 }
 
 /// Noir "Ask AI about your costs" card (Reports board).
+/// Cost card in the "By type" grid (V2 version of the original app's cards).
+class _WhereOptions {
+  const _WhereOptions({required this.project, required this.floors, required this.phases, required this.phase, required this.activities});
+  final ProjectModel? project;
+  final List<String> floors;
+  final List<ProjectPhase> phases;
+  final ProjectPhase? phase;
+  final List<String> activities;
+}
+
+/// Quick filter chip on the noir header: "Phase ▾" when off; the chosen value
+/// with an × (clears it) when on. [dim] = needs a project first.
+class _WhereChip extends StatelessWidget {
+  const _WhereChip({required this.label, required this.value, required this.onTap, required this.onClear, this.enabled = true, this.dim = false});
+  final String label;
+  final String? value;
+  final VoidCallback onTap;
+  final VoidCallback onClear;
+  final bool enabled;
+  final bool dim;
+
+  @override
+  Widget build(BuildContext context) {
+    final on = value != null;
+    final fg = on ? Bt.noir : Bt.bone.withValues(alpha: (dim || !enabled) ? .5 : 1);
+    final text = on && value!.length > 20 ? '${value!.substring(0, 19).trimRight()}…' : (value ?? label);
+    return Semantics(
+      button: true,
+      label: on ? '$label: $value' : '$label filter',
+      child: BtPressable(
+        onTap: enabled ? onTap : null,
+        scale: .95,
+        child: AnimatedContainer(
+          duration: Bt.fast,
+          curve: Bt.ease,
+          constraints: const BoxConstraints(minHeight: 36),
+          padding: EdgeInsets.only(left: 13, right: on ? 4 : 9),
+          decoration: BoxDecoration(
+            color: on ? Bt.bone : Colors.white.withValues(alpha: .08),
+            borderRadius: BorderRadius.circular(Bt.rChip),
+            border: on ? null : Border.all(color: Colors.white.withValues(alpha: .12)),
+          ),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            ExcludeSemantics(child: Text(text, style: BtText.subhead(context, weight: FontWeight.w500, color: fg))),
+            if (on)
+              Semantics(
+                button: true,
+                label: 'Clear $label',
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: onClear,
+                  child: SizedBox(width: 30, height: 36, child: Icon(Icons.close_rounded, size: 16, color: fg)),
+                ),
+              )
+            else ...[
+              const SizedBox(width: 2),
+              Icon(Icons.expand_more_rounded, size: 18, color: fg),
+            ],
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
+class _CostCard extends StatelessWidget {
+  const _CostCard({
+    required this.title,
+    required this.value,
+    required this.icon,
+    this.color,
+    this.featured = false,
+    this.share,
+    this.onTap,
+  });
+  final String title;
+  final double value;
+  final IconData icon;
+  final Color? color;
+  final bool featured;
+  /// Share of the total billed (type cards only).
+  final double? share;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = featured ? Bt.bone : (color ?? Bt.ink);
+    final label = featured ? Bt.onNoir2 : Bt.ink2;
+    final card = Container(
+      padding: const EdgeInsets.fromLTRB(11, 11, 11, 11),
+      decoration: BoxDecoration(
+        color: featured ? Bt.ink : Bt.card,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: featured ? null : Bt.shadow,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(
+              color: featured ? Colors.white.withValues(alpha: .1) : (color ?? Bt.ink).withValues(alpha: .12),
+              borderRadius: BorderRadius.circular(9),
+            ),
+            child: Icon(icon, size: 16, color: featured ? Bt.bone : (color ?? Bt.ink)),
+          ),
+          const SizedBox(height: 10),
+          Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: BtText.caption(context, color: label).copyWith(fontSize: 12)),
+          const SizedBox(height: 2),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              formatInr(value, compact: true),
+              maxLines: 1,
+              style: BtText.num(BtText.body(context, weight: FontWeight.w700, color: featured ? Bt.bone : Bt.ink)).copyWith(fontSize: 15),
+            ),
+          ),
+          if (share != null) ...[
+            const SizedBox(height: 8),
+            BtProgress(value: share!, color: fg, thin: true),
+          ],
+        ],
+      ),
+    );
+    if (onTap == null) return Semantics(label: '$title ${formatInr(value)}', excludeSemantics: true, child: card);
+    return BtPressable(
+      onTap: onTap!,
+      scale: .96,
+      semanticLabel: '$title ${formatInr(value)}. Open $title tab',
+      child: card,
+    );
+  }
+}
+
 class _AskAiBanner extends StatelessWidget {
   const _AskAiBanner({required this.projectName});
   final String projectName;
@@ -2638,7 +3686,7 @@ class _AskAiBanner extends StatelessWidget {
         onTap: () => Navigator.pushNamed(
           context,
           '/ai-chat',
-          arguments: {'projectName': projectName},
+          arguments: {'projectName': projectName, 'projectId': ReportFilterState.selectedProjectId},
         ),
         child: Row(
           children: [
@@ -2731,16 +3779,30 @@ class _ToolChip extends StatelessWidget {
   }
 }
 
-/// Slim 3-cell strip: Total billed · Paid · Remaining.
+/// Slim 3-cell strip: Total billed · Paid · Remaining (or, for the finance
+/// table, In · Out · Net).
 class _SummaryStrip extends StatelessWidget {
-  const _SummaryStrip({required this.total, required this.paid, required this.remaining});
+  const _SummaryStrip({required this.total, required this.paid, required this.remaining})
+      : labels = const ('Total billed', 'Paid', 'Remaining'),
+        net = false;
+
+  /// In · Out · Net of the finance table's rows. Net is [moneyIn] − [moneyOut].
+  const _SummaryStrip.money({required double moneyIn, required double moneyOut})
+      : total = moneyIn,
+        paid = moneyOut,
+        remaining = moneyIn - moneyOut,
+        labels = const ('In', 'Out', 'Net'),
+        net = true;
+
   final double total;
   final double paid;
   final double remaining;
+  final (String, String, String) labels;
+  final bool net;
 
   @override
   Widget build(BuildContext context) {
-    Widget cell(String label, double v, Color color) => Expanded(
+    Widget cell(String label, double v, Color color, {String Function(double)? format}) => Expanded(
           child: Container(
             color: Bt.card,
             padding: const EdgeInsets.fromLTRB(11, 9, 11, 9),
@@ -2755,7 +3817,7 @@ class _SummaryStrip extends StatelessWidget {
                   alignment: Alignment.centerLeft,
                   child: BtCountUp(
                     value: v,
-                    format: (x) => formatInr(x),
+                    format: format ?? (x) => formatInr(x),
                     style: BtText.body(context, weight: FontWeight.w700, color: color).copyWith(fontSize: 15),
                   ),
                 ),
@@ -2773,11 +3835,19 @@ class _SummaryStrip extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                cell('Total billed', total, Bt.ink),
-                const SizedBox(width: 1),
-                cell('Paid', paid, Bt.green),
-                const SizedBox(width: 1),
-                cell('Remaining', remaining, remaining > 0 ? Bt.red : Bt.green),
+                if (net) ...[
+                  cell(labels.$1, total, Bt.green),
+                  const SizedBox(width: 1),
+                  cell(labels.$2, paid, Bt.red),
+                  const SizedBox(width: 1),
+                  cell(labels.$3, remaining, remaining >= 0 ? Bt.green : Bt.red, format: (x) => x > 0 ? '+${formatInr(x)}' : formatInr(x)),
+                ] else ...[
+                  cell(labels.$1, total, Bt.ink),
+                  const SizedBox(width: 1),
+                  cell(labels.$2, paid, Bt.green),
+                  const SizedBox(width: 1),
+                  cell(labels.$3, remaining, remaining > 0 ? Bt.red : Bt.green),
+                ],
               ],
             ),
           ),
@@ -2936,14 +4006,15 @@ class _DetailAction extends StatelessWidget {
 /// Full-screen sheet with a rotate (landscape) / straight view switch.
 class _FullScreenLogsViewer extends StatefulWidget {
   const _FullScreenLogsViewer({
-    required this.filteredEntries,
+    required this.entriesOf,
     required this.getProjectName,
     required this.statusOf,
     required this.quickCategoryTab,
     required this.title,
     required this.onExportCsv,
     required this.onExportPdf,
-    required this.activeColumns,
+    required this.columnsOf,
+    required this.onPinColumn,
     required this.sortColumn,
     required this.sortAscending,
     required this.onSort,
@@ -2951,15 +4022,26 @@ class _FullScreenLogsViewer extends StatefulWidget {
     required this.onAddMore,
     required this.onRecordPayment,
     required this.onEdit,
+    this.moneyRowsOf,
+    this.moneyChanged,
+    this.onMoneyRowTap,
   });
-  final List<EntryModel> filteredEntries;
+
+  /// Finance table: the rows (filtered + sorted by Reports, read on each build)
+  /// instead of [entriesOf], and a signal that they changed.
+  final List<MoneyRow> Function()? moneyRowsOf;
+  final Listenable? moneyChanged;
+  final void Function(MoneyRow)? onMoneyRowTap;
+  final List<EntryModel> Function(ProjectProvider) entriesOf;
   final String Function(String) getProjectName;
   final String Function(EntryModel) statusOf;
   final String quickCategoryTab;
   final String title;
-  final VoidCallback onExportCsv;
-  final VoidCallback onExportPdf;
-  final List<String> activeColumns;
+  final void Function(List<EntryModel> rows) onExportCsv;
+  final void Function(List<EntryModel> rows) onExportPdf;
+  /// The tab's columns in on-screen order (pinned first), read on each build.
+  final List<String> Function() columnsOf;
+  final void Function(String column) onPinColumn;
   final String sortColumn;
   final bool sortAscending;
   final void Function(String column, bool ascending) onSort;
@@ -2975,7 +4057,12 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
   int _quarterTurns = 0;
   late String _sortColumn = widget.sortColumn;
   late bool _sortAscending = widget.sortAscending;
-  late List<EntryModel> _rows = _sorted();
+  /// Rows as last built (refiltered + sorted in build from the live entries).
+  List<EntryModel> _rows = const [];
+  List<MoneyRow> _moneyRows = const [];
+
+  bool get _isMoney => widget.moneyRowsOf != null;
+  int get _count => _isMoney ? _moneyRows.length : _rows.length;
 
   void _toggleRotation() {
     setState(() {
@@ -2983,19 +4070,9 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
     });
   }
 
-  List<EntryModel> _sorted() {
-    final list = List<EntryModel>.from(widget.filteredEntries);
-    list.sort((a, b) {
-      int cmp = 0;
-      if (_sortColumn == 'date') {
-        cmp = a.date.compareTo(b.date);
-      } else if (_sortColumn == 'amount') {
-        cmp = a.amount.compareTo(b.amount);
-      } else if (_sortColumn == 'project') {
-        cmp = widget.getProjectName(a.projectId).compareTo(widget.getProjectName(b.projectId));
-      }
-      return _sortAscending ? cmp : -cmp;
-    });
+  List<EntryModel> _sorted(List<EntryModel> source) {
+    final list = List<EntryModel>.from(source);
+    list.sort((a, b) => compareReportEntries(a, b, _sortColumn, _sortAscending, widget.getProjectName));
     return list;
   }
 
@@ -3003,7 +4080,7 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
     showBtSheet(
       context,
       title: 'Export',
-      subtitle: '${_rows.length} entries',
+      subtitle: '$_count entries',
       builder: (sheetCtx) => BtGroup(
         children: [
           BtRow(
@@ -3013,7 +4090,7 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
             showChevron: true,
             onTap: () {
               Navigator.pop(sheetCtx);
-              widget.onExportCsv();
+              widget.onExportCsv(_rows);
             },
           ),
           BtRow(
@@ -3023,7 +4100,7 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
             showChevron: true,
             onTap: () {
               Navigator.pop(sheetCtx);
-              widget.onExportPdf();
+              widget.onExportPdf(_rows);
             },
           ),
         ],
@@ -3033,6 +4110,7 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
 
   Widget _content(double width) {
     final rotated = _quarterTurns != 0;
+    final columns = widget.columnsOf();
     final wide = width > 600;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -3058,7 +4136,7 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
                       Text.rich(
                         TextSpan(children: [
                           TextSpan(text: widget.title),
-                          TextSpan(text: '  (${_rows.length} entries)', style: BtText.caption(context, color: Bt.ink2, weight: FontWeight.w500)),
+                          TextSpan(text: '  ($_count entries)', style: BtText.caption(context, color: Bt.ink2, weight: FontWeight.w500)),
                         ]),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -3098,11 +4176,36 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
             child: LayoutBuilder(
               builder: (context, c) => Align(
                 alignment: Alignment.topCenter,
-                child: _rows.isEmpty
+                child: _count == 0
                     ? const BtCard(child: BtEmpty(icon: Icons.search_off_outlined, title: 'No transaction logs match filters.'))
+                    : _isMoney
+                    ? ReportSheet.money(
+                        rows: _moneyRows,
+                        maxHeight: c.maxHeight - ReportSheet.footerHeight,
+                        pinnedWidth: wide ? 158 : 132,
+                        statusOf: widget.statusOf,
+                        sortColumn: _sortColumn,
+                        sortAscending: _sortAscending,
+                        onSort: (column, ascending) {
+                          setState(() {
+                            _sortColumn = column;
+                            _sortAscending = ascending;
+                          });
+                          widget.onSort(column, ascending);
+                        },
+                        onMoneyRowTap: widget.onMoneyRowTap!,
+                        onAddMore: widget.onAddMore,
+                        onRecordPayment: widget.onRecordPayment,
+                        onEdit: widget.onEdit,
+                      )
                     : ReportSheet(
                         entries: _rows,
-                        columns: widget.activeColumns,
+                        columns: columns,
+                        pinnedColumn: columns.isEmpty ? null : columns.first,
+                        onPinColumn: (column) {
+                          widget.onPinColumn(column);
+                          setState(() {});
+                        },
                         maxHeight: c.maxHeight - ReportSheet.footerHeight,
                         pinnedWidth: wide ? 158 : 132,
                         projectNameOf: (e) => widget.getProjectName(e.projectId),
@@ -3113,7 +4216,6 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
                           setState(() {
                             _sortColumn = column;
                             _sortAscending = ascending;
-                            _rows = _sorted();
                           });
                           widget.onSort(column, ascending);
                         },
@@ -3132,26 +4234,46 @@ class _FullScreenLogsViewerState extends State<_FullScreenLogsViewer> {
 
   @override
   Widget build(BuildContext context) {
+    final projectProvider = context.watch<ProjectProvider>();
     final rotated = _quarterTurns != 0;
-    return Scaffold(
-      backgroundColor: Bt.ground,
-      body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            if (!rotated) return _content(constraints.maxWidth);
-            return RotatedBox(
-              quarterTurns: _quarterTurns,
-              child: SizedBox(
-                width: constraints.maxHeight,
-                height: constraints.maxWidth,
-                child: _content(constraints.maxHeight),
-              ),
-            );
-          },
-        ),
-      ),
+    return ListenableBuilder(
+      listenable: widget.moneyChanged ?? const _NeverChanges(),
+      builder: (context, _) {
+        if (_isMoney) {
+          _moneyRows = widget.moneyRowsOf!();
+        } else {
+          _rows = _sorted(widget.entriesOf(projectProvider));
+        }
+        return Scaffold(
+          backgroundColor: Bt.ground,
+          body: SafeArea(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                if (!rotated) return _content(constraints.maxWidth);
+                return RotatedBox(
+                  quarterTurns: _quarterTurns,
+                  child: SizedBox(
+                    width: constraints.maxHeight,
+                    height: constraints.maxWidth,
+                    child: _content(constraints.maxHeight),
+                  ),
+                );
+              },
+            ),
+          ),
+        );
+      },
     );
   }
+}
+
+/// A [Listenable] that never notifies (full screen sheet without a ledger).
+class _NeverChanges implements Listenable {
+  const _NeverChanges();
+  @override
+  void addListener(VoidCallback listener) {}
+  @override
+  void removeListener(VoidCallback listener) {}
 }
 
 final _objectIdPattern = RegExp(r'^[0-9a-fA-F]{24}$');
@@ -3228,14 +4350,9 @@ class _ReportActions {
         route = '/add-material';
         break;
     }
-    Navigator.pushNamed(context, route, arguments: dupArgs).then((val) {
-      if (context.mounted) {
-        final loadId = ReportFilterState.selectedProjectId == 'all'
-            ? null
-            : ReportFilterState.selectedProjectId;
-        context.read<ProjectProvider>().loadEntriesForProject(loadId);
-        context.read<ProjectProvider>().load();
-      }
+    Navigator.pushNamed(context, route, arguments: dupArgs).then((saved) {
+      // Forms pop with true (saved) or 'deleted'; plain back needs no reload.
+      if (context.mounted && saved != null) ReportFilterState.reloadEntries(context);
     });
   }
 
@@ -3257,14 +4374,9 @@ class _ReportActions {
         route = '/add-material';
         break;
     }
-    Navigator.pushNamed(context, route, arguments: editArgs).then((val) {
-      if (context.mounted) {
-        final loadId = ReportFilterState.selectedProjectId == 'all'
-            ? null
-            : ReportFilterState.selectedProjectId;
-        context.read<ProjectProvider>().loadEntriesForProject(loadId);
-        context.read<ProjectProvider>().load();
-      }
+    Navigator.pushNamed(context, route, arguments: editArgs).then((saved) {
+      // Forms pop with true (saved) or 'deleted'; plain back needs no reload.
+      if (context.mounted && saved != null) ReportFilterState.reloadEntries(context);
     });
   }
 
@@ -3291,7 +4403,7 @@ class _ReportActions {
         Navigator.of(context).pop(); // pop progress
         if (success) {
           btToast(context, 'Entry deleted successfully');
-          context.read<ProjectProvider>().load();
+          ReportFilterState.reloadEntries(context);
         } else {
           btToast(context, 'Failed to delete entry', error: true);
         }
@@ -3367,7 +4479,7 @@ class _ReportActions {
         arguments: payArgs,
       ).then((updated) {
         if (updated == true && context.mounted) {
-          context.read<ProjectProvider>().load();
+          ReportFilterState.reloadEntries(context);
         }
       });
     }

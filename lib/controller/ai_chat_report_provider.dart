@@ -83,8 +83,12 @@ class AiChatReportProvider extends ChangeNotifier {
     required this.projectProvider,
     required this.authToken,
     required this.baseUrl,
+    this.scopeProjectId,
   });
   final ProjectProvider projectProvider;
+  /// Project the question is about when opened from Reports ('all' = every
+  /// project). Null → the app's selected project, as before.
+  final String? scopeProjectId;
   final String authToken;
   final String baseUrl;
   AiReportState _state = AiReportState.initial;
@@ -118,7 +122,7 @@ class AiChatReportProvider extends ChangeNotifier {
     notifyListeners();
     try {
       final uri = Uri.parse('$baseUrl/api/reports/dashboard/query');
-      final projectId = projectProvider.selectedProject?.id ?? 'all';
+      final projectId = scopeProjectId ?? projectProvider.selectedProject?.id ?? 'all';
       final headers = {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $authToken',

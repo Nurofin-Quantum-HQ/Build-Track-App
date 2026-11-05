@@ -1,10 +1,10 @@
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:buildtrack_mobile/common/themes/app_colors.dart';
 import 'package:buildtrack_mobile/common/themes/app_theme.dart';
 import 'package:buildtrack_mobile/common/widgets/subscription_card.dart';
 import 'package:buildtrack_mobile/controller/role_manager.dart';
 import 'package:buildtrack_mobile/controller/user_session.dart';
+import 'package:buildtrack_mobile/controller/nav_controller.dart';
 import 'package:buildtrack_mobile/controller/project_provider.dart';
 import 'package:buildtrack_mobile/controller/inventory_provider.dart';
 import 'package:buildtrack_mobile/controller/subscription_provider.dart';
@@ -13,6 +13,7 @@ import 'package:buildtrack_mobile/services/auth_service.dart';
 import 'package:provider/provider.dart';
 import 'package:buildtrack_mobile/controller/theme_provider.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:buildtrack_mobile/design/design.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
@@ -20,6 +21,7 @@ import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:buildtrack_mobile/common/utils/image_pick_helper.dart';
 import 'package:showcaseview/showcaseview.dart';
 import 'package:buildtrack_mobile/controller/showcase_keys.dart';
+import 'package:buildtrack_mobile/screen/profile/change_password_sheet.dart';
 class ProfileUserData {
   const ProfileUserData({
     required this.name,
@@ -94,7 +96,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _profileError = null;
     });
     try {
-      final response = await ApiService.get('/users/profile');
+      // Don't leave the page on its loading skeleton for ApiService's 90 s
+      // timeout on a slow/unreachable network — fall back to the cached
+      // session data (the catch below) after 20 s.
+      final response = await ApiService.get('/users/profile').timeout(const Duration(seconds: 20));
       if (!mounted) return;
       if (response.statusCode == 200) {
         final decoded = json.decode(response.body);
@@ -272,6 +277,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       globalTooltipActions: [TooltipActionButton(type: TooltipDefaultActionType.skip, backgroundColor: Colors.transparent, textStyle: const TextStyle(color: Colors.white70, fontWeight: FontWeight.bold)), TooltipActionButton(type: TooltipDefaultActionType.next, backgroundColor: AppColors.primary, textStyle: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))], enableAutoScroll: true,
       builder: (context) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
+          // The tour targets only exist once the profile has loaded; starting
+          // earlier marked the module visited and ended the tour at step 1.
+          if (!mounted || _isLoadingProfile) return;
           final projProvider = Provider.of<ProjectProvider>(context, listen: false);
           if (projProvider.projectsLoaded && projProvider.projects.isEmpty && !UserSession.hasSkippedTour && !UserSession.visitedModules.contains('profile')) {
             UserSession.markModuleVisited('profile');
@@ -312,7 +320,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 child: _tour(ShowcaseKeys.profileSubscription, 'View your current subscription plan and limits.', SubscriptionCard(showUpgradeButton: RoleManager.isAdmin)),
               ),
               const SizedBox(height: 24),
-              // ── Workspace (was the side menu) ──
+              // ── Workspace (was the side menu) ── Admin only: Team Overview is
+              // admin-gated (non-admins hit a lock screen), the plan is
+              // "managed by your admin", and the other rows were already admin-only.
+              if (RoleManager.isAdmin) ...[
               BtReveal(
                 index: 3,
                 child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -350,13 +361,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           showChevron: true,
                           onTap: () => Navigator.pushNamed(context, '/logs'),
                         ),
-                      if (UserSession.isAdmin)
-                        BtRow(
-                          leading: const BtTile(icon: Icons.workspaces_outline, size: 34),
-                          title: 'Create Workspace',
-                          showChevron: true,
-                          onTap: () => Navigator.pushNamed(context, '/create-workspace'),
-                        ),
                     ]),
                   ),
                   if (RoleManager.canViewTeamAccess)
@@ -367,6 +371,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ]),
               ),
               const SizedBox(height: 24),
+              ],
               // ── You ──
               BtReveal(
                 index: 4,
@@ -387,7 +392,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       title: 'App Guidelines',
                       subtitle: 'Replay the guided tour',
                       showChevron: true,
-                      onTap: () => ShowCaseWidget.of(context).startShowCase(_tourKeys),
+                      onTap: _replayAppTour,
                     ),
                     BtRow(
                       leading: const BtTile(icon: Icons.language_rounded, size: 34),
@@ -441,7 +446,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         size: 20,
         color: Bt.bone,
         background: glass,
-        semantic: 'App guidelines',
+        semantic: 'Tour this page',
         onTap: () => ShowCaseWidget.of(context).startShowCase(_tourKeys),
       ),
       const SizedBox(width: 8),
@@ -602,6 +607,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         showChevron: true,
         onTap: () => _showAppearance(context),
       ),
+      const _MotionRow(),
       BtRow(
         leading: const BtTile(icon: Icons.notifications_outlined, size: 34),
         title: 'Notifications',
@@ -612,7 +618,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         leading: const BtTile(icon: Icons.lock_outline, size: 34),
         title: 'Change Password',
         showChevron: true,
-        onTap: () => Navigator.pushNamed(context, '/forgot-password'),
+        onTap: () => showChangePasswordSheet(context),
       ),
     ]);
   }
@@ -651,12 +657,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final response = await ApiService.delete('/auth/account');
       if (!mounted) return;
       if (response.statusCode == 200 || response.statusCode == 204) {
-        await AuthService.logout();
-        if (!mounted) return;
-        context.read<ProjectProvider>().clear();
-        context.read<InventoryProvider>().clear();
-        context.read<SubscriptionProvider>().clear();
-        Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+        final projects = context.read<ProjectProvider>();
+        final inventory = context.read<InventoryProvider>();
+        final subscription = context.read<SubscriptionProvider>();
+        await AuthService.logout(); // navigates to /login
+        projects.clear();
+        inventory.clear();
+        subscription.clear();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -675,14 +682,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
     }
   }
+  /// App Guidelines: restart the whole guided app tour (all tabs) from Home.
+  Future<void> _replayAppTour() async {
+    await UserSession.restartAppTour();
+    if (!mounted) return;
+    context.read<NavController>().setRoute('/home', context);
+  }
+
   void _onLogoutPressed() async {
+    // Read the providers before the await — this page is removed by the
+    // navigation inside AuthService.logout().
+    final projects = context.read<ProjectProvider>();
+    final inventory = context.read<InventoryProvider>();
+    final subscription = context.read<SubscriptionProvider>();
+    // Intentional logout: AuthService clears the session, ignores any 401s from
+    // requests still in flight (no "Session expired" alert) and returns to
+    // /login itself, so no second navigation here.
     await AuthService.logout();
-    if (mounted) {
-      context.read<ProjectProvider>().clear();
-      context.read<InventoryProvider>().clear();
-      context.read<SubscriptionProvider>().clear();
-      Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
-    }
+    projects.clear();
+    inventory.clear();
+    subscription.clear();
   }
 }
 class _ErrorBanner extends StatelessWidget {
@@ -714,6 +733,56 @@ class _ErrorBanner extends StatelessWidget {
 }
 
 
+
+/// Settings row: Motion  Full / Reduced / Off (saved per user on this device).
+class _MotionRow extends StatelessWidget {
+  const _MotionRow();
+
+  static const _hints = {
+    BtMotionLevel.full: 'Everything animates, including the save celebrations.',
+    BtMotionLevel.reduced: 'Gentle fades only. No sliding, counting or looping.',
+    BtMotionLevel.off: 'Nothing moves. Changes appear instantly.',
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: BtMotion.instance,
+      builder: (context, _) {
+        final level = BtMotion.instance.level;
+        final osLimited = BtMotion.osLimited(context);
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              const BtTile(icon: Icons.animation_rounded, size: 34),
+              const SizedBox(width: 12),
+              Expanded(child: Text('Motion', style: BtText.body(context, weight: FontWeight.w500))),
+            ]),
+            const SizedBox(height: 12),
+            BtSegmented<BtMotionLevel>(
+              value: level,
+              onChanged: (v) {
+                HapticFeedback.selectionClick();
+                BtMotion.instance.set(v);
+              },
+              segments: const {
+                BtMotionLevel.full: 'Full',
+                BtMotionLevel.reduced: 'Reduced',
+                BtMotionLevel.off: 'Off',
+              },
+            ),
+            const SizedBox(height: 8),
+            Text(
+              osLimited ? 'Your phone\'s Reduce Motion setting is on, so the app stays at Reduced.' : _hints[level]!,
+              style: BtText.caption(context, color: Bt.ink3),
+            ),
+          ]),
+        );
+      },
+    );
+  }
+}
 
 class _ThemePicker extends StatelessWidget {
   const _ThemePicker();

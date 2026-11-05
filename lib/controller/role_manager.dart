@@ -35,8 +35,10 @@ class RoleManager {
       isAdmin || UserSession.hasPermission('assign_roles');
   static bool get canAssignProject =>
       isAdmin || UserSession.hasPermission('assign_project');
+  /// Assign Role › "Assign Tasks" (POST /tasks needs `assign_tasks`).
+  static const assignTasksKey = 'assign_tasks';
   static bool get canAssignTasks =>
-      isAdmin || isSupervisor || UserSession.hasPermission('assign_tasks');
+      isAdmin || UserSession.hasPermission(assignTasksKey);
   static bool get canAssignRole => canAssignRoles;
   static bool get canManageTeam =>
       isAdmin || UserSession.hasPermission('manage_team');
@@ -60,6 +62,22 @@ class RoleManager {
       isAdmin ||
       canSubmitDailyUpdate ||
       UserSession.hasPermission('add_entries');
+  /// Saving a material / labour / equipment entry (POST/PUT /transactions):
+  /// the backend requires `manage_expenses` or `add_entries` (Admins always).
+  static bool get canAddTransactions =>
+      isAdmin ||
+      UserSession.hasPermission('manage_expenses') ||
+      UserSession.hasPermission('add_entries');
+  /// Daily update / progress (PUT /projects/:id). Backend allows Admins, these
+  /// permission keys, or anyone with a task on that project (the task case is
+  /// checked by the screen that has the tasks).
+  static bool get canSubmitProjectUpdate =>
+      isAdmin ||
+      UserSession.hasPermission('edit_project') ||
+      UserSession.hasPermission('manage_team') ||
+      UserSession.hasPermission('add_entry') ||
+      UserSession.hasPermission('submit_daily_update') ||
+      UserSession.hasPermission('approve_updates');
   static bool get canApproveUpdates =>
       isAdmin ||
       UserSession.hasPermission('approve_updates') ||
@@ -70,6 +88,12 @@ class RoleManager {
       UserSession.hasPermission('approve_payments');
   static bool get canAddSupervisorRemarks =>
       isAdmin || UserSession.hasPermission('add_supervisor_remarks');
+  /// Recording a payment / marking paid (POST/PUT /transactions with paidAmount or
+  /// paymentStatus Paid): the backend allows Admins, approve_payments or mark_paid.
+  static bool get canRecordPayments =>
+      isAdmin ||
+      UserSession.hasPermission('approve_payments') ||
+      UserSession.hasPermission('mark_paid');
   static bool get canApprovePayments =>
       isAdmin ||
       UserSession.hasPermission('approve_payments') ||
@@ -84,6 +108,16 @@ class RoleManager {
       isAdmin || UserSession.hasPermission('view_delay_tracker');
   static bool get canViewMediaGallery =>
       isAdmin || UserSession.hasPermission('view_media_gallery');
+  /// Budget figures (project budget, budget used/left). Admins always; others
+  /// only when granted "Project budget" in Assign Role (permission key below).
+  static const viewProjectBudgetKey = 'view_project_budget';
+  static bool get canViewProjectBudget =>
+      isAdmin || UserSession.hasPermission(viewProjectBudgetKey);
+  /// Money in / money out / loans in Reports (GET /reports/ledger). Admins
+  /// always; others only when granted "View finances" in Assign Role.
+  static const viewFinancesKey = 'view_finances';
+  static bool get canViewFinances =>
+      isAdmin || UserSession.hasPermission(viewFinancesKey);
   static bool get canViewReports =>
       isAdmin || UserSession.hasPermission('view_reports');
   static bool get canManageExpenses =>
@@ -113,20 +147,27 @@ class RoleManager {
       isAdmin || UserSession.hasPermission('view_contractor_performance');
   static bool get canViewNotifications => true;
   static bool get canEditProfile => true;
-  static bool get canDeleteEntries => isAdmin || canApprovePayments;
+  /// Assign Role › Activities & Entries › Delete (DELETE /transactions/:id
+  /// needs `delete_entry`).
+  static bool get canDeleteEntries =>
+      isAdmin || UserSession.hasPermission('delete_entry');
   static bool get canApproveEntries => isAdmin || canApprovePayments;
   static bool get canUpdateProgress => canAddEntries;
   static bool get canViewTeamAccess => isAdmin;
   static const _restrictedRoutes = <String, bool Function()>{
     '/assign-role': _checkAssignRole,
     '/reports': _checkReports,
-    '/create-workspace': _checkAdmin,
+    '/create-workspace': _checkCreateWorkspace,
     '/logs': _checkLogs,
   };
-  static bool _checkAssignRole() => canAssignRoles;
+  // Assign Role's APIs (/auth/users, /auth/provision) are Admin-only on the
+  // backend, so the `assign_roles` permission alone can't use the screen.
+  static bool _checkAssignRole() => isAdmin;
   static bool _checkReports() => canViewReports;
-  static bool _checkAdmin() => isAdmin;
-  static bool _checkLogs() => isAdmin || canViewReports;
+  // Sign-up only (Login screen, logged out). Removed from Account.
+  static bool _checkCreateWorkspace() => UserSession.userId.isEmpty;
+  // GET /transactions is open to every signed-in user (scoped server-side).
+  static bool _checkLogs() => UserSession.userId.isNotEmpty;
   static bool canNavigate(String route) {
     final check = _restrictedRoutes[route];
     if (check == null) return true;

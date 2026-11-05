@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:developer' as dev;
 import 'package:buildtrack_mobile/models/project_model.dart';
+import 'package:buildtrack_mobile/common/utils/date_parse.dart';
 import '../models/phase_model.dart';
 import 'package:buildtrack_mobile/services/api_service.dart';
 import 'package:buildtrack_mobile/controller/user_session.dart';
@@ -25,6 +26,15 @@ class ProjectProvider extends ChangeNotifier {
   String _error = '';
   bool _entriesLoading = false;
   bool get entriesLoading => _entriesLoading;
+  /// Last entries-fetch failure ('' when the last fetch worked). On failure the
+  /// previous entries are kept (and the cache is not overwritten), so screens
+  /// can show "couldn't refresh" instead of zeros.
+  String _entriesError = '';
+  /// True when the last projects fetch failed and the list shown is cached.
+  bool _projectsStale = false;
+  bool get projectsStale => _projectsStale;
+  String get entriesError => _entriesError;
+  bool get entriesStale => _entriesError.isNotEmpty;
   List<ProjectModel> get projects => List.unmodifiable(_projects);
   List<EntryModel> get entries => List.unmodifiable(_entries);
   List<PhaseModel> get phases => List.unmodifiable(_phases);
@@ -195,6 +205,9 @@ class ProjectProvider extends ChangeNotifier {
     final filtered = apiMaterials.where((json) {
       final rawType = (json['type'] ?? '').toString().toLowerCase();
       if (rawType == 'income' || rawType == 'revenue') return false;
+      // Home's "Money Out" records (client money returned) are stored as Expense
+      // rows; they're cash flow, not a site cost/entry.
+      if (rawType == 'expense' && (json['category'] ?? '').toString() == 'Money Out') return false;
       final approvalStatus = (json['approvalStatus'] ?? '')
           .toString()
           .toLowerCase()
@@ -266,9 +279,8 @@ class ProjectProvider extends ChangeNotifier {
           paymentStatusRaw = 'Partial';
         }
       }
-      final paymentDateRaw = json['paymentDate'] != null
-          ? DateTime.tryParse(json['paymentDate'].toString())?.toLocal()
-          : null;
+      final paymentDateRaw = parseFlexibleDate(json['paymentDate']);
+      final createdAtParsed = parseFlexibleDate(json['createdAt']) ?? DateTime.now();
       String? workerName;
       if (json['worker'] is Map) {
         workerName = json['worker']['name']?.toString();
@@ -293,12 +305,9 @@ class ProjectProvider extends ChangeNotifier {
         projectId: entryProjectId,
         type: parsedType,
         amount: amount,
-        createdAt: json['createdAt'] != null
-            ? DateTime.tryParse(json['createdAt'].toString())?.toLocal() ?? DateTime.now()
-            : DateTime.now(),
-        date: json['date'] != null
-            ? DateTime.tryParse(json['date'].toString())?.toLocal() ?? DateTime.now()
-            : DateTime.now(),
+        createdAt: createdAtParsed,
+        // Unreadable / missing date → when it was logged, not "today".
+        date: parseFlexibleDate(json['date']) ?? createdAtParsed,
         description:
             json['materialName'] ??
             json['title'] ??
@@ -339,8 +348,11 @@ class ProjectProvider extends ChangeNotifier {
       final targetId = (projectId == 'all') ? null : projectId;
       final freshEntries = await _fetchEntriesForProject(targetId);
       _entries = freshEntries;
+      _entriesError = '';
       await _persistEntries();
     } catch (e, st) {
+      // Keep the previous entries and cache; flag the failure.
+      _entriesError = 'Could not refresh entries: $e';
       dev.log('loadEntriesForProject error: $e', stackTrace: st);
     } finally {
       _entriesLoading = false;
@@ -459,15 +471,25 @@ class ProjectProvider extends ChangeNotifier {
           initialProjId ??
           prefs.getString('buildtrack_selected_project_id') ??
           (UserSession.projectId.isNotEmpty ? UserSession.projectId : null);
-      final results = await Future.wait([
+      // An entries failure must not drop the project list, and must not
+      // replace the cached entries with an empty list (shows ₹0 everywhere).
+      bool entriesFailed = false;
+      Future<List<EntryModel>?> tryEntries(String id) =>
+          _fetchEntriesForProject(id).then<List<EntryModel>?>((v) => v).catchError((Object e) {
+            entriesFailed = true;
+            _entriesError = 'Could not refresh entries: $e';
+            dev.log('entries fetch failed: $e');
+            return null;
+          });
+      final results = await Future.wait<Object?>([
         ApiService.fetchProjects(),
         if (targetProjId != null)
-          _fetchEntriesForProject(targetProjId)
+          tryEntries(targetProjId)
         else
           Future.value(<EntryModel>[]),
       ]);
       final fetched = results[0] as List<ProjectModel>;
-      final List<EntryModel> freshEntries = results[1] as List<EntryModel>;
+      final List<EntryModel>? freshEntries = results[1] as List<EntryModel>?;
       final Map<String, Map<String, dynamic>> persistedDetails =
           await _loadPersistedActivityDetails();
       _projects = _filterForCurrentUser(fetched);
@@ -563,14 +585,14 @@ class ProjectProvider extends ChangeNotifier {
         UserSession.projectId = _selectedProject!.id;
       }
       if (_selectedProject != null) {
-        if (_selectedProject!.id == targetProjId) {
-          _entries = freshEntries;
-        } else {
-          _entries = await _fetchEntriesForProject(_selectedProject!.id);
-        }
+        final List<EntryModel>? got = _selectedProject!.id == targetProjId
+            ? freshEntries
+            : await tryEntries(_selectedProject!.id);
+        if (got != null) _entries = got;
       } else {
         _entries = [];
       }
+      if (!entriesFailed) _entriesError = '';
       _projects = _projects.map((p) {
         final localTotal = totalSpentForProject(p.id);
         if (localTotal > 0 && localTotal > p.spentAmount) {
@@ -601,12 +623,18 @@ class ProjectProvider extends ChangeNotifier {
         _selectedActivityId = null;
       }
       await _backfillCompletedActivities();
-      await _persistEntries();
+      if (!entriesFailed) await _persistEntries();
       _projectsLoaded = true;
       _error = '';
+      _projectsStale = false;
       notifyListeners();
     } catch (e, st) {
-      _error = 'Failed to load background network: $e';
+      // fetchProjects throws on failure now: the previous (cached) projects
+      // and entries are kept. Only a user with nothing to show gets the
+      // error card; otherwise the data is just flagged stale.
+      _projectsStale = true;
+      if (_projects.isEmpty) _error = 'Could not load projects: $e';
+      notifyListeners();
       dev.log(
         'ProjectProvider._fetchNetworkData error',
         error: e,
@@ -654,8 +682,10 @@ class ProjectProvider extends ChangeNotifier {
       }
       _projectsLoaded = true;
       _error = '';
+      _projectsStale = false;
     } catch (e) {
-      _error = 'Failed to fetch projects: $e';
+      _projectsStale = true;
+      if (_projects.isEmpty) _error = 'Could not load projects: $e';
       dev.log('fetchProjects error: $e');
     } finally {
       _setLoading(false);
@@ -681,11 +711,43 @@ class ProjectProvider extends ChangeNotifier {
       throw Exception('Failed to save project');
     }
     _projects.add(saved);
+    // The project just created becomes the app's selected project (Home,
+    // Projects, Reports pick it up). Clear the old floor/phase/activity and
+    // persist both the choice and the list: before, neither was saved, so the
+    // next load() restored the previously cached project id and the new
+    // project silently lost the selection.
     _selectedProject = saved;
     UserSession.projectId = saved.id;
+    _selectedFloor = null;
+    _selectedPhase = null;
+    _selectedPhaseId = null;
+    _selectedActivity = null;
+    _selectedActivityId = null;
     notifyListeners();
+    await _saveContextPrefs();
+    await _persistProjects();
     unawaited(loadEntriesForProject(saved.id));
   }
+
+  /// A project from the loaded list by id (null when absent).
+  ProjectModel? projectById(String? id) {
+    if (id == null || id.trim().isEmpty) return null;
+    for (final p in _projects) {
+      if (p.id.trim() == id.trim()) return p;
+    }
+    return null;
+  }
+
+  /// The project a new form should start on: the app's selected project,
+  /// else the only project the user has.
+  ProjectModel? get defaultProjectForForm {
+    final sel = projectById(_selectedProject?.id);
+    if (sel != null) return sel;
+    return _projects.length == 1 ? _projects.first : null;
+  }
+  /// Saves the edited project. Throws with the server's message when the
+  /// save fails (callers show it) — before, failures were stored in [error]
+  /// (which also blanked the Projects list) and the screen said "updated".
   Future<void> updateProject(ProjectModel updated) async {
     _setLoading(true);
     try {
@@ -693,26 +755,27 @@ class ProjectProvider extends ChangeNotifier {
         '/projects/${updated.id}',
         updated.toJson(),
       );
-      if (response.statusCode == 200) {
-        final decoded = json.decode(response.body);
-        final Map<String, dynamic> projectJson = 
-            (decoded is Map && decoded.containsKey('project'))
-                ? decoded['project'] as Map<String, dynamic>
-                : decoded as Map<String, dynamic>;
-        final serverProject = ProjectModel.fromJson(projectJson);
-        final idx = _projects.indexWhere((p) => p.id == serverProject.id);
-        if (idx != -1) _projects[idx] = serverProject;
-        if (_selectedProject?.id == serverProject.id) {
-          _selectedProject = serverProject;
-          UserSession.projectId = serverProject.id;
-        }
-        _error = '';
-      } else {
-        _error = 'Failed to update project: ${response.statusCode}';
+      if (response.statusCode != 200) {
+        throw Exception(_serverMessage(response));
       }
+      final decoded = json.decode(response.body);
+      if (decoded is! Map || decoded['offline'] == true) {
+        throw Exception('Not saved — you appear to be offline.');
+      }
+      final Map<String, dynamic> projectJson = decoded.containsKey('project')
+          ? decoded['project'] as Map<String, dynamic>
+          : Map<String, dynamic>.from(decoded);
+      final serverProject = ProjectModel.fromJson(projectJson);
+      final idx = _projects.indexWhere((p) => p.id == serverProject.id);
+      if (idx != -1) _projects[idx] = serverProject;
+      if (_selectedProject?.id == serverProject.id) {
+        _selectedProject = serverProject;
+        UserSession.projectId = serverProject.id;
+      }
+      await _persistProjects();
     } catch (e) {
-      _error = 'Update error: $e';
       dev.log('updateProject error: $e');
+      rethrow;
     } finally {
       _setLoading(false);
     }
@@ -812,37 +875,72 @@ class ProjectProvider extends ChangeNotifier {
   void setSelectedFloor(String? floor) => selectFloor(floor);
   void setSelectedPhase(ProjectPhase? phase) => selectPhase(phase?.phaseName, phase?.id);
   void setSelectedActivity(String? activity, [String? activityId]) => selectActivity(activity, activityId);
+  /// Why the last project save failed (server message, or a local reason).
+  /// Null after a successful save.
+  String? _lastSaveError;
+  String? get lastSaveError => _lastSaveError;
+
+  static String _serverMessage(dynamic response) {
+    try {
+      final body = jsonDecode(response.body as String);
+      final msg = body is Map ? body['message']?.toString() : null;
+      if (msg != null && msg.isNotEmpty) return msg;
+    } catch (_) {}
+    final code = response.statusCode as int;
+    if (code == 403) return 'You do not have access to update this project.';
+    if (code == 404) return 'Project not found or not accessible.';
+    return 'Server error ($code).';
+  }
+
+  /// Index of [projectId] in the local list. A project the user reaches only
+  /// through an assigned task is not in the (projectIds-filtered) list, so
+  /// fetch it from the server and add it — without changing the selection.
+  Future<int> _ensureProjectLoaded(String projectId) async {
+    var idx = _projects.indexWhere((p) => p.id == projectId);
+    if (idx != -1) return idx;
+    final fresh = await ApiService.fetchProjectById(projectId);
+    if (fresh == null) return -1;
+    idx = _projects.indexWhere((p) => p.id == projectId);
+    if (idx != -1) return idx;
+    _projects.add(fresh);
+    return _projects.length - 1;
+  }
+
+  /// Public form of [_ensureProjectLoaded] for screens opened from a task.
+  Future<ProjectModel?> ensureProject(String projectId) async {
+    final idx = await _ensureProjectLoaded(projectId);
+    if (idx == -1) return null;
+    notifyListeners();
+    return _projects[idx];
+  }
+
+  /// Saves only the project's progress (PUT /projects/:id updates just the
+  /// fields it receives).
   Future<bool> updateProjectProgress(String id, double progress) async {
-    debugPrint('[DEBUG] updateProjectProgress: id=$id, progress=$progress');
-    final idx = _projects.indexWhere((p) => p.id == id);
+    _lastSaveError = null;
+    final idx = await _ensureProjectLoaded(id);
     if (idx == -1) {
-      debugPrint(
-        '[DEBUG] updateProjectProgress: project not found in list (idx == -1)',
-      );
+      _lastSaveError = 'Could not load this project. Check your connection.';
       return false;
     }
-    _projects[idx] = _projects[idx].copyWith(
-      progress: progress.clamp(0.0, 1.0),
-    );
-    if (_selectedProject?.id == id) _selectedProject = _projects[idx];
+    final value = progress.clamp(0.0, 1.0).toDouble();
     try {
-      debugPrint(
-        '[DEBUG] updateProjectProgress: sending PUT to /projects/$id...',
-      );
-      final response = await ApiService.put(
-        '/projects/$id',
-        _projects[idx].toJson(),
-      );
-      debugPrint(
-        '[DEBUG] updateProjectProgress: PUT response status: ${response.statusCode}',
-      );
+      final response = await ApiService.put('/projects/$id', {'progress': value});
       if (response.statusCode == 200 || response.statusCode == 204) {
+        final i = _projects.indexWhere((p) => p.id == id);
+        if (i != -1) {
+          _projects[i] = _projects[i].copyWith(progress: value);
+          if (_selectedProject?.id == id) _selectedProject = _projects[i];
+        }
+        await _persistProjects();
         notifyListeners();
         return true;
       }
+      _lastSaveError = _serverMessage(response);
       return false;
     } catch (e) {
-      debugPrint('[DEBUG] updateProjectProgress PERSISTENCE ERROR: $e');
+      debugPrint('updateProjectProgress error: $e');
+      _lastSaveError = 'Network error — not saved. Check your connection and try again.';
       return false;
     }
   }
@@ -859,16 +957,16 @@ class ProjectProvider extends ChangeNotifier {
     debugPrint(
       '[DEBUG] toggleActivityCompletion: projectId=$projectId, activityId=$activityId, isCompleted=$isCompleted, notes=${notes != null}, photo=${photo != null}, photos=${photos != null}',
     );
-    final projectIndex = _projects.indexWhere((p) => p.id == projectId);
+    _lastSaveError = null;
+    final projectIndex = await _ensureProjectLoaded(projectId);
     if (projectIndex == -1) {
-      debugPrint(
-        '[DEBUG] toggleActivityCompletion: project not found in list (projectIndex == -1)',
-      );
+      _lastSaveError = 'Could not load this project. Check your connection.';
       return false;
     }
     final project = _projects[projectIndex];
     final phases = List<ProjectPhase>.from(project.selectedPhases ?? []);
     bool found = false;
+    String? foundPhaseId;
     DateTime? stampedDate;
     bool newCompletedStatus = true;
 
@@ -878,6 +976,7 @@ class ProjectProvider extends ChangeNotifier {
       final aIndex = activities.indexWhere((a) => a.id == activityId);
       if (aIndex != -1) {
         final current = activities[aIndex];
+        foundPhaseId = phase.id;
         newCompletedStatus =
             isCompleted ??
             (notes != null ||
@@ -914,9 +1013,7 @@ class ProjectProvider extends ChangeNotifier {
       }
     }
     if (!found) {
-      debugPrint(
-        '[DEBUG] toggleActivityCompletion: activity $activityId not found in phases',
-      );
+      _lastSaveError = 'This activity is no longer in the project. Refresh and try again.';
       return false;
     }
     final total = phases.fold<int>(0, (sum, p) => sum + p.totalCount);
@@ -935,15 +1032,48 @@ class ProjectProvider extends ChangeNotifier {
     _projects[projectIndex] = updated;
     if (_selectedProject?.id == projectId) _selectedProject = updated;
     notifyListeners();
+    void restore() {
+      final i = _projects.indexWhere((p) => p.id == projectId);
+      if (i != -1) _projects[i] = project;
+      if (_selectedProject?.id == projectId) _selectedProject = project;
+      notifyListeners();
+    }
 
     try {
       debugPrint(
         '[DEBUG] toggleActivityCompletion: sending PUT to /projects/$projectId...',
       );
-      final response = await ApiService.put(
-        '/projects/$projectId',
-        updated.toJson(),
-      );
+      // Only what this change touches. PUT /projects/:id updates just the
+      // fields it receives; sending the whole project re-wrote clientName,
+      // buildingType ('' failed the enum → 400) and every other field.
+      // `progress` only when the user set it — otherwise the server derives
+      // it from completed / total activities.
+      // One activity only (PUT /projects/:id/activities/:activityId): photos go
+      // to file storage and the reply is just this activity + progress, instead
+      // of re-sending every activity's photos both ways.
+      final changed = phases
+          .firstWhere((ph) => ph.id == foundPhaseId)
+          .activities
+          .firstWhere((a) => a.id == activityId);
+      var response = await ApiService.put('/projects/$projectId/activities/$activityId', {
+        if (foundPhaseId != null) 'phaseId': foundPhaseId,
+        'completed': newCompletedStatus,
+        if (newCompletedStatus && stampedDate != null) 'completedAt': stampedDate.toUtc().toIso8601String(),
+        if (newCompletedStatus && notes != null) 'notes': notes,
+        if (newCompletedStatus && (photos != null || photo != null))
+          'photos': changed.photos ?? [if (changed.photo != null) changed.photo!],
+        if (manualProgress != null) 'progress': manualProgress.clamp(0.0, 1.0),
+      });
+      var usedActivityRoute = true;
+      if (response.statusCode == 404 && response.body.contains('Route not found')) {
+        // Server not updated yet — fall back to the whole-phases update.
+        usedActivityRoute = false;
+        response = await ApiService.put('/projects/$projectId', {
+          'selectedPhases': phases.map((ph) => ph.toJson()).toList(),
+          'completedActivityKeys': completedKeys,
+          if (manualProgress != null) 'progress': manualProgress.clamp(0.0, 1.0),
+        });
+      }
       debugPrint(
         '[DEBUG] toggleActivityCompletion: PUT response status: ${response.statusCode}',
       );
@@ -965,14 +1095,48 @@ class ProjectProvider extends ChangeNotifier {
             photos: photos,
           );
         }
-        if (response.statusCode == 200 && response.body.isNotEmpty) {
+        if (usedActivityRoute && response.statusCode == 200 && response.body.isNotEmpty) {
+          try {
+            final data = jsonDecode(response.body);
+            if (data is Map && data['activity'] is Map) {
+              final saved = ProjectActivity.fromJson(Map<String, dynamic>.from(data['activity'] as Map));
+              final i = _projects.indexWhere((p) => p.id == projectId);
+              if (i != -1) {
+                final cur = _projects[i];
+                final newPhases = (cur.selectedPhases ?? [])
+                    .map((ph) => ph.id == (data['phaseId'] ?? foundPhaseId)
+                        ? ph.copyWith(
+                            activities: ph.activities
+                                .map((a) => a.id == activityId ? saved : a)
+                                .toList(),
+                          )
+                        : ph)
+                    .toList();
+                final serverProgress = (data['progress'] as num?)?.toDouble();
+                final next = cur.copyWith(
+                  selectedPhases: newPhases,
+                  completedActivityKeys: (data['completedActivityKeys'] as List?)
+                      ?.map((e) => e.toString())
+                      .toList(),
+                  progress: serverProgress ?? cur.progress,
+                );
+                _projects[i] = next;
+                if (_selectedProject?.id == projectId) _selectedProject = next;
+                notifyListeners();
+              }
+            }
+          } catch (e) {
+            dev.log('[DEBUG] toggleActivityCompletion parse error: $e');
+          }
+        } else if (response.statusCode == 200 && response.body.isNotEmpty) {
           try {
             final data = jsonDecode(response.body);
             if (data['project'] != null) {
               final newProject = ProjectModel.fromJson(
                 data['project'] as Map<String, dynamic>,
               );
-              _projects[projectIndex] = newProject;
+              final i = _projects.indexWhere((p) => p.id == projectId);
+              if (i != -1) _projects[i] = newProject;
               if (_selectedProject?.id == projectId) {
                 _selectedProject = newProject;
               }
@@ -985,16 +1149,14 @@ class ProjectProvider extends ChangeNotifier {
         await _persistProjects();
         return true;
       } else {
-        _projects[projectIndex] = project;
-        if (_selectedProject?.id == projectId) _selectedProject = project;
-        notifyListeners();
+        _lastSaveError = _serverMessage(response);
+        restore();
         return false;
       }
     } catch (e) {
       debugPrint('[DEBUG] toggleActivityCompletion PERSISTENCE ERROR: $e');
-      _projects[projectIndex] = project;
-      if (_selectedProject?.id == projectId) _selectedProject = project;
-      notifyListeners();
+      _lastSaveError = 'Network error — not saved. Check your connection and try again.';
+      restore();
       return false;
     }
   }
@@ -1090,8 +1252,10 @@ class ProjectProvider extends ChangeNotifier {
             dev.log('[DEBUG] updateActivityBudget parse error: $e');
           }
         }
+        _lastSaveError = null;
         return true;
       } else {
+        _lastSaveError = _serverMessage(response);
         _projects[projectIndex] = project;
         if (_selectedProject?.id == projectId) _selectedProject = project;
         notifyListeners();
@@ -1099,6 +1263,7 @@ class ProjectProvider extends ChangeNotifier {
       }
     } catch (e) {
       dev.log('[DEBUG] updateActivityBudget PERSISTENCE ERROR: $e');
+      _lastSaveError = 'Network error — not saved. Check your connection and try again.';
       _projects[projectIndex] = project;
       if (_selectedProject?.id == projectId) _selectedProject = project;
       notifyListeners();
@@ -1211,6 +1376,8 @@ class ProjectProvider extends ChangeNotifier {
     _isLoading = false;
     _projectsLoaded = false;
     _error = '';
+    _entriesError = '';
+    _projectsStale = false;
     notifyListeners();
   }
 }

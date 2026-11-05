@@ -1,4 +1,3 @@
-import 'package:buildtrack_mobile/common/themes/app_colors.dart';
 import 'package:buildtrack_mobile/controller/project_provider.dart';
 import 'package:buildtrack_mobile/models/construction_models.dart';
 import 'package:buildtrack_mobile/models/project_model.dart';
@@ -9,6 +8,8 @@ import 'package:provider/provider.dart';
 import 'package:buildtrack_mobile/common/utils/currency_formatter.dart';
 import 'package:buildtrack_mobile/common/utils/image_pick_helper.dart';
 import 'package:buildtrack_mobile/services/api_service.dart';
+import 'dart:convert';
+import 'package:buildtrack_mobile/controller/nav_controller.dart';
 const Map<String, List<String>> kInventoryUnits = {
   'Weight': ['kg', 'ton', 'gram'],
   'Volume': ['litre', 'm³', 'cum'],
@@ -100,9 +101,6 @@ String normalizeUnit(String raw) {
   };
   return aliases[s] ?? s;
 }
-var _kBlue = AppColors.primary;
-const _kGray = AppColors.textLight;
-const _kDark = AppColors.textDark;
 class EntrySectionCard extends StatelessWidget {
   const EntrySectionCard({
     super.key,
@@ -341,6 +339,7 @@ class UnitSelectorField extends StatelessWidget {
   void _showUnitSheet(BuildContext context) {
     showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: btSheetStyleDefault(context),
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => _UnitPickerSheet(
@@ -371,11 +370,20 @@ class _UnitPickerSheetState extends State<_UnitPickerSheet> {
     _searchCtrl.dispose();
     super.dispose();
   }
+  /// The catalogue plus the current value when it is a custom unit, so a unit
+  /// added via "Custom" shows as the selected chip when the sheet reopens.
+  Map<String, List<String>> get _units {
+    final cur = widget.currentValue?.trim();
+    if (cur == null || cur.isEmpty) return widget.units;
+    final known = widget.units.values.any((l) => l.contains(cur));
+    return known ? widget.units : {'Custom': [cur], ...widget.units};
+  }
   Map<String, List<String>> get _filtered {
-    if (_query.isEmpty) return widget.units;
+    final all = _units;
+    if (_query.isEmpty) return all;
     final q = _query.toLowerCase();
     final result = <String, List<String>>{};
-    widget.units.forEach((cat, units) {
+    all.forEach((cat, units) {
       final matched = units.where((u) => u.toLowerCase().contains(q)).toList();
       if (matched.isNotEmpty) result[cat] = matched;
     });
@@ -741,7 +749,7 @@ class ExecutionContextCard extends StatelessWidget {
               ),
               if (phaseError != null) EntryErrorText(phaseError!),
               const SizedBox(height: 18),
-              const EntryFieldLabel('Activity', required: true),
+              const EntryFieldLabel('Activity'),
               const SizedBox(height: 8),
               EntryDropdownField<String>(
                 value: activities.contains(selectedActivity)
@@ -800,11 +808,7 @@ class CostSummaryCard extends StatelessWidget {
                 children: [
                   Text(
                     entry.$1,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: _kGray,
-                      fontWeight: FontWeight.w500,
-                    ),
+                    style: BtText.subhead(context, color: Bt.ink2, weight: FontWeight.w500),
                   ),
                   const SizedBox(width: 12),
                   Flexible(
@@ -813,11 +817,7 @@ class CostSummaryCard extends StatelessWidget {
                       textAlign: TextAlign.end,
                       overflow: TextOverflow.ellipsis,
                       maxLines: 2,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: _kDark,
-                        fontWeight: FontWeight.w600,
-                      ),
+                      style: BtText.subhead(context, color: Bt.ink, weight: FontWeight.w600),
                     ),
                   ),
                 ],
@@ -852,23 +852,14 @@ class VoiceParseCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ts = timestamp ?? TimeOfDay.now().format(context);
+    final bt = context.bt;
     return EntrySectionCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF0B63CE), Color(0xFF0B63CE)],
-                  ),
-                  borderRadius: BorderRadius.circular(13),
-                ),
-                child: const Icon(Icons.mic, color: Colors.white, size: 22),
-              ),
+              BtTile(icon: Icons.mic, size: 44, bg: bt.accentSoft, fg: bt.accentInk),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
@@ -876,66 +867,29 @@ class VoiceParseCard extends StatelessWidget {
                   children: [
                     Text(
                       'Parsed from Voice',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: _kBlue,
-                      ),
+                      style: BtText.headline(context),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       'Confidence: ${confidence.toStringAsFixed(1)}% · $ts',
-                      style: const TextStyle(fontSize: 13, color: _kGray),
+                      style: BtText.caption(context),
                     ),
                   ],
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 5,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE7F6EE),
-                  borderRadius: BorderRadius.circular(Bt.rCard),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.check_circle_outline,
-                      color: Color(0xFF067647),
-                      size: 13,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      entryTypeLabel,
-                      style: const TextStyle(
-                        color: Color(0xFF067647),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.8,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              BtBadge(label: entryTypeLabel, tone: BtTone.green),
             ],
           ),
           const SizedBox(height: 16),
-          const Divider(color: Color(0xFFEEF1F5), thickness: 1),
+          const Divider(color: Bt.line, thickness: 1),
           const SizedBox(height: 14),
           Row(
             children: [
-              Icon(Icons.format_align_left, color: _kBlue, size: 14),
+              Icon(Icons.format_align_left, color: bt.accentInk, size: 14),
               const SizedBox(width: 6),
               Text(
                 'Voice transcript',
-                style: TextStyle(
-                  color: _kBlue,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
+                style: BtText.subhead(context, color: bt.accentInk, weight: FontWeight.w600),
               ),
             ],
           ),
@@ -943,29 +897,24 @@ class VoiceParseCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: const Color(0xFFF6F7F9),
+              color: Bt.fill,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: Bt.line),
             ),
             child: Text(
               '"$transcript"',
-              style: const TextStyle(
-                color: _kDark,
-                fontSize: 13.5,
-                fontStyle: FontStyle.italic,
-                height: 1.65,
-              ),
+              style: BtText.body(context, color: Bt.ink).copyWith(fontStyle: FontStyle.italic, height: 1.65),
             ),
           ),
           const SizedBox(height: 10),
           Row(
             children: [
-              const Icon(Icons.info_outline, size: 13, color: _kGray),
+              const Icon(Icons.info_outline, size: 13, color: Bt.ink3),
               const SizedBox(width: 5),
-              const Expanded(
+              Expanded(
                 child: Text(
                   'Fields have been auto-filled from voice. Review and edit before confirming.',
-                  style: TextStyle(fontSize: 13, color: _kGray),
+                  style: BtText.caption(context),
                 ),
               ),
             ],
@@ -1124,6 +1073,48 @@ class PaymentSummaryBanner extends StatelessWidget {
     );
   }
 }
+/// Money compared in whole paise, so float noise (3600.0030000000006,
+/// 1000 + 2600.003 …) never decides whether a payment "exceeds".
+int moneyPaise(num v) => (v * 100).round();
+
+/// True when [amount] pays off [outstanding]: equal to the paisa, or the
+/// whole-rupee figure the screens show for it (bills with GST / decimal rates
+/// end in paise — ₹2,600 is what you see for 2600.003 or 2599.6). Such a
+/// payment is recorded as exactly [outstanding] and the entry becomes Paid.
+bool paymentSettles(double amount, double outstanding) {
+  if (outstanding <= 0 || amount <= 0) return false;
+  if ((moneyPaise(amount) - moneyPaise(outstanding)).abs() <= 1) return true;
+  if (amount != amount.roundToDouble()) return false;
+  return amount == outstanding.roundToDouble() || amount == outstanding.ceilToDouble();
+}
+
+/// True when [amount] is more than [outstanding] — never for the exact
+/// remainder (see [paymentSettles]).
+bool paymentExceeds(double amount, double outstanding) =>
+    !paymentSettles(amount, outstanding) && moneyPaise(amount) > moneyPaise(outstanding);
+
+/// Payments that add up to [bill] to the paisa can still sum a hair under it
+/// (1000 + 2600.003 …), and the server then keeps the entry "Partial"
+/// (`paidAmount >= amount`). Tops the last payment up by that sub-paisa gap.
+void settlePaymentHistory(List<dynamic> history, double bill) {
+  if (history.isEmpty || bill <= 0) return;
+  double sum = 0;
+  for (final p in history) {
+    if (p is Map) sum += (p['amount'] as num?)?.toDouble() ?? 0;
+  }
+  final last = history.last;
+  if (sum < bill && moneyPaise(sum) == moneyPaise(bill) && last is Map) {
+    last['amount'] = ((last['amount'] as num?)?.toDouble() ?? 0) + (bill - sum);
+  }
+}
+
+/// Amount-field text for a sum: "3600" or "2600.50" (was rounded to whole
+/// rupees, so a bill ending in paise prefilled a figure above what was due).
+String paymentAmountText(double v) {
+  final p = moneyPaise(v);
+  return p % 100 == 0 ? (p ~/ 100).toString() : (p / 100).toStringAsFixed(2);
+}
+
 Future<Map<String, dynamic>?> showPaymentSheet(
   BuildContext context, {
   required String entryTitle,
@@ -1153,7 +1144,11 @@ Future<Map<String, dynamic>?> showPaymentSheet(
   bool isEsignPolling = false;
   bool isEsignCompleted = false;
   String esignStatusText = '';
-  Future<void> startEsignFlow(StateSetter ss) async {
+  // Polling can outlive the sheet (drag-dismiss, Back, Cancel, Confirm): it stops
+  // when the sheet closes and never calls the sheet's setState after that.
+  bool sheetOpen = true;
+  Future<void> startEsignFlow(StateSetter setSheet) async {
+    void ss(VoidCallback f) => sheetOpen ? setSheet(f) : f();
     final amt = double.tryParse(amountCtrl.text);
     if (amt == null || amt <= 0) {
       ss(() => amountError = 'Please enter a valid amount before requesting an E-Signature.');
@@ -1184,9 +1179,12 @@ Future<Map<String, dynamic>?> showPaymentSheet(
       esignStatusText = 'Waiting for client to sign...';
     });
     final reqId = res['requestId'];
-    while (isEsignPolling) {
+    int attempts = 0;
+    const maxAttempts = 60; // 3 minutes (60 × 3 s), same as the payment screen
+    while (isEsignPolling && sheetOpen && attempts < maxAttempts) {
+      attempts++;
       await Future.delayed(const Duration(seconds: 3));
-      if (!isEsignPolling) break;
+      if (!isEsignPolling || !sheetOpen) break;
       final statusRes = await ApiService.checkEsignatureStatus(reqId);
       if (statusRes != null && statusRes['status'] == 'signed') {
         ss(() {
@@ -1198,6 +1196,12 @@ Future<Map<String, dynamic>?> showPaymentSheet(
         break;
       }
     }
+    if (isEsignPolling) {
+      ss(() {
+        isEsignPolling = false;
+        esignStatusText = sheetOpen ? 'Signing timed out. You can retry or proceed.' : '';
+      });
+    }
   }
   const pMethods = [
     {'label': 'UPI', 'icon': Icons.phone_android_outlined},
@@ -1208,6 +1212,7 @@ Future<Map<String, dynamic>?> showPaymentSheet(
   ];
   return showModalBottomSheet<Map<String, dynamic>>(
     context: context,
+    sheetAnimationStyle: btSheetStyleDefault(context),
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     barrierColor: Bt.scrim,
@@ -1220,7 +1225,7 @@ Future<Map<String, dynamic>?> showPaymentSheet(
         if (selectedStatus == PaymentStatus.paid) {
           helperText = 'Full settlement — ${formatCurrency(outstanding)}';
           if (amountCtrl.text.isEmpty || amountCtrl.text == '0') {
-            amountCtrl.text = outstanding.toStringAsFixed(0);
+            amountCtrl.text = paymentAmountText(outstanding);
           }
         } else if (selectedStatus == PaymentStatus.pending) {
           helperText = 'No payment recorded';
@@ -1378,8 +1383,8 @@ Future<Map<String, dynamic>?> showPaymentSheet(
                                         selectedStatus = v;
                                         amountError = null;
                                         amountCtrl.text = outstanding > 0
-                                            ? outstanding.toStringAsFixed(0)
-                                            : totalAmount.toStringAsFixed(0);
+                                            ? paymentAmountText(outstanding)
+                                            : paymentAmountText(totalAmount);
                                       }),
                                     ),
                                     const SizedBox(width: 4),
@@ -1394,8 +1399,8 @@ Future<Map<String, dynamic>?> showPaymentSheet(
                                         selectedStatus = v;
                                         amountError = null;
                                         final tText = outstanding > 0
-                                            ? outstanding.toStringAsFixed(0)
-                                            : totalAmount.toStringAsFixed(0);
+                                            ? paymentAmountText(outstanding)
+                                            : paymentAmountText(totalAmount);
                                         if (amountCtrl.text == '0' ||
                                             amountCtrl.text == tText) {
                                           amountCtrl.clear();
@@ -1462,7 +1467,8 @@ Future<Map<String, dynamic>?> showPaymentSheet(
                                           selectedStatus =
                                               PaymentStatus.pending;
                                         } else if (outstanding > 0 &&
-                                            amt >= outstanding) {
+                                            (amt >= outstanding ||
+                                                paymentSettles(amt, outstanding))) {
                                           selectedStatus = PaymentStatus.paid;
                                         } else if (outstanding == 0 &&
                                             amt >= totalAmount) {
@@ -1778,10 +1784,10 @@ Future<Map<String, dynamic>?> showPaymentSheet(
                                     lastDate: DateTime(2100),
                                     builder: (c, child) => Theme(
                                       data: Theme.of(c).copyWith(
-                                        colorScheme: const ColorScheme.light(
+                                        colorScheme: Theme.of(c).colorScheme.copyWith(
                                           primary: Bt.ink,
-                                          onPrimary: Colors.white,
-                                          onSurface: _kDark,
+                                          onPrimary: Bt.card,
+                                          onSurface: Bt.ink,
                                         ),
                                       ),
                                       child: child!,
@@ -1816,7 +1822,12 @@ Future<Map<String, dynamic>?> showPaymentSheet(
                             BtButton(
                                 label: 'Confirm Payment & Update Inventory',
                                 onPressed: () {
-                                  if (selectedStatus != PaymentStatus.pending) {
+                                  // A leftover under one paisa (old float bills) shows "0":
+                                  // Fully Paid still clears it.
+                                  final subPaisaLeft = selectedStatus == PaymentStatus.paid &&
+                                      outstanding > 0 &&
+                                      moneyPaise(outstanding) == 0;
+                                  if (selectedStatus != PaymentStatus.pending && !subPaisaLeft) {
                                     final raw = amountCtrl.text.trim();
                                     final amt = parseAmount(raw);
                                     if (raw.isEmpty ||
@@ -1828,12 +1839,16 @@ Future<Map<String, dynamic>?> showPaymentSheet(
                                       );
                                       return;
                                     }
-                                    if (outstanding > 0 && amt > outstanding) {
+                                    if (outstanding > 0 && paymentExceeds(amt, outstanding)) {
                                       ss(
                                         () => amountError =
                                             'Payment amount cannot exceed the outstanding amount.',
                                       );
                                       return;
+                                    }
+                                    // The exact remainder settles the entry.
+                                    if (paymentSettles(amt, outstanding)) {
+                                      selectedStatus = PaymentStatus.paid;
                                     }
                                     if (outstanding <= 0) {
                                       ss(
@@ -1880,7 +1895,10 @@ Future<Map<String, dynamic>?> showPaymentSheet(
         );
       },
     ),
-  );
+  ).whenComplete(() {
+    sheetOpen = false;
+    isEsignPolling = false;
+  });
 }
 class _SheetSectionLabel extends StatelessWidget {
   const _SheetSectionLabel(this.label);
@@ -2603,4 +2621,70 @@ class EntryBottomBar extends StatelessWidget {
       ),
     );
   }
+}
+
+// ─── Entry save helpers (shared by add material / labour / equipment + voice) ───
+
+enum EntrySaveOutcome { saved, offline, failed }
+
+class EntrySaveResult {
+  const EntrySaveResult(this.outcome, {this.body, this.message});
+  final EntrySaveOutcome outcome;
+  final Map<String, dynamic>? body;
+  final String? message;
+  bool get saved => outcome == EntrySaveOutcome.saved;
+  bool get offline => outcome == EntrySaveOutcome.offline;
+  static const offlineMessage = ApiService.offlineSavedMessage;
+}
+
+/// POST /transactions. Distinguishes a real save (200/201), a request queued by
+/// the offline queue (202 or `{offline: true}`) and a failure (server message).
+Future<EntrySaveResult> postTransaction(Map<String, dynamic> payload) async {
+  try {
+    final res = await ApiService.post('/transactions', payload);
+    Map<String, dynamic>? body;
+    try {
+      final d = jsonDecode(res.body);
+      if (d is Map<String, dynamic>) body = d;
+    } catch (_) {}
+    if (ApiService.isOfflineQueued(res) || body?['offline'] == true) {
+      return EntrySaveResult(
+        EntrySaveOutcome.offline,
+        body: body,
+        message: body?['message']?.toString() ?? EntrySaveResult.offlineMessage,
+      );
+    }
+    if (res.statusCode == 200 || res.statusCode == 201) {
+      return EntrySaveResult(EntrySaveOutcome.saved, body: body);
+    }
+    return EntrySaveResult(EntrySaveOutcome.failed, body: body, message: body?['message']?.toString());
+  } catch (e) {
+    debugPrint('postTransaction error: $e');
+    return const EntrySaveResult(EntrySaveOutcome.failed);
+  }
+}
+
+/// How an add / edit screen leaves after a successful save (route arg `entryExit`):
+/// * `'dock'`   — started from the + sheet / Add Entry tab → the Add Entry tab.
+/// * `'origin'` — started from a screen (e.g. a project's activity) via
+///   /execution-context → back to that screen.
+/// * anything else (edit, Add More, repeat…) → `Navigator.pop(context, true)` so the
+///   caller reloads; only when nothing can pop does it fall back to the Add Entry tab.
+void finishEntrySave(BuildContext context, {String? exit}) {
+  final nav = Navigator.of(context);
+  if (exit == 'origin') {
+    var passed = false;
+    nav.popUntil((r) {
+      if (passed || r.isFirst) return true;
+      if (r.settings.name == '/execution-context') passed = true;
+      return false;
+    });
+    return;
+  }
+  if (exit != 'dock' && nav.canPop()) {
+    nav.pop(true);
+    return;
+  }
+  final navCtl = context.read<NavController>();
+  navCtl.setRoute(navCtl.isRouteEnabled('/add-entry') ? '/add-entry' : '/home', context);
 }
