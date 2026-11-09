@@ -222,7 +222,7 @@ class SubscriptionProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> verifyPayment({int maxRetries = 6, Duration delay = const Duration(seconds: 2)}) async {
+  Future<bool> verifyPayment({int maxRetries = 18, Duration delay = const Duration(seconds: 2)}) async {
     _isLoading = true;
     notifyListeners();
     for (int attempt = 0; attempt < maxRetries; attempt++) {
@@ -244,8 +244,8 @@ class SubscriptionProvider extends ChangeNotifier {
 
   Future<bool> handlePaymentResult(bool success) async {
     _pendingPaymentParams = null;
-    // Always poll network to verify because payment webhooks / GPay can take a few seconds to sync
-    final verified = await verifyPayment(maxRetries: success ? 5 : 4);
+    // Always poll network to verify because payment webhooks / GPay can take up to 30 seconds to settle
+    final verified = await verifyPayment(maxRetries: 18, delay: const Duration(seconds: 2));
     if (verified) {
       _error = '';
       return true;

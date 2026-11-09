@@ -12,13 +12,16 @@ class PaymentWebViewScreen extends StatefulWidget {
   State<PaymentWebViewScreen> createState() => _PaymentWebViewScreenState();
 }
 
-class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
+class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> with WidgetsBindingObserver {
   late final WebViewController _controller;
   bool _isLoading = true;
+  bool _isVerifying = false;
+  bool _hasLaunchedExternalApp = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(Colors.white)
@@ -51,11 +54,24 @@ class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
             if (url.contains('/api/subscriptions/callback') || url.contains('/api/subscriptions/browser-return')) {
               return NavigationDecision.navigate;
             }
+
+            // Once Google Pay / UPI has launched once or during verification,
+            // strictly BLOCK any second launch to prevent being prompted twice!
+            if (_hasLaunchedExternalApp || _isVerifying) {
+              if (url.startsWith('intent://') ||
+                  url.startsWith('upi://') ||
+                  url.startsWith('gpay://') ||
+                  url.startsWith('phonepe://') ||
+                  url.startsWith('paytm://') ||
+                  (!url.startsWith('http://') && !url.startsWith('https://') && !url.startsWith('about:'))) {
+                debugPrint('Blocked duplicate external intent launch: $url');
+                return NavigationDecision.prevent;
+              }
+            }
             
             // Fix for Google Pay and other UPI Apps!
             // Airpay formats Google Pay as an Android Intent (intent://pay?...)
             if (url.startsWith('intent://')) {
-              // Pass the raw intent string directly to the OS launcher
               _launchExternalUrl(url);
               return NavigationDecision.prevent;
             }
@@ -80,6 +96,22 @@ class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
         _buildPaymentHtml(),
         baseUrl: 'https://buildtrack.nurofin.com/',
       );
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // When the user completes payment in Google Pay and returns to the app,
+    // Android triggers AppLifecycleState.resumed.
+    if (state == AppLifecycleState.resumed && _hasLaunchedExternalApp && !_isVerifying) {
+      debugPrint('Returned from external payment app. Starting verification...');
+      _handlePaymentReturn(true);
+    }
   }
 
   String _buildPaymentHtml() {
@@ -135,9 +167,6 @@ class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
 ''';
   }
 
-  bool _isVerifying = false;
-  DateTime? _lastExternalLaunchTime;
-
   Future<void> _handlePaymentReturn(bool mayBeSuccess) async {
     if (_isVerifying) return;
     if (mounted) setState(() => _isVerifying = true);
@@ -146,15 +175,12 @@ class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
   }
 
   Future<void> _launchExternalUrl(String url) async {
-    // Debounce duplicate intent / UPI invocations from gateway JS fallbacks within 5 seconds
-    // to prevent Google Pay or UPI apps from opening twice.
-    final now = DateTime.now();
-    if (_lastExternalLaunchTime != null &&
-        now.difference(_lastExternalLaunchTime!) < const Duration(seconds: 5)) {
-      debugPrint("Skipping duplicate external intent launch: $url");
+    // Only launch external payment app ONCE per session to avoid duplicate prompts
+    if (_hasLaunchedExternalApp || _isVerifying) {
+      debugPrint('Already launched external payment app once. Ignoring $url');
       return;
     }
-    _lastExternalLaunchTime = now;
+    _hasLaunchedExternalApp = true;
 
     // For complex Android Intents (like Google Pay), canLaunchUrl will falsely return false.
     // We must bypass the check and force the OS to handle it.
@@ -163,7 +189,7 @@ class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
         await launchUrl(Uri.parse(url), mode: LaunchMode.externalNonBrowserApplication);
         return;
       } catch (e) {
-        debugPrint("Forced launch failed for $url: $e");
+        debugPrint('Forced launch failed for $url: $e');
       }
     }
 
@@ -172,18 +198,17 @@ class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
       } else {
-        // Fallback: just try launching it anyway (fixes some Android 11+ visibility issues)
         await launchUrl(uri, mode: LaunchMode.externalNonBrowserApplication);
       }
     } catch (e) {
-      debugPrint("Error launching external URL $url: $e");
+      debugPrint('Error launching external URL $url: $e');
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      canPop: false,
+      canPop: !_isVerifying,
       onPopInvokedWithResult: (didPop, _) async {
         if (didPop) return;
         _handlePaymentReturn(false);
@@ -193,16 +218,35 @@ class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
         appBar: BtNavBar(
           title: 'Secure Payment',
           close: true,
-          onBack: () => _handlePaymentReturn(false),
+          onBack: _isVerifying ? null : () => _handlePaymentReturn(false),
           trailing: const Icon(Icons.lock_rounded, color: Bt.green, size: 18),
         ),
         body: Stack(
           children: [
-            WebViewWidget(controller: _controller),
+            IgnorePointer(
+              ignoring: _isVerifying,
+              child: Opacity(
+                opacity: _isVerifying ? 0.0 : 1.0,
+                child: WebViewWidget(controller: _controller),
+              ),
+            ),
             if (_isVerifying)
               Container(
                 color: Bt.ground,
-                child: const BtPageLoader(label: 'Verifying payment with bank...'),
+                alignment: Alignment.center,
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const BtPageLoader(label: 'Verifying payment with bank...'),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Please wait a moment while your bank confirms the transaction.',
+                      textAlign: TextAlign.center,
+                      style: BtText.caption(context),
+                    ),
+                  ],
+                ),
               )
             else if (_isLoading)
               Container(
