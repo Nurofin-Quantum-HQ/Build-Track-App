@@ -55,35 +55,22 @@ class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> with Widget
               return NavigationDecision.navigate;
             }
 
-            // Once Google Pay / UPI has launched once or during verification,
-            // strictly BLOCK any second launch to prevent being prompted twice!
+            // Once external payment app has been launched once or verification is active,
+            // strictly BLOCK all further external intents AND page re-navigations within AirPay
+            // so AirPay cannot fire secondary fallback intents into Google Pay!
             if (_hasLaunchedExternalApp || _isVerifying) {
-              if (url.startsWith('intent://') ||
-                  url.startsWith('upi://') ||
-                  url.startsWith('gpay://') ||
-                  url.startsWith('phonepe://') ||
-                  url.startsWith('paytm://') ||
-                  (!url.startsWith('http://') && !url.startsWith('https://') && !url.startsWith('about:'))) {
-                debugPrint('Blocked duplicate external intent launch: $url');
-                return NavigationDecision.prevent;
-              }
-            }
-            
-            // Fix for Google Pay and other UPI Apps!
-            // Airpay formats Google Pay as an Android Intent (intent://pay?...)
-            if (url.startsWith('intent://')) {
-              _launchExternalUrl(url);
+              debugPrint('Blocked duplicate navigation after payment app launched: $url');
               return NavigationDecision.prevent;
             }
             
-            // Intercept standard UPI deep links
-            if (url.startsWith('upi://') || url.startsWith('gpay://') || url.startsWith('phonepe://') || url.startsWith('paytm://')) {
-              _launchExternalUrl(url);
-              return NavigationDecision.prevent;
-            }
-
-            // Intercept other unknown schemes
-            if (!url.startsWith('http://') && !url.startsWith('https://') && !url.startsWith('about:')) {
+            // Intercept Google Pay and other UPI Apps (Android Intent or custom scheme)
+            if (url.startsWith('intent://') ||
+                url.startsWith('upi://') ||
+                url.startsWith('gpay://') ||
+                url.startsWith('phonepe://') ||
+                url.startsWith('paytm://') ||
+                (!url.startsWith('http://') && !url.startsWith('https://') && !url.startsWith('about:'))) {
+              _hasLaunchedExternalApp = true;
               _launchExternalUrl(url);
               return NavigationDecision.prevent;
             }
@@ -175,12 +162,10 @@ class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> with Widget
   }
 
   Future<void> _launchExternalUrl(String rawUrl) async {
-    // Only launch external payment app ONCE per session to avoid duplicate prompts
-    if (_hasLaunchedExternalApp || _isVerifying) {
-      debugPrint('Already launched external payment app once. Ignoring $rawUrl');
-      return;
-    }
-    _hasLaunchedExternalApp = true;
+    // Freeze pointer events in WebView so page cannot receive double taps
+    try {
+      _controller.runJavaScript("document.body.style.pointerEvents = 'none';");
+    } catch (_) {}
 
     // Convert Android intent:// URLs to clean, standard upi:// URLs so the OS opens Google Pay cleanly
     String launchableUrl = rawUrl;
