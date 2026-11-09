@@ -174,34 +174,29 @@ class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> with Widget
     if (mounted) Navigator.of(context).pop(verified);
   }
 
-  Future<void> _launchExternalUrl(String url) async {
+  Future<void> _launchExternalUrl(String rawUrl) async {
     // Only launch external payment app ONCE per session to avoid duplicate prompts
     if (_hasLaunchedExternalApp || _isVerifying) {
-      debugPrint('Already launched external payment app once. Ignoring $url');
+      debugPrint('Already launched external payment app once. Ignoring $rawUrl');
       return;
     }
     _hasLaunchedExternalApp = true;
 
-    // For complex Android Intents (like Google Pay), canLaunchUrl will falsely return false.
-    // We must bypass the check and force the OS to handle it.
-    if (url.startsWith('intent://') || url.startsWith('upi://') || url.startsWith('gpay://')) {
-      try {
-        await launchUrl(Uri.parse(url), mode: LaunchMode.externalNonBrowserApplication);
-        return;
-      } catch (e) {
-        debugPrint('Forced launch failed for $url: $e');
-      }
+    // Convert Android intent:// URLs to clean, standard upi:// URLs so the OS opens Google Pay cleanly
+    String launchableUrl = rawUrl;
+    if (launchableUrl.startsWith('intent://')) {
+      final hashIndex = launchableUrl.indexOf('#Intent');
+      final queryPart = hashIndex != -1
+          ? launchableUrl.substring('intent://'.length, hashIndex)
+          : launchableUrl.substring('intent://'.length);
+      launchableUrl = 'upi://$queryPart';
     }
 
-    final uri = Uri.parse(url);
     try {
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else {
-        await launchUrl(uri, mode: LaunchMode.externalNonBrowserApplication);
-      }
+      final uri = Uri.parse(launchableUrl);
+      await launchUrl(uri, mode: LaunchMode.externalNonBrowserApplication);
     } catch (e) {
-      debugPrint('Error launching external URL $url: $e');
+      debugPrint('Error launching external URL $launchableUrl: $e');
     }
   }
 
