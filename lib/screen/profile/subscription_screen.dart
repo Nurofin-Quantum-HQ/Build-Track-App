@@ -287,29 +287,6 @@ class _SubscriptionScreenContentState
             _ErrorBanner(message: sub.error),
             const SizedBox(height: 16),
           ],
-          Padding(
-            padding: const EdgeInsets.fromLTRB(4, 0, 4, 12),
-            child: Text('CHOOSE A PLAN · MONTHLY', style: BtText.mono(context)),
-          ),
-          Showcase(
-            key: _plansKey,
-            description: 'Choose the plan that fits your business needs.',
-            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              for (var i = 0; i < _plans.length; i++) ...[
-                if (i > 0) const SizedBox(height: 10),
-                BtReveal(
-                  index: 3 + i,
-                  child: _PlanCard(
-                    info: _plans[i],
-                    selected: _plans[i].plan == selected.plan,
-                    isCurrent: _plans[i].plan == sub.currentPlan,
-                    onTap: () => setState(() => _picked = _plans[i].plan),
-                  ),
-                ),
-              ],
-            ]),
-          ),
-          const SizedBox(height: 16),
           GestureDetector(
             onTap: () => setState(() => _isAutoPay = !_isAutoPay),
             child: Container(
@@ -352,6 +329,29 @@ class _SubscriptionScreenContentState
                 ],
               ),
             ),
+          ),
+          const SizedBox(height: 16),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 0, 4, 12),
+            child: Text('CHOOSE A PLAN · MONTHLY', style: BtText.mono(context)),
+          ),
+          Showcase(
+            key: _plansKey,
+            description: 'Choose the plan that fits your business needs.',
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              for (var i = 0; i < _plans.length; i++) ...[
+                if (i > 0) const SizedBox(height: 10),
+                BtReveal(
+                  index: 3 + i,
+                  child: _PlanCard(
+                    info: _plans[i],
+                    selected: _plans[i].plan == selected.plan,
+                    isCurrent: _plans[i].plan == sub.currentPlan,
+                    onTap: () => setState(() => _picked = _plans[i].plan),
+                  ),
+                ),
+              ],
+            ]),
           ),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
