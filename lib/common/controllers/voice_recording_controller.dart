@@ -1,3 +1,4 @@
+import 'package:buildtrack_mobile/bug_report/breadcrumbs.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:speech_to_text/speech_recognition_error.dart';
@@ -74,6 +75,7 @@ class VoiceRecordingController extends ChangeNotifier {
     notifyListeners();
   }
   Future<void> startListening() async {
+    Breadcrumbs.tap('Start voice entry');
     debugPrint(
       '[VOICE START] startListening() requested. Current state: $_engineState',
     );

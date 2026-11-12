@@ -22,6 +22,9 @@ import 'package:buildtrack_mobile/common/utils/image_pick_helper.dart';
 import 'package:showcaseview/showcaseview.dart';
 import 'package:buildtrack_mobile/controller/showcase_keys.dart';
 import 'package:buildtrack_mobile/screen/profile/change_password_sheet.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:buildtrack_mobile/bug_report/bug_report_flow.dart';
+import 'package:buildtrack_mobile/bug_report/shake_service.dart';
 class ProfileUserData {
   const ProfileUserData({
     required this.name,
@@ -395,6 +398,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       onTap: _replayAppTour,
                     ),
                     BtRow(
+                      leading: const BtTile(icon: Icons.flag_outlined, size: 34),
+                      title: 'Report a problem',
+                      subtitle: 'Something not working? Tell us.',
+                      showChevron: true,
+                      onTap: () => BugReportFlow.open(trigger: 'account'),
+                    ),
+                    BtRow(
+                      leading: const BtTile(icon: Icons.chat_bubble_outline_rounded, size: 34),
+                      title: 'Your reports',
+                      subtitle: 'What you sent and where it stands',
+                      showChevron: true,
+                      onTap: () => Navigator.pushNamed(context, '/my-reports'),
+                    ),
+                    BtRow(
                       leading: const BtTile(icon: Icons.language_rounded, size: 34),
                       title: 'Web Portal',
                       subtitle: 'buildtrack.nurofin.com',
@@ -614,6 +631,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
         trailing: BtSwitch(value: _notificationsEnabled, onChanged: _setNotificationsEnabled),
         onTap: () => _setNotificationsEnabled(!_notificationsEnabled),
       ),
+      if (!kIsWeb)
+        ValueListenableBuilder<bool>(
+          valueListenable: ShakeService.instance.enabled,
+          builder: (context, on, _) => BtRow(
+            leading: const BtTile(icon: Icons.vibration_rounded, size: 34),
+            title: 'Shake to report a problem',
+            subtitle: 'Shake your phone twice to tell us what went wrong',
+            subtitleMaxLines: 2,
+            trailing: BtSwitch(value: on, onChanged: ShakeService.instance.setEnabled),
+            onTap: () => ShakeService.instance.setEnabled(!on),
+          ),
+        ),
       BtRow(
         leading: const BtTile(icon: Icons.lock_outline, size: 34),
         title: 'Change Password',

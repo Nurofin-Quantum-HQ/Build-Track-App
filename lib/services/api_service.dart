@@ -10,6 +10,7 @@ import 'dart:math';
 import 'package:buildtrack_mobile/services/auth_service.dart';
 import 'package:buildtrack_mobile/controller/user_session.dart';
 import 'package:buildtrack_mobile/common/utils/entry_names.dart';
+import 'package:buildtrack_mobile/bug_report/breadcrumbs.dart';
 
 class ApiService {
   static Future<bool> backupCsv() async {
@@ -52,6 +53,15 @@ class ApiService {
       'X-Request-ID': _generateRequestId(),
       if (token != null) 'Authorization': 'Bearer $token',
     };
+  }
+
+  /// Problem-report breadcrumbs: failed calls only (method, path without
+  /// query, status or "network error"). Never bodies, headers or tokens. The
+  /// report endpoint itself is skipped.
+  static void _trace(String method, String endpoint, {int? status}) {
+    if (status != null && status < 400) return;
+    if (endpoint.startsWith('/bug-reports')) return;
+    Breadcrumbs.apiFailure(method, endpoint, status);
   }
 
   static void _checkUnauthorized(http.Response response) {
@@ -222,9 +232,16 @@ class ApiService {
     final headers = await _getHeaders();
     final url = '$baseUrl$endpoint';
     debugPrint('API Request [GET]: $url');
-    final response = await http
-        .get(Uri.parse(url), headers: headers)
-        .timeout(timeout);
+    final http.Response response;
+    try {
+      response = await http
+          .get(Uri.parse(url), headers: headers)
+          .timeout(timeout);
+    } catch (_) {
+      _trace('GET', endpoint);
+      rethrow;
+    }
+    _trace('GET', endpoint, status: response.statusCode);
 
     _checkUnauthorized(response);
 
@@ -252,12 +269,14 @@ class ApiService {
           .timeout(const Duration(seconds: 90));
     } catch (e) {
       // Network error / timeout (the request may not have reached the server).
+      _trace('POST', endpoint);
       if (!queueable) rethrow;
       debugPrint('Network/API error caught: $e. Queuing entry for offline sync.');
       await _queueOfflineRequest(endpoint, body);
       return http.Response(jsonEncode({'offline': true, 'message': offlineSavedMessage}), 202);
     }
     debugPrint('Status: ${response.statusCode}');
+    _trace('POST', endpoint, status: response.statusCode);
     _checkUnauthorized(response);
     // Opportunistically sync
     syncOfflineEntries();
@@ -271,10 +290,17 @@ class ApiService {
     final headers = await _getHeaders();
     final url = '$baseUrl$endpoint';
     debugPrint('API Request [PUT]: $url');
-    final response = await http
-        .put(Uri.parse(url), headers: headers, body: jsonEncode(body))
-        .timeout(const Duration(seconds: 90));
+    final http.Response response;
+    try {
+      response = await http
+          .put(Uri.parse(url), headers: headers, body: jsonEncode(body))
+          .timeout(const Duration(seconds: 90));
+    } catch (_) {
+      _trace('PUT', endpoint);
+      rethrow;
+    }
     debugPrint('Status: ${response.statusCode}');
+    _trace('PUT', endpoint, status: response.statusCode);
     _checkUnauthorized(response);
     // Opportunistically sync
     syncOfflineEntries();
@@ -287,10 +313,17 @@ class ApiService {
     final headers = await _getHeaders();
     final url = '$baseUrl$endpoint';
     debugPrint('API Request [PATCH]: $url');
-    final response = await http
-        .patch(Uri.parse(url), headers: headers, body: jsonEncode(body))
-        .timeout(const Duration(seconds: 90));
+    final http.Response response;
+    try {
+      response = await http
+          .patch(Uri.parse(url), headers: headers, body: jsonEncode(body))
+          .timeout(const Duration(seconds: 90));
+    } catch (_) {
+      _trace('PATCH', endpoint);
+      rethrow;
+    }
     debugPrint('Status: ${response.statusCode}');
+    _trace('PATCH', endpoint, status: response.statusCode);
     _checkUnauthorized(response);
     return response;
   }
@@ -299,10 +332,17 @@ class ApiService {
     final headers = await _getHeaders();
     final url = '$baseUrl$endpoint';
     debugPrint('API Request [DELETE]: $url');
-    final response = await http
-        .delete(Uri.parse(url), headers: headers, body: body == null ? null : jsonEncode(body))
-        .timeout(const Duration(seconds: 90));
+    final http.Response response;
+    try {
+      response = await http
+          .delete(Uri.parse(url), headers: headers, body: body == null ? null : jsonEncode(body))
+          .timeout(const Duration(seconds: 90));
+    } catch (_) {
+      _trace('DELETE', endpoint);
+      rethrow;
+    }
     debugPrint('Status: ${response.statusCode}');
+    _trace('DELETE', endpoint, status: response.statusCode);
 
     _checkUnauthorized(response);
 
@@ -527,6 +567,7 @@ class ApiService {
     Map<String, dynamic> payload,
   ) async {
     // Return response directly so caller can distinguish status codes
+    Breadcrumbs.tap('Update payment');
     return await put('/transactions/$id', payload);
   }
   static Future<bool> updateTransaction(
@@ -1118,6 +1159,7 @@ class ApiService {
     }
   }
   static Future<bool> approveTransaction(String txId) async {
+    Breadcrumbs.tap('Approve entry');
     try {
       final response = await put('/transactions/$txId/approve', {});
       return response.statusCode == 200;
@@ -1127,6 +1169,7 @@ class ApiService {
     }
   }
   static Future<bool> rejectTransaction(String txId, String reason) async {
+    Breadcrumbs.tap('Reject entry');
     try {
       final response = await put('/transactions/$txId/reject', {
         'rejectionReason': reason,
@@ -1138,6 +1181,7 @@ class ApiService {
     }
   }
   static Future<bool> approveProjectUpdate(String updateId) async {
+    Breadcrumbs.tap('Approve progress update');
     try {
       final response = await put('/project-updates/$updateId/approve', {});
       return response.statusCode == 200;
@@ -1150,6 +1194,7 @@ class ApiService {
     String updateId,
     String reason,
   ) async {
+    Breadcrumbs.tap('Reject progress update');
     try {
       final response = await put('/project-updates/$updateId/reject', {
         'rejectionReason': reason,

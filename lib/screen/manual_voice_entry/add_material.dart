@@ -1,3 +1,4 @@
+import 'package:buildtrack_mobile/bug_report/breadcrumbs.dart';
 import 'package:buildtrack_mobile/design/design.dart';
 import 'dart:convert';
 import 'package:buildtrack_mobile/common/themes/app_colors.dart';
@@ -1075,6 +1076,7 @@ class _AddMaterialScreenState extends State<AddMaterialScreen> {
   }
 
   Future<void> _save(BuildContext ctx) async {
+    Breadcrumbs.tap('Save material entry');
     if (!_validate()) return;
     setState(() => _isSaving = true);
     final name = _nameToSave();

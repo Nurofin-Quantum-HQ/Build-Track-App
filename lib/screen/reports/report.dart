@@ -1,3 +1,4 @@
+import 'package:buildtrack_mobile/bug_report/breadcrumbs.dart';
 import 'package:buildtrack_mobile/common/widgets/record_payment_sheet.dart';
 import 'package:buildtrack_mobile/common/tour_targets.dart';
 import 'package:buildtrack_mobile/controller/nav_controller.dart';
@@ -1035,6 +1036,7 @@ class _ReportsViewState extends State<_ReportsView> {
     String quickCategoryTab, {
     List<String>? activeColumns,
   }) async {
+    Breadcrumbs.tap('Export CSV report');
     if (filtered.isEmpty) {
       btToast(context, 'No report entries to export.', error: true);
       return;
@@ -1057,6 +1059,7 @@ class _ReportsViewState extends State<_ReportsView> {
     String quickCategoryTab, {
     List<String>? activeColumns,
   }) async {
+    Breadcrumbs.tap('Export PDF report');
     if (filtered.isEmpty) {
       btToast(context, 'No report entries to export.', error: true);
       return;

@@ -1,3 +1,4 @@
+import 'package:buildtrack_mobile/bug_report/breadcrumbs.dart';
 import 'package:buildtrack_mobile/design/design.dart';
 import 'package:buildtrack_mobile/common/themes/app_colors.dart';
 import 'package:buildtrack_mobile/controller/subscription_provider.dart';
@@ -407,6 +408,7 @@ class _SubscriptionScreenContentState
   ) async {
     if (plan.productId == null) return;
     if (sub.currentPlan == plan.plan) return;
+    Breadcrumbs.tap('Pay for plan');
     final params = await sub.purchase(plan.productId!, isRecurring: _isAutoPay);
     if (!context.mounted) return;
     if (params == null) {

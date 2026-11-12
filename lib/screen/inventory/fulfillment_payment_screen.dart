@@ -1,3 +1,4 @@
+import 'package:buildtrack_mobile/bug_report/breadcrumbs.dart';
 import 'package:buildtrack_mobile/design/design.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -205,6 +206,7 @@ class _FulfillmentPaymentScreenState extends State<FulfillmentPaymentScreen> {
     return double.tryParse(val);
   }
   Future<void> _handleConfirmPayment() async {
+    Breadcrumbs.tap('Record payment');
     setState(() {
       _amountError = null;
     });

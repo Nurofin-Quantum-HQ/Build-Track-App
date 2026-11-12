@@ -1,3 +1,4 @@
+import 'package:buildtrack_mobile/bug_report/breadcrumbs.dart';
 import 'package:buildtrack_mobile/design/design.dart';
 import 'dart:async';
 import 'dart:math' as math;
@@ -1558,6 +1559,7 @@ class _AiVoiceEntryScreenState extends State<AiVoiceEntryScreen>
     return 'unit';
   }
   Future<void> _saveEntry() async {
+    Breadcrumbs.tap('Save voice entry');
     if (_isProcessing) {
       debugPrint('[AI] Already saving — ignoring duplicate');
       return;

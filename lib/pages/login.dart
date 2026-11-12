@@ -1,3 +1,4 @@
+import 'package:buildtrack_mobile/bug_report/breadcrumbs.dart';
 import 'dart:async';
 import 'package:buildtrack_mobile/controller/theme_provider.dart';
 import 'package:buildtrack_mobile/design/design.dart';
@@ -244,6 +245,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
   Future<void> _login() async {
+    Breadcrumbs.tap('Sign in');
     final email = _emailCtrl.text.trim();
     final password = _passCtrl.text.trim();
     if (email.isEmpty || password.isEmpty) {

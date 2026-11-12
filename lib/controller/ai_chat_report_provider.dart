@@ -1,3 +1,4 @@
+import 'package:buildtrack_mobile/bug_report/breadcrumbs.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -108,6 +109,7 @@ class AiChatReportProvider extends ChangeNotifier {
   ];
   List<String> get recentSearches => List.unmodifiable(_recentSearches);
   Future<void> sendQuery(String query) async {
+    Breadcrumbs.tap('Ask AI');
     final trimmed = query.trim();
     if (trimmed.isEmpty) return;
     if (!_recentSearches.contains(trimmed)) {

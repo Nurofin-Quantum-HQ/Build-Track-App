@@ -54,6 +54,10 @@ import 'package:buildtrack_mobile/services/push_notification_service.dart';
 import 'package:buildtrack_mobile/services/auth_service.dart';
 import 'package:buildtrack_mobile/config/navigator_key.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:buildtrack_mobile/bug_report/breadcrumbs.dart';
+import 'package:buildtrack_mobile/bug_report/bug_report_host.dart';
+import 'package:buildtrack_mobile/bug_report/my_reports_screen.dart';
+import 'package:buildtrack_mobile/bug_report/screen_tracker.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -67,6 +71,18 @@ void main() {
       debugPrint('App Started');
       WidgetsFlutterBinding.ensureInitialized();
       debugPrint('Flutter Initialized');
+
+      // Problem reports: note uncaught framework errors as a breadcrumb, then
+      // hand over to whatever handler was already installed (chained, not replaced).
+      final previousOnError = FlutterError.onError;
+      FlutterError.onError = (FlutterErrorDetails details) {
+        Breadcrumbs.error(details.exception, 'Screen error');
+        if (previousOnError != null) {
+          previousOnError(details);
+        } else {
+          FlutterError.presentError(details);
+        }
+      };
 
       try {
         await Firebase.initializeApp(
@@ -102,6 +118,7 @@ void main() {
       );
     },
     (error, stack) {
+      Breadcrumbs.error(error, 'Uncaught error');
       debugPrint('[Uncaught Exception] Error: $error\n$stack');
     },
   );
@@ -195,7 +212,10 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.build(themeProvider.btTheme),
       // Motion setting (Profile -> Motion) is read by every animation helper.
-      builder: (context, child) => BtMotionScope(notifier: BtMotion.instance, child: child ?? const SizedBox.shrink()),
+      builder: (context, child) => BugReportHost(
+        child: BtMotionScope(notifier: BtMotion.instance, child: child ?? const SizedBox.shrink()),
+      ),
+      navigatorObservers: [ScreenTracker.instance],
       initialRoute: isLoggedIn ? '/home' : '/',
       onGenerateInitialRoutes: (initialRouteName) {
         debugPrint('Navigation Started');
@@ -218,6 +238,7 @@ class MyApp extends StatelessWidget {
         '/profile': (_) => const ProfileScreen(),
         '/edit-profile': (_) => const EditProfileScreen(),
         '/subscription': (_) => const SubscriptionScreen(),
+        '/my-reports': (_) => const MyReportsScreen(),
         '/payment-webview': (context) =>
             PaymentWebViewScreen(paymentParams: const {}),
         '/home': (_) => HomeScreen(),

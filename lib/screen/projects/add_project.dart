@@ -1,3 +1,4 @@
+import 'package:buildtrack_mobile/bug_report/breadcrumbs.dart';
 import 'package:buildtrack_mobile/design/design.dart';
 import 'package:buildtrack_mobile/controller/project_provider.dart';
 import 'package:buildtrack_mobile/models/construction_models.dart';
@@ -220,6 +221,7 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
     }
   }
   Future<void> _submit() async {
+    Breadcrumbs.tap('Create project');
     if (_nameCtrl.text.trim().isEmpty) {
       btToast(context, 'Please enter a project name', error: true);
       return;
