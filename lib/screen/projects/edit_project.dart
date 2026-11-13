@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:csv/csv.dart';
 import 'dart:convert';
 import 'package:buildtrack_mobile/screen/reports/save_helper_stub.dart'
@@ -38,6 +39,12 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
   late final TextEditingController _budgetEquipmentCtrl;
   late final TextEditingController _budgetMiscCtrl;
   late final TextEditingController _customSubTypeCtrl;
+  late final TextEditingController _scopeCtrl;
+  String? _currentPhotoUrl;
+  Uint8List? _newPhotoBytes;
+  String? _newPhotoPath;
+  String? _newPhotoDataUri;
+  bool _removePhoto = false;
   final _customStageNameCtrl = TextEditingController();
   late DateTime _startDate;
   DateTime? _expectedEndDate;
@@ -248,6 +255,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
     _budgetEquipmentCtrl = TextEditingController();
     _budgetMiscCtrl = TextEditingController();
     _customSubTypeCtrl = TextEditingController();
+    _scopeCtrl = TextEditingController();
     _startDate = DateTime.now();
     _selectedFloorChips = [];
     _room1BHKCount = 0;
@@ -269,6 +277,12 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
   void _populateFrom(ProjectModel p) {
     _currentProject = p;
     _nameCtrl.text = p.name;
+    _scopeCtrl.text = p.scope ?? '';
+    _currentPhotoUrl = p.photo;
+    _newPhotoBytes = null;
+    _newPhotoPath = null;
+    _newPhotoDataUri = null;
+    _removePhoto = false;
     _cityCtrl.text = p.city.isNotEmpty
         ? p.city
         : (p.location.isNotEmpty ? p.location : '');
@@ -506,6 +520,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
     _budgetEquipmentCtrl.dispose();
     _budgetMiscCtrl.dispose();
     _customSubTypeCtrl.dispose();
+    _scopeCtrl.dispose();
     _customStageNameCtrl.dispose();
     super.dispose();
   }
@@ -533,6 +548,151 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
       });
     }
   }
+
+  Future<void> _pickSitePhoto() async {
+    final hasExisting = (_currentPhotoUrl != null && _currentPhotoUrl!.isNotEmpty && !_removePhoto);
+    final hasNew = _newPhotoBytes != null;
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      sheetAnimationStyle: btSheetStyleDefault(context),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Choose from Gallery'),
+              onTap: () => Navigator.pop(ctx, 'gallery'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.camera_alt_outlined),
+              title: const Text('Take Photo'),
+              onTap: () => Navigator.pop(ctx, 'camera'),
+            ),
+            if (hasExisting || hasNew)
+              ListTile(
+                leading: const Icon(Icons.delete_outline, color: Bt.crimson),
+                title: const Text('Remove Photo', style: TextStyle(color: Bt.crimson)),
+                onTap: () => Navigator.pop(ctx, 'remove'),
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (choice == null || !mounted) return;
+    if (choice == 'remove') {
+      setState(() {
+        _removePhoto = true;
+        _newPhotoBytes = null;
+        _newPhotoPath = null;
+        _newPhotoDataUri = null;
+      });
+      return;
+    }
+    try {
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(
+        source: choice == 'camera' ? ImageSource.camera : ImageSource.gallery,
+        maxWidth: 1600,
+        maxHeight: 1600,
+        imageQuality: 85,
+      );
+      if (picked == null || !mounted) return;
+      final bytes = await picked.readAsBytes();
+      final ext = picked.path.split('.').last.toLowerCase();
+      final mime = (ext == 'png') ? 'image/png' : (ext == 'webp' ? 'image/webp' : 'image/jpeg');
+      setState(() {
+        _newPhotoBytes = bytes;
+        _newPhotoPath = picked.path;
+        _newPhotoDataUri = 'data:$mime;base64,${base64Encode(bytes)}';
+        _removePhoto = false;
+      });
+    } catch (e) {
+      debugPrint('Error picking site photo: $e');
+      if (mounted) btToast(context, 'Could not pick photo: $e', error: true);
+    }
+  }
+
+  Widget _sitePhotoCard() {
+    final hasNew = _newPhotoBytes != null;
+    final hasExisting = (_currentPhotoUrl != null && _currentPhotoUrl!.isNotEmpty && !_removePhoto);
+    final hasAnyPhoto = hasNew || hasExisting;
+
+    return _section(
+      'SITE PHOTO',
+      InkWell(
+        onTap: _pickSitePhoto,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          height: 140,
+          decoration: BoxDecoration(
+            color: hasAnyPhoto ? null : Bt.noir.withValues(alpha: 0.04),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: Bt.ink.withValues(alpha: 0.12),
+              width: 1,
+            ),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: hasAnyPhoto
+              ? Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    if (hasNew)
+                      Image.memory(_newPhotoBytes!, fit: BoxFit.cover)
+                    else
+                      Image.network(
+                        _currentPhotoUrl!.startsWith('http')
+                            ? _currentPhotoUrl!
+                            : '${ApiService.baseUrl.replaceAll('/api', '')}$_currentPhotoUrl',
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => const Center(
+                          child: Icon(Icons.broken_image_outlined, size: 32, color: Bt.ink2),
+                        ),
+                      ),
+                    Positioned(
+                      right: 10,
+                      bottom: 10,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Bt.noir.withValues(alpha: 0.75),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.camera_alt_outlined, size: 14, color: Bt.bone),
+                            SizedBox(width: 4),
+                            Text('Change photo', style: TextStyle(color: Bt.bone, fontSize: 12, fontWeight: FontWeight.w600)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                )
+              : Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.add_a_photo_outlined, size: 32, color: context.bt.accentInk),
+                      const SizedBox(height: 8),
+                      Text('Add Site Photo', style: BtText.body(context).copyWith(fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 2),
+                      Text('Camera or gallery (optional)', style: BtText.subhead(context)),
+                    ],
+                  ),
+                ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     if (_mainBuildingType == null) {
@@ -659,6 +819,9 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
         trackedActivityKeys: trackedActivityKeysList,
         selectedPhases: selectedPhasesList,
         completedActivityKeys: completedActivityKeysList,
+        photo: _removePhoto ? null : (_newPhotoDataUri ?? _currentPhotoUrl),
+        clearPhoto: _removePhoto,
+        scope: _scopeCtrl.text.trim().isNotEmpty ? _scopeCtrl.text.trim() : null,
       );
       await context.read<ProjectProvider>().updateProject(updated);
       if (mounted) {
@@ -761,6 +924,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
                       // ── Step 1 · Basics
                       _stepBlock(0, [
                         Text('Name the site.', style: BtText.d2(context)),
+                        _sitePhotoCard(),
                         _section(
                           'PROJECT SETUP',
                           _InGroup(children: [
@@ -819,6 +983,19 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
                             _inRow(
                               'Engineer',
                               child: _bareField(controller: _engineerCtrl, hint: 'Engineer in charge'),
+                            ),
+                          ]),
+                        ),
+                        _section(
+                          'PROJECT SCOPE',
+                          _InGroup(children: [
+                            _inRow(
+                              'Scope',
+                              child: _bareField(
+                                controller: _scopeCtrl,
+                                hint: 'Scope of work, key milestones, objectives...',
+                                maxLines: 3,
+                              ),
                             ),
                           ]),
                         ),
@@ -1245,6 +1422,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
     TextInputType? keyboardType,
     List<TextInputFormatter>? inputFormatters,
     int? maxLength,
+    int? maxLines = 1,
     String? prefixText,
     String? Function(String?)? validator,
   }) {
@@ -1254,6 +1432,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
       keyboardType: keyboardType,
       inputFormatters: inputFormatters,
       maxLength: maxLength,
+      maxLines: maxLines,
       validator: validator,
       style: BtText.num(BtText.body(context)),
       decoration: InputDecoration(
