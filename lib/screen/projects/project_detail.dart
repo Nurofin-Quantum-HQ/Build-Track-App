@@ -15,6 +15,9 @@ import 'package:buildtrack_mobile/services/api_service.dart';
 import 'package:buildtrack_mobile/services/task_service.dart';
 import 'package:buildtrack_mobile/screen/projects/edit_project.dart';
 import 'package:buildtrack_mobile/screen/project_insights/project_insights_screen.dart';
+import 'package:buildtrack_mobile/screen/projects/doc_viewer_stub.dart'
+    if (dart.library.html) 'package:buildtrack_mobile/screen/projects/doc_viewer_web.dart'
+    if (dart.library.io) 'package:buildtrack_mobile/screen/projects/doc_viewer_mobile.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:csv/csv.dart';
 import 'package:buildtrack_mobile/screen/reports/save_helper_stub.dart'
@@ -2909,8 +2912,11 @@ class _GalleryDialogState extends State<_GalleryDialog> {
                   );
                 }
               } else {
+                final resolved = photoUrl.startsWith('http')
+                    ? photoUrl
+                    : '${ApiService.baseUrl.replaceAll('/api', '')}/${photoUrl.replaceFirst(RegExp(r'^/+'), '')}';
                 imageWidget = Image.network(
-                  photoUrl,
+                  resolved,
                   fit: BoxFit.contain,
                   loadingBuilder: (context, child, loadingProgress) {
                     if (loadingProgress == null) return child;
@@ -3320,30 +3326,112 @@ class _CsvImportExportCardState extends State<_CsvImportExportCard> {
 class _SitePhotoCard extends StatelessWidget {
   final String photoUrl;
   const _SitePhotoCard({required this.photoUrl});
+
+  String _resolve(String url) {
+    if (url.startsWith('data:') || url.startsWith('http')) return url;
+    final clean = url.replaceFirst(RegExp(r'^/+'), '');
+    return '${ApiService.baseUrl.replaceAll('/api', '')}/$clean';
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      height: 210,
-      decoration: BoxDecoration(
-        color: Bt.noir3,
-        borderRadius: BorderRadius.circular(Bt.rCard),
-        boxShadow: Bt.shadow,
-        image: DecorationImage(
-          image: NetworkImage(
-            photoUrl.startsWith('http') 
-              ? photoUrl 
-              : '${ApiService.baseUrl.replaceAll('/api', '')}$photoUrl'
-          ),
+    final isBase64 = photoUrl.startsWith('data:image/') && photoUrl.contains(';base64,');
+    final resolvedUrl = _resolve(photoUrl);
+
+    Widget imageWidget;
+    if (isBase64) {
+      try {
+        final b64 = photoUrl.split(';base64,').last;
+        imageWidget = Image.memory(
+          base64Decode(b64),
           fit: BoxFit.cover,
+          width: double.infinity,
+          height: double.infinity,
+          errorBuilder: (_, _, _) => _fallback(context),
+        );
+      } catch (_) {
+        imageWidget = _fallback(context);
+      }
+    } else {
+      imageWidget = Image.network(
+        resolvedUrl,
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: double.infinity,
+        errorBuilder: (_, _, _) => _fallback(context),
+      );
+    }
+
+    return InkWell(
+      onTap: () {
+        showDialog(
+          context: context,
+          barrierColor: Colors.transparent,
+          builder: (context) => _GalleryDialog(
+            photos: [resolvedUrl],
+            initialIndex: 0,
+          ),
+        );
+      },
+      borderRadius: BorderRadius.circular(Bt.rCard),
+      child: Container(
+        width: double.infinity,
+        height: 220,
+        decoration: BoxDecoration(
+          color: Bt.noir3,
+          borderRadius: BorderRadius.circular(Bt.rCard),
+          boxShadow: Bt.shadow,
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            imageWidget,
+            Positioned(
+              left: 12,
+              bottom: 12,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: const Color(0xCC0C0E12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text('SITE PHOTO', style: BtText.mono(context, color: Bt.bone)),
+              ),
+            ),
+            Positioned(
+              right: 12,
+              bottom: 12,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: const Color(0xCC0C0E12),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.fullscreen_rounded, size: 16, color: Bt.bone),
+                    SizedBox(width: 4),
+                    Text(
+                      'Tap to view',
+                      style: TextStyle(color: Bt.bone, fontSize: 11, fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       ),
-      alignment: Alignment.bottomLeft,
-      padding: const EdgeInsets.all(12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        decoration: BoxDecoration(color: const Color(0x990C0E12), borderRadius: BorderRadius.circular(10)),
-        child: Text('SITE PHOTO', style: BtText.mono(context, color: Bt.bone)),
+    );
+  }
+
+  Widget _fallback(BuildContext context) {
+    return Container(
+      color: Bt.noir3,
+      child: const Center(
+        child: Icon(Icons.broken_image_outlined, size: 36, color: Bt.ink3),
       ),
     );
   }
@@ -3366,45 +3454,165 @@ class _ProjectScopeCard extends StatelessWidget {
 class _DocumentsCard extends StatelessWidget {
   final List<String> documents;
   const _DocumentsCard({required this.documents});
+
+  String _resolve(String url) {
+    if (url.startsWith('data:') || url.startsWith('http')) return url;
+    final clean = url.replaceFirst(RegExp(r'^/+'), '');
+    return '${ApiService.baseUrl.replaceAll('/api', '')}/$clean';
+  }
+
+  String _displayName(String doc, int idx) {
+    if (doc.startsWith('data:')) {
+      if (doc.contains('name=')) {
+        final raw = doc.split('name=').last.split(';').first;
+        return Uri.decodeComponent(raw);
+      }
+      final mime = doc.replaceFirst('data:', '').split(';').first;
+      final ext = mime.contains('/') ? mime.split('/').last.toUpperCase() : 'PDF';
+      return 'Blueprint ${idx + 1}.$ext';
+    }
+    final rawName = doc.split('/').last.split('?').first;
+    return rawName.isNotEmpty ? rawName : 'Document ${idx + 1}';
+  }
+
+  String _extension(String doc, String name) {
+    if (doc.startsWith('data:')) {
+      final mime = doc.replaceFirst('data:', '').split(';').first;
+      return mime.contains('/') ? mime.split('/').last.toUpperCase() : 'PDF';
+    }
+    final dot = name.lastIndexOf('.');
+    return dot > 0 && dot < name.length - 1 ? name.substring(dot + 1).toUpperCase() : 'DOC';
+  }
+
+  Future<void> _openDoc(BuildContext context, String doc, String name) async {
+    final isImg = doc.startsWith('data:image/') ||
+        RegExp(r'\.(jpg|jpeg|png|webp|gif)$', caseSensitive: false).hasMatch(name);
+    final resolved = _resolve(doc);
+
+    if (isImg) {
+      showDialog(
+        context: context,
+        barrierColor: Colors.transparent,
+        builder: (ctx) => _GalleryDialog(photos: [resolved], initialIndex: 0),
+      );
+      return;
+    }
+
+    try {
+      await openDocumentPlatform(doc: resolved, name: name);
+    } catch (e) {
+      debugPrint('openDocumentPlatform error: $e');
+      if (context.mounted) {
+        btToast(context, 'Could not open document: $e', error: true);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 132,
+      height: 140,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         clipBehavior: Clip.none,
         itemCount: documents.length,
         separatorBuilder: (_, _) => const SizedBox(width: 10),
         itemBuilder: (context, i) {
-          final name = documents[i].split("/").last;
-          final dot = name.lastIndexOf('.');
-          final ext = dot > 0 && dot < name.length - 1 ? name.substring(dot + 1).toUpperCase() : 'FILE';
-          return SizedBox(
-            width: 118,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  height: 88,
-                  decoration: BoxDecoration(color: Bt.noir, borderRadius: BorderRadius.circular(Bt.rTile)),
-                  child: Stack(
-                    children: [
-                      const Center(child: Icon(Icons.insert_drive_file_outlined, color: Bt.onNoir3, size: 30)),
-                      Positioned(
-                        left: 8,
-                        bottom: 8,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                          decoration: BoxDecoration(color: Colors.white.withValues(alpha: .1), borderRadius: BorderRadius.circular(6)),
-                          child: Text(ext.length > 4 ? ext.substring(0, 4) : ext, style: BtText.mono(context, color: Bt.bone, size: 9.5)),
+          final doc = documents[i];
+          final name = _displayName(doc, i);
+          final ext = _extension(doc, name);
+          final isImg = doc.startsWith('data:image/') ||
+              RegExp(r'\.(jpg|jpeg|png|webp|gif)$', caseSensitive: false).hasMatch(name);
+          final resolved = _resolve(doc);
+
+          Widget previewWidget;
+          if (isImg) {
+            if (doc.startsWith('data:image/') && doc.contains(';base64,')) {
+              try {
+                previewWidget = Image.memory(
+                  base64Decode(doc.split(';base64,').last),
+                  fit: BoxFit.cover,
+                  width: double.infinity,
+                  height: double.infinity,
+                );
+              } catch (_) {
+                previewWidget = const Icon(Icons.image_outlined, color: Bt.bone, size: 28);
+              }
+            } else {
+              previewWidget = Image.network(
+                resolved,
+                fit: BoxFit.cover,
+                width: double.infinity,
+                height: double.infinity,
+                errorBuilder: (_, _, _) => const Icon(Icons.image_outlined, color: Bt.bone, size: 28),
+              );
+            }
+          } else {
+            previewWidget = Icon(
+              ext == 'PDF' ? Icons.picture_as_pdf_outlined : Icons.insert_drive_file_outlined,
+              color: ext == 'PDF' ? Bt.red : Bt.bone,
+              size: 30,
+            );
+          }
+
+          return InkWell(
+            onTap: () => _openDoc(context, doc, name),
+            borderRadius: BorderRadius.circular(Bt.rTile),
+            child: SizedBox(
+              width: 120,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    height: 88,
+                    decoration: BoxDecoration(
+                      color: Bt.noir,
+                      borderRadius: BorderRadius.circular(Bt.rTile),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        Center(child: previewWidget),
+                        Positioned(
+                          left: 6,
+                          bottom: 6,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xCC0C0E12),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              ext.length > 4 ? ext.substring(0, 4) : ext,
+                              style: BtText.mono(context, color: Bt.bone, size: 9),
+                            ),
+                          ),
                         ),
-                      ),
-                    ],
+                        Positioned(
+                          right: 6,
+                          top: 6,
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: const Color(0x990C0E12),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(Icons.visibility_outlined, size: 12, color: Bt.bone),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                Text(name, maxLines: 2, overflow: TextOverflow.ellipsis, style: BtText.caption(context, color: Bt.ink, weight: FontWeight.w500)),
-              ],
+                  const SizedBox(height: 6),
+                  Text(
+                    name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: BtText.caption(context, color: Bt.ink, weight: FontWeight.w500),
+                  ),
+                ],
+              ),
             ),
           );
         },

@@ -40,6 +40,8 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
   late final TextEditingController _budgetMiscCtrl;
   late final TextEditingController _customSubTypeCtrl;
   late final TextEditingController _scopeCtrl;
+  final List<String> _documents = [];
+  final List<String> _documentNames = [];
   String? _currentPhotoUrl;
   Uint8List? _newPhotoBytes;
   String? _newPhotoPath;
@@ -283,6 +285,12 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
     _newPhotoPath = null;
     _newPhotoDataUri = null;
     _removePhoto = false;
+    _documents.clear();
+    _documentNames.clear();
+    if (p.documents != null && p.documents!.isNotEmpty) {
+      _documents.addAll(p.documents!);
+      _documentNames.addAll(p.documents!.map((d) => d.split('/').last.split('?').first));
+    }
     _cityCtrl.text = p.city.isNotEmpty
         ? p.city
         : (p.location.isNotEmpty ? p.location : '');
@@ -575,8 +583,8 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
             ),
             if (hasExisting || hasNew)
               ListTile(
-                leading: const Icon(Icons.delete_outline, color: Bt.crimson),
-                title: const Text('Remove Photo', style: TextStyle(color: Bt.crimson)),
+                leading: const Icon(Icons.delete_outline, color: Bt.red),
+                title: const Text('Remove Photo', style: TextStyle(color: Bt.red)),
                 onTap: () => Navigator.pop(ctx, 'remove'),
               ),
             const SizedBox(height: 8),
@@ -689,6 +697,148 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
                   ),
                 ),
         ),
+      ),
+    );
+  }
+
+  String _mimeForExt(String ext) {
+    switch (ext.toLowerCase()) {
+      case 'pdf':
+        return 'application/pdf';
+      case 'png':
+        return 'image/png';
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'webp':
+        return 'image/webp';
+      case 'doc':
+        return 'application/msword';
+      case 'docx':
+        return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+      case 'dwg':
+        return 'image/vnd.dwg';
+      case 'dxf':
+        return 'image/vnd.dxf';
+      default:
+        return 'application/octet-stream';
+    }
+  }
+
+  Future<void> _pickDocuments() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        allowMultiple: true,
+        type: FileType.custom,
+        allowedExtensions: ['pdf', 'png', 'jpg', 'jpeg', 'webp', 'doc', 'docx', 'dwg', 'dxf', 'txt'],
+        withData: true,
+      );
+      if (result == null || result.files.isEmpty) return;
+      for (final f in result.files) {
+        if (f.bytes != null) {
+          final ext = (f.extension ?? 'bin').toLowerCase();
+          final mime = _mimeForExt(ext);
+          final dataUri = 'data:$mime;name=${Uri.encodeComponent(f.name)};base64,${base64Encode(f.bytes!)}';
+          setState(() {
+            _documents.add(dataUri);
+            _documentNames.add(f.name);
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error picking documents: $e');
+      if (mounted) btToast(context, 'Could not pick documents: $e', error: true);
+    }
+  }
+
+  Widget _documentsCard() {
+    final count = _documents.length;
+    return _section(
+      'BLUEPRINTS & DOCUMENTS',
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          InkWell(
+            onTap: _pickDocuments,
+            borderRadius: BorderRadius.circular(14),
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
+              decoration: BoxDecoration(
+                color: Bt.noir.withValues(alpha: 0.04),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: Bt.ink.withValues(alpha: 0.12),
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.upload_file_outlined, size: 22, color: context.bt.accentInk),
+                  const SizedBox(width: 10),
+                  Text(
+                    'Upload Blueprints & Documents',
+                    style: BtText.body(context).copyWith(fontWeight: FontWeight.w600),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (count > 0) ...[
+            const SizedBox(height: 10),
+            ...List.generate(count, (idx) {
+              final name = idx < _documentNames.length ? _documentNames[idx] : 'Document ${idx + 1}';
+              final dot = name.lastIndexOf('.');
+              final ext = dot > 0 && dot < name.length - 1 ? name.substring(dot + 1).toUpperCase() : 'DOC';
+              return Container(
+                margin: const EdgeInsets.only(bottom: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Bt.fill,
+                  borderRadius: BorderRadius.circular(Bt.rTile),
+                  border: Border.all(color: Bt.line),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: ext == 'PDF' ? Bt.red : Bt.noir,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        ext.length > 4 ? ext.substring(0, 4) : ext,
+                        style: const TextStyle(color: Bt.bone, fontSize: 10, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: BtText.body(context).copyWith(fontSize: 13, fontWeight: FontWeight.w500),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 18, color: Bt.ink3),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      onPressed: () {
+                        setState(() {
+                          _documents.removeAt(idx);
+                          if (idx < _documentNames.length) {
+                            _documentNames.removeAt(idx);
+                          }
+                        });
+                      },
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ],
+        ],
       ),
     );
   }
@@ -822,6 +972,8 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
         photo: _removePhoto ? null : (_newPhotoDataUri ?? _currentPhotoUrl),
         clearPhoto: _removePhoto,
         scope: _scopeCtrl.text.trim().isNotEmpty ? _scopeCtrl.text.trim() : null,
+        documents: _documents.isNotEmpty ? _documents : null,
+        clearDocuments: _documents.isEmpty,
       );
       await context.read<ProjectProvider>().updateProject(updated);
       if (mounted) {
@@ -999,6 +1151,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
                             ),
                           ]),
                         ),
+                        _documentsCard(),
                       ]),
 
                       // ── Step 2 · Building

@@ -20,6 +20,7 @@ import 'package:showcaseview/showcaseview.dart';
 import 'package:buildtrack_mobile/controller/showcase_keys.dart';
 import 'package:buildtrack_mobile/controller/nav_controller.dart';
 import 'package:buildtrack_mobile/screen/dashboard/notifications_bell.dart';
+import 'package:buildtrack_mobile/services/app_update_service.dart';
 
 String relativeTimeLabel(DateTime date) {
   final now = DateTime.now();
@@ -135,6 +136,14 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Gently check for updates after the dashboard mounts
+      Future.delayed(const Duration(seconds: 2), () {
+        if (mounted) {
+          AppUpdateService.checkAndPrompt(context);
+        }
+      });
+    });
   }
 
   void _checkTour(ProjectProvider provider) {
