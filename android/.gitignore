@@ -15,3 +15,4 @@ GeneratedPluginRegistrant.java
 key.properties
 **/*.keystore
 **/*.jks
+!**/buildtrack-keystore.jks

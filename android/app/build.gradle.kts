@@ -39,11 +39,22 @@ android {
         abortOnError = false
     }
 
+    signingConfigs {
+        create("release") {
+            val keystoreFile = file("buildtrack-keystore.jks")
+            if (keystoreFile.exists()) {
+                storeFile = keystoreFile
+                storePassword = "buildtrack_secret_2026"
+                keyAlias = "buildtrack"
+                keyPassword = "buildtrack_secret_2026"
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            val releaseConfig = signingConfigs.findByName("release")
+            signingConfig = if (file("buildtrack-keystore.jks").exists()) releaseConfig else signingConfigs.getByName("debug")
         }
     }
 }
