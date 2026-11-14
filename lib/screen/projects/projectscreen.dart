@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:buildtrack_mobile/common/tour_targets.dart';
 import 'package:buildtrack_mobile/design/design.dart';
 import 'package:buildtrack_mobile/common/themes/app_colors.dart';
@@ -510,8 +511,27 @@ class _ProjectPhoto extends StatelessWidget {
   Widget build(BuildContext context) {
     final url = photo;
     if (url == null || url.isEmpty) return _placeholder(context);
+
+    if (url.startsWith('data:image/') && url.contains(';base64,')) {
+      try {
+        final b64 = url.split(';base64,').last;
+        return Image.memory(
+          base64Decode(b64),
+          fit: BoxFit.cover,
+          gaplessPlayback: true,
+          errorBuilder: (_, _, _) => _placeholder(context),
+        );
+      } catch (_) {
+        return _placeholder(context);
+      }
+    }
+
+    final resolved = url.startsWith('http')
+        ? url
+        : '${ApiService.baseUrl.replaceAll('/api', '')}/${url.replaceFirst(RegExp(r'^/+'), '')}';
+
     return Image.network(
-      url.startsWith('http') ? url : '${ApiService.baseUrl.replaceAll('/api', '')}$url',
+      resolved,
       fit: BoxFit.cover,
       gaplessPlayback: true,
       errorBuilder: (_, _, _) => _placeholder(context),

@@ -28,17 +28,40 @@ jobs:
       - run: yes | flutter doctor --android-licenses
       
       - run: flutter pub get
-      - run: flutter build apk --release
+      - name: Build Flutter APK
+        run: flutter build apk --release --build-number=${{ github.run_number }}
+      
+      - name: Generate Version Metadata
+        run: |
+          VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //' | cut -d '+' -f 1 | tr -d '[:space:]')
+          cat <<EOF > version.json
+          {
+            "version": "$VERSION",
+            "buildNumber": ${{ github.run_number }},
+            "downloadUrl": "https://github.com/Nurofin-Quantum-HQ/Build-Track-App/releases/latest/download/app-release.apk",
+            "releaseNotes": "Latest updates and enhancements for BuildTrack.",
+            "forceUpdate": false,
+            "publishedAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          }
+          EOF
+          cat version.json
       
       - uses: actions/upload-artifact@v4
         with:
           name: release-apk
           path: build/app/outputs/flutter-apk/app-release.apk
 
+      - uses: actions/upload-artifact@v4
+        with:
+          name: version-metadata
+          path: version.json
+
       - name: Update Latest Release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: latest
           name: Latest Release
-          files: build/app/outputs/flutter-apk/app-release.apk
+          files: |
+            build/app/outputs/flutter-apk/app-release.apk
+            version.json
           prerelease: false

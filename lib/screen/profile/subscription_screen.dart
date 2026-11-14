@@ -58,7 +58,7 @@ const _plans = [
   _PlanInfo(
     plan: SubscriptionPlan.starter,
     title: 'Starter',
-    price: '₹2',
+    price: '₹499',
     period: '/month',
     tagline: 'For small teams just getting started.',
     features: [

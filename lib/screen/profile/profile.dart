@@ -19,6 +19,8 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 
 import 'package:buildtrack_mobile/common/utils/image_pick_helper.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:buildtrack_mobile/services/app_update_service.dart';
 import 'package:showcaseview/showcaseview.dart';
 import 'package:buildtrack_mobile/controller/showcase_keys.dart';
 import 'package:buildtrack_mobile/screen/profile/change_password_sheet.dart';
@@ -76,11 +78,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final GlobalKey _settingsCardKey = GlobalKey();
   final GlobalKey _teamAccessKey = GlobalKey();
   final GlobalKey _logoutKey = GlobalKey();
+  String _appVersion = '';
+  int _appBuildNumber = 0;
   @override
   void initState() {
     super.initState();
     _fetchProfile();
     _loadNotificationPrefs();
+    _loadAppVersion();
+  }
+  Future<void> _loadAppVersion() async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+      if (mounted) {
+        setState(() {
+          _appVersion = info.version;
+          _appBuildNumber = int.tryParse(info.buildNumber) ?? 0;
+        });
+      }
+    } catch (_) {}
   }
   Future<void> _loadNotificationPrefs() async {
     final prefs = await ApiService.getNotificationPreferences();
@@ -437,9 +453,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     child: Text('Delete Account…', style: BtText.caption(context, color: Bt.red, weight: FontWeight.w500)),
                   ),
                 const Spacer(),
-                Padding(
-                  padding: const EdgeInsets.only(right: 4),
-                  child: Text('BUILDTRACK VERSION 2.4.0 (2024)', style: BtText.mono(context)),
+                InkWell(
+                  onTap: () => AppUpdateService.checkAndPrompt(context, forceCheck: true),
+                  borderRadius: BorderRadius.circular(6),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          _appVersion.isNotEmpty
+                              ? 'BUILDTRACK v$_appVersion (#$_appBuildNumber)'
+                              : 'BUILDTRACK',
+                          style: BtText.mono(context),
+                        ),
+                        const SizedBox(width: 4),
+                        const Icon(Icons.refresh_rounded, size: 12, color: Bt.ink3),
+                      ],
+                    ),
+                  ),
                 ),
               ]),
             ],
