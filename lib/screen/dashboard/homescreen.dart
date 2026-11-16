@@ -1652,6 +1652,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
     double gBudget = 0;
     double gSpent = 0;
     double gRev = 0;
+    double gMoneyOut = 0;
     double gProg = 0;
     if (_isGlobalView) {
       for (var p in provider.projects) {
@@ -1661,6 +1662,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
         final local = provider.totalSpentForProject(p.id);
         gSpent += local > p.spentAmount ? local : p.spentAmount;
         gRev += p.totalIncome;
+        gMoneyOut += p.totalMoneyOut;
         gProg += p.progress;
       }
       if (provider.projects.isNotEmpty) gProg /= provider.projects.length;
@@ -1680,9 +1682,8 @@ class _AdminDashboardState extends State<_AdminDashboard> {
     // Project revenue failed to load and nothing was loaded before: don't
     // show ₹0 / a fake loss.
     final revenueUnknown = !_isGlobalView && project != null && _revenueError && _revenueEntries.isEmpty;
-    // Project view: money out isn't a site cost (excluded from entries), so it's
-    // subtracted here. Global view uses the server totals, whose cost includes it.
-    final netCash = _isGlobalView ? revenue - spent : revenue - _moneyOutSum - spent;
+    // Net cash flow: Revenue Inflow - Money Out (Financing/Refunds) - Site Cost Spent
+    final netCash = _isGlobalView ? revenue - gMoneyOut - spent : revenue - _moneyOutSum - spent;
     final isLoss = netCash < 0;
     final progress = _isGlobalView ? gProg : (project?.progress ?? 0.0);
     final usedPct = budget > 0 ? (spent / budget) : 0.0;

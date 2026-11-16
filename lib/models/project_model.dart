@@ -576,6 +576,7 @@ class ProjectModel {
   final double totalBudget;
   final double spentAmount;
   final double totalIncome;
+  final double totalMoneyOut;
   final DateTime startDate;
   final String location;
   final String? clientName;
@@ -621,6 +622,7 @@ class ProjectModel {
     required this.totalBudget,
     required this.spentAmount,
     this.totalIncome = 0.0,
+    this.totalMoneyOut = 0.0,
     required this.startDate,
     required this.location,
     this.clientName,
@@ -667,6 +669,7 @@ class ProjectModel {
     double? totalBudget,
     double? spentAmount,
     double? totalIncome,
+    double? totalMoneyOut,
     DateTime? startDate,
     String? location,
     String? clientName,
@@ -715,6 +718,7 @@ class ProjectModel {
       totalBudget: totalBudget ?? this.totalBudget,
       spentAmount: spentAmount ?? this.spentAmount,
       totalIncome: totalIncome ?? this.totalIncome,
+      totalMoneyOut: totalMoneyOut ?? this.totalMoneyOut,
       startDate: startDate ?? this.startDate,
       location: location ?? this.location,
       clientName: clientName ?? this.clientName,
@@ -786,6 +790,7 @@ class ProjectModel {
       'progress': progress,
       'spentAmount': spentAmount,
       'totalIncome': totalIncome,
+      'totalMoneyOut': totalMoneyOut,
       'totalBudget': totalBudget,
       'startDate': startDate.toIso8601String(),
       'dates': {
@@ -1000,6 +1005,7 @@ class ProjectModel {
       progress: parsedProgress,
       spentAmount: (j['spentAmount'] as num?)?.toDouble() ?? 0.0,
       totalIncome: (j['totalIncome'] as num?)?.toDouble() ?? 0.0,
+      totalMoneyOut: (j['totalMoneyOut'] as num?)?.toDouble() ?? 0.0,
       totalBudget:
           (j['totalBudget'] as num?)?.toDouble() ??
           (budget?['total'] as num?)?.toDouble() ??
