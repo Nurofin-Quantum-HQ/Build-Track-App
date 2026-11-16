@@ -151,8 +151,8 @@ class ReportProvider extends ChangeNotifier {
     );
   }
   String _fmt(double v) {
-    if (v >= 10000000) return '${(v / 10000000).toStringAsFixed(1)}Cr';
-    if (v >= 100000) return '${(v / 100000).toStringAsFixed(1)}L';
+    if (v >= 10000000) return '${(v / 10000000).toStringAsFixed(2).replaceAll(RegExp(r'\.?0+$'), '')}Cr';
+    if (v >= 100000) return '${(v / 100000).toStringAsFixed(2).replaceAll(RegExp(r'\.?0+$'), '')}L';
     if (v >= 1000) return '${(v / 1000).toStringAsFixed(1)}K';
     return v.toStringAsFixed(0);
   }

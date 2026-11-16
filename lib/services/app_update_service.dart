@@ -74,10 +74,13 @@ class AppUpdateService {
 
       AppUpdateInfo? remoteInfo;
 
-      // Try primary release asset URL first
+      // Try primary release asset URL first with cache-busting timestamp
       try {
-        final res = await http.get(Uri.parse(_primaryUrl)).timeout(
-              const Duration(seconds: 5),
+        final cacheBusterUri = Uri.parse(
+          '$_primaryUrl?t=${DateTime.now().millisecondsSinceEpoch}',
+        );
+        final res = await http.get(cacheBusterUri).timeout(
+              const Duration(seconds: 12),
             );
         if (res.statusCode == 200) {
           final data = jsonDecode(res.body) as Map<String, dynamic>;
@@ -87,7 +90,33 @@ class AppUpdateService {
         debugPrint('[AppUpdateService] Primary check failed: $e');
       }
 
-      // Try raw github fallback if primary asset failed
+      // Try GitHub Releases API fallback if primary asset failed
+      if (remoteInfo == null) {
+        try {
+          final res = await http.get(
+            Uri.parse('https://api.github.com/repos/Nurofin-Quantum-HQ/Build-Track-App/releases/latest'),
+            headers: {'User-Agent': 'BuildTrack-App', 'Accept': 'application/vnd.github.v3+json'},
+          ).timeout(const Duration(seconds: 10));
+          if (res.statusCode == 200) {
+            final data = jsonDecode(res.body) as Map<String, dynamic>;
+            final assets = (data['assets'] as List?) ?? [];
+            final versionAsset = assets.firstWhere(
+              (a) => (a['name'] as String?) == 'version.json',
+              orElse: () => null,
+            );
+            if (versionAsset != null && versionAsset['browser_download_url'] != null) {
+              final vRes = await http.get(Uri.parse(versionAsset['browser_download_url'] as String)).timeout(const Duration(seconds: 10));
+              if (vRes.statusCode == 200) {
+                remoteInfo = AppUpdateInfo.fromJson(jsonDecode(vRes.body) as Map<String, dynamic>);
+              }
+            }
+          }
+        } catch (e) {
+          debugPrint('[AppUpdateService] API fallback failed: $e');
+        }
+      }
+
+      // Try raw github fallback as last resort
       if (remoteInfo == null) {
         try {
           final res = await http.get(Uri.parse(_fallbackUrl)).timeout(
@@ -165,7 +194,7 @@ class AppUpdateService {
     return false;
   }
 
-  /// Check whether we should prompt the user right now (respects 24h snooze).
+  /// Check whether we should prompt the user right now (respects 1h snooze).
   static Future<bool> shouldPrompt(AppUpdateInfo info) async {
     if (info.forceUpdate) return true;
     final prefs = await SharedPreferences.getInstance();
@@ -173,10 +202,11 @@ class AppUpdateService {
     final lastPromptMillis = prefs.getInt(_prefLastPromptTime) ?? 0;
     final nowMillis = DateTime.now().millisecondsSinceEpoch;
 
-    // If already dismissed this exact build and within 24h, skip
+    // If already dismissed this exact build and within 1 hour, snooze briefly.
+    // If a newer build is released or 1 hour has passed, prompt again.
     if (dismissedBuild == info.buildNumber) {
       final hoursPassed = (nowMillis - lastPromptMillis) / (1000 * 60 * 60);
-      if (hoursPassed < 24) return false;
+      if (hoursPassed < 1) return false;
     }
     return true;
   }

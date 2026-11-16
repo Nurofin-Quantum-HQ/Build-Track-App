@@ -9,10 +9,10 @@ String formatCurrency(num amount) {
   final String prefix = isNegative ? '-₹' : '₹';
 
   if (absAmount >= 10000000) {
-    return '$prefix${(absAmount / 10000000).toStringAsFixed(1).replaceAll(RegExp(r'\.0$'), '')}Cr';
+    return '$prefix${(absAmount / 10000000).toStringAsFixed(2).replaceAll(RegExp(r'\.?0+$'), '')}Cr';
   }
   if (absAmount >= 100000) {
-    return '$prefix${(absAmount / 100000).toStringAsFixed(1).replaceAll(RegExp(r'\.0$'), '')}L';
+    return '$prefix${(absAmount / 100000).toStringAsFixed(2).replaceAll(RegExp(r'\.?0+$'), '')}L';
   }
   if (absAmount >= 1000) {
     return '$prefix${(absAmount / 1000).toStringAsFixed(1).replaceAll(RegExp(r'\.0$'), '')}K';

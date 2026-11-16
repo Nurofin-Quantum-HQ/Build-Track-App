@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:buildtrack_mobile/common/tour_targets.dart';
 import 'package:buildtrack_mobile/common/themes/app_colors.dart';
 import 'package:buildtrack_mobile/models/task_model.dart';
@@ -103,7 +104,7 @@ class _HomeScreenContent extends StatefulWidget {
   @override
   State<_HomeScreenContent> createState() => _HomeScreenContentState();
 }
-class _HomeScreenContentState extends State<_HomeScreenContent> {
+class _HomeScreenContentState extends State<_HomeScreenContent> with WidgetsBindingObserver {
   /// Home tour steps in the order they appear on screen (top → bottom, then
   /// the bottom dock left → right). Only keys whose widgets are mounted right
   /// now are used — the admin cards don't exist on the supervisor / mason
@@ -132,10 +133,12 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
   }
 
   bool _tourChecked = false;
+  Timer? _updateCheckTimer;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       // Gently check for updates after the dashboard mounts
       Future.delayed(const Duration(seconds: 2), () {
@@ -144,6 +147,28 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
         }
       });
     });
+
+    // Check periodically (every 10 minutes) while the app is active
+    _updateCheckTimer = Timer.periodic(const Duration(minutes: 10), (_) {
+      if (mounted) {
+        AppUpdateService.checkAndPrompt(context);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _updateCheckTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted) {
+      // Check for updates automatically whenever user switches back to the app
+      AppUpdateService.checkAndPrompt(context);
+    }
   }
 
   void _checkTour(ProjectProvider provider) {

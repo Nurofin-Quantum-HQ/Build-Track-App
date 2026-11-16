@@ -18,7 +18,7 @@ String formatInr(num? v, {bool compact = false}) {
 }
 
 String _trim(num x) {
-  final str = x >= 100 ? x.toStringAsFixed(0) : x >= 10 ? x.toStringAsFixed(1) : x.toStringAsFixed(2);
+  final str = x >= 100 ? x.toStringAsFixed(0) : x.toStringAsFixed(2);
   return str.contains('.') ? str.replaceFirst(RegExp(r'\.?0+$'), '') : str;
 }
 
