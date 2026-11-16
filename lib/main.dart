@@ -50,6 +50,8 @@ import 'package:buildtrack_mobile/screen/profile/payment_webview_screen.dart';
 import 'package:buildtrack_mobile/screen/approvals/approvals_screen.dart';
 import 'package:buildtrack_mobile/screen/inventory/fulfillment_payment_screen.dart';
 import 'package:buildtrack_mobile/services/push_notification_service.dart';
+import 'package:buildtrack_mobile/common/help_assistant/help_assistant_provider.dart';
+import 'package:buildtrack_mobile/screen/help/help_screen.dart';
 
 import 'package:buildtrack_mobile/services/auth_service.dart';
 import 'package:buildtrack_mobile/config/navigator_key.dart';
@@ -112,6 +114,7 @@ void main() {
             ChangeNotifierProvider(create: (_) => SubscriptionProvider()),
             ChangeNotifierProvider(create: (_) => InventoryProvider()),
             ChangeNotifierProvider(create: (_) => ThemeProvider()),
+            ChangeNotifierProvider(create: (_) => HelpAssistantProvider()),
           ],
           child: MyApp(isLoggedIn: hasToken),
         ),
@@ -268,6 +271,7 @@ class MyApp extends StatelessWidget {
         '/add-labour': (_) => const AddLabourScreen(),
         '/add-equipment': (_) => const AddEquipmentScreen(),
         '/fulfillment-payment': (_) => const FulfillmentPaymentScreen(),
+        '/help': (_) => const HelpScreen(),
       },
       onGenerateRoute: (settings) {
         final name = settings.name ?? '';

@@ -214,7 +214,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent> with WidgetsBind
         if (mounted) {
           final keysToShow = _getShowcaseKeys();
           if (keysToShow.isNotEmpty) {
-            ShowCaseWidget.of(context).startShowCase(keysToShow);
+            ShowcaseView.get().startShowCase(keysToShow);
           }
         }
       });
@@ -294,6 +294,15 @@ class _HomeScreenContentState extends State<_HomeScreenContent> with WidgetsBind
                 }
               },
             ),
+          ),
+          const SizedBox(width: 6),
+          BtIconButton(
+            icon: Icons.support_agent_rounded,
+            semantic: 'Help Assistant Chatbot',
+            size: 21,
+            color: context.bt.accent,
+            background: context.bt.accent.withValues(alpha: .15),
+            onTap: () => Navigator.pushNamed(context, '/help'),
           ),
           const SizedBox(width: 6),
           Showcase(
