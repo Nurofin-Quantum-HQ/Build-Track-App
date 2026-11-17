@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:buildtrack_mobile/design/design.dart';
 import 'package:buildtrack_mobile/common/help_assistant/help_assistant_provider.dart';
 import 'package:buildtrack_mobile/common/help_assistant/help_knowledge_base.dart';
+import 'package:buildtrack_mobile/bug_report/bug_report_flow.dart';
 
 class HelpScreen extends StatefulWidget {
   const HelpScreen({super.key});
@@ -72,56 +73,105 @@ class _HelpScreenState extends State<HelpScreen> {
               child: Icon(Icons.smart_toy_rounded, color: bt.onAccent, size: 18),
             ),
             const SizedBox(width: 10),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text(
-                      'BuildTrack Assistant',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                      decoration: BoxDecoration(
-                        color: bt.accent.withValues(alpha: 0.16),
-                        borderRadius: BorderRadius.circular(4),
-                        border: Border.all(color: bt.accent.withValues(alpha: 0.3)),
-                      ),
-                      child: Text(
-                        'HELP',
-                        style: TextStyle(
-                          color: bt.accent,
-                          fontSize: 9,
-                          fontWeight: FontWeight.w800,
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Flexible(
+                        child: Text(
+                          'BuildTrack Assistant',
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
-                    ),
-                  ],
-                ),
-                const Text(
-                  'Step-by-step help for all features',
-                  style: TextStyle(
-                    color: Colors.white54,
-                    fontSize: 11,
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                        decoration: BoxDecoration(
+                          color: bt.accent.withValues(alpha: 0.16),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: bt.accent.withValues(alpha: 0.3)),
+                        ),
+                        child: Text(
+                          'HELP',
+                          style: TextStyle(
+                            color: bt.accent,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-              ],
+                  Text(
+                    provider.currentLanguageObj.subtitle,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white54,
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded, color: Colors.white70, size: 22),
-            tooltip: 'Reset Conversation',
-            onPressed: () => provider.resetChat(),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+            child: InkWell(
+              onTap: () {
+                _inputCtrl.clear();
+                provider.resetChat();
+                ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Row(
+                      children: [
+                        Icon(Icons.restart_alt_rounded, color: bt.accent, size: 18),
+                        const SizedBox(width: 8),
+                        const Text('Conversation reset. Started a new chat.'),
+                      ],
+                    ),
+                    duration: const Duration(seconds: 2),
+                    behavior: SnackBarBehavior.floating,
+                    backgroundColor: const Color(0xFF1E2430),
+                  ),
+                );
+              },
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.restart_alt_rounded, size: 15, color: Colors.white70),
+                    const SizedBox(width: 4),
+                    const Text(
+                      'Reset',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
           const SizedBox(width: 4),
         ],
@@ -129,6 +179,67 @@ class _HelpScreenState extends State<HelpScreen> {
       body: SafeArea(
         child: Column(
           children: [
+            // ── Small Language Switcher Option at Top ──
+            Container(
+              height: 38,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              decoration: const BoxDecoration(
+                color: Color(0xFF0E1117),
+                border: Border(bottom: BorderSide(color: Color(0x1FFFFFFF), width: 1)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.language_rounded, size: 15, color: bt.accent),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Language:',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.65),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: HelpAssistantProvider.supportedLanguages.length,
+                      separatorBuilder: (context, index) => const SizedBox(width: 5),
+                      itemBuilder: (context, idx) {
+                        final lang = HelpAssistantProvider.supportedLanguages[idx];
+                        final active = provider.selectedLanguage == lang.code;
+                        return InkWell(
+                          onTap: () => provider.setLanguage(lang.code),
+                          borderRadius: BorderRadius.circular(12),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: active
+                                  ? bt.accent.withValues(alpha: 0.22)
+                                  : Colors.white.withValues(alpha: 0.05),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: active ? bt.accent : Colors.white.withValues(alpha: 0.1),
+                              ),
+                            ),
+                            child: Text(
+                              lang.nativeName,
+                              style: TextStyle(
+                                color: active ? bt.accent : Colors.white70,
+                                fontSize: 11,
+                                fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
             // ── Category Filters Carousel ──
             Container(
               height: 44,
@@ -214,7 +325,10 @@ class _HelpScreenState extends State<HelpScreen> {
                               Icon(Icons.auto_awesome, color: bt.accent, size: 13),
                               const SizedBox(width: 5),
                               Text(
-                                topic.title,
+                                HelpKnowledgeBase.getLocalizedTopic(
+                                  topic,
+                                  provider.selectedLanguage,
+                                ).title,
                                 style: TextStyle(
                                   color: Colors.white.withValues(alpha: 0.85),
                                   fontSize: 11,
@@ -268,7 +382,7 @@ class _HelpScreenState extends State<HelpScreen> {
                                 errorBorder: InputBorder.none,
                                 disabledBorder: InputBorder.none,
                                 contentPadding: const EdgeInsets.symmetric(vertical: 12),
-                                hintText: 'Ask anything (e.g. how to add project, csv)...',
+                                hintText: provider.currentLanguageObj.placeholder,
                                 hintStyle: TextStyle(
                                   color: Colors.white.withValues(alpha: 0.4),
                                   fontSize: 13,
@@ -554,7 +668,11 @@ class _HelpScreenState extends State<HelpScreen> {
                   style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
                 ),
                 onPressed: () {
-                  Navigator.pushNamed(context, topic.route);
+                  if (topic.id == 'report_problem') {
+                    BugReportFlow.open(trigger: 'help_assistant');
+                  } else {
+                    Navigator.pushNamed(context, topic.route);
+                  }
                 },
               ),
             ),

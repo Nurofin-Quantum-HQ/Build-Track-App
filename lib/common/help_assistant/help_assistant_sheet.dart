@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:buildtrack_mobile/design/design.dart';
 import 'help_assistant_provider.dart';
 import 'help_knowledge_base.dart';
+import 'package:buildtrack_mobile/bug_report/bug_report_flow.dart';
 
 class HelpAssistantSheet extends StatefulWidget {
   final VoidCallback? onReplayTour;
@@ -142,7 +143,7 @@ class _HelpAssistantSheetState extends State<HelpAssistantSheet> {
                             ],
                           ),
                           Text(
-                            'Step-by-step help for all features',
+                            provider.currentLanguageObj.subtitle,
                             style: TextStyle(
                               color: Colors.white.withValues(alpha: 0.5),
                               fontSize: 11,
@@ -152,29 +153,120 @@ class _HelpAssistantSheetState extends State<HelpAssistantSheet> {
                       ),
                     ),
 
-                    // Visual Tour Button
-                    if (widget.onReplayTour != null)
-                      IconButton(
-                        icon: Icon(Icons.explore_rounded, color: bt.accent, size: 20),
-                        tooltip: 'Visual Tour',
-                        onPressed: () {
-                          Navigator.pop(context);
-                          widget.onReplayTour?.call();
-                        },
+                    // Reset conversation / New Chat
+                    InkWell(
+                      onTap: () {
+                        _inputCtrl.clear();
+                        provider.resetChat();
+                        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Row(
+                              children: [
+                                Icon(Icons.restart_alt_rounded, color: bt.accent, size: 18),
+                                const SizedBox(width: 8),
+                                const Text('Conversation reset. Started a new chat.'),
+                              ],
+                            ),
+                            duration: const Duration(seconds: 2),
+                            behavior: SnackBarBehavior.floating,
+                            backgroundColor: const Color(0xFF1E2430),
+                          ),
+                        );
+                      },
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.restart_alt_rounded, size: 14, color: Colors.white70),
+                            const SizedBox(width: 4),
+                            const Text(
+                              'Reset',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-
-                    // Reset conversation
-                    IconButton(
-                      icon: Icon(Icons.refresh_rounded, color: Colors.white.withValues(alpha: 0.7), size: 20),
-                      tooltip: 'Reset Conversation',
-                      onPressed: () => provider.resetChat(),
                     ),
+                    const SizedBox(width: 4),
 
                     // Close Sheet
                     IconButton(
                       icon: Icon(Icons.close_rounded, color: Colors.white.withValues(alpha: 0.8), size: 22),
                       tooltip: 'Close',
                       onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+              ),
+
+              // ── Small Language Switcher Option at Top ──
+              Container(
+                height: 38,
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                decoration: const BoxDecoration(
+                  color: Color(0xFF0C0E12),
+                  border: Border(bottom: BorderSide(color: Color(0x1FFFFFFF), width: 1)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.language_rounded, size: 15, color: bt.accent),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Language:',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.65),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: HelpAssistantProvider.supportedLanguages.length,
+                        separatorBuilder: (context, index) => const SizedBox(width: 5),
+                        itemBuilder: (context, idx) {
+                          final lang = HelpAssistantProvider.supportedLanguages[idx];
+                          final active = provider.selectedLanguage == lang.code;
+                          return InkWell(
+                            onTap: () => provider.setLanguage(lang.code),
+                            borderRadius: BorderRadius.circular(12),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: active
+                                    ? bt.accent.withValues(alpha: 0.22)
+                                    : Colors.white.withValues(alpha: 0.05),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: active ? bt.accent : Colors.white.withValues(alpha: 0.1),
+                                ),
+                              ),
+                              child: Text(
+                                lang.nativeName,
+                                style: TextStyle(
+                                  color: active ? bt.accent : Colors.white70,
+                                  fontSize: 11,
+                                  fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
                     ),
                   ],
                 ),
@@ -267,8 +359,14 @@ class _HelpAssistantSheetState extends State<HelpAssistantSheet> {
                                 Icon(Icons.auto_awesome, color: bt.accent, size: 13),
                                 const SizedBox(width: 5),
                                 Text(
-                                  topic.title,
-                                  style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 11),
+                                  HelpKnowledgeBase.getLocalizedTopic(
+                                    topic,
+                                    provider.selectedLanguage,
+                                  ).title,
+                                  style: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.85),
+                                    fontSize: 11,
+                                  ),
                                 ),
                               ],
                             ),
@@ -318,7 +416,7 @@ class _HelpAssistantSheetState extends State<HelpAssistantSheet> {
                                   errorBorder: InputBorder.none,
                                   disabledBorder: InputBorder.none,
                                   contentPadding: const EdgeInsets.symmetric(vertical: 12),
-                                  hintText: 'Ask anything (e.g. how to add project, csv)...',
+                                  hintText: provider.currentLanguageObj.placeholder,
                                   hintStyle: TextStyle(
                                     color: Colors.white.withValues(alpha: 0.4),
                                     fontSize: 13,
@@ -606,7 +704,11 @@ class _HelpAssistantSheetState extends State<HelpAssistantSheet> {
                 ),
                 onPressed: () {
                   Navigator.pop(context);
-                  Navigator.pushNamed(context, topic.route);
+                  if (topic.id == 'report_problem') {
+                    BugReportFlow.open(trigger: 'help_assistant');
+                  } else {
+                    Navigator.pushNamed(context, topic.route);
+                  }
                 },
               ),
             ),
