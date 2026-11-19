@@ -113,25 +113,21 @@ class _LoginScreenState extends State<LoginScreen> {
       mainAxisSize: MainAxisSize.min,
       children: [
         ClipRRect(
-          borderRadius: BorderRadius.circular(10),
-          child: Container(
-            color: Colors.white,
-            padding: const EdgeInsets.all(4),
-            child: Image.asset(
+          borderRadius: BorderRadius.circular(8),
+          child: Image.asset(
+            'assets/images/buildtrack-logo.png',
+            width: 36,
+            height: 36,
+            fit: BoxFit.contain,
+            errorBuilder: (context, error, stackTrace) => Image.network(
               'assets/images/buildtrack-logo.png',
-              width: 30,
-              height: 30,
+              width: 36,
+              height: 36,
               fit: BoxFit.contain,
-              errorBuilder: (context, error, stackTrace) => Image.network(
-                'assets/images/buildtrack-logo.png',
-                width: 30,
-                height: 30,
-                fit: BoxFit.contain,
-              ),
             ),
           ),
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: 12),
         Text('BuildTrack', style: BtText.d3(context, color: Bt.bone)),
       ],
     );
@@ -294,8 +290,24 @@ class _LoginScreenState extends State<LoginScreen> {
       children: [
         const SizedBox(height: 12),
         _buildPoweredByNurofin(),
-        const SizedBox(height: 6),
-        Text('PRIVACY POLICY · TERMS OF SERVICE', style: BtText.mono(context)),
+        const SizedBox(height: 8),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            GestureDetector(
+              onTap: () => Navigator.pushNamed(context, '/privacy-policy'),
+              child: Text(
+                'PRIVACY POLICY',
+                style: BtText.mono(context).copyWith(
+                  decoration: TextDecoration.underline,
+                  color: context.bt.accent,
+                ),
+              ),
+            ),
+            Text(' · ', style: BtText.mono(context)),
+            Text('TERMS OF SERVICE', style: BtText.mono(context)),
+          ],
+        ),
       ],
     );
   }

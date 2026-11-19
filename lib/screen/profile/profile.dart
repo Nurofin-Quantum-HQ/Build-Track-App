@@ -24,6 +24,7 @@ import 'package:buildtrack_mobile/services/app_update_service.dart';
 import 'package:showcaseview/showcaseview.dart';
 import 'package:buildtrack_mobile/controller/showcase_keys.dart';
 import 'package:buildtrack_mobile/screen/profile/change_password_sheet.dart';
+import 'package:buildtrack_mobile/screen/profile/privacy_policy_screen.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:buildtrack_mobile/bug_report/bug_report_flow.dart';
 import 'package:buildtrack_mobile/bug_report/shake_service.dart';
@@ -438,6 +439,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           await launchUrl(url, mode: LaunchMode.externalApplication);
                         }
                       },
+                    ),
+                    BtRow(
+                      leading: const BtTile(icon: Icons.shield_outlined, size: 34),
+                      title: 'Privacy Policy',
+                      subtitle: 'DPDPA 2023 compliance & data rights',
+                      showChevron: true,
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const PrivacyPolicyScreen()),
+                      ),
                     ),
                   ]),
                 ]),

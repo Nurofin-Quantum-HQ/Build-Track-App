@@ -47,6 +47,7 @@ import 'package:provider/provider.dart';
 import 'package:buildtrack_mobile/controller/theme_provider.dart';
 import 'package:buildtrack_mobile/controller/user_session.dart';
 import 'package:buildtrack_mobile/screen/profile/payment_webview_screen.dart';
+import 'package:buildtrack_mobile/screen/profile/privacy_policy_screen.dart';
 import 'package:buildtrack_mobile/screen/approvals/approvals_screen.dart';
 import 'package:buildtrack_mobile/screen/inventory/fulfillment_payment_screen.dart';
 import 'package:buildtrack_mobile/services/push_notification_service.dart';
@@ -237,6 +238,8 @@ class MyApp extends StatelessWidget {
       routes: {
         '/': (_) => const LoginScreen(),
         '/login': (_) => const LoginScreen(),
+        '/privacy': (_) => const PrivacyPolicyScreen(),
+        '/privacy-policy': (_) => const PrivacyPolicyScreen(),
         '/forgot-password': (_) => const ForgotPasswordScreen(),
         '/profile': (_) => const ProfileScreen(),
         '/edit-profile': (_) => const EditProfileScreen(),
