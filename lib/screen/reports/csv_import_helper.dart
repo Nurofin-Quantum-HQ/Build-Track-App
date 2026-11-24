@@ -541,6 +541,16 @@ class CsvImportHelper {
         final i = idx[f];
         return i != null && i < row.length ? _num(row[i]) : 0.0;
       }
+
+      // Automatically skip unchanged or summary calculation rows (Total, Net)
+      final actionVal = cell('action').toLowerCase();
+      if (actionVal == 'unchanged' || actionVal == 'summary' || actionVal == 'skip' || actionVal == 'skipped') {
+        continue;
+      }
+      final nameVal = cell('name').toLowerCase();
+      if (nameVal == 'total' || nameVal == 'net (in - out)' || nameVal == 'net' || nameVal.startsWith('total ')) {
+        continue;
+      }
       try {
         // ── project
         final projName = cell('project');

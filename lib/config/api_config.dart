@@ -9,6 +9,7 @@ class ApiConfig {
   static const String _override = String.fromEnvironment('API_BASE_URL');
   static String get baseUrl {
     if (_override.isNotEmpty) return _override;
-    return 'https://buildtrack-api.nurofin.com/api';
+    return 'http://localhost:5001/api';
+    //return 'https://buildtrack-api.nurofin.com/api';
   }
 }

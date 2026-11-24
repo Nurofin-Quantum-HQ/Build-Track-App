@@ -181,6 +181,21 @@ class MoneyExport {
   MoneyExport._();
 
   static const headers = ['Date', 'Description', 'Project', 'Type', 'In', 'Out', 'Balance', 'Paid', 'Remaining', 'Status'];
+  static const csvHeaders = [
+    'Transaction ID',
+    'Action',
+    'Date',
+    'Description',
+    'Project',
+    'Type',
+    'Amount',
+    'In',
+    'Out',
+    'Balance',
+    'Paid',
+    'Remaining',
+    'Status'
+  ];
 
   static String _dmy(DateTime? d) => d == null ? '' : '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
 
@@ -236,6 +251,26 @@ class MoneyExport {
   }
 
 
+  static List<String> _csvCells(MoneyRow m, String Function(EntryModel) statusOf, String Function(double) money) {
+    final l = m.ledger;
+    final e = m.entry;
+    return [
+      m.id,
+      'unchanged',
+      _dmy(l.date),
+      _safe(m.description),
+      _safe(l.projectName),
+      m.categoryLabel,
+      money(l.amount),
+      m.isIn ? money(l.amount) : '',
+      m.isIn ? '' : money(l.amount),
+      l.runningBalance == null ? '' : money(l.runningBalance!),
+      e == null ? '' : money(e.paidAmount),
+      e == null ? '' : money(e.remainingAmount),
+      m.statusLabel(statusOf),
+    ];
+  }
+
   /// The totals under the rows: In and Out of the shown rows, then their Net
   /// (in the Balance column, which is where the money left over reads).
   static List<List<String>> _totalRows(({double moneyIn, double moneyOut, double net}) t, String Function(double) money) => [
@@ -243,14 +278,19 @@ class MoneyExport {
         ['', 'Net (In - Out)', '', '', '', '', money(t.net), '', '', ''],
       ];
 
+  static List<List<String>> _csvTotalRows(({double moneyIn, double moneyOut, double net}) t, String Function(double) money) => [
+        ['', 'summary', '', 'Total', '', '', '', money(t.moneyIn), money(t.moneyOut), '', '', '', ''],
+        ['', 'summary', '', 'Net (In - Out)', '', '', '', '', '', money(t.net), '', '', ''],
+      ];
+
   static String toCsv(List<MoneyRow> rows, String Function(EntryModel) statusOf) {
     final t = MoneyTable.totals(rows);
-    final b = StringBuffer('﻿'); // BOM so Excel reads the rupee/UTF-8 text right
-    b.writeln(headers.map(_cell).join(','));
+    final b = StringBuffer('\uFEFF'); // BOM so Excel reads the rupee/UTF-8 text right
+    b.writeln(csvHeaders.map(_cell).join(','));
     for (final m in rows) {
-      b.writeln(_cells(m, statusOf, _money).map(_cell).join(','));
+      b.writeln(_csvCells(m, statusOf, _money).map(_cell).join(','));
     }
-    b.writeln(_totalRows(t, _money).expand((r) => [r.map(_cell).join(',')]).join('\n'));
+    b.writeln(_csvTotalRows(t, _money).expand((r) => [r.map(_cell).join(',')]).join('\n'));
     return b.toString();
   }
 
